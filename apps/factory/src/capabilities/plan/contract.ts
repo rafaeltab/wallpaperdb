@@ -1,5 +1,5 @@
 import { Context, type Effect } from 'effect';
-import type { Status, Unavailable } from '../job/index.js';
+import type { Status, Unavailable, RecoveryStatus } from '../job/index.js';
 export interface PlanningIssue {
   readonly number: number;
   readonly url: string;
@@ -15,6 +15,7 @@ export interface PlanningIssue {
   readonly joinRequired?: boolean;
   readonly recovery?: {
     readonly progress: string;
+    readonly active?: boolean;
     readonly classification?: 'SIMPLE' | 'COMPLEX';
     readonly threadId?: string;
     readonly question?: string;
@@ -95,14 +96,7 @@ export interface JobPool {
 }
 export const JobPool = Context.Service<JobPool>('wallpaperdb.factory.JobPool');
 export interface ScheduleStatus {
-  readonly recoveries?: readonly {
-    issue: number;
-    pr: string;
-    progress: string;
-    classification?: 'SIMPLE' | 'COMPLEX';
-    threadId?: string;
-    question?: string;
-  }[];
+  readonly recoveries?: readonly RecoveryStatus[];
   readonly state: ScheduleState;
   readonly jobs: readonly Status[];
 }

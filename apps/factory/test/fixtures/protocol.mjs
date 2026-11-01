@@ -68,7 +68,28 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
-  if (args[1] === 'start') {
+  if (args[0] === 'acp-mcp-call') {
+    console.log(
+      JSON.stringify({
+        structuredContent: {
+          thread: { latestRunId: state.thread.latestRunId },
+          items: [
+            {
+              itemId: 'restack-question',
+              runId: state.thread.latestRunId,
+              type: 'user_input_request',
+              status: 'waiting',
+              text: config.restack.question,
+              sourceThreadId: 'restacker',
+              visibility: 'local',
+            },
+          ],
+          hasMore: false,
+          nextPosition: null,
+        },
+      })
+    );
+  } else if (args[1] === 'start') {
     const prompt = args[3];
     const operation = prompt.match(/Operation ([a-f0-9]+)\./)[1];
     const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/).slice(1);
@@ -77,7 +98,12 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
     try {
       git(worktree, 'rebase', '--onto', onto, parent);
     } catch {
-      writeFileSync(join(worktree, 'shared.txt'), 'resolved D and C behavior');
+      writeFileSync(
+        join(worktree, 'shared.txt'),
+        config.restack.outcome === 'COMPLEX'
+          ? `export const behavior = () => 'resolved D and C behavior';`
+          : 'resolved D and C behavior'
+      );
       git(worktree, 'add', 'shared.txt');
       execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], {
         cwd: worktree,
@@ -104,7 +130,7 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       messages: [
         {
           role: 'assistant',
-          runId: 'resolve-run',
+          runId: config.restack.staleRun ? 'prior-run' : 'resolve-run',
           text:
             config.restack.question ??
             JSON.stringify({
@@ -123,6 +149,15 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
     );
   } else if (args[1] === 'send') {
+    if (config.restack.repair) {
+      writeFileSync(
+        join(state.thread.worktreePath, 'shared.txt'),
+        'resolved D and C after independent review'
+      );
+      git(state.thread.worktreePath, 'add', 'shared.txt');
+      git(state.thread.worktreePath, 'commit', '--amend', '--no-edit');
+      state.head = git(state.thread.worktreePath, 'rev-parse', 'HEAD');
+    }
     state.thread.runCount = 2;
     state.thread.latestRunId = 'review-run';
     state.messages = [

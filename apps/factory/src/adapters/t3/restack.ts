@@ -49,26 +49,32 @@ export function t3Restacker(
   const branch = `factory-restack/${operation.id}`;
   const call = async (args: string[], signal?: AbortSignal) =>
     JSON.parse(await command(config.binary, ['thread', ...args, '--json'], config.project, signal));
-  const observe = async (signal?: AbortSignal) => {
-    const matches = z
+  const discover = async (signal?: AbortSignal) =>
+    z
       .array(z.object({ threadId: z.string(), title: z.string() }))
       .parse(await call(['list', '--project', config.projectId], signal))
       .filter((item) => item.title === title);
+  const observe = async (signal?: AbortSignal) => {
+    const matches = await discover(signal);
     if (matches.length !== 1 || !matches[0]) return null;
     const observed = detail.parse(
       await call(['show', matches[0].threadId, '--messages', '1'], signal)
     );
-    const thread = observed.thread;
-    if (
-      thread.projectId !== config.projectId ||
-      thread.title !== title ||
-      thread.branch !== branch ||
-      thread.providerInstanceId !== 'codex' ||
-      thread.model !== 'gpt-6.1-sol' ||
-      !thread.worktreePath ||
-      thread.worktreePath === config.project
-    )
-      return null;
+    const binding = z
+      .object({
+        projectId: z.literal(config.projectId),
+        title: z.literal(title),
+        branch: z.literal(branch),
+        providerInstanceId: z.literal('codex'),
+        model: z.literal('gpt-6.1-sol'),
+        worktreePath: z
+          .string()
+          .min(1)
+          .refine((path) => path !== config.project),
+      })
+      .safeParse(observed.thread);
+    if (!binding.success) return null;
+    const thread = binding.data;
     const actualBranch = (
       await command('git', ['branch', '--show-current'], thread.worktreePath, signal)
     ).trim();
@@ -81,15 +87,18 @@ export function t3Restacker(
     if (await git(['status', '--porcelain'])) return null;
     const head = sha.parse(await git(['rev-parse', 'HEAD']));
     await git(['merge-base', '--is-ancestor', operation.onto, head]);
-    if (await git(['rev-list', '--merges', `${operation.onto}..${head}`])) return null;
+    return (await validComparison(git, head)) ? head : null;
+  };
+  const validComparison = async (git: (args: string[]) => Promise<string>, head: string) => {
+    if (await git(['rev-list', '--merges', `${operation.onto}..${head}`])) return false;
     const count = await git(['rev-list', '--count', `${operation.onto}..${head}`]);
     if (
       count === '0' ||
       count !== (await git(['rev-list', '--count', `${operation.parent}..${operation.oldHead}`]))
     )
-      return null;
-    if (!(await git(['diff', '--name-only', operation.onto, head]))) return null;
-    return head;
+      return false;
+    if (!(await git(['diff', '--name-only', operation.onto, head]))) return false;
+    return true;
   };
   const receipt = (
     observed: z.infer<typeof detail>,
@@ -97,16 +106,27 @@ export function t3Restacker(
     commit: string
   ) => {
     const { thread, messages } = observed;
-    const message = messages.at(-1);
-    if (
-      thread.status !== 'completed' ||
-      thread.pendingRequestCount ||
-      thread.runCount < (phase === 'resolve' ? 1 : 2) ||
-      !thread.latestRunId ||
-      message?.role !== 'assistant' ||
-      message.runId !== thread.latestRunId
-    )
-      return null;
+    const terminal = z
+      .object({
+        status: z.literal('completed'),
+        pendingRequestCount: z.literal(0),
+        runCount: z
+          .number()
+          .int()
+          .min(phase === 'resolve' ? 1 : 2),
+        latestRunId: z.string().min(1),
+      })
+      .safeParse(thread);
+    if (!terminal.success) return null;
+    const current = z
+      .object({
+        role: z.literal('assistant'),
+        runId: z.literal(terminal.data.latestRunId),
+        text: z.string(),
+      })
+      .safeParse(messages.at(-1));
+    if (!current.success) return null;
+    const message = current.data;
     try {
       return z
         .object({
@@ -124,50 +144,80 @@ export function t3Restacker(
     }
   };
   const prompt = `Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the full issue, comments, PR and parent spec; preserve all retained scope and user decisions below. Start with git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX and will require a separate review-loop before CI. Unknown/incomplete work must never claim success. On completion return only JSON {"operation":"${operation.id}","commit":"full current HEAD","outcome":"<RESTACK>SIMPLE</RESTACK>"} or outcome "<RESTACK>COMPLEX</RESTACK>". Context:\n${operation.context}`;
+  const ensureLaunch = async (signal?: AbortSignal) => {
+    let observed = await observe(signal);
+    if (!observed) {
+      if ((await discover(signal)).length) return null;
+      if (await journal.write('launch.json', operation)) {
+        await call(
+          [
+            'start',
+            config.projectId,
+            prompt,
+            '--title',
+            title,
+            '--provider',
+            'codex',
+            '--model',
+            'gpt-6.1-sol',
+            '--worktree',
+            operation.oldHead,
+            '--branch',
+            branch,
+          ],
+          signal
+        );
+      }
+      observed = await observe(signal);
+    }
+    return observed;
+  };
+  const question = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
+    if (!observed.thread.pendingRequestCount) return undefined;
+    if (!config.mcpEndpoint) return 'Open recovery thread to answer the pending question';
+    return (
+      await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal)
+    ).question?.text;
+  };
+  const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => ({
+    progress: `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`,
+    threadId: observed.thread.threadId,
+    active: observed.thread.pendingRequestCount === 0,
+    question: await question(observed, signal),
+  });
+  const savedResolution = async (
+    saved: unknown,
+    observed: z.infer<typeof detail>,
+    head: string
+  ) => {
+    const accepted = z
+      .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
+      .safeParse(saved);
+    if (accepted.success) return accepted.data;
+    if ((await journal.read('review-delivery.json')) && receipt(observed, 'review', head))
+      return { commit: head, classification: 'COMPLEX' as const };
+    return { progress: 'Recovery head changed; incomplete' };
+  };
+  const acceptResolution = async (observed: z.infer<typeof detail>, head: string) => {
+    const accepted = receipt(observed, 'resolve', head);
+    if (!accepted) return {};
+    const classification =
+      accepted.outcome === '<RESTACK>SIMPLE</RESTACK>' ? ('SIMPLE' as const) : ('COMPLEX' as const);
+    const result = { commit: head, classification };
+    await journal.write('resolution.json', {
+      ...result,
+      threadId: observed.thread.threadId,
+      runId: observed.thread.latestRunId,
+      ordinal: observed.thread.runCount,
+      operation: operation.id,
+    });
+    return result;
+  };
   const execution = {
     resolve: async (signal?: AbortSignal) => {
-      let observed = await observe(signal);
-      if (!observed) {
-        if (await journal.write('launch.json', operation)) {
-          await call(
-            [
-              'start',
-              config.projectId,
-              prompt,
-              '--title',
-              title,
-              '--provider',
-              'codex',
-              '--model',
-              'gpt-6.1-sol',
-              '--worktree',
-              operation.oldHead,
-              '--branch',
-              branch,
-            ],
-            signal
-          );
-        }
-        observed = await observe(signal);
-      }
+      const observed = await ensureLaunch(signal);
       if (!observed) return { progress: 'Recovery launch pending reconciliation' };
-      const progress = `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`;
-      const display = {
-        progress,
-        threadId: observed.thread.threadId,
-        question: observed.thread.pendingRequestCount
-          ? config.mcpEndpoint
-            ? (
-                await pendingQuestion(
-                  config,
-                  observed.thread.threadId,
-                  observed.thread.latestRunId,
-                  signal
-                )
-              ).question?.text
-            : 'Open recovery thread to answer the pending question'
-          : undefined,
-      };
+      const display = await presentation(observed, signal);
       const saved = await journal.read('resolution.json');
       if (observed.thread.status !== 'completed' || observed.thread.pendingRequestCount) {
         const parsed = z.object({ classification: z.enum(['SIMPLE', 'COMPLEX']) }).safeParse(saved);
@@ -178,31 +228,12 @@ export function t3Restacker(
       }
       const head = await currentHead(observed, signal);
       if (!head) return display;
-      if (saved) {
-        const accepted = z
-          .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
-          .safeParse(saved);
-        return accepted.success
-          ? { ...accepted.data, ...display }
-          : (await journal.read('review-delivery.json')) && receipt(observed, 'review', head)
-            ? { commit: head, classification: 'COMPLEX' as const, ...display }
-            : { progress: 'Recovery head changed; incomplete' };
-      }
-      const accepted = receipt(observed, 'resolve', head);
-      if (!accepted) return display;
-      const classification =
-        accepted.outcome === '<RESTACK>SIMPLE</RESTACK>'
-          ? ('SIMPLE' as const)
-          : ('COMPLEX' as const);
-      await journal.write('resolution.json', {
-        commit: head,
-        classification,
-        threadId: observed.thread.threadId,
-        runId: observed.thread.latestRunId,
-        ordinal: observed.thread.runCount,
-        operation: operation.id,
-      });
-      return { commit: head, classification, ...display };
+      return {
+        ...display,
+        ...(saved
+          ? await savedResolution(saved, observed, head)
+          : await acceptResolution(observed, head)),
+      };
     },
     review: async (commit: string, signal?: AbortSignal) => {
       const observed = await observe(signal);

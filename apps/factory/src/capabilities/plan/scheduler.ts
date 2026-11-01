@@ -28,10 +28,16 @@ const slots = (state: ScheduleState, jobs: readonly Status[]) =>
       (state.resuming ?? []).some((claim) => claim.issue === state.admissions[index]?.issue)
     )
   ).length;
-const available = (state: ScheduleState, jobs: readonly Status[]) =>
-  !state.paused &&
-  (state.allowance === -1 || state.admissions.length < state.allowance) &&
-  (state.concurrency === -1 || slots(state, jobs) < state.concurrency);
+const recoverySlots = (snapshot: ScheduleStatus) =>
+  (snapshot.recoveries ?? []).filter((item) => item.active !== false).length;
+const available = (snapshot: ScheduleStatus) => {
+  const { state, jobs } = snapshot;
+  return (
+    !state.paused &&
+    (state.allowance === -1 || state.admissions.length < state.allowance) &&
+    (state.concurrency === -1 || slots(state, jobs) + recoverySlots(snapshot) < state.concurrency)
+  );
+};
 export const SchedulerLive = Layer.effect(
   Scheduler,
   Effect.gen(function* () {
@@ -67,10 +73,10 @@ export const SchedulerLive = Layer.effect(
       });
     const reserve = (command: Start, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
-        const { state, jobs } = snapshot;
+        const { state } = snapshot;
         if (state.admissions.some((a) => a.issue === command.issue)) return false;
         // Empty reserved jobs still occupy capacity until reconciled. Never release an uncertain launch.
-        if (!available(state, jobs)) return false;
+        if (!available(snapshot)) return false;
         return yield* store.save({
           ...state,
           revision: state.revision + 1,
@@ -185,7 +191,7 @@ export const SchedulerLive = Layer.effect(
           if (!eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }))
             return { kind: 'rejected' as const };
           const before = yield* status();
-          if (!available(before.state, before.jobs)) return { kind: 'occupied' as const };
+          if (!available(before)) return { kind: 'occupied' as const };
           issue = yield* prepareIssue(command.issue, before.jobs, issue);
           const snapshot = yield* status();
           if (!dispatchable(issue, snapshot.jobs)) return { kind: 'rejected' as const };
@@ -197,7 +203,7 @@ export const SchedulerLive = Layer.effect(
         Effect.gen(function* () {
           yield* reconcile();
           const snapshot = yield* status();
-          if (!available(snapshot.state, snapshot.jobs)) return snapshot;
+          if (!available(snapshot)) return snapshot;
           const input = yield* source.read();
           const normalized = {
             ...input,
@@ -290,7 +296,7 @@ function resumeCapacity(target: Status, snapshot: ScheduleStatus) {
   return (
     active(target) ||
     snapshot.state.concurrency === -1 ||
-    slots(snapshot.state, snapshot.jobs) < snapshot.state.concurrency
+    slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) < snapshot.state.concurrency
   );
 }
 function plannedStart(
@@ -356,7 +362,7 @@ function dispatchable(
 }
 
 function currentDispatch(snapshot: ScheduleStatus, revision: number) {
-  return snapshot.state.revision === revision && available(snapshot.state, snapshot.jobs);
+  return snapshot.state.revision === revision && available(snapshot);
 }
 
 function joinPreview(preview: Preview) {

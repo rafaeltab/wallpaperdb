@@ -4,6 +4,7 @@ export interface Resolution {
   readonly classification?: 'SIMPLE' | 'COMPLEX';
   readonly commit?: string;
   readonly progress: string;
+  readonly active?: boolean;
   readonly threadId?: string;
   readonly question?: string;
 }

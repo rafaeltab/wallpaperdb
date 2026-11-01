@@ -9,6 +9,7 @@ import {
   ScheduleStore,
   JobPool,
   type PlanningIssue,
+  type ScheduleStatus,
 } from '../src/capabilities/plan/index.js';
 import { Issues, type Job, type Status } from '../src/capabilities/job/index.js';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
@@ -31,6 +32,7 @@ function fixture() {
   const store = controlledScheduleStore();
   const snapshot = () => Effect.runSync(store.read());
   const preparations: number[] = [];
+  let recoveries: NonNullable<ScheduleStatus['recoveries']> = [];
   let prepared = false;
   let reconciliation: () => void = () => {};
   let duringPlan: (() => void) | undefined;
@@ -122,6 +124,7 @@ function fixture() {
   };
   const deps = Layer.mergeAll(
     Layer.succeed(Issues, {
+      recoveries: () => Effect.sync(() => recoveries),
       reconcile: () => Effect.sync(() => reconciliation()),
       prepare: (number) =>
         Effect.sync(() => {
@@ -182,6 +185,9 @@ function fixture() {
   );
   return {
     runtime,
+    setRecoveries: (values: NonNullable<ScheduleStatus['recoveries']>) => {
+      recoveries = values;
+    },
     statuses,
     launches,
     resumed,
@@ -693,6 +699,41 @@ it('reconciles an existing join while its prerequisite CI wait occupies the last
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([3, 5]);
     expect(f.snapshot().admissions.map((item) => item.issue)).toEqual([3, 5]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('counts conflict recovery against concurrency and releases parked or verified recovery without another admission', async () => {
+  const f = fixture();
+  try {
+    const scheduler = await f.runtime.runPromise(Scheduler);
+    f.setRecoveries([
+      {
+        issue: 4,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+        progress: 'Awaiting CI',
+        active: true,
+      },
+    ]);
+    expect(await f.runtime.runPromise(scheduler.start({ issue: 1, base, context: '' }))).toEqual({
+      kind: 'occupied',
+    });
+    await f.runtime.runPromise(scheduler.tick(base));
+    expect(f.launches).toEqual([]);
+    f.setRecoveries([
+      {
+        issue: 4,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+        progress: 'Question in T3',
+        active: false,
+      },
+    ]);
+    await f.runtime.runPromise(scheduler.start({ issue: 1, base, context: '' }));
+    expect(f.launches).toEqual([1]);
+    expect(
+      (await f.runtime.runPromise(scheduler.status())).state.admissions.map((a) => a.issue)
+    ).toEqual([1]);
   } finally {
     await f.runtime.dispose();
   }

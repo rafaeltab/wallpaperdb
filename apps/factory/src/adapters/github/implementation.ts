@@ -109,7 +109,7 @@ export function githubIssues(config: {
     const context = await joinContext(numbers, signal);
     const { assertions, pending, bound } = context;
     if (prepare) await recover(numbers, context, signal);
-    const replay = bound ? ((await joins?.evidence(numbers)) ?? []) : [];
+    const replay = bound ? ((await joins?.evidence(numbers, signal)) ?? []) : [];
     const effective = replayAssertions(assertions, replay);
     const readiness = await prerequisiteReadiness(
       { ...config, prerequisites: effective },
@@ -172,12 +172,23 @@ export function githubIssues(config: {
     };
   }
   return {
+    reconcile: () =>
+      Effect.tryPromise({
+        try: (signal) => joins?.reconcile(signal) ?? Promise.resolve(),
+        catch: (cause) => new Unavailable({ operation: 'reconcile-prerequisite-joins', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.github.joins.reconcile')
+      ),
     pullRequest: (intent) =>
       Effect.gen(function* () {
         const replay = yield* Effect.tryPromise({
-          try: () => joins?.replayFor(intent.issue) ?? Promise.resolve(null),
+          try: (signal) => joins?.replayFor(intent.issue, signal) ?? Promise.resolve(null),
           catch: (cause) => new Unavailable({ operation: 'replay-publication', cause }),
-        });
+        }).pipe(
+          Effect.tapError((error) => Effect.logError(error)),
+          Effect.withSpan('factory.github.replay-publication')
+        );
         const observed = yield* publication(
           gh,
           replay?.target ?? targetBase(intent.prBase, config.prBase)

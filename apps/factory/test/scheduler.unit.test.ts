@@ -32,6 +32,7 @@ function fixture() {
   const snapshot = () => Effect.runSync(store.read());
   const preparations: number[] = [];
   let prepared = false;
+  let reconciliation: () => void = () => {};
   let duringPlan: (() => void) | undefined;
   const statuses = new Map<number, Status>();
   const launches: number[] = [];
@@ -121,6 +122,7 @@ function fixture() {
   };
   const deps = Layer.mergeAll(
     Layer.succeed(Issues, {
+      reconcile: () => Effect.sync(() => reconciliation()),
       prepare: (number) =>
         Effect.sync(() => {
           preparations.push(number);
@@ -184,6 +186,9 @@ function fixture() {
     launches,
     resumed,
     preparations,
+    onReconcile: (callback: () => void) => {
+      reconciliation = callback;
+    },
     prepareSucceeds: () => {
       prepared = true;
     },
@@ -659,6 +664,35 @@ it('rejects cyclic join proposals before preparing any branches', async () => {
     expect(f.preparations).toEqual([]);
     expect(f.launches).toEqual([]);
     expect(f.snapshot().admissions).toEqual([]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('reconciles an existing join while its prerequisite CI wait occupies the last slot', async () => {
+  const f = fixture();
+  try {
+    f.setIssues([issue(3)]);
+    await f.run((s) => s.configure({ revision: -1, concurrency: 1, allowance: -1, paused: false }));
+    await f.run((s) => s.tick(base));
+    const c = f.statuses.get(3);
+    if (c?.kind !== 'job') throw new Error('Missing C job');
+    const ready = {
+      ...c,
+      delivery: { stage: 'ci' as const, commit: base, ready: true, landed: false },
+    };
+    f.statuses.set(3, ready);
+    f.setIssues([{ ...issue(5), blockers: [3, 4], blockersReady: false, joinRequired: true }]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([3]);
+    f.statuses.set(3, { ...ready, delivery: { ...ready.delivery, ready: false } });
+    f.onReconcile(() => {
+      f.statuses.set(3, ready);
+      f.prepareSucceeds();
+    });
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([3, 5]);
+    expect(f.snapshot().admissions.map((item) => item.issue)).toEqual([3, 5]);
   } finally {
     await f.runtime.dispose();
   }

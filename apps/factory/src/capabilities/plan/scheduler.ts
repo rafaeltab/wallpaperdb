@@ -75,6 +75,7 @@ export const SchedulerLive = Layer.effect(
       });
     const reconcile = () =>
       Effect.gen(function* () {
+        yield* issues.reconcile?.() ?? Effect.void;
         const state = yield* store.read();
         for (const admission of state.admissions) {
           const job = yield* pool.job(admission.issue);

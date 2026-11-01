@@ -52,7 +52,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
   else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');
   else if (args[0] === 'api' && args[1].includes('dependencies'))
     result = [
-      [
+      state.blockers ?? [
         { number: 3, state: 'open' },
         { number: 4, state: 'open' },
       ],
@@ -81,10 +81,16 @@ if (config.join && basename(process.argv[1]) === 'gh') {
     if (args[1] === 'list') result = [result];
   } else if (args[0] === 'pr' && args[1] === 'edit')
     state.prs[String(number)].base = flag('--base');
-  else if (args[0] === 'stack' && args[1] === 'link')
+  else if (
+    args[0] === 'api' &&
+    args.includes('POST') &&
+    args.includes('repos/rafaeltab/wallpaperdb/stacks')
+  )
     state.members = state.corruptGrouping
       ? []
-      : args.filter((value) => value.startsWith('https://'));
+      : args
+          .filter((value) => value.startsWith('pull_requests[]='))
+          .map((value) => `https://github.com/rafaeltab/wallpaperdb/pull/${value.split('=')[1]}`);
   else if (args[0] === 'api' && args.includes('POST')) state.members = [];
   else if (args[0] === 'api' && args[1].includes('/stacks'))
     result = state.members.length
@@ -96,7 +102,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
         ]
       : [];
   const boundary =
-    args[0] === 'stack'
+    args.includes('repos/rafaeltab/wallpaperdb/stacks') && args.includes('POST')
       ? 'group'
       : args[0] === 'pr' && args[1] === 'edit'
         ? 'base'

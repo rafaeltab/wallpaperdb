@@ -17,7 +17,22 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       projectId: 'project-id',
     });
     const input = {
-      issues: [],
+      issues: [
+        {
+          number: 580,
+          url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+          title: 'Large spec context',
+          body: 'x'.repeat(150000),
+          author: 'rafaeltab',
+          open: true,
+          labels: ['ready-for-agent'],
+          comments: [],
+          blockers: [],
+          parents: [],
+          blockersReady: true,
+          prerequisiteEvidence: '',
+        },
+      ],
       job: { kind: 'empty' as const },
       capacity: { concurrency: 1 as const, admission: 1 as const },
     };

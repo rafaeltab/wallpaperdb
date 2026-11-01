@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { Effect } from 'effect';
+import { z } from 'zod';
 import { fileStore } from '../src/adapters/store/index.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -71,6 +72,23 @@ it('a fresh process reconciles publication after a lost response without repeati
       kind: 'job',
       execution: { kind: 'found', threadId: 'thread-live' },
     });
+    const scheduler = z
+      .object({ state: z.object({ revision: z.number() }) })
+      .parse(await (await fetch(origin + '/api/scheduler')).json());
+    expect(
+      (
+        await fetch(origin + '/api/scheduler', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            revision: scheduler.state.revision,
+            concurrency: 3,
+            allowance: -1,
+            paused: true,
+          }),
+        })
+      ).ok
+    ).toBe(true);
     await host.save({
       complete: true,
       base: host.base,
@@ -94,6 +112,9 @@ it('a fresh process reconciles publication after a lost response without repeati
     await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
     child = launch();
     await ready();
+    expect(await (await fetch(origin + '/api/scheduler')).json()).toMatchObject({
+      state: { concurrency: 3, allowance: -1, paused: true, admissions: [{ issue: 577 }] },
+    });
     const recovered = await fetch(origin + '/api/job');
     expect(await recovered.json()).toMatchObject({
       kind: 'job',

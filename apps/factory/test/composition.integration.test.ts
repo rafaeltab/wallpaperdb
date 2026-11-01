@@ -129,3 +129,66 @@ it('continues admitted work through publication without an operations-page obser
     await host.cleanup();
   }
 });
+
+it('continuously admits a validated semantic plan through production adapters without page traffic', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const candidate = {
+    number: 581,
+    title: 'Scheduler',
+    body: 'Implement scheduler',
+    state: 'OPEN',
+    url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+    author: { login: 'rafaeltab' },
+    labels: [{ name: 'ready-for-agent' }],
+    comments: [],
+  };
+  await host.save({
+    planning: { issues: [candidate] },
+    planner: {
+      proposal: {
+        selected: [
+          { issue: 581, reason: 'Thin end-to-end experiment', dependsOn: [], conflicts: [] },
+        ],
+        deferred: [],
+      },
+    },
+  });
+  try {
+    const running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: `${host.directory}/state`,
+      FACTORY_PORT: '0',
+    });
+    try {
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await host.calls()).filter(
+              (c) => c.args[1] === 'start' && c.args.includes('--worktree')
+            )
+          ).toHaveLength(1),
+        { timeout: 10000, interval: 30 }
+      );
+      const status = (await running.app.inject('/api/scheduler')).json();
+      expect(status).toMatchObject({
+        state: { concurrency: 1, allowance: 1, paused: false, admissions: [{ issue: 581 }] },
+        jobs: [{ kind: 'job', execution: { kind: 'found', threadId: 'thread-live' } }],
+      });
+      const plannerInput = JSON.parse(await readFile(join(host.directory, 'planner.json'), 'utf8'));
+      expect(JSON.stringify(plannerInput)).toContain('Implement scheduler');
+    } finally {
+      await running.close();
+    }
+  } finally {
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

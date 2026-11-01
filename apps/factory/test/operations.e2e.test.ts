@@ -236,6 +236,9 @@ it('previews automatically discovered work without starting an implementation wo
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
       await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.getByLabel('Pause admissions').check();
+      await page.getByRole('button', { name: 'Save scheduler controls' }).click();
+      await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
       await page.getByRole('button', { name: 'Generate plan preview' }).click();
       await browserExpect(page.locator('#plan')).toContainText('Validated advisory proposal');
       await browserExpect(page.locator('#plan')).toContainText('#580: Thin end-to-end experiment');
@@ -256,5 +259,74 @@ it('previews automatically discovered work without starting an implementation wo
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;
     await host.cleanup();
+  }
+});
+
+it('edits durable scheduler limits and pauses admissions while an existing job continues', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const recording = await mkdtemp(join(tmpdir(), 'factory-581-demo-'));
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 960, height: 900 },
+    recordVideo: { dir: recording, size: { width: 960, height: 900 } },
+  });
+  try {
+    const running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: `${host.directory}/state`,
+      FACTORY_PORT: '0',
+    });
+    try {
+      const page = await context.newPage();
+      const address = running.app.server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing listener');
+      await page.goto(`http://127.0.0.1:${address.port}`);
+      await browserExpect(page.getByLabel('Concurrency')).toHaveValue('1');
+      await browserExpect(page.getByLabel('Distinct issue allowance')).toHaveValue('1');
+      await page.getByLabel('Selected issue number').fill('581');
+      await page.getByRole('button', { name: 'Start selected issue' }).click();
+      await browserExpect(page.getByText('Status: running')).toBeVisible();
+      await page.getByLabel('Concurrency').fill('3');
+      await page.getByLabel('Distinct issue allowance').fill('-1');
+      await page.getByLabel('Pause admissions').check();
+      await page.getByRole('button', { name: 'Save scheduler controls' }).click();
+      await browserExpect(page.getByText('Admissions: 1. Admissions paused.')).toBeVisible();
+      await browserExpect(page.getByText('Status: running')).toBeVisible();
+      await page.reload();
+      await browserExpect(page.getByLabel('Concurrency')).toHaveValue('3');
+      await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
+      await browserExpect(page.getByRole('link', { name: 'Open T3 thread' })).toHaveAttribute(
+        'href',
+        't3-thread://v1/thread-live'
+      );
+      await page.getByLabel('Concurrency').fill('-1');
+      await page.getByLabel('Pause admissions').uncheck();
+      await page.getByRole('button', { name: 'Save scheduler controls' }).click();
+      await browserExpect(page.getByText('Admissions: 1. Admissions enabled.')).toBeVisible();
+      await browserExpect(page.getByLabel('Concurrency')).toHaveValue('-1');
+      await browserExpect(page.getByText('Status: running')).toBeVisible();
+      const launches = (await host.calls()).filter(
+        (c) => c.args[1] === 'start' && c.args.includes('--worktree')
+      );
+      expect(launches).toHaveLength(1);
+    } finally {
+      await running.close();
+    }
+  } finally {
+    await context.close();
+    await browser.close();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+    process.stdout.write(`Controlled GitHub/T3 protocol scheduler demo recording: ${recording}\n`);
   }
 });

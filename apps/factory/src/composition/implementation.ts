@@ -1,10 +1,27 @@
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
-import { Execution, Issues, Job, JobLive, JobStore, Time } from '../capabilities/job/index.js';
+import {
+  Execution,
+  Issues,
+  Job,
+  JobLive,
+  JobStore,
+  Time,
+  Unavailable,
+} from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
-import { fileStore } from '../adapters/store/index.js';
-import { Plan, PlanLive, PlanningSource, IPlanner } from '../capabilities/plan/index.js';
+import { fileStore, fileScheduleStore } from '../adapters/store/index.js';
+import {
+  Plan,
+  PlanLive,
+  PlanningSource,
+  IPlanner,
+  Scheduler,
+  SchedulerLive,
+  JobPool,
+  ScheduleStore,
+} from '../capabilities/plan/index.js';
 import { githubIssues, githubPlanning } from '../adapters/github/index.js';
 import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
@@ -71,36 +88,87 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   );
   if (!help.includes('--worktree') || !help.includes('--model'))
     throw new Error('T3 installation lacks required headless thread interface');
-  const deps = Layer.mergeAll(
-    Layer.succeed(Time, systemTime),
-    Layer.succeed(JobStore, fileStore(configuration.FACTORY_STATE)),
-    Layer.succeed(
-      Issues,
-      githubIssues({
-        project,
-        prBase: configuration.FACTORY_PR_BASE,
-        base: configuration.FACTORY_BASE,
-        prerequisites: configuration.FACTORY_PREREQUISITES,
-      })
-    ),
-    Layer.succeed(
-      Execution,
-      t3Execution({
-        project,
-        prBase: configuration.FACTORY_PR_BASE,
-        projectId: configuration.FACTORY_T3_PROJECT_ID,
-        binary: configuration.FACTORY_T3_BINARY,
-        mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-        mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-      })
-    )
-  );
+  const jobDeps = (directory: string) =>
+    Layer.mergeAll(
+      Layer.succeed(Time, systemTime),
+      Layer.succeed(JobStore, fileStore(directory)),
+      Layer.succeed(
+        Issues,
+        githubIssues({
+          project,
+          prBase: configuration.FACTORY_PR_BASE,
+          base: configuration.FACTORY_BASE,
+          prerequisites: configuration.FACTORY_PREREQUISITES,
+        })
+      ),
+      Layer.succeed(
+        Execution,
+        t3Execution({
+          project,
+          prBase: configuration.FACTORY_PR_BASE,
+          projectId: configuration.FACTORY_T3_PROJECT_ID,
+          binary: configuration.FACTORY_T3_BINARY,
+          mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+          mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+        })
+      )
+    );
+  const deps = jobDeps(configuration.FACTORY_STATE);
   const jobLayer = JobLive.pipe(Layer.provide(deps));
+  const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
+  const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
+  const legacy = await Effect.runPromise(fileStore(configuration.FACTORY_STATE).read());
+  if (legacy) {
+    const state = await Effect.runPromise(scheduleStore.read());
+    if (!state.admissions.some((a) => a.issue === legacy.issue))
+      await Effect.runPromise(
+        scheduleStore.save({
+          ...state,
+          revision: state.revision + 1,
+          admissions: [
+            ...state.admissions,
+            { issue: legacy.issue, base: legacy.base, context: legacy.context },
+          ],
+        })
+      );
+  }
+  let rootIssue = legacy?.issue;
+  const pool: JobPool = {
+    job: (issue) =>
+      Effect.tryPromise({
+        try: async () => {
+          let worker = workers.get(issue);
+          if (!worker) {
+            rootIssue ??= issue;
+            worker = ManagedRuntime.make(
+              JobLive.pipe(
+                Layer.provide(
+                  jobDeps(
+                    rootIssue === issue
+                      ? configuration.FACTORY_STATE
+                      : resolve(configuration.FACTORY_STATE, `issue-${issue}`)
+                  )
+                )
+              )
+            );
+            workers.set(issue, worker);
+          }
+          return worker.runPromise(Job);
+        },
+        catch: (cause) => new Unavailable({ operation: 'job-runtime', cause }),
+      }),
+  };
+
+  const schedulerDeps = Layer.mergeAll(
+    deps,
+    Layer.succeed(ScheduleStore, scheduleStore),
+    Layer.succeed(JobPool, pool)
+  );
   const planningDeps = Layer.mergeAll(
     Layer.effect(
       PlanningSource,
-      Effect.map(Job, (job) =>
-        githubPlanning(
+      Effect.map(Job, (job) => {
+        const source = githubPlanning(
           {
             project,
             base: configuration.FACTORY_BASE,
@@ -108,8 +176,26 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             prerequisites: configuration.FACTORY_PREREQUISITES,
           },
           job
-        )
-      )
+        );
+        return {
+          read: () =>
+            Effect.gen(function* () {
+              const input = yield* source.read();
+              const state = yield* scheduleStore.read();
+              const jobs = [];
+              for (const admission of state.admissions)
+                jobs.push(yield* (yield* pool.job(admission.issue)).status());
+              return {
+                ...input,
+                jobs,
+                scheduleRevision: state.revision,
+                admissions: state.admissions.map((a) => a.issue),
+                paused: state.paused,
+                capacity: { concurrency: state.concurrency, admission: state.allowance },
+              };
+            }),
+        };
+      })
     ),
     Layer.succeed(
       IPlanner,
@@ -121,16 +207,25 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     )
   ).pipe(Layer.provideMerge(jobLayer));
   const runtime = ManagedRuntime.make(
-    PlanLive.pipe(
-      Layer.provideMerge(planningDeps),
+    SchedulerLive.pipe(
+      Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
+      Layer.provideMerge(schedulerDeps),
       Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
     )
   );
-  const job = await runtime.runPromise(Job);
+  const scheduler = await runtime.runPromise(Scheduler);
+  const job: Job = {
+    status: () =>
+      Effect.map(scheduler.status(), (value) => value.jobs[0] ?? { kind: 'empty' as const }),
+    start: (command) => scheduler.start(command),
+    resume: (command) => scheduler.resume(command),
+    cancel: (id) => scheduler.cancel(id),
+  };
   const requests = new AbortController();
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
     job,
+    scheduler,
     plan: await runtime.runPromise(Plan),
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
@@ -146,6 +241,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     } finally {
       requests.abort();
       await runtime.dispose();
+      await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }
     throw cause;
   }
@@ -154,9 +250,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const observationTimer = setInterval(() => {
     if (observing) return;
     observing = runtime
-      .runPromise(job.status().pipe(Effect.catch((error) => Effect.logError(error))), {
-        signal: requests.signal,
-      })
+      .runPromise(
+        scheduler
+          .tick(configuration.FACTORY_BASE)
+          .pipe(Effect.catch((error) => Effect.logError(error))),
+        {
+          signal: requests.signal,
+        }
+      )
       .finally(() => {
         observing = undefined;
       });
@@ -177,6 +278,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         requests.abort();
         await observing?.catch(() => undefined);
         await runtime.dispose();
+        await Promise.all([...workers.values()].map((worker) => worker.dispose()));
       }
     })());
   return { app, close };

@@ -15,7 +15,7 @@ if (mcpSend) {
 }
 const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
-if (config.planning && basename(process.argv[1]) === 'gh') {
+if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   if (args[1] === 'list')
     reply(
       (config.planning.candidates ?? config.planning.issues.map((i) => i.number)).map((number) => ({
@@ -35,13 +35,18 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
     reply(
       config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context
     );
-} else if (config.planner && args[1] === 'start' && !args.includes('--help')) {
+} else if (
+  config.planner &&
+  args[1] === 'start' &&
+  !args.includes('--help') &&
+  !args.includes('--worktree')
+) {
   const prompt = args[3] === '-' ? readFileSync(0, 'utf8') : args[3];
   const request = JSON.parse(prompt.split('Request: ')[1]);
   writeFileSync(join(config.directory, 'planner.json'), JSON.stringify(request));
   if (config.planner.lostStart) process.exit(1);
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
-} else if (config.planner && args[1] === 'show') {
+} else if (config.planner && args[1] === 'show' && args[2] === 'planner-thread') {
   const { requestId } = JSON.parse(readFileSync(join(config.directory, 'planner.json'), 'utf8'));
   reply({
     thread: {

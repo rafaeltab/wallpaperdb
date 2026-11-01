@@ -19,12 +19,21 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
       base: host.base,
       context: 'Read only',
+      prerequisiteEvidence:
+        'Verified prerequisite issue 573, PR 591, reviewed and CI-passing commit ' + host.base,
       branch: 'factory/job-1',
       createdAt: 100,
       expectedStage: 'implementation',
     };
     expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'absent' });
     expect(await Effect.runPromise(adapter.launch(intent))).toEqual({ kind: 'uncertain' });
+    const starts = (await host.calls()).filter(
+      (call) => call.args[1] === 'start' && call.args.includes('--worktree')
+    );
+    expect(starts).toHaveLength(1);
+    expect(starts[0].args[3]).toContain(
+      `Read only\nVerified prerequisite evidence: ${intent.prerequisiteEvidence}\n`
+    );
     expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
       kind: 'found',
       threadId: 'thread-live',

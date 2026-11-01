@@ -113,7 +113,7 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
     const head = git(worktree, 'rev-parse', 'HEAD');
     state = {
       thread: {
-        threadId: 'restacker',
+        threadId: config.restack.responseThreadId ?? 'restacker',
         projectId: 'project-id',
         title: flag('--title'),
         branch: flag('--branch'),

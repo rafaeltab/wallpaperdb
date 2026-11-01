@@ -63,6 +63,7 @@ export function t3Restacker(
     );
     const binding = z
       .object({
+        threadId: z.literal(matches[0].threadId),
         projectId: z.literal(config.projectId),
         title: z.literal(title),
         branch: z.literal(branch),

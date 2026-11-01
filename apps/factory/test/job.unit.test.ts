@@ -16,6 +16,7 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
           open: true,
           author: 'rafaeltab',
           labels: ['ready-for-agent'],
+          blockers: [],
           blockersReady: true,
           url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
         }),

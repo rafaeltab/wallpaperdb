@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect';
-import { Unavailable } from '../job/index.js';
+import { Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
@@ -46,13 +46,7 @@ function selectionReason(
   if (excluded) return excluded;
   if (cyclic(item.issue)) return 'Cyclic explicit dependencies';
   if (duplicates) return 'Duplicate issue in proposal';
-  if (
-    issue.blockers.some((number) =>
-      (input.jobs ?? []).some(
-        (job) => job.kind === 'job' && job.intent.issue === number && !job.delivery?.ready
-      )
-    )
-  )
+  if (locallyBlocked(issue.blockers, input.jobs ?? []))
     return 'Prerequisite job is active or parked';
   return semanticReason(item, input);
 }
@@ -147,4 +141,10 @@ function comparable(input: PlanningInput) {
 
 function knownJobs(input: PlanningInput) {
   return [input.job, ...(input.jobs ?? [])];
+}
+
+export function locallyBlocked(blockers: readonly number[], jobs: readonly Status[]) {
+  return blockers.some((number) =>
+    jobs.some((job) => job.kind === 'job' && job.intent.issue === number && !job.delivery?.ready)
+  );
 }

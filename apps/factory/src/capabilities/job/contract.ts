@@ -77,6 +77,8 @@ export interface Issues {
       open: boolean;
       author: string;
       labels: readonly string[];
+      /** Complete explicit blocking issue identities, including native and fallback edges. */
+      blockers: readonly number[];
       blockersReady: boolean;
       url: string;
     },

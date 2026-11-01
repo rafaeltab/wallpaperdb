@@ -53,13 +53,19 @@ export interface Plan {
 }
 export const Plan = Context.Service<Plan>('wallpaperdb.factory.Plan');
 
+export interface ResumeClaim {
+  readonly issue: number;
+  readonly index: number;
+  readonly questionId: string;
+  readonly run?: { readonly id: string; readonly ordinal: number };
+}
 export interface ScheduleState {
   readonly revision: number;
   readonly concurrency: number;
   readonly allowance: number;
   readonly paused: boolean;
   /** Durable active-slot claims for uncertain resumption, without another distinct admission. */
-  readonly resuming?: readonly number[];
+  readonly resuming?: readonly ResumeClaim[];
   /** Distinct reservations are permanent, including uncertain starts. */
   readonly admissions: readonly import('../job/index.js').Start[];
 }

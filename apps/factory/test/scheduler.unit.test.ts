@@ -126,6 +126,7 @@ function fixture() {
             open: candidate?.open ?? false,
             author: candidate?.author ?? '',
             labels: candidate?.labels ?? [],
+            blockers: candidate?.blockers ?? [],
             blockersReady: candidate?.blockersReady ?? false,
             url: issue(number).url,
           };
@@ -451,17 +452,58 @@ it('retains an uncertain resumed slot across recovery until the existing job is 
         ...f.snapshot(),
         revision: f.snapshot().revision + 1,
         allowance: -1,
-        resuming: [1],
+        resuming: [{ issue: 1, index: 0, questionId: 'q', run: { id: 'run-1', ordinal: 1 } }],
       })
     );
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([1]);
-    expect(await f.run((s) => s.resume({ jobId: '1', index: 0, questionId: 'q' }))).toMatchObject({
-      kind: 'job',
-      delivery: { active: true },
+    f.statuses.set(1, {
+      ...first,
+      execution: {
+        kind: 'found',
+        threadId: 'thread-1',
+        status: 'running',
+        worktree: '/worker',
+        branch: first.intent.branch,
+        model: 'gpt-6.1-sol',
+        run: { id: 'run-2', ordinal: 2 },
+      },
     });
-    expect(f.snapshot().resuming).toEqual([]);
+    expect((await f.run((s) => s.status())).state.resuming).toEqual([]);
+    expect(f.resumed).toEqual([]);
     expect(f.snapshot().admissions).toHaveLength(1);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('does not manually admit a dependent of parked work even with claimed prerequisite readiness', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 1, allowance: -1, paused: false }));
+    await f.run((s) => s.start({ issue: 1, base, context: '' }));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing first job');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        active: false,
+        activity: 'awaiting-answer',
+        commit: base,
+        ready: false,
+        landed: false,
+      },
+    });
+    f.setIssues([issue(1), { ...issue(2), blockers: [1] }, issue(3)]);
+    expect(await f.run((s) => s.start({ issue: 2, base, context: '' }))).toEqual({
+      kind: 'rejected',
+    });
+    expect(f.launches).toEqual([1]);
+    expect(await f.run((s) => s.start({ issue: 3, base, context: '' }))).toMatchObject({
+      kind: 'job',
+    });
+    expect(f.launches).toEqual([1, 3]);
   } finally {
     await f.runtime.dispose();
   }

@@ -15,6 +15,7 @@ const facts = {
   open: true,
   author: 'rafaeltab',
   labels: ['ready-for-agent'],
+  blockers: [],
   blockersReady: true,
   url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
 };

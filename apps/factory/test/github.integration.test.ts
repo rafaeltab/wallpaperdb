@@ -14,6 +14,7 @@ it('translates external issue observations and rejects unverified or malformed d
       open: true,
       author: 'rafaeltab',
       labels: ['ready-for-agent'],
+      blockers: [],
       blockersReady: true,
       url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
     });
@@ -25,6 +26,11 @@ it('translates external issue observations and rejects unverified or malformed d
       await host.save({ body });
       expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
     }
+    await host.save({ blockers: [{ number: 573, state: 'open' }], body: 'Blocked by: #573, #574' });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({
+      blockers: [573, 574],
+      blockersReady: false,
+    });
     await host.save({ body: 'Parent: #573' });
     expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: true });
     const verified = githubIssues({

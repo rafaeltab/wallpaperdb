@@ -39,7 +39,40 @@ export async function freshWorker({
 	let state = load();
 	let observedStop;
 	const pending = state.admission && state.admission.status !== "published";
-	if (pending) assertAdmission(state, config);
+	if (pending) {
+		assertAdmission(state, config);
+		const admission = state.admission;
+		// A cleanup decision is durable. Active metadata cannot cancel a submitted
+		// stop, or turn a previously completed candidate into admitted work.
+		if (admission.shutdownAttempt) {
+			if (admission.candidate) {
+				const info = await json(["info", admission.candidate.id]);
+				const worker = info?.sandbox ?? info;
+				if (
+					worker?.id === admission.candidate.id &&
+					worker.name === admission.name &&
+					worker.type === admission.size &&
+					active(worker) &&
+					!admission.runningSince
+				) {
+					// Reactivation time is unknown. Charge conservatively from the completed
+					// observation and retain already settled charges and the original attempt.
+					admission.runningSince = Date.parse(
+						admission.shutdownAttempt.completion.observedAt,
+					);
+					admission.stopContradiction = {
+						workerId: worker.id,
+						status: workerState(worker),
+						observedAt: new Date().toISOString(),
+					};
+					persist(state);
+				}
+			}
+			throw new Error(
+				"Candidate stop obligation retained; no publication, bootstrap or new work admitted",
+			);
+		}
+	}
 	if (!pending && state.id) {
 		let info, error;
 		try {

@@ -1131,7 +1131,7 @@ if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  }
  console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
 }
-if(argv.includes('stop')&&argv.includes('fake-new-worker')){fs.writeFileSync(path.join(control,'candidate-stopped'),'yes');console.log('{}');process.exit(0);}
+if(argv.includes('stop')&&argv.includes('fake-new-worker')){if(fs.existsSync(path.join(control,'candidate-stop-uncertain')))process.exit(46);fs.writeFileSync(path.join(control,'candidate-stopped'),'yes');console.log('{}');process.exit(0);}
 if(argv.includes('stop')){fs.writeFileSync(path.join(control,'shutdown-request-state'),fs.readFileSync('.boat/state.json'));fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
 if(argv.includes('info')&&argv.includes('fake-new-worker')){if(fs.existsSync(path.join(control,'candidate-stopped'))){const a=JSON.parse(fs.readFileSync('.boat/state.json')).admission;console.log(JSON.stringify({sandbox:{id:'fake-new-worker',name:a.name,type:a.size,state:'stopped'}}));process.exit(0);}if(fs.existsSync(path.join(control,'candidate-kill'))){fs.unlinkSync(path.join(control,'candidate-kill'));process.kill(process.ppid,'SIGKILL');process.exit(1);}if(fs.existsSync(path.join(control,'candidate-info'))){const info=JSON.parse(fs.readFileSync(path.join(control,'candidate-info'),'utf8'));info.sandbox.name??=JSON.parse(fs.readFileSync('.boat/state.json')).admission?.name;console.log(JSON.stringify(info));process.exit(0);}console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
 if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
@@ -11184,3 +11184,51 @@ function reconstructionEvidence(t) {
 		ownPackageGroups: true,
 	};
 }
+
+for (const outcome of ["uncertain", "completed-then-active"])
+	test(`fresh lifecycle recovery retains candidate ${outcome} stop obligation before any work`, async (t) => {
+		const f = await freshCheckout(t);
+		flag(f, "candidate-kill");
+		const crash = await f.generate();
+		assert.notEqual(crash.status, 0);
+		if (outcome === "uncertain") flag(f, "candidate-stop-uncertain");
+		const cleanup = await f.run("boat-stop").done;
+		assert.equal(cleanup.status === 0, outcome !== "uncertain", cleanup.output);
+		const before = f.json(".boat/state.json"),
+			attempt = before.admission.shutdownAttempt;
+		assert.equal(
+			attempt.status,
+			outcome === "uncertain" ? "submission-uncertain" : "completed-observed",
+		);
+		if (outcome !== "uncertain")
+			fs.rmSync(path.join(f.control, "candidate-stopped"));
+		const calls = freshCalls(f).length;
+		const next = await f.generate();
+		assert.notEqual(next.status, 0, next.output);
+		assert.match(next.output, /candidate.*stop.*obligation/i);
+		const after = f.json(".boat/state.json");
+		assert.equal(after.id, "fake-worker");
+		assert.equal(after.admission.status, "candidate-owned");
+		assert.deepEqual(after.admission.shutdownAttempt, attempt);
+		assert.equal(after.admission.cost, before.admission.cost);
+		assert.ok(after.admission.runningSince);
+		assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+		assert.equal(
+			freshCalls(f).filter(
+				(a) => a.includes("stop") && a.includes("fake-new-worker"),
+			).length,
+			1,
+		);
+		assert.equal(
+			freshCalls(f)
+				.slice(calls)
+				.some((a) => a.includes("ssh") || a.includes("exec")),
+			false,
+		);
+		const status = await f.run("boat-status").done;
+		assert.equal(status.status, 0, status.output);
+		const dollars = Number(
+			status.output.match(/"estimatedExperimentCost": ([0-9.e+-]+)/)[1],
+		);
+		assert.ok(dollars > (before.cost ?? 0) + (before.admission.cost ?? 0));
+	});

@@ -248,9 +248,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       if (!(await claimResource(key, resource))) return false;
     return true;
   };
-  const blockingFile = async (dir: string) => {
+  const legacyBlock = async (dir: string) => {
     const saved = await read(dir, 'blocked.json');
-    if (saved && !z.object({ kind: z.literal('conflict') }).safeParse(saved).success) return saved;
+    if (!saved) return null;
+    if (!z.object({ kind: z.literal('conflict') }).safeParse(saved).success) return saved;
+    const conflict = z.object({ issue: z.number() }).parse(saved);
+    return (await read(dir, `resolved-${conflict.issue}.json`)) ? null : saved;
+  };
+  const blockingFile = async (dir: string) => {
+    const saved = await legacyBlock(dir);
+    if (saved) return saved;
     const names = await readdir(dir).catch((cause) => {
       if (errno(cause, 'ENOENT')) return [];
       throw cause;

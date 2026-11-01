@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmod, readFile, writeFile, readdir } from 'node:fs/promises';
+import { chmod, readFile, writeFile, readdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -1059,6 +1059,25 @@ it('resumes a later conflict using the earlier durable replay head across commit
   } finally {
     if (previousDate === undefined) delete process.env.GIT_COMMITTER_DATE;
     else process.env.GIT_COMMITTER_DATE = previousDate;
+    await f.close();
+  }
+});
+
+it('resumes a predecessor-format durable conflict record', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const directory = join(f.host.directory, 'joins');
+    const operation = (await readdir(directory)).find((name) => /^[a-f0-9]{64}$/.test(name));
+    if (!operation) throw new Error('Missing operation');
+    await rename(
+      join(directory, operation, 'conflict-4.json'),
+      join(directory, operation, 'blocked.json')
+    );
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
     await f.close();
   }
 });

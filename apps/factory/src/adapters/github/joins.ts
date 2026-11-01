@@ -461,7 +461,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       onto: value.onto,
       tree,
       classification: result.classification,
-      reviewedCommit: result.classification === 'COMPLEX' ? result.commit : reviewOrigin(item),
+      reviewedCommit: reviewOrigin(item),
+      reviewedHead: reviewed ? result.commit : undefined,
       reviewed,
     });
     return true;
@@ -966,6 +967,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         .object({
           next: z.literal(item.next),
           classification: z.enum(['SIMPLE', 'COMPLEX']),
+          reviewedHead: sha.optional(),
           reviewed: z.boolean(),
         })
         .parse(saved);
@@ -977,7 +979,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
               classification: resolved.classification,
               progress: 'Resolved',
             }),
-          review: () => Effect.succeed(resolved.reviewed),
+          review: () => Effect.succeed(resolved.reviewed && resolved.reviewedHead === item.next),
           verify: () =>
             Effect.tryPromise({
               try: () => validate(item, dir, signal),

@@ -117,21 +117,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const jobLayer = JobLive.pipe(Layer.provide(deps));
   const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
   const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
-  const legacy = await Effect.runPromise(fileStore(configuration.FACTORY_STATE).read());
-  if (legacy) {
-    const state = await Effect.runPromise(scheduleStore.read());
-    if (!state.admissions.some((a) => a.issue === legacy.issue))
-      await Effect.runPromise(
-        scheduleStore.save({
-          ...state,
-          revision: state.revision + 1,
-          admissions: [
-            ...state.admissions,
-            { issue: legacy.issue, base: legacy.base, context: legacy.context },
-          ],
-        })
-      );
-  }
+  const legacy = await adoptLegacy(configuration.FACTORY_STATE, scheduleStore);
   let rootIssue = legacy?.issue;
   const pool: JobPool = {
     job: (issue) =>
@@ -282,4 +268,23 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       }
     })());
   return { app, close };
+}
+
+async function adoptLegacy(directory: string, scheduleStore: ScheduleStore) {
+  const legacy = await Effect.runPromise(fileStore(directory).read());
+  if (legacy) {
+    const state = await Effect.runPromise(scheduleStore.read());
+    if (!state.admissions.some((a) => a.issue === legacy.issue))
+      await Effect.runPromise(
+        scheduleStore.save({
+          ...state,
+          revision: state.revision + 1,
+          admissions: [
+            ...state.admissions,
+            { issue: legacy.issue, base: legacy.base, context: legacy.context },
+          ],
+        })
+      );
+  }
+  return legacy;
 }

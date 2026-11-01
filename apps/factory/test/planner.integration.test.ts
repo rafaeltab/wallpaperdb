@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
 it('translates a bound assistant proposal and rejects malformed or user messages', async () => {
@@ -170,6 +170,53 @@ it('returns Unavailable when the planner exits before consuming large context', 
       )
     ).rejects.toMatchObject({ _tag: 'Unavailable' });
   } finally {
+    await host.cleanup();
+  }
+});
+
+it('bounds one outstanding advisory request across polling iterations and concurrent callers', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const abort = new AbortController();
+  try {
+    await host.save({ planner: { status: 'running', proposal: { selected: [], deferred: [] } } });
+    const adapter = t3Planner({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    const pending = Effect.runPromise(adapter.propose(input), { signal: abort.signal });
+    await Promise.all([
+      expect(pending).rejects.toBeDefined(),
+      (async () => {
+        try {
+          await vi.waitFor(
+            async () =>
+              expect(
+                (await host.calls()).filter((call) => call.args[1] === 'show').length
+              ).toBeGreaterThanOrEqual(2),
+            { timeout: 5000, interval: 30 }
+          );
+          await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
+            _tag: 'Unavailable',
+            cause: expect.objectContaining({ message: 'Planner request already in progress' }),
+          });
+          expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+        } finally {
+          abort.abort();
+        }
+      })(),
+    ]);
+  } finally {
+    abort.abort();
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
     await host.cleanup();
   }
 });

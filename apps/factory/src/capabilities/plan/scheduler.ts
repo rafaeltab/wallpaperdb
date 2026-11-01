@@ -8,18 +8,26 @@ import {
   Scheduler,
   type ScheduleState,
   type ScheduleStatus,
+  type Preview,
+  type PlanningInput,
+  type Proposal,
 } from './contract.js';
 import { validate } from './implementation.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
-const active = (job: Status) =>
-  job.kind === 'job' &&
-  !job.delivery?.ready &&
-  job.delivery?.activity !== 'cancelled' &&
-  job.delivery?.active !== false;
+const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
+function holdsSlot(job: Status, resuming: boolean): boolean {
+  if (job.kind === 'empty') return true;
+  if (finished(job)) return false;
+  return job.delivery?.active !== false || resuming;
+}
+const slots = (state: ScheduleState, jobs: readonly Status[]) =>
+  jobs.filter((job, index) =>
+    holdsSlot(job, (state.resuming ?? []).includes(state.admissions[index]?.issue ?? 0))
+  ).length;
 const available = (state: ScheduleState, jobs: readonly Status[]) =>
   !state.paused &&
   (state.allowance === -1 || state.admissions.length < state.allowance) &&
-  (state.concurrency === -1 || jobs.filter(active).length < state.concurrency);
+  (state.concurrency === -1 || slots(state, jobs) < state.concurrency);
 export const SchedulerLive = Layer.effect(
   Scheduler,
   Effect.gen(function* () {
@@ -44,13 +52,7 @@ export const SchedulerLive = Layer.effect(
         const { state, jobs } = snapshot;
         if (state.admissions.some((a) => a.issue === command.issue)) return false;
         // Empty reserved jobs still occupy capacity until reconciled. Never release an uncertain launch.
-        if (
-          !available(state, jobs) ||
-          (state.concurrency !== -1 &&
-            jobs.filter(active).length + jobs.filter((j) => j.kind === 'empty').length >=
-              state.concurrency)
-        )
-          return false;
+        if (!available(state, jobs)) return false;
         return yield* store.save({
           ...state,
           revision: state.revision + 1,
@@ -74,6 +76,53 @@ export const SchedulerLive = Layer.effect(
         }
         return null;
       });
+    const dispatch = (preview: Preview, base: string, initialRevision: number) =>
+      Effect.gen(function* () {
+        let revision = initialRevision;
+        for (const selection of preview.selected) {
+          const current = yield* status();
+          if (current.state.revision !== revision) break;
+          const validated = validate(
+            { selected: [selection], deferred: [] },
+            {
+              ...preview.input,
+              jobs: current.jobs,
+              admissions: current.state.admissions.map((a) => a.issue),
+            }
+          );
+          if (!validated.selected.length) continue;
+          const command = plannedStart(selection, preview, base);
+          if (!(yield* reserve(command, current))) continue;
+          revision++;
+          yield* (yield* pool.job(selection.issue)).start(command);
+        }
+      });
+    const claimResume = (issue: number, target: Status, snapshot: ScheduleStatus) =>
+      Effect.gen(function* () {
+        const { state } = snapshot;
+        if (state.resuming?.includes(issue)) return true;
+        if (!resumeCapacity(target, snapshot)) return false;
+        return yield* store.save({
+          ...state,
+          revision: state.revision + 1,
+          resuming: [...(state.resuming ?? []), issue],
+        });
+      });
+    const releaseResume = (issue: number) =>
+      Effect.gen(function* () {
+        for (;;) {
+          const current = yield* store.read();
+          const claims = current.resuming ?? [];
+          if (
+            yield* store.save({
+              ...current,
+              revision: current.revision + 1,
+              resuming: claims.filter((number) => number !== issue),
+            })
+          )
+            return;
+        }
+      });
     return {
       status,
       configure: (command) =>
@@ -87,22 +136,8 @@ export const SchedulerLive = Layer.effect(
         }).pipe(Effect.withSpan('factory.scheduler.configure')),
       start: (command) =>
         Effect.gen(function* () {
-          if (
-            !Number.isSafeInteger(command.issue) ||
-            command.issue <= 0 ||
-            command.context.length > 16000 ||
-            !/^[a-f0-9]{40}$/.test(command.base)
-          )
-            return { kind: 'rejected' as const };
-          const issue = yield* issues.inspect(command.issue);
-          if (
-            !issue.open ||
-            !['rafaeltab', 'zero-two-rafaeltab'].includes(issue.author) ||
-            !issue.labels.includes('ready-for-agent') ||
-            issue.labels.some((label) => ['future-work', 'spec'].includes(label)) ||
-            !issue.blockersReady
-          )
-            return { kind: 'rejected' as const };
+          if (!validStart(command)) return { kind: 'rejected' as const };
+          if (!eligible(yield* issues.inspect(command.issue))) return { kind: 'rejected' as const };
           const snapshot = yield* status();
           if (!(yield* reserve(command, snapshot))) return { kind: 'occupied' as const };
           return yield* (yield* pool.job(command.issue)).start(command);
@@ -119,52 +154,29 @@ export const SchedulerLive = Layer.effect(
             jobs: input.jobs?.map(normalize),
           };
           const signature = JSON.stringify(normalized);
-          if (
-            signature === lastInput ||
-            !input.issues.some(
-              (issue) =>
-                issue.open &&
-                issue.labels.includes('ready-for-agent') &&
-                !snapshot.state.admissions.some((a) => a.issue === issue.number)
-            )
-          )
-            return snapshot;
+          if (signature === lastInput || !hasFrontier(input, snapshot.state)) return snapshot;
           const preview = yield* plan.preview();
           if (preview.kind === 'stale') return yield* status();
           lastInput = signature;
           // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.
           if (preview.input.scheduleRevision !== snapshot.state.revision) return yield* status();
-          let revision = snapshot.state.revision;
-          for (const selection of preview.selected) {
-            const current = yield* status();
-            if (current.state.revision !== revision) break;
-            const validated = validate(
-              { selected: [selection], deferred: [] },
-              {
-                ...preview.input,
-                jobs: current.jobs,
-                admissions: current.state.admissions.map((a) => a.issue),
-              }
-            );
-            if (!validated.selected.length) continue;
-            const command = {
-              issue: selection.issue,
-              base,
-              context:
-                preview.input.issues.find((i) => i.number === selection.issue)
-                  ?.prerequisiteEvidence ?? '',
-            };
-            if (!(yield* reserve(command, current))) continue;
-            revision++;
-            yield* (yield* pool.job(selection.issue)).start(command);
-          }
+          yield* dispatch(preview, base, snapshot.state.revision);
           return yield* status();
         }).pipe(Effect.withSpan('factory.scheduler.tick')),
       resume: (command) =>
         Effect.gen(function* () {
-          const job = yield* commandJob(command.jobId);
-          return job ? yield* job.resume(command) : { kind: 'rejected' as const };
-        }),
+          const snapshot = yield* status();
+          const target = snapshot.jobs.find(
+            (job) => job.kind === 'job' && job.intent.id === command.jobId
+          );
+          if (target?.kind !== 'job') return { kind: 'rejected' as const };
+          const issue = target.intent.issue;
+          if (!(yield* claimResume(issue, target, snapshot))) return { kind: 'occupied' as const };
+          const job = yield* pool.job(issue);
+          const result = yield* job.resume(command);
+          yield* releaseResume(issue);
+          return result;
+        }).pipe(Effect.withSpan('factory.scheduler.resume')),
       cancel: (id) =>
         Effect.gen(function* () {
           const job = yield* commandJob(id);
@@ -176,4 +188,59 @@ export const SchedulerLive = Layer.effect(
 
 function normalize(job: Status) {
   return job.kind === 'job' ? { ...job, elapsedMs: 0 } : job;
+}
+
+function validStart(command: Start) {
+  return (
+    Number.isSafeInteger(command.issue) &&
+    command.issue > 0 &&
+    command.context.length <= 16000 &&
+    /^[a-f0-9]{40}$/.test(command.base)
+  );
+}
+function eligible(issue: {
+  open: boolean;
+  author: string;
+  labels: readonly string[];
+  blockersReady: boolean;
+}) {
+  return (
+    issue.open &&
+    ['rafaeltab', 'zero-two-rafaeltab'].includes(issue.author) &&
+    issue.labels.includes('ready-for-agent') &&
+    !issue.labels.some((label) => ['future-work', 'spec'].includes(label)) &&
+    issue.blockersReady
+  );
+}
+function hasFrontier(input: PlanningInput, state: ScheduleState) {
+  return input.issues.some(
+    (issue) =>
+      issue.open &&
+      issue.labels.includes('ready-for-agent') &&
+      !state.admissions.some((a) => a.issue === issue.number)
+  );
+}
+
+function finished(job: Extract<Status, { kind: 'job' }>) {
+  return job.delivery?.ready || job.delivery?.activity === 'cancelled';
+}
+function resumeCapacity(target: Status, snapshot: ScheduleStatus) {
+  return (
+    active(target) ||
+    snapshot.state.concurrency === -1 ||
+    slots(snapshot.state, snapshot.jobs) < snapshot.state.concurrency
+  );
+}
+function plannedStart(
+  selection: Proposal['selected'][number],
+  preview: Preview,
+  base: string
+): Start {
+  return {
+    issue: selection.issue,
+    base,
+    context:
+      preview.input.issues.find((issue) => issue.number === selection.issue)
+        ?.prerequisiteEvidence ?? '',
+  };
 }

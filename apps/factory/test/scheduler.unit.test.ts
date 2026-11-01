@@ -33,6 +33,7 @@ function fixture() {
   let duringPlan: (() => void) | undefined;
   const statuses = new Map<number, Status>();
   const launches: number[] = [];
+  const resumed: number[] = [];
   const jobs = new Map<number, Job>();
   const pool: JobPool = {
     job: (number) =>
@@ -61,8 +62,42 @@ function fixture() {
                 statuses.set(number, status);
                 return status;
               }),
-            resume: () => Effect.succeed({ kind: 'rejected' }),
-            cancel: () => Effect.succeed({ kind: 'rejected' }),
+            resume: () =>
+              Effect.sync(() => {
+                resumed.push(number);
+                const status = statuses.get(number);
+                if (status?.kind !== 'job') return { kind: 'rejected' as const };
+                const result = {
+                  ...status,
+                  delivery: {
+                    stage: 'implementation' as const,
+                    commit: base,
+                    ready: false,
+                    landed: false,
+                    active: true,
+                  },
+                };
+                statuses.set(number, result);
+                return result;
+              }),
+            cancel: () =>
+              Effect.sync(() => {
+                const status = statuses.get(number);
+                if (status?.kind !== 'job') return { kind: 'rejected' as const };
+                const result = {
+                  ...status,
+                  delivery: {
+                    stage: 'implementation' as const,
+                    commit: base,
+                    ready: false,
+                    landed: false,
+                    active: false,
+                    activity: 'cancelled' as const,
+                  },
+                };
+                statuses.set(number, result);
+                return result;
+              }),
           };
           jobs.set(number, job);
         }
@@ -84,13 +119,16 @@ function fixture() {
   };
   const deps = Layer.mergeAll(
     Layer.succeed(Issues, {
-      inspect: () =>
-        Effect.succeed({
-          open: true,
-          author: 'rafaeltab',
-          labels: ['ready-for-agent'],
-          blockersReady: true,
-          url: issue(1).url,
+      inspect: (number) =>
+        Effect.sync(() => {
+          const candidate = issues.find((i) => i.number === number);
+          return {
+            open: candidate?.open ?? false,
+            author: candidate?.author ?? '',
+            labels: candidate?.labels ?? [],
+            blockersReady: candidate?.blockersReady ?? false,
+            url: issue(number).url,
+          };
         }),
       pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
     }),
@@ -120,6 +158,7 @@ function fixture() {
     runtime,
     statuses,
     launches,
+    resumed,
     setIssues: (next: PlanningIssue[]) => {
       issues = next;
     },
@@ -312,6 +351,117 @@ it('allows unlimited concurrency and allowance without charging replayed admissi
     expect(await f.run((s) => s.start({ issue: 1, base, context: '' }))).toEqual({
       kind: 'occupied',
     });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('requires active capacity to resume parked work and does not consume a fresh allowance', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 1, allowance: -1, paused: false }));
+    await f.run((s) => s.tick(base));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing first job');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        active: false,
+        activity: 'awaiting-answer',
+        commit: base,
+        ready: false,
+        landed: false,
+      },
+    });
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1, 2]);
+    expect(await f.run((s) => s.resume({ jobId: '1', index: 0, questionId: 'q' }))).toEqual({
+      kind: 'occupied',
+    });
+    expect(f.resumed).toEqual([]);
+    await f.run((s) =>
+      s.configure({ revision: f.snapshot().revision, concurrency: 2, allowance: 1, paused: true })
+    );
+    expect(await f.run((s) => s.resume({ jobId: '1', index: 0, questionId: 'q' }))).toMatchObject({
+      kind: 'job',
+    });
+    expect(f.resumed).toEqual([1]);
+    expect(f.snapshot().admissions.map((a) => a.issue)).toEqual([1, 2]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('rejects invalid or ineligible manual requests without consuming the distinct allowance', async () => {
+  const f = fixture();
+  try {
+    expect(await f.run((s) => s.start({ issue: 1, base: 'bad', context: '' }))).toEqual({
+      kind: 'rejected',
+    });
+    f.setIssues([{ ...issue(1), author: 'outside' }]);
+    expect(await f.run((s) => s.start({ issue: 1, base, context: '' }))).toEqual({
+      kind: 'rejected',
+    });
+    expect(f.snapshot().admissions).toEqual([]);
+    f.setIssues([issue(1)]);
+    expect(await f.run((s) => s.start({ issue: 1, base, context: '' }))).toMatchObject({
+      kind: 'job',
+    });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+it('cancels only the identified job while retaining its admission', async () => {
+  const f = fixture();
+  try {
+    expect(await f.run((s) => s.cancel('missing'))).toEqual({ kind: 'rejected' });
+    await f.run((s) => s.configure({ revision: -1, concurrency: 2, allowance: -1, paused: false }));
+    await f.run((s) => s.tick(base));
+    expect(await f.run((s) => s.cancel('1'))).toMatchObject({
+      kind: 'job',
+      delivery: { activity: 'cancelled' },
+    });
+    expect(f.statuses.get(2)).toMatchObject({ kind: 'job', execution: { kind: 'absent' } });
+    expect(f.snapshot().admissions.map((a) => a.issue)).toEqual([1, 2]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('retains an uncertain resumed slot across recovery until the existing job is reconciled', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.start({ issue: 1, base, context: 'Retained scope' }));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing first job');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        active: false,
+        commit: base,
+        ready: false,
+        landed: false,
+        activity: 'awaiting-answer',
+      },
+    });
+    await Effect.runPromise(
+      f.store.save({
+        ...f.snapshot(),
+        revision: f.snapshot().revision + 1,
+        allowance: -1,
+        resuming: [1],
+      })
+    );
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1]);
+    expect(await f.run((s) => s.resume({ jobId: '1', index: 0, questionId: 'q' }))).toMatchObject({
+      kind: 'job',
+      delivery: { active: true },
+    });
+    expect(f.snapshot().resuming).toEqual([]);
+    expect(f.snapshot().admissions).toHaveLength(1);
   } finally {
     await f.runtime.dispose();
   }

@@ -1324,23 +1324,25 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     // Older records are usable only when their original identity is reconstructable.
     return id(numbers) === key ? numbers : null;
   };
-  const reconcile = async (signal?: AbortSignal) => {
-    for (const key of await operationDirectories()) {
-      if (!/^[a-f0-9]{64}$/.test(key)) continue;
-      const saved = await read(join(config.directory, key), 'intent.json');
-      if (await read(join(config.directory, key), 'complete.json')) continue;
-      if (!saved) {
-        const seed = await read(join(config.directory, key), 'seed.json');
-        if (seed) {
-          const layers = z.array(layer).parse(seed);
-          const numbers = await recoveryNumbers(key, layers);
-          if (numbers) await prepare(numbers, seed, signal);
-        }
-        continue;
-      }
+  const reconcileOperation = async (key: string, signal?: AbortSignal) => {
+    const dir = join(config.directory, key);
+    if (await read(dir, 'complete.json')) return;
+    const saved = await read(dir, 'intent.json');
+    if (saved) {
       const operation = intent.parse(saved);
       await prepare(operation.numbers, null, signal);
+      return;
     }
+    const seed = await read(dir, 'seed.json');
+    if (!seed) return;
+    const numbers = await recoveryNumbers(key, z.array(layer).parse(seed));
+    if (numbers) await prepare(numbers, seed, signal);
+  };
+  const reconcile = async (signal?: AbortSignal) => {
+    for (const key of (await operationDirectories()).filter((value) =>
+      /^[a-f0-9]{64}$/.test(value)
+    ))
+      await reconcileOperation(key, signal);
   };
   const recoveryStatus = async (dir: string) => {
     const blocked = await blockingFile(dir);

@@ -186,7 +186,7 @@ import { cacheServer } from "./lib/boat-cache.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { acquireDockerLease } from "./lib/docker-queue.mjs";
 import { ownsWatch } from "./boat-stop-watch.mjs";
@@ -365,24 +365,33 @@ test("actual Make routing preserves enrolled remote tasks and explicit local/wor
 		fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
 		fs.copyFileSync(path.join(repository, name), path.join(root, name));
 	}
-	const run = (override) =>
+	fs.mkdirSync(path.join(root, "apps/asset"), { recursive: true });
+	fs.writeFileSync(path.join(root, "apps/asset/package.json"), "{}\n");
+	const env = {
+		...process.env,
+		MAKEFLAGS: "",
+		MFLAGS: "",
+		MAKEOVERRIDES: "",
+		BOAT_EXEC: "",
+		PACKAGE: "",
+		SCRIPT: "",
+		ARGS: "",
+		SERVICE: "",
+		DB: "",
+		FORCE: "",
+	};
+	const run = (override, goals = ["build"]) =>
 		execFileSync(
 			"make",
 			[
 				"-n",
-				"build",
+				...goals,
 				"SHELL=/bin/sh",
 				...(override ? [`BOAT_EXEC=${override}`] : []),
 			],
 			{
 				cwd: root,
-				env: {
-					...process.env,
-					MAKEFLAGS: "",
-					MFLAGS: "",
-					MAKEOVERRIDES: "",
-					BOAT_EXEC: "",
-				},
+				env,
 			},
 		).toString();
 	assert.match(run(), /turbo.*run build/);
@@ -394,6 +403,31 @@ test("actual Make routing preserves enrolled remote tasks and explicit local/wor
 	assert.match(run(), /boat.mjs command -- build/);
 	assert.match(run("local"), /turbo.*run build/);
 	assert.match(run("worker"), /turbo.*run build/);
+	assert.match(run(undefined, ["dev"]), /boat.mjs command -- dev/);
+	assert.match(
+		run(undefined, ["run", "PACKAGE=asset", "SCRIPT=dev:configure"]),
+		/pnpm.*dev:configure/,
+	);
+	fs.writeFileSync(
+		path.join(root, ".boat/enrollment.json"),
+		JSON.stringify({ mode: "validation" }),
+	);
+	assert.match(run(undefined, ["dev"]), /check-infra\.sh/);
+	assert.match(
+		run(undefined, ["run", "PACKAGE=asset", "SCRIPT=db:migrate"]),
+		/pnpm.*db:migrate/,
+	);
+	assert.match(
+		run(undefined, ["run", "PACKAGE=scripts", "SCRIPT=dependencies:lock"]),
+		/boat.mjs command -- run/,
+	);
+	const mixed = spawnSync("make", ["-n", "build", "help", "SHELL=/bin/sh"], {
+		cwd: root,
+		encoding: "utf8",
+		env,
+	});
+	assert.notEqual(mixed.status, 0);
+	assert.match(mixed.stderr, /Use separate Make invocations/);
 });
 
 test("preparation rejects missing mounts and directories and invalidates changed generated inputs", (t) => {
@@ -1087,6 +1121,7 @@ async function lockGenerationCheckout(
 		directory: ownedDirectory,
 		cleanupReport,
 		ownPackageGroups = false,
+		captureStreams = false,
 	} = {},
 ) {
 	readiness.enter("checkout setup");
@@ -1399,9 +1434,20 @@ child.on('close',code=>{
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		const output = lockFixtureOutput();
+		const streams = { stdout: [], stderr: [] };
 		const capture = output.capture;
 		child.stdout.on("data", capture);
 		child.stderr.on("data", capture);
+		if (captureStreams)
+			for (const stream of ["stdout", "stderr"])
+				child[stream].on("data", (bytes) => {
+					streams[stream].push(bytes);
+					assert.ok(
+						streams[stream].reduce((sum, chunk) => sum + chunk.length, 0) <=
+							1048576,
+						"Make arguments fixture stream exceeds 1 MiB",
+					);
+				});
 		child.on("error", (error) => capture(error.message));
 		const record = {
 			directory,
@@ -1419,7 +1465,17 @@ child.on('close',code=>{
 		record.done = new Promise((resolve) => {
 			child.on("close", (status, signal) => {
 				record.closed = true;
-				resolve({ status, signal, output: output.read() });
+				resolve({
+					status,
+					signal,
+					output: output.read(),
+					...(captureStreams
+						? {
+								stdout: Buffer.concat(streams.stdout).toString("utf8"),
+								stderr: Buffer.concat(streams.stderr).toString("utf8"),
+							}
+						: {}),
+				});
 			});
 		});
 		owned.push(record);
@@ -1537,6 +1593,321 @@ const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;
 			run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock").done,
 	};
 }
+
+async function makeArgumentsCheckout(t, cacheShell) {
+	const destination = process.env.BOAT_MAKE_ARGS_EVIDENCE_DIRECTORY;
+	if (destination) fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+	const archive = destination
+		? fs.mkdtempSync(path.join(destination, "make-arguments-"))
+		: undefined;
+	const f = await lockGenerationCheckout(t, {
+		readiness: lockFixtureReadiness({ deadline: fixtureNow() + 20000 }),
+		cleanupReport: archive && path.join(archive, "retirement"),
+		ownPackageGroups: true,
+		captureStreams: true,
+	});
+	if (cacheShell)
+		for (const name of ["scripts/mise-shell.sh", "scripts/boat-shell.mjs"])
+			f.local(
+				name,
+				fs.readFileSync(path.join(import.meta.dirname, "..", name)),
+			);
+	let invocation = 0;
+	const run = async (...argv) => {
+		const command = f.run(...argv);
+		try {
+			await f.readiness.wait(
+				() => command.closed,
+				"Make arguments command closure",
+			);
+		} finally {
+			if (archive) {
+				const prefix = path.join(archive, String(invocation++));
+				fs.writeFileSync(`${prefix}.argv.json`, JSON.stringify(argv));
+				if (command.closed) {
+					const result = await command.done;
+					fs.writeFileSync(`${prefix}.stdout.raw`, result.stdout);
+					fs.writeFileSync(`${prefix}.stderr.raw`, result.stderr);
+					fs.writeFileSync(
+						`${prefix}.result.json`,
+						JSON.stringify({
+							status: result.status,
+							signal: result.signal,
+							birth: command.birth,
+							closedBeforeSafety: command.closed,
+							groupLiveBeforeSafety: processGroupRunning(command.child.pid),
+						}),
+					);
+				}
+				for (const name of ["events.jsonl", "manifest.json", "prepared.json"])
+					if (fs.existsSync(path.join(f.root, ".boat", name)))
+						fs.copyFileSync(
+							path.join(f.root, ".boat", name),
+							`${prefix}.${name}`,
+						);
+				fs.copyFileSync(path.join(f.root, "Makefile"), `${prefix}.Makefile`);
+			}
+		}
+		assert.equal(processGroupRunning(command.child.pid), false);
+		assert.ok(liveOwnedProcess(f.root, f.json(".boat/state.json").daemon));
+		assert.ok(liveOwnedProcess(f.root, f.json(".boat/cache-tunnel.json")));
+		return command.done;
+	};
+	const generated = await run(
+		"run",
+		"PACKAGE=scripts",
+		"SCRIPT=dependencies:lock",
+	);
+	assert.equal(generated.status, 0, generated.output);
+	if (archive) {
+		for (const name of [
+			"Makefile",
+			"scripts/boat.mjs",
+			"scripts/boat-route.mk",
+			"scripts/boat.test.mjs",
+		])
+			fs.copyFileSync(
+				path.join(import.meta.dirname, "..", name),
+				path.join(archive, path.basename(name)),
+			);
+		t.diagnostic(
+			JSON.stringify({ test: t.name, archive, syntheticLocalCli: true }),
+		);
+	}
+	return { ...f, run };
+}
+
+for (const cacheShell of [false, true])
+	test(`Make arguments preserve quoted Node bodies and trailing argv with cache shell ${cacheShell}`, async (t) => {
+		const f = await makeArgumentsCheckout(t, cacheShell);
+		const payload = `const crypto=require('node:crypto');const body='spaces (parentheses) and "double quotes"';console.log('MAKE_ARGS '+JSON.stringify({bodyHash:crypto.createHash('sha256').update(body).digest('hex'),execArgv:process.execArgv,argv:process.argv.slice(1)}));console.error('MAKE_ARGS_STDERR drained');`;
+		const trailing = ["space argument", "single' double\" (round) back\\slash"];
+		const args = `ARGS=node -e ${quote(payload)} -- ${trailing.map(quote).join(" ")}`;
+		for (const override of ["unenrolled", "local", "worker", undefined]) {
+			const enrollment = path.join(f.root, ".boat/enrollment.json");
+			const saved = path.join(f.control, "enrollment.json");
+			if (override === "unenrolled") fs.renameSync(enrollment, saved);
+			let result;
+			try {
+				result = await f.run(
+					"docker-run",
+					args,
+					...(override && override !== "unenrolled"
+						? [`BOAT_EXEC=${override}`]
+						: []),
+				);
+			} finally {
+				if (override === "unenrolled") fs.renameSync(saved, enrollment);
+			}
+			assert.equal(result.status, 0, result.output);
+			const proof = JSON.parse(
+				result.stdout
+					.split("\n")
+					.find((line) => line.startsWith("MAKE_ARGS "))
+					.slice(10),
+			);
+			assert.deepEqual(proof, {
+				bodyHash: createHash("sha256")
+					.update('spaces (parentheses) and "double quotes"')
+					.digest("hex"),
+				execArgv: ["-e", payload],
+				argv: trailing,
+			});
+			assert.match(result.stderr, /MAKE_ARGS_STDERR drained/);
+		}
+		for (const override of ["local", undefined]) {
+			const flags = override ? [`BOAT_EXEC=${override}`] : [];
+			const simple = await f.run("docker-run", "ARGS=node --version", ...flags);
+			assert.equal(simple.status, 0, simple.output);
+			assert.match(
+				simple.stdout,
+				new RegExp(process.version.replaceAll(".", "\\.")),
+			);
+			const failed = await f.run(
+				"docker-run",
+				"ARGS=node -e process.exitCode=7",
+				...flags,
+			);
+			assert.equal(failed.status, 2, failed.output);
+			assert.match(failed.stdout, /exit 7\./);
+		}
+	});
+
+for (const cacheShell of [false, true])
+	test(`Make arguments preserve custom overrides and Make value semantics with cache shell ${cacheShell}`, async (t) => {
+		const f = await makeArgumentsCheckout(t, cacheShell);
+		const sentinel = path.join(f.control, "must-not-execute");
+		const literal = `spaces ' \" back\\slash $$(touch ${sentinel}) \`touch ${sentinel}\``;
+		f.local(
+			".worktree",
+			"INGRESS_PORT=9120\nCONFIG_WORD=from-worker-configuration\n",
+		);
+		f.local(
+			"Makefile",
+			`${fs.readFileSync(path.join(f.root, "Makefile"), "utf8")}
+export REF_RAW := $(value REF)
+export REF_FLAVOR := $(flavor REF)
+export SIMPLE_RAW := $(value SIMPLE)
+export SIMPLE_FLAVOR := $(flavor SIMPLE)
+export PUNCTUATION_VALUE := $(value CUSTOM.DASH-NAME)
+export NUMBERED_VALUE := $(value 1)
+`,
+		);
+		const keys = [
+			"PACKAGE",
+			"SERVICE",
+			"DB",
+			"SCRIPT",
+			"ARGS",
+			"FORCE",
+			"CUSTOM",
+			"MULTILINE",
+			"PUNCTUATION_VALUE",
+			"NUMBERED_VALUE",
+			"name",
+			"boat_shell_quote",
+			"boat_newline",
+			"REF",
+			"REF_RAW",
+			"REF_FLAVOR",
+			"SIMPLE",
+			"SIMPLE_RAW",
+			"SIMPLE_FLAVOR",
+		];
+		f.local(
+			"inspect.cjs",
+			`console.log('MAKE_VALUES '+JSON.stringify(Object.fromEntries(${JSON.stringify(keys)}.map(k=>[k,process.env[k]]))));`,
+		);
+		f.env.CUSTOM = "ambient must lose";
+		f.env.AMBIENT_ONLY = "must not become a command-line override";
+		const args = "node inspect.cjs";
+		const assignments = [
+			"PACKAGE=scripts",
+			"SERVICE=first",
+			"SERVICE=",
+			"DB=asset",
+			"SCRIPT=proof",
+			"ARGS=must lose",
+			`ARGS=${args}`,
+			"FORCE=0",
+			"FORCE=1",
+			"CLI_WORD=cli-reference",
+			`CUSTOM=${literal}`,
+			"MULTILINE=line1\n\nline2\n",
+			"CUSTOM.DASH-NAME=custom punctuation",
+			"name=caller name",
+			"boat_shell_quote=caller quote",
+			"boat_newline=caller newline",
+			"1=numbered caller",
+			"REF=$(CONFIG_WORD)",
+			"SIMPLE:=$(CLI_WORD) $$literal",
+		];
+		const expected = {
+			PACKAGE: "scripts",
+			SERVICE: "",
+			DB: "asset",
+			SCRIPT: "proof",
+			ARGS: args,
+			FORCE: "1",
+			CUSTOM: literal.replace("$$", "$"),
+			MULTILINE: "line1\n\nline2\n",
+			PUNCTUATION_VALUE: "custom punctuation",
+			NUMBERED_VALUE: "numbered caller",
+			name: "caller name",
+			boat_shell_quote: "caller quote",
+			boat_newline: "caller newline",
+			REF: "from-worker-configuration",
+			REF_RAW: "$(CONFIG_WORD)",
+			REF_FLAVOR: "recursive",
+			SIMPLE: "cli-reference $literal",
+			SIMPLE_RAW: "cli-reference $literal",
+			SIMPLE_FLAVOR: "simple",
+		};
+		for (const override of ["local", undefined]) {
+			const result = await f.run(
+				"docker-run",
+				...assignments,
+				...(override ? [`BOAT_EXEC=${override}`] : []),
+			);
+			assert.equal(result.status, 0, result.output);
+			const line = result.stdout
+				.split("\n")
+				.find((value) => value.startsWith("MAKE_VALUES "));
+			assert.deepEqual(JSON.parse(line.slice(12)), expected);
+			assert.equal(fs.existsSync(sentinel), false);
+		}
+		const command = fs
+			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse)
+			.findLast((e) => e.kind === "command");
+		assert.equal(
+			command.targets.some((v) => v.startsWith("AMBIENT_ONLY=")),
+			false,
+		);
+		assert.equal(
+			command.targets.some((v) => v.startsWith("BOAT_EXEC=")),
+			false,
+		);
+		assert.equal(
+			command.targets.filter((v) => v.startsWith("ARGS=")).length,
+			1,
+		);
+	});
+
+test("Make arguments preserve an original assignment as data without executing its payload", async (t) => {
+	const f = await makeArgumentsCheckout(t, true);
+	const file = process.env.BOAT_MAKE_ARGS_ORIGINAL_ARGV_FILE;
+	const original = file
+		? JSON.parse(fs.readFileSync(file, "utf8"))
+		: [
+				"make",
+				"docker-run",
+				`ARGS=node -e ${quote("throw Error('data only (never executed)')")}`,
+			];
+	assert.equal(original.length, 3);
+	assert.deepEqual(original.slice(0, 2), ["make", "docker-run"]);
+	const actualMake = execFileSync("sh", ["-c", "command -v make"], {
+		encoding: "utf8",
+	}).trim();
+	const capture = path.join(f.control, "worker-make-argv.json");
+	const wrapper = path.join(f.env.HOME, ".local/bin/make");
+	// This one data-only check stops at worker Make's argv. Executing the
+	// real worker recipe/queue/payload is covered by the quoted-body neighbors.
+	fs.writeFileSync(
+		wrapper,
+		`#!${process.execPath}
+const fs=require('fs'),cp=require('child_process');const argv=process.argv.slice(2);
+if(process.cwd()===process.env.FAKE_WORKER&&argv[0]==='BOAT_EXEC=worker'&&argv[1]==='docker-run'){
+ fs.writeFileSync(${JSON.stringify(capture)},JSON.stringify(argv));process.exit(0);
+}
+const result=cp.spawnSync(${JSON.stringify(actualMake)},argv,{env:process.env,stdio:'inherit'});process.exit(result.status??1);
+`,
+		{ mode: 0o755 },
+	);
+	const result = await f.run(...original.slice(1));
+	assert.equal(result.status, 0, result.output);
+	assert.deepEqual(JSON.parse(fs.readFileSync(capture, "utf8")), [
+		"BOAT_EXEC=worker",
+		...original.slice(1),
+	]);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "command");
+	assert.deepEqual(event.targets, original.slice(1));
+	t.diagnostic(
+		JSON.stringify({
+			dataOnly: true,
+			actualAssignmentSha256: createHash("sha256")
+				.update(original[2])
+				.digest("hex"),
+		}),
+	);
+});
 
 async function assetExecutionCheckout(t, options) {
 	const f = await lockGenerationCheckout(t, {

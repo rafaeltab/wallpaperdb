@@ -262,7 +262,24 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "✓ Clean complete"
 
 else
+# Command-line values are Make source, not shell words or expanded environment
+# values. Quote each raw assignment before the extra controller shell parses it.
+# '=' keeps helper names outside the forwarded name=value assignment namespace.
+define boat$(strip =)newline
+
+
+endef
+define boat$(strip =)quote
+'$(subst $(boat=newline),'"$${wallpaperdb_boat_newline}"',$(subst ','"'"',$(1)))'
+endef
+# Immediate assignments have already expanded. Escape their dollars for the
+# worker's immediate assignment; recursive assignments retain their raw source.
+define boat$(strip =)arguments
+$(foreach boat=variable,$(sort $(.VARIABLES)),$(if $(filter command line,$(origin $(boat=variable))),$(call boat=quote,$(boat=variable)$(if $(filter simple,$(flavor $(boat=variable))),:=$(subst $$,$$$$,$(value $(boat=variable))),=$(value $(boat=variable))))))
+endef
+
 .PHONY: $(boat_routed_goals)
 $(boat_routed_goals):
-	@node scripts/boat.mjs command -- $@ $(MAKEOVERRIDES)
+	@wallpaperdb_boat_newline=$$(printf '\nx'); wallpaperdb_boat_newline=$${wallpaperdb_boat_newline%x}; \
+	  node scripts/boat.mjs command -- $@ $(boat=arguments)
 endif

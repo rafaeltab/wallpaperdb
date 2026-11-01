@@ -904,6 +904,8 @@ async function lockGenerationCheckout(
 				"release-sync",
 				"release-collect",
 				"release-stop-completion",
+				"release-daemon-generation",
+				"release-ordinary-generation",
 			])
 				fs.writeFileSync(path.join(control, name), "yes");
 		let commandCleanup;
@@ -1099,6 +1101,14 @@ if(argv.includes('--lockfile-only')){
 const fs=require('fs'),cp=require('child_process'),path=require('path');
 const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
+if(process.env.FAKE_OLD_WORKER&&argv.some(a=>['ssh','exec','extend'].includes(a))){
+ const operation=argv.findIndex(a=>['ssh','exec','extend'].includes(a)),id=argv[operation+1];
+ if(!['fake-worker','fake-new-worker'].includes(id))throw Error('unknown generation');
+ const current=JSON.parse(fs.readFileSync('.boat/state.json')).id;
+ if(id!==current){fs.appendFileSync(path.join(control,'wrong-generation'),JSON.stringify(argv)+'\\n');console.error('stopped generation forbidden');process.exit(59);}
+ if(id==='fake-worker')process.env.FAKE_WORKER=process.env.FAKE_OLD_WORKER;
+}
+
 function shutdownHold(phase){
  if(!fs.existsSync(path.join(control,'shutdown-hang-'+phase)))return;
  const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
@@ -11346,3 +11356,215 @@ for (const variant of [
 		}
 		assert.equal(liveOwnedProcess(f.root, before.daemon), true);
 	});
+
+for (const transition of ["replacement", "replacement-idle", "same-worker"])
+	test(`fresh lifecycle real daemon retains automatic source and renewal across ${transition}`, async (t) => {
+		const f = await freshCheckout(t),
+			sibling = f.json(".boat/state.json").daemon;
+		const oldWorker = path.join(f.directory, "old-worker");
+		fs.cpSync(f.worker, oldWorker, { recursive: true });
+		f.env.FAKE_OLD_WORKER = oldWorker;
+		if (transition === "replacement-idle")
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					lastActivity: Date.now() - 1800001,
+				}),
+			);
+		if (transition === "same-worker") {
+			// Same-generation control uses that worker as the selected destination.
+			fs.rmSync(oldWorker, { recursive: true });
+			fs.symlinkSync(f.worker, oldWorker);
+			fs.writeFileSync(
+				path.join(f.control, "provider-info"),
+				JSON.stringify({ sandbox: { id: "fake-worker", state: "ready" } }),
+			);
+		}
+		f.local("automatic-delete.txt", "remove on current generation\n");
+		const oldInventory = () =>
+			fs
+				.readdirSync(oldWorker, { recursive: true })
+				.sort()
+				.map((name) => {
+					const file = path.join(oldWorker, name),
+						stat = fs.lstatSync(file);
+					return {
+						name,
+						mode: stat.mode,
+						content: stat.isFile()
+							? createHash("sha256").update(fs.readFileSync(file)).digest("hex")
+							: stat.isSymbolicLink()
+								? fs.readlinkSync(file)
+								: null,
+					};
+				});
+		const oldBefore = oldInventory();
+		const hook = path.join(f.directory, "daemon-generation.cjs");
+		fs.writeFileSync(
+			hook,
+			`const fs=require('fs'),path=require('path');
+if(process.argv[2]==='daemon'){
+ const control=process.env.FAKE_CONTROL,read=fs.readFileSync,mkdir=fs.mkdirSync;
+ let captured,held=false;
+ fs.readFileSync=function(name,...args){const bytes=read.call(this,name,...args);if(String(name)===path.join(process.cwd(),'.boat/state.json'))captured=JSON.parse(bytes.toString());return bytes;};
+ fs.mkdirSync=function(name,...args){
+ if(!held&&/\\.boat\\/(source|lifecycle)\\.lock$/.test(String(name))){held=true;
+ const tmp=path.join(control,'daemon-generation.tmp'),receipt=path.join(control,'daemon-generation.json');
+ fs.writeFileSync(tmp,JSON.stringify({workerId:captured.id,requestedLock:path.basename(name),pid:process.pid}));fs.renameSync(tmp,receipt);
+ while(!fs.existsSync(path.join(control,'release-daemon-generation')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ }
+ return mkdir.call(this,name,...args);};
+}`,
+		);
+		f.env.NODE_OPTIONS = `--require=${hook}`;
+		const daemon = f.daemon();
+		await observed(
+			() => fs.existsSync(path.join(f.control, "daemon-generation.json")),
+			"real daemon queued generation",
+		);
+		const receipt = JSON.parse(
+			fs.readFileSync(path.join(f.control, "daemon-generation.json")),
+		);
+		assert.equal(receipt.workerId, "fake-worker");
+		assert.equal(fs.existsSync(path.join(f.root, ".boat/source.lock")), false);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/lifecycle.lock")),
+			false,
+		);
+		const identity = fixtureProcess(daemon.child.pid);
+		assert.ok(identity);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				daemon: identity,
+				daemonPid: identity.pid,
+			}),
+		);
+		const foreground = await f.generate();
+		assert.equal(foreground.status, 0, foreground.output);
+		const id = transition !== "same-worker" ? "fake-new-worker" : "fake-worker";
+		assert.equal(f.json(".boat/state.json").id, id);
+		assert.equal(
+			f.json(".boat/state.json").daemon.startTicks,
+			identity.startTicks,
+		);
+		f.local("notes.txt", "edit after foreground completed\n");
+		flag(f, "release-daemon-generation");
+		const destination = transition !== "same-worker" ? f.worker : oldWorker;
+		await observed(() => {
+			assert.equal(daemon.terminal, null, daemon.output());
+			return (
+				fs.readFileSync(path.join(destination, "notes.txt"), "utf8") ===
+					"edit after foreground completed\n" &&
+				freshCalls(f).some((a) => a.includes("extend") && a.includes(id))
+			);
+		}, "automatic current-generation edit and renewal");
+		f.local("notes.txt", "second automatic edit\n");
+		fs.rmSync(path.join(f.root, "automatic-delete.txt"));
+		await observed(() => {
+			assert.equal(daemon.terminal, null, daemon.output());
+			return (
+				fs.readFileSync(path.join(destination, "notes.txt"), "utf8") ===
+					"second automatic edit\n" &&
+				!fs.existsSync(path.join(destination, "automatic-delete.txt"))
+			);
+		}, "automatic subsequent edit and deletion without foreground Make");
+		assert.equal(liveOwnedProcess(f.root, identity), true);
+		assert.equal(liveOwnedProcess(f.root, sibling), true);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "wrong-generation")),
+			false,
+		);
+		if (transition !== "same-worker")
+			assert.deepEqual(oldInventory(), oldBefore);
+	});
+
+test("fresh lifecycle ordinary command rejects superseded generation before source effects", async (t) => {
+	const f = await freshCheckout(t);
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify({ sandbox: { id: "fake-worker", state: "ready" } }),
+	);
+	const primed = await f.generate();
+	assert.equal(primed.status, 0, primed.output);
+	const oldWorker = path.join(f.directory, "old-worker");
+	fs.cpSync(f.worker, oldWorker, { recursive: true });
+	f.env.FAKE_OLD_WORKER = oldWorker;
+	const hook = path.join(f.directory, "ordinary-generation.cjs");
+	fs.writeFileSync(
+		hook,
+		`const fs=require('fs'),path=require('path');
+if(process.argv[2]==='command'&&process.argv.includes('SCRIPT=dev:configure')){
+ const rename=fs.renameSync;let held=false;
+ fs.renameSync=function(from,to){
+ if(!held&&/\\.boat\\/command-\\d+\\.json$/.test(String(to))){held=true;
+ fs.writeFileSync(path.join(process.env.FAKE_CONTROL,'ordinary-generation-entered'),'yes');
+ while(!fs.existsSync(path.join(process.env.FAKE_CONTROL,'release-ordinary-generation')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ }
+ return rename.call(this,from,to);};
+}`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const ordinary = f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	);
+	await observed(
+		() => fs.existsSync(path.join(f.control, "ordinary-generation-entered")),
+		"ordinary command before lease publication",
+	);
+	useFreshPolicy(f);
+	const replacement = await f.generate();
+	assert.equal(replacement.status, 0, replacement.output);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	const count = freshCalls(f).length;
+	flag(f, "release-ordinary-generation");
+	const result = await ordinary.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation changed/);
+	assert.equal(
+		freshCalls(f)
+			.slice(count)
+			.some((a) => a.includes("ssh") || a.includes("exec")),
+		false,
+	);
+	assert.equal(fs.existsSync(path.join(f.control, "wrong-generation")), false);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+});
+
+test("fresh lifecycle real daemon retains uncertain source writer as a truthful failure", async (t) => {
+	const f = await freshCheckout(t);
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify({ sandbox: { id: "fake-worker", state: "ready" } }),
+	);
+	const writer = {
+		workerId: "fake-worker",
+		commandId: "cmd_uncertain",
+		terminal: null,
+	};
+	f.local(".boat/source-writer.json", JSON.stringify(writer));
+	const daemon = f.daemon();
+	await observed(
+		() => daemon.closed,
+		"real daemon reports uncertain writer failure",
+	);
+	const result = await daemon.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Source writer completion is uncertain/);
+	assert.deepEqual(f.json(".boat/source-writer.json"), writer);
+	assert.equal(
+		freshCalls(f).some(
+			(a) => a.includes("ssh") || a.includes("exec") || a.includes("extend"),
+		),
+		false,
+	);
+	assert.equal(
+		liveOwnedProcess(f.root, f.json(".boat/state.json").daemon),
+		true,
+	);
+});

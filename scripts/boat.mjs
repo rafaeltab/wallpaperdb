@@ -269,7 +269,13 @@ function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
+async function lock(
+	fn,
+	name = "lifecycle",
+	deadline = Infinity,
+	shutdown,
+	{ waitForOwner = true } = {},
+) {
 	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
 		if (shutdown && performance.now() >= shutdown.deadline)
@@ -289,6 +295,7 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 				pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
 			} catch (error) {
 				if (error.code !== "ENOENT") throw error;
+				if (!waitForOwner) return null;
 				if (attempt > 600) throw new Error("Lifecycle lock timed out");
 				// mkdir/pid publication and owner release are separate filesystem steps.
 				// Missing publication never authorizes removing another owner's lock.
@@ -310,6 +317,7 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 				fs.rmSync(lockDir, { recursive: true, force: true });
 				continue;
 			}
+			if (!waitForOwner) return null;
 			if (attempt > 600) throw new Error("Lifecycle lock timed out");
 			await wait(
 				Math.max(
@@ -529,23 +537,31 @@ function manifest() {
 	}
 	return result;
 }
+function startupWorker(id) {
+	if (read(stateFile).id !== id)
+		throw new Error(
+			"Worker generation changed; no source synchronization or generation permitted",
+		);
+	return snapshots.startup();
+}
+async function syncOwned(id, capture) {
+	startupWorker(id);
+	assertSourceWriterStopped();
+	recoverPublication(root, acceptSource);
+	const source = manifest();
+	const intended = capture?.(source);
+	await syncSource(id, source);
+	if (
+		capture &&
+		JSON.stringify(capture(manifest())) !== JSON.stringify(intended)
+	)
+		throw new Error(
+			"Migration source changed during authoritative flush; no launch",
+		);
+	return intended;
+}
 async function sync(id, capture) {
-	return lock(async () => {
-		snapshots.startup();
-		assertSourceWriterStopped();
-		recoverPublication(root, acceptSource);
-		const source = manifest();
-		const intended = capture?.(source);
-		await syncSource(id, source);
-		if (
-			capture &&
-			JSON.stringify(capture(manifest())) !== JSON.stringify(intended)
-		)
-			throw new Error(
-				"Migration source changed during authoritative flush; no launch",
-			);
-		return intended;
-	}, "source");
+	return lock(() => syncOwned(id, capture), "source");
 }
 // Caller holds source.lock, including while accepting generated source.
 async function syncSource(id, after, sourceRoot = root) {
@@ -779,7 +795,7 @@ async function generate(id, started, kind) {
 				transport: {
 					workerId: id,
 					assertStopped: () => {
-						snapshots.startup();
+						startupWorker(id);
 						assertSourceWriterStopped();
 					},
 					sync: (source, snapshot) => syncSource(id, source, snapshot),
@@ -1020,7 +1036,11 @@ async function stopAdmission(budget) {
 		`Stopped owned candidate ${a.candidate.id}; admission history retained, no replacement admitted.`,
 	);
 }
-async function stop(remove = false, targets, { preserveIntent = false } = {}) {
+async function stop(
+	remove = false,
+	targets,
+	{ preserveIntent = false, expectedWorkerId } = {},
+) {
 	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
 		fs.appendFileSync(
 			path.join(dir, "shutdown-processes.jsonl"),
@@ -1038,6 +1058,10 @@ async function stop(remove = false, targets, { preserveIntent = false } = {}) {
 	try {
 		return await lock(
 			async () => {
+				// A daemon's idle/cost decision belongs to the generation it observed.
+				// Explicit stop/settle calls still clean all of their owned obligations.
+				if (expectedWorkerId && read(stateFile).id !== expectedWorkerId)
+					return false;
 				const errors = [];
 				try {
 					await stopAdmission(budget);
@@ -1471,18 +1495,36 @@ async function runDaemon() {
 			accounting() >= 9.9 ||
 			(!active && Date.now() - s.lastActivity >= 1800000)
 		) {
-			await stop();
+			const stopped = await stop(false, undefined, { expectedWorkerId: s.id });
+			if (stopped === false) continue;
 			return;
 		}
-		await sync(s.id);
-		const fresh = read(stateFile);
-		if (
-			Date.now() - extended > 60000 &&
-			(active || Date.now() - fresh.lastActivity < 60000)
-		) {
-			await boat(["extend", s.id, "--ttl", "2100"]);
-			extended = Date.now();
-		}
+		// Select and use one generation after bootstrap, in lifecycle -> source
+		// order. A busy source owner yields the lifecycle lock immediately so other
+		// foreground commands can publish leases and wait on source normally.
+		const running = await lock(async () => {
+			const current = read(stateFile);
+			if (!current.id || !current.runningSince) return false;
+			return lock(
+				async () => {
+					await syncOwned(current.id);
+					const fresh = read(stateFile);
+					if (
+						Date.now() - extended > 60000 &&
+						(active || Date.now() - fresh.lastActivity < 60000)
+					) {
+						await boat(["extend", current.id, "--ttl", "2100"]);
+						extended = Date.now();
+					}
+					return true;
+				},
+				"source",
+				Infinity,
+				undefined,
+				{ waitForOwner: false },
+			);
+		});
+		if (running === false) return;
 		event("resources", {
 			local: resourceSample(),
 			estimatedExperimentCost: accounting(),

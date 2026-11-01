@@ -250,8 +250,6 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     // The PR's old parent boundary is captured before any refs change.
     const parent = await git(['merge-base', item.parent, item.commit], signal);
     if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
-    if (await isAncestor(item.commit, onto, signal)) return 'contained' as const;
-    if (!(await isAncestor(parent, onto, signal))) return;
     await mkdir(dir, { recursive: true });
     const path = await mkdtemp(join(dir, 'replay-'));
     await git(['worktree', 'add', '--detach', path, item.commit], signal);
@@ -271,19 +269,56 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const tree = (await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim();
     return { ...item, parent, next, onto, target, tree };
   };
-  const combine = async (
-    ranked: readonly { item: Layer; depth: number }[],
-    dir: string,
+  const coveredBy = async (commit: string, heads: readonly string[], signal?: AbortSignal) => {
+    for (const head of heads) if (await isAncestor(commit, head, signal)) return true;
+    return false;
+  };
+  const nextLayer = async (
+    remaining: readonly Layer[],
+    covered: readonly string[],
     signal?: AbortSignal
   ) => {
-    const first = ranked[0];
+    for (const item of remaining) {
+      if (await coveredBy(item.commit, covered, signal)) return { item, alreadyIncluded: true };
+      if (await coveredBy(item.parent, covered, signal)) return { item, alreadyIncluded: false };
+    }
+    return null;
+  };
+  const orderFrom = async (anchor: Layer, layers: readonly Layer[], signal?: AbortSignal) => {
+    const order = [anchor];
+    const covered = [anchor.commit];
+    let remaining = layers.filter((item) => item.issue !== anchor.issue);
+    while (remaining.length) {
+      const next = await nextLayer(remaining, covered, signal);
+      if (!next) return null;
+      remaining = remaining.filter((item) => item.issue !== next.item.issue);
+      if (next.alreadyIncluded) continue;
+      order.push(next.item);
+      covered.push(next.item.commit);
+    }
+    return order;
+  };
+  const replayOrder = async (layers: readonly Layer[], signal?: AbortSignal) => {
+    const sources = await Promise.all(
+      layers.map(async (item) => ({
+        ...item,
+        parent: await git(['merge-base', item.parent, item.commit], signal),
+      }))
+    );
+    for (const anchor of sources) {
+      const order = await orderFrom(anchor, sources, signal);
+      if (order) return order;
+    }
+    return null;
+  };
+  const combine = async (order: readonly Layer[], dir: string, signal?: AbortSignal) => {
+    const first = order[0];
     if (!first) return;
-    let onto = first.item.commit;
-    let target = first.item.branch;
+    let onto = first.commit;
+    let target = first.branch;
     const replay: Intent['replay'] = [];
-    for (const { item } of ranked.slice(1)) {
+    for (const item of order.slice(1)) {
       const result = await replayLayer(item, onto, target, dir, signal);
-      if (result === 'contained') continue;
       if (!result) return;
       replay.push(result);
       onto = result.next;
@@ -363,17 +398,15 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       return;
     }
     if (!(await writers(layers, signal))) return;
-    const ranked = await Promise.all(
-      layers.map(async (item) => ({
-        item,
-        depth: Number(await git(['rev-list', '--count', `${base}..${item.commit}`], signal)),
-      }))
-    );
-    ranked.sort((a, b) => b.depth - a.depth || a.item.issue - b.item.issue);
-    const replay = await combine(ranked, dir, signal);
+    const order = await replayOrder(layers, signal);
+    if (!order) {
+      await publish(dir, 'blocked.json', { kind: 'missing-parent-boundary' });
+      return;
+    }
+    const replay = await combine(order, dir, signal);
     if (!replay?.length) return;
     const groups = await groupsFor(
-      ranked.map(({ item }) => item.pr),
+      layers.map((item) => item.pr),
       signal
     );
     const replayed = new Set(replay.map((item) => item.pr));
@@ -534,22 +567,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     dir: string,
     signal?: AbortSignal
   ) => {
-    const current = z
-      .object({ headRefOid: sha, baseRefName: z.string(), state: z.string() })
-      .parse(
-        await gh(
-          [
-            'pr',
-            'view',
-            String(item.pr),
-            '--repo',
-            'rafaeltab/wallpaperdb',
-            '--json',
-            'headRefOid,baseRefName,state',
-          ],
-          signal
-        )
-      );
+    const current = await prState(item, signal);
     if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
     const recorded = z
       .object({
@@ -667,22 +685,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   }
   const metadataMatches = async (operation: Intent, signal?: AbortSignal) => {
     for (const item of operation.replay) {
-      const current = z
-        .object({ headRefOid: sha, baseRefName: z.string(), state: z.string() })
-        .parse(
-          await gh(
-            [
-              'pr',
-              'view',
-              String(item.pr),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'headRefOid,baseRefName,state',
-            ],
-            signal
-          )
-        );
+      const current = await prState(item, signal);
       if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
     }
     const groups = await groupsFor(operation.members, signal);

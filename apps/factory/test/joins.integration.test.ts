@@ -822,6 +822,8 @@ it.each([
 it.each([
   { outcome: 'SIMPLE' as const, review: false, ready: true },
   { outcome: 'COMPLEX' as const, review: true, ready: true },
+  { outcome: 'COMPLEX' as const, review: true, repair: true, ready: true },
+  { outcome: 'SIMPLE' as const, staleRun: true, ready: false },
   { outcome: 'COMPLEX' as const, review: false, ready: false },
   { outcome: undefined, review: false, ready: false },
   { outcome: 'SIMPLE' as const, review: false, stale: true, ready: false },
@@ -838,6 +840,9 @@ it.each([
     await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
     const ready = await Effect.runPromise(f.reopen().inspect(5));
     expect(ready.blockersReady).toBe(scenario.ready);
+    expect(await Effect.runPromise(f.issues.recoveries?.() ?? Effect.succeed([]))).toEqual([
+      expect.objectContaining({ issue: 4, threadId: 'restacker' }),
+    ]);
     if (scenario.ready) {
       const head = ready.prerequisite?.base;
       expect(f.git('show', `${head}:shared.txt`)).toContain('resolved');
@@ -898,6 +903,26 @@ it('keeps a classified SIMPLE resolution incomplete until CI verifies its publis
     await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
     expect((await Effect.runPromise(f.reopen().inspect(5))).prerequisite?.base).toBe(current);
     expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
+it('exposes the current structured T3 question without establishing readiness', async () => {
+  const f = await fixture({
+    conflict: true,
+    restack: { mcp: true, question: 'May I change this requirement?' },
+  });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+      blockersReady: false,
+      recovery: { question: 'May I change this requirement?', threadId: 'restacker' },
+    });
+    expect(await Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]))).toEqual([
+      expect.objectContaining({ active: false, question: 'May I change this requirement?' }),
+    ]);
   } finally {
     await f.close();
   }

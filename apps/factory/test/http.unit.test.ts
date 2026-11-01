@@ -512,3 +512,48 @@ it('translates a valid scheduler command rejected by the capability into 422 Pro
     await app.close();
   }
 });
+
+it.each([false, true])(
+  'renders recovery classification, progress and escaped questions, classified=%s',
+  async (classified) => {
+    const state = { revision: 0, concurrency: 1, allowance: 1, paused: false, admissions: [] };
+    const app = operationsServer({
+      base: intent.base,
+      job: idle,
+      run: Effect.runPromise,
+      scheduler: {
+        status: () =>
+          Effect.succeed({
+            state,
+            jobs: [],
+            recoveries: [
+              {
+                issue: 584,
+                pr: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+                classification: classified ? ('COMPLEX' as const) : undefined,
+                progress: 'Awaiting independent review-loop',
+                question: classified ? '<script>scope?</script>' : undefined,
+                threadId: classified ? 'recovery-thread' : undefined,
+              },
+            ],
+          }),
+        configure: () => Effect.succeed('saved'),
+        tick: () => Effect.succeed({ state, jobs: [] }),
+        start: idle.start,
+        resume: idle.resume,
+        cancel: idle.cancel,
+      },
+    });
+    try {
+      const response = await app.inject('/');
+      expect(response.body).toContain(`Classification: ${classified ? 'COMPLEX' : 'Unclassified'}`);
+      expect(response.body).toContain('Awaiting independent review-loop');
+      if (classified) {
+        expect(response.body).toContain('Question: &lt;script&gt;scope?&lt;/script&gt;');
+        expect(response.body).toContain('t3-thread://v1/recovery-thread');
+      }
+    } finally {
+      await app.close();
+    }
+  }
+);

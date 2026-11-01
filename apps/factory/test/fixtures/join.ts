@@ -8,6 +8,9 @@ export async function joinFixture(
     conflict?: boolean;
     restack?: {
       loseLaunch?: boolean;
+      repair?: boolean;
+      staleRun?: boolean;
+      mcp?: boolean;
       outcome?: 'SIMPLE' | 'COMPLEX';
       review?: boolean;
       stale?: boolean;
@@ -129,6 +132,13 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
       ),
     },
   });
+  await writeFile(join(host.directory, 'mcp-auth'), 'controlled-protocol');
+  const mcp = options.restack?.mcp
+    ? {
+        mcpEndpoint: 'http://controlled.invalid/mcp',
+        mcpAuthorizationFile: join(host.directory, 'mcp-auth'),
+      }
+    : {};
   const issues = githubIssues({
     project: host.repository,
     base: host.base,
@@ -140,6 +150,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
       directory: join(host.directory, 'joins'),
       binary: host.binary,
       projectId: 'project-id',
+      ...mcp,
     },
   });
   return {
@@ -160,6 +171,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
           directory: join(host.directory, 'joins'),
           binary: host.binary,
           projectId: 'project-id',
+          ...mcp,
         },
       }),
     close: async () => {

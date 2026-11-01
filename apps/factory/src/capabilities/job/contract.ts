@@ -72,18 +72,17 @@ export interface Control {
   };
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
+export interface RecoveryStatus {
+  readonly issue: number;
+  readonly pr: string;
+  readonly progress: string;
+  readonly active?: boolean;
+  readonly classification?: 'SIMPLE' | 'COMPLEX';
+  readonly threadId?: string;
+  readonly question?: string;
+}
 export interface Issues {
-  recoveries?(): Effect.Effect<
-    readonly {
-      issue: number;
-      pr: string;
-      progress: string;
-      classification?: 'SIMPLE' | 'COMPLEX';
-      threadId?: string;
-      question?: string;
-    }[],
-    Unavailable
-  >;
+  recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
   /** Advance only already durable prerequisite joins, even while their CI waits
    * occupy capacity. Never reserves a new join or admits a child. */
   reconcile?(): Effect.Effect<void, Unavailable>;
@@ -110,6 +109,7 @@ export interface Issues {
       joinRequired?: boolean;
       recovery?: {
         readonly progress: string;
+        readonly active?: boolean;
         readonly classification?: 'SIMPLE' | 'COMPLEX';
         readonly threadId?: string;
         readonly question?: string;

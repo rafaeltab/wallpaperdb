@@ -9,6 +9,7 @@ import {
   JobStore,
   Time,
   Unavailable,
+  type Status,
 } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
 import { fileStore, fileScheduleStore } from '../adapters/store/index.js';
@@ -22,7 +23,11 @@ import {
   JobPool,
   ScheduleStore,
 } from '../capabilities/plan/index.js';
-import { githubIssues, githubPlanning } from '../adapters/github/index.js';
+import {
+  githubIssues,
+  githubPlanning,
+  type VerifiedPrerequisite,
+} from '../adapters/github/index.js';
 import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command } from '../platform/index.js';
@@ -92,28 +97,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     throw new Error('T3 installation lacks required headless thread interface');
   const readyPrerequisites = () =>
     Effect.gen(function* () {
-      const result: {
-        issue: number;
-        pr: number;
-        commit: string;
-        reviewedCommit?: string;
-        context?: string;
-        owningThreadId?: string;
-      }[] = [];
+      const result: VerifiedPrerequisite[] = [];
       for (const admission of (yield* scheduleStore.read()).admissions) {
-        const status = yield* (yield* pool.job(admission.issue)).status();
-        if (status.kind !== 'job' || !status.delivery?.ready) continue;
-        const pr = status.delivery.pr;
-        if (pr?.kind === 'found')
-          result.push({
-            issue: admission.issue,
-            pr: Number(pr.url.split('/').at(-1)),
-            commit: pr.commit,
-            reviewedCommit: pr.reviewedCommit,
-            context: status.intent.context,
-            owningThreadId:
-              status.execution.kind === 'found' ? status.execution.threadId : undefined,
-          });
+        const assertion = readyAssertion(yield* (yield* pool.job(admission.issue)).status());
+        if (assertion) result.push(assertion);
       }
       return result;
     });
@@ -313,6 +300,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       }
     })());
   return { app, close };
+}
+
+function readyAssertion(status: Status): VerifiedPrerequisite | null {
+  if (status.kind !== 'job' || !status.delivery?.ready) return null;
+  const pr = status.delivery.pr;
+  if (pr?.kind !== 'found') return null;
+  return {
+    issue: status.intent.issue,
+    pr: Number(pr.url.split('/').at(-1)),
+    commit: pr.commit,
+    reviewedCommit: pr.reviewedCommit,
+    context: status.intent.context,
+    owningThreadId: status.execution.kind === 'found' ? status.execution.threadId : undefined,
+  };
 }
 
 async function adoptLegacy(directory: string, scheduleStore: ScheduleStore) {

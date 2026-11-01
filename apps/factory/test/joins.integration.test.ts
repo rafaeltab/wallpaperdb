@@ -14,6 +14,8 @@ async function fixture(
     conflict?: boolean;
     duplicate?: boolean;
     multiple?: boolean;
+    cCommits?: number;
+    reverse?: boolean;
     groups?: boolean;
     descendant?: boolean;
     merge?: boolean;
@@ -66,7 +68,8 @@ async function fixture(
   }
   git('switch', '-c', 'C', a);
   let c = await commit('C');
-  if (options.multiple) c = await commit('C2');
+  for (let index = 2; index <= (options.cCommits ?? (options.multiple ? 2 : 1)); index++)
+    c = await commit(`C${index}`);
   git('push', 'origin', 'A', 'B', 'C', 'D');
   if (options.descendant) git('branch', 'F', c);
   git('switch', '--detach', host.base);
@@ -92,6 +95,12 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
     joinWriterBranch: options.descendant ? 'F' : 'C',
     join: {
       lose: options.lose,
+      blockers: options.reverse
+        ? [
+            { number: 4, state: 'open' },
+            { number: 3, state: 'open' },
+          ]
+        : undefined,
       originalHeads: { 101: a, 102: b, 103: d, 104: c },
       groups: options.groups
         ? [
@@ -541,3 +550,30 @@ it('waits for an active descendant writer before rewriting its prerequisite', as
     await f.close();
   }
 });
+
+it.each([false, true])(
+  'joins a longer C path without depending on native blocker order, reversed=%s',
+  async (reverse) => {
+    const f = await fixture({ cCommits: 3, reverse });
+    try {
+      if (!f.issues.prepare) throw new Error('Missing preparation');
+      await Effect.runPromise(f.issues.prepare(5));
+      const ready = await Effect.runPromise(f.issues.inspect(5));
+      expect(ready.blockersReady).toBe(true);
+      const head = ready.prerequisite?.base;
+      if (!head) throw new Error('Missing verified join');
+      expect(f.git('log', '--format=%s', `${f.host.base}..${head}`)).toBe('C3\nC2\nC\nD\nB\nA');
+      expect(f.git('diff', '--name-only', `${f.d}..${head}`)).toBe('C.txt\nC2.txt\nC3.txt');
+      expect(f.git('rev-list', '--merges', `${f.host.base}..${head}`)).toBe('');
+      const metadata = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+      expect(metadata.prs['104'].base).toBe('D');
+      expect(metadata.members).toEqual(
+        [101, 102, 103, 104].map(
+          (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
+        )
+      );
+    } finally {
+      await f.close();
+    }
+  }
+);

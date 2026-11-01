@@ -103,7 +103,7 @@ export const JobLive = Layer.effect(
           const id = `${createdAt}-${yield* Random.nextInt}-${yield* Random.nextInt}`;
           const intent: Intent = {
             ...command,
-            prBase: prerequisiteTarget(command, issue.prerequisite),
+            ...prerequisiteBinding(command, issue.prerequisite),
             id,
             createdAt,
             issueUrl: issue.url,
@@ -193,6 +193,8 @@ function matchesPrerequisite(command: Start, prerequisite?: { base: string }) {
   return !prerequisite || command.base === prerequisite.base;
 }
 
-function prerequisiteTarget(command: Start, prerequisite?: { prBase: string }) {
-  return prerequisite?.prBase ?? command.prBase;
+function prerequisiteBinding(command: Start, prerequisite?: { prBase: string; evidence: string }) {
+  return prerequisite
+    ? { prBase: prerequisite.prBase, prerequisiteEvidence: prerequisite.evidence }
+    : { prBase: command.prBase, prerequisiteEvidence: command.prerequisiteEvidence };
 }

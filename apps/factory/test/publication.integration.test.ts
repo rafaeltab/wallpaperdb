@@ -237,3 +237,61 @@ it('reports current CI step progress and rejects unrelated run or head observati
     await close();
   }
 });
+
+it('observes a child PR against its stored target instead of the configured default', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const adapter = githubIssues({
+      project: host.repository,
+      base: host.base,
+      prBase: 'main',
+      prerequisites: [],
+    });
+    const intent: Intent = {
+      id: 'fork',
+      issue: 574,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/574',
+      base: host.base,
+      prBase: 'factory/A',
+      context: '',
+      branch: 'factory/B',
+      createdAt: 1,
+      expectedStage: 'implementation',
+    };
+    await host.save({
+      prs: [
+        {
+          url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+          headRefName: 'factory/B',
+          baseRefName: 'factory/A',
+          headRefOid: host.base,
+          baseRefOid: host.base,
+          state: 'OPEN',
+          isDraft: false,
+          mergeable: 'MERGEABLE',
+          statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
+            (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+          ),
+        },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.pullRequest(intent))).toMatchObject({
+      kind: 'found',
+      commit: host.base,
+      ready: true,
+    });
+    const calls = (await host.calls()).filter(
+      (call) => call.binary === 'gh' && call.args[0] === 'pr' && call.args[1] === 'list'
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0].args[calls[0].args.indexOf('--base') + 1]).toBe('factory/A');
+  } finally {
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

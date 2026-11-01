@@ -130,6 +130,11 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
       await runtime.runPromise(
         scheduler.configure({ revision: -1, concurrency: 2, allowance: 2, paused: false })
       );
+      expect(
+        await runtime.runPromise(
+          scheduler.start({ issue: 574, base: host.base, context: 'x'.repeat(16000) })
+        )
+      ).toMatchObject({ kind: 'job' });
       const status = await runtime.runPromise(scheduler.tick(host.base));
       expect(status.jobs).toHaveLength(2);
       const comparisons = [];
@@ -139,6 +144,15 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
         expect(job.execution.status).toBe('running');
         expect(job.intent.base).toBe(a);
         expect(job.intent.prBase).toBe('factory/pr-591');
+        const reopened = await Effect.runPromise(
+          fileStore(join(host.directory, `job-${job.intent.issue}`)).read()
+        );
+        expect(reopened).toMatchObject({
+          base: a,
+          prBase: 'factory/pr-591',
+          prerequisiteEvidence: expect.stringContaining(a),
+        });
+        if (job.intent.issue === 574) expect(reopened?.context).toBe('x'.repeat(16000));
         expect(await readFile(join(job.execution.worktree, 'A.txt'), 'utf8')).toBe(
           'Verified prerequisite code'
         );

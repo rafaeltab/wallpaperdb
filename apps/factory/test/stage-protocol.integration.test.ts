@@ -262,3 +262,16 @@ it('accepts a latest watcher receipt only with the owning delivery identity and 
       });
     }
   }));
+
+it('delivers the durable per-job PR target instead of the configured default', () =>
+  stageFixture(async ({ host, adapter, intent, review }) => {
+    await host.save({ lost: false, idempotency: true });
+    await Effect.runPromise(adapter.sendStage({ ...intent, prBase: 'factory/A' }, review));
+    const sends = (await host.calls()).filter(
+      (call) => call.args[1] === 'send' && !call.args.includes('--help')
+    );
+    expect(sends).toHaveLength(1);
+    expect(sends[0].args[3]).toContain(
+      'against PR target factory/A, pinned comparison ' + host.base
+    );
+  }));

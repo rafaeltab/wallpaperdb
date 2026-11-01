@@ -299,7 +299,13 @@ async function adoptLegacy(directory: string, scheduleStore: ScheduleStore) {
           revision: state.revision + 1,
           admissions: [
             ...state.admissions,
-            { issue: legacy.issue, base: legacy.base, context: legacy.context },
+            {
+              issue: legacy.issue,
+              base: legacy.base,
+              context: legacy.context,
+              prBase: legacy.prBase,
+              prerequisiteEvidence: legacy.prerequisiteEvidence,
+            },
           ],
         })
       );

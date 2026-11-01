@@ -11,6 +11,7 @@ export interface Intent {
   readonly id: string;
   readonly issue: number;
   readonly issueUrl: string;
+  readonly prerequisiteEvidence?: string;
   readonly prBase?: string;
   readonly base: string;
   readonly context: string;
@@ -104,6 +105,7 @@ export interface Execution {
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
   readonly issue: number;
+  readonly prerequisiteEvidence?: string;
   readonly prBase?: string;
   readonly base: string;
   readonly context: string;

@@ -265,7 +265,8 @@ function plannedStart(
   return {
     issue: selection.issue,
     base,
-    context:
+    context: '',
+    prerequisiteEvidence:
       preview.input.issues.find((issue) => issue.number === selection.issue)
         ?.prerequisiteEvidence ?? '',
   };
@@ -306,7 +307,7 @@ function prerequisiteStart(
         ...command,
         base: prerequisite.base,
         prBase: prerequisite.prBase,
-        context: `${command.context}\nVerified prerequisite evidence: ${prerequisite.evidence}`,
+        prerequisiteEvidence: prerequisite.evidence,
       }
     : command;
 }

@@ -1921,9 +1921,15 @@ try {
 			console.log(
 				"Remote cleanup skipped: another worktree owner remains active.",
 			);
-		else if (read(stateFile).id) {
-			event("settle-stop", { owners: owners.owners });
-			await stop(false, ["stop"], { preserveIntent: true });
+		else {
+			const state = read(stateFile);
+			if (
+				state.id ||
+				(state.admission && state.admission.status !== "published")
+			) {
+				event("settle-stop", { owners: owners.owners });
+				await stop(false, ["stop"], { preserveIntent: true });
+			}
 		}
 	} else
 		throw new Error(

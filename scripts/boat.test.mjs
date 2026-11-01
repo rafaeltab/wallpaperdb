@@ -11232,3 +11232,99 @@ for (const outcome of ["uncertain", "completed-then-active"])
 		);
 		assert.ok(dollars > (before.cost ?? 0) + (before.admission.cost ?? 0));
 	});
+
+function settleOwner(f, active = false) {
+	f.env.T3CODE_HOME = path.join(f.directory, "t3");
+	fs.mkdirSync(path.join(f.env.T3CODE_HOME, "userdata"), { recursive: true });
+	execFileSync("python", [
+		"-c",
+		`import sqlite3,json,sys
+c=sqlite3.connect(sys.argv[1])
+c.execute('create table orchestration_v2_projection_threads(payload_json text)')
+c.execute('create table orchestration_v2_projection_runs(thread_id text,status text)')
+c.execute('insert into orchestration_v2_projection_threads values (?)',(json.dumps({'id':'fixture-owner','worktreePath':sys.argv[2],'settledOverride':sys.argv[3]}),))
+c.commit()`,
+		path.join(f.env.T3CODE_HOME, "userdata/statev2.sqlite"),
+		f.root,
+		active ? "active" : "settled",
+	]);
+}
+
+for (const variant of [
+	"initial",
+	"lost",
+	"main",
+	"failed-main",
+	"unknown",
+	"empty",
+	"active",
+])
+	test(`fresh lifecycle settle handles ${variant} owned compute without new admission`, async (t) => {
+		const f = await freshCheckout(t);
+		settleOwner(f, variant === "active");
+		if (["initial", "unknown", "empty"].includes(variant)) {
+			const state = f.json(".boat/state.json");
+			delete state.id;
+			state.runningSince = null;
+			f.local(".boat/state.json", JSON.stringify(state));
+		}
+		if (variant === "lost")
+			fs.writeFileSync(path.join(f.control, "info-error"), "not_found");
+		if (variant !== "empty") {
+			flag(f, variant === "unknown" ? "ambiguous-create" : "candidate-kill");
+			const interrupted = await f.generate();
+			assert.notEqual(interrupted.status, 0);
+		}
+		if (variant === "failed-main") {
+			flag(f, "candidate-stop-uncertain");
+			fs.rmSync(path.join(f.control, "provider-info"));
+		}
+		const before = f.json(".boat/state.json"),
+			calls = freshCalls(f).length;
+		const result = await f.run("boat-settle").done;
+		assert.equal(
+			result.status === 0,
+			!["unknown", "failed-main"].includes(variant),
+			result.output,
+		);
+		const effects = freshCalls(f).slice(calls);
+		assert.equal(
+			effects.some(
+				(a) =>
+					a.includes("new") || a.includes("resume") || a.includes("delete"),
+			),
+			false,
+		);
+		if (["empty", "active"].includes(variant)) {
+			assert.equal(effects.length, 0);
+			assert.deepEqual(f.json(".boat/state.json"), before);
+		} else if (variant === "unknown") {
+			assert.match(result.output, /Unknown create obligation/);
+			assert.deepEqual(f.json(".boat/state.json").admission, before.admission);
+		} else {
+			const after = f.json(".boat/state.json");
+			assert.equal(after.id, before.id);
+			assert.equal(
+				effects.filter(
+					(a) => a.includes("stop") && a.includes("fake-new-worker"),
+				).length,
+				1,
+			);
+			assert.equal(after.admission.candidate.id, "fake-new-worker");
+			assert.equal(
+				after.admission.shutdownAttempt.status,
+				variant === "failed-main"
+					? "submission-uncertain"
+					: "completed-observed",
+			);
+			if (variant === "failed-main")
+				assert.ok(
+					effects.some((a) => a.includes("stop") && a.includes("fake-worker")),
+				);
+			else {
+				assert.equal(after.admission.runningSince, null);
+				assert.ok(after.admission.cost > 0);
+			}
+		}
+		assert.equal(liveOwnedProcess(f.root, before.daemon), true);
+	});

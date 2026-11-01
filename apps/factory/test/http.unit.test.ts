@@ -479,3 +479,36 @@ it('renders server-owned scheduler settings and all reserved jobs', async () => 
     await app.close();
   }
 });
+
+it('translates a valid scheduler command rejected by the capability into 422 Problem Details', async () => {
+  const state = { revision: 0, concurrency: 1, allowance: 1, paused: false, admissions: [] };
+  const app = operationsServer({
+    base: intent.base,
+    job: idle,
+    run: Effect.runPromise,
+    scheduler: {
+      status: () => Effect.succeed({ state, jobs: [] }),
+      configure: () => Effect.succeed('rejected'),
+      tick: () => Effect.succeed({ state, jobs: [] }),
+      start: idle.start,
+      resume: idle.resume,
+      cancel: idle.cancel,
+    },
+  });
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/scheduler',
+      payload: { revision: 0, concurrency: 2, allowance: -1, paused: false },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.json()).toEqual({
+      status: 422,
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/factory-command.md',
+      title: 'Controls changed or limits invalid. Refresh observation.',
+    });
+  } finally {
+    await app.close();
+  }
+});

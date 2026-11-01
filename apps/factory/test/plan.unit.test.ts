@@ -137,3 +137,11 @@ it('does not propose an already parked job as fresh work', async () => {
   expect(result.selected).toEqual([]);
   expect(result.rejected).toContainEqual({ issue: 580, reason: 'Already active or parked' });
 });
+
+it('rejects a proposal that both selects and defers the same issue', async () => {
+  const result = await preview([issue], {
+    selected: proposal.selected,
+    deferred: [{ issue: 580, reason: 'API contract unsettled' }],
+  });
+  expect(result.selected).toEqual([]);
+});

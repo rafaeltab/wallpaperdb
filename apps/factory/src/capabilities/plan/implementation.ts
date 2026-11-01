@@ -48,6 +48,12 @@ function semanticReason(item: Proposal['selected'][number], input: PlanningInput
     return 'Already active or parked';
   return undefined;
 }
+function repeated(issue: number, proposal: Proposal) {
+  return (
+    proposal.selected.filter((i) => i.issue === issue).length !== 1 ||
+    proposal.deferred.some((i) => i.issue === issue)
+  );
+}
 function validate(proposal: Proposal, input: PlanningInput) {
   const selected: Proposal['selected'][number][] = [];
   const rejected = input.issues.flatMap((i) => {
@@ -56,11 +62,7 @@ function validate(proposal: Proposal, input: PlanningInput) {
     return reason ? [{ issue: i.number, reason }] : [];
   });
   for (const item of proposal.selected) {
-    const reason = selectionReason(
-      item,
-      input,
-      proposal.selected.filter((i) => i.issue === item.issue).length !== 1
-    );
+    const reason = selectionReason(item, input, repeated(item.issue, proposal));
     if (reason) rejected.push({ issue: item.issue, reason });
     else selected.push(item);
   }

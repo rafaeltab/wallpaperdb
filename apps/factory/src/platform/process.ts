@@ -6,9 +6,10 @@ export async function command(
   args: readonly string[],
   cwd: string,
   signal?: AbortSignal,
-  environment?: NodeJS.ProcessEnv
+  environment?: NodeJS.ProcessEnv,
+  input?: string
 ): Promise<string> {
-  const result = await execute(binary, [...args], {
+  const pending = execute(binary, [...args], {
     cwd,
     env: environment ? { ...process.env, ...environment } : process.env,
     timeout: 30000,
@@ -17,5 +18,7 @@ export async function command(
     encoding: 'utf8',
     signal,
   });
+  if (input !== undefined) pending.child.stdin?.end(input);
+  const result = await pending;
   return result.stdout;
 }

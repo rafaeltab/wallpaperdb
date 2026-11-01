@@ -32,8 +32,17 @@ export function t3Planner(config: {
   project: string;
   projectId: string;
 }): IPlanner {
-  const call = async (args: string[], signal: AbortSignal) =>
-    JSON.parse(await command(config.binary, ['thread', ...args, '--json'], config.project, signal));
+  const call = async (args: string[], signal: AbortSignal, input?: string) =>
+    JSON.parse(
+      await command(
+        config.binary,
+        ['thread', ...args, '--json'],
+        config.project,
+        signal,
+        undefined,
+        input
+      )
+    );
   return {
     propose: (input) =>
       Effect.tryPromise({
@@ -51,7 +60,7 @@ export function t3Planner(config: {
                 [
                   'start',
                   config.projectId,
-                  prompt,
+                  '-',
                   '--title',
                   `Factory plan preview ${requestId}`,
                   '--provider',
@@ -59,7 +68,8 @@ export function t3Planner(config: {
                   '--model',
                   'gpt-6.1-sol',
                 ],
-                signal
+                signal,
+                prompt
               )
             );
           for (let attempt = 0; attempt < 120; attempt++) {

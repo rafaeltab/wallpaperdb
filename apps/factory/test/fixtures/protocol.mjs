@@ -31,7 +31,8 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
       config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context
     );
 } else if (config.planner && args[1] === 'start' && !args.includes('--help')) {
-  const requestId = JSON.parse(args[3].split('Request: ')[1]).requestId;
+  const prompt = args[3] === '-' ? readFileSync(0, 'utf8') : args[3];
+  const requestId = JSON.parse(prompt.split('Request: ')[1]).requestId;
   writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ requestId }));
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
 } else if (config.planner && args[1] === 'show') {

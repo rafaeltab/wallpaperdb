@@ -18,25 +18,33 @@ function exclusion(issue: PlanningIssue): string | undefined {
   if (!issue.blockersReady) return 'Explicit blockers lack verified prerequisite readiness';
   return undefined;
 }
-function cyclic(
-  number: number,
-  issues: readonly PlanningIssue[],
-  path: readonly number[] = []
-): boolean {
-  if (path.includes(number)) return true;
-  const issue = issues.find((i) => i.number === number);
-  return issue?.blockers.some((b) => cyclic(b, issues, [...path, number])) ?? false;
+function cycleCheck(issues: readonly PlanningIssue[]) {
+  const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
+  const completed = new Map<number, boolean>();
+  const active = new Set<number>();
+  const cyclic = (number: number): boolean => {
+    if (active.has(number)) return true;
+    const known = completed.get(number);
+    if (known !== undefined) return known;
+    active.add(number);
+    const result = byNumber.get(number)?.blockers.some(cyclic) ?? false;
+    active.delete(number);
+    completed.set(number, result);
+    return result;
+  };
+  return cyclic;
 }
 function selectionReason(
   item: Proposal['selected'][number],
   input: PlanningInput,
-  duplicates: boolean
+  duplicates: boolean,
+  cyclic: (number: number) => boolean
 ) {
   const issue = input.issues.find((i) => i.number === item.issue);
   if (!issue) return 'Unknown issue in proposal';
   const excluded = exclusion(issue);
   if (excluded) return excluded;
-  if (cyclic(item.issue, input.issues)) return 'Cyclic explicit dependencies';
+  if (cyclic(item.issue)) return 'Cyclic explicit dependencies';
   if (duplicates) return 'Duplicate issue in proposal';
   return semanticReason(item, input);
 }
@@ -55,14 +63,14 @@ function repeated(issue: number, proposal: Proposal) {
   );
 }
 function validate(proposal: Proposal, input: PlanningInput) {
+  const cyclic = cycleCheck(input.issues);
   const selected: Proposal['selected'][number][] = [];
   const rejected = input.issues.flatMap((i) => {
-    const reason =
-      exclusion(i) ?? (cyclic(i.number, input.issues) ? 'Cyclic explicit dependencies' : undefined);
+    const reason = exclusion(i) ?? (cyclic(i.number) ? 'Cyclic explicit dependencies' : undefined);
     return reason ? [{ issue: i.number, reason }] : [];
   });
   for (const item of proposal.selected) {
-    const reason = selectionReason(item, input, repeated(item.issue, proposal));
+    const reason = selectionReason(item, input, repeated(item.issue, proposal), cyclic);
     if (reason) rejected.push({ issue: item.issue, reason });
     else selected.push(item);
   }

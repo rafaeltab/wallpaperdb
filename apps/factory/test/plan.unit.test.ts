@@ -145,3 +145,31 @@ it('rejects a proposal that both selects and defers the same issue', async () =>
   });
   expect(result.selected).toEqual([]);
 });
+
+it('validates shared acyclic prerequisite context without blocking preview', async () => {
+  const issues = Array.from({ length: 42 }, (_, index) => ({
+    ...issue,
+    number: 580 + index,
+    open: index === 0,
+    blockers: [581 + index, 582 + index].filter((number) => number < 622),
+  }));
+  const started = performance.now();
+  const result = await preview(issues);
+  expect(result.selected).toEqual(proposal.selected);
+  expect(performance.now() - started).toBeLessThan(1000);
+});
+
+it('rejects a cycle behind shared prerequisites without rejecting an independent issue', async () => {
+  const result = await preview(
+    [
+      { ...issue, blockers: [581, 582] },
+      { ...issue, number: 581, blockers: [583] },
+      { ...issue, number: 582, blockers: [583] },
+      { ...issue, number: 583, blockers: [581] },
+      { ...issue, number: 584 },
+    ],
+    { selected: [...proposal.selected, { ...selection, issue: 584 }], deferred: [] }
+  );
+  expect(result.selected).toEqual([{ ...selection, issue: 584 }]);
+  expect(result.rejected).toContainEqual({ issue: 580, reason: 'Cyclic explicit dependencies' });
+});

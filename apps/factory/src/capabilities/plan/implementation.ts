@@ -60,11 +60,7 @@ function semanticReason(item: Proposal['selected'][number], input: PlanningInput
   if (!item.reason.trim()) return 'Missing semantic rationale';
   if (item.dependsOn.length) return 'Inferred prerequisite requires resolution before selection';
   if (item.conflicts.length) return 'Semantic conflict requires resolution before selection';
-  if (
-    [input.job, ...(input.jobs ?? [])].some(
-      (job) => job.kind === 'job' && job.intent.issue === item.issue
-    )
-  )
+  if (knownJobs(input).some((job) => job.kind === 'job' && job.intent.issue === item.issue))
     return 'Already active or parked';
   if (input.admissions?.includes(item.issue)) return 'Already admitted';
   return undefined;
@@ -147,4 +143,8 @@ function comparable(input: PlanningInput) {
   const normalize = (job: PlanningInput['job']) =>
     job.kind === 'job' ? { ...job, elapsedMs: 0 } : job;
   return { ...input, job: normalize(input.job), jobs: input.jobs?.map(normalize) };
+}
+
+function knownJobs(input: PlanningInput) {
+  return [input.job, ...(input.jobs ?? [])];
 }

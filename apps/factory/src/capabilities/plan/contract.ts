@@ -58,6 +58,8 @@ export interface ScheduleState {
   readonly concurrency: number;
   readonly allowance: number;
   readonly paused: boolean;
+  /** Durable active-slot claims for uncertain resumption, without another distinct admission. */
+  readonly resuming?: readonly number[];
   /** Distinct reservations are permanent, including uncertain starts. */
   readonly admissions: readonly import('../job/index.js').Start[];
 }

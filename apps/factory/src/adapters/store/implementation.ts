@@ -226,6 +226,7 @@ const scheduleSchema = z
       .int()
       .refine((v) => v === -1 || v > 0),
     paused: z.boolean(),
+    resuming: z.array(z.number().int().positive()).optional(),
     admissions: z.array(
       z
         .object({

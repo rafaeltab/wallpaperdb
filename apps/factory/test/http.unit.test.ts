@@ -450,3 +450,32 @@ it('translates scheduler controls including unlimited limits and stale revisions
     await app.close();
   }
 });
+
+it('renders server-owned scheduler settings and all reserved jobs', async () => {
+  const state = { revision: 4, concurrency: -1, allowance: 3, paused: true, admissions: [] };
+  const job: Status = { kind: 'job', intent, execution: { kind: 'absent' }, elapsedMs: 0 };
+  const app = operationsServer({
+    base: intent.base,
+    job: idle,
+    run: Effect.runPromise,
+    scheduler: {
+      status: () => Effect.succeed({ state, jobs: [{ kind: 'empty' }, { kind: 'empty' }, job] }),
+      configure: () => Effect.succeed('saved'),
+      tick: () => Effect.succeed({ state, jobs: [] }),
+      start: idle.start,
+      resume: idle.resume,
+      cancel: idle.cancel,
+    },
+  });
+  try {
+    const paused = await app.inject('/');
+    expect(paused.body).toContain('Admissions paused.');
+    expect(paused.body).toContain('value="-1"');
+    expect(paused.body).toContain('Reserved admission awaiting reconciliation.');
+    expect(paused.body).toContain('Issue #576');
+    state.paused = false;
+    expect((await app.inject('/')).body).toContain('Admissions enabled.');
+  } finally {
+    await app.close();
+  }
+});

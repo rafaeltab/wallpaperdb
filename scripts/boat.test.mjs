@@ -876,6 +876,95 @@ function lockFixtureReadiness({
 	};
 }
 
+// Synthetic contracts from the documented detach/status/attach modes, not a
+// historical CLI transcript. Timeout zero implicitly starts and attaches; its
+// sparse frames cannot stand in for the explicit detached start/status receipts.
+// https://docs.boat.dev/long-running-tasks/background-commands
+// https://docs.boat.dev/api/reference/agent/attach-command
+// Ordinary command and Asset database migration streams keep their separate fake.
+const sourceCommandContractFixture = String.raw`
+function sourceFixtureWriter(control, command, startedAt) {
+ const fs=require('fs'),cp=require('child_process'),path=require('path');
+ if(fs.existsSync(path.join(control,'stream-loss')))return;
+ const file=path.join(control,'source-process-'+process.pid),offsets={stdout:0,stderr:0};
+ fs.writeFileSync(file+'.frames','');
+ const child=cp.spawn('bash',['-c',command.replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER)],{env:process.env,stdio:['ignore','pipe','pipe']});
+ for(const type of ['stdout','stderr'])child[type].on('data',bytes=>{
+  offsets[type]+=bytes.length;
+  fs.appendFileSync(file+'.frames',JSON.stringify({type,data:bytes.toString(),nextOffset:offsets[type]})+'\n');
+ });
+ child.on('close',(code,signal)=>{
+  const status={success:true,processId:process.pid,pid:process.pid,command,startedAt,known:true,running:false,status:'exited',exitCode:code,signal,oomKilled:false,finishedAt:new Date().toISOString(),stdout:'',stderr:''};
+  fs.writeFileSync(file+'.status.tmp',JSON.stringify({...status,...offsets}));
+  fs.renameSync(file+'.status.tmp',file+'.status');
+ });
+}
+async function sourceCommandContract() {
+ const generator=argv.includes('exec')&&/make BOAT_EXEC=worker run PACKAGE=(scripts SCRIPT=dependencies:lock|asset SCRIPT=db:generate)$/.test(argv.at(-1));
+ const mode=argv.includes('--attach')?'attach':argv.includes('--status')?'status':argv.includes('--detach')?'detach':'implicit';
+ const followed=mode==='attach'||mode==='status';
+ const processId=followed?Number(argv[argv.indexOf('--'+mode)+1]):null;
+ const prefix=processId&&path.join(control,'source-process-'+processId);
+ if(!generator&&!(followed&&fs.existsSync(prefix+'.start')))return false;
+ const flag=name=>fs.existsSync(path.join(control,name));
+ const override=(name,value)=>{
+  const file=path.join(control,'source-'+name+'-override.json');
+  if(!fs.existsSync(file))return value;
+  for(const [key,entry] of Object.entries(JSON.parse(fs.readFileSync(file)))){
+   if(entry==='__missing__')delete value[key];else value[key]=entry;
+  }
+  return value;
+ };
+ const emit=(phase,value)=>{
+  fs.appendFileSync(path.join(control,'source-protocol-events'),JSON.stringify({phase,value})+'\n');
+  console.log(JSON.stringify(value));
+ };
+ let start;
+ if(generator){
+  if(mode==='implicit'&&!(argv.includes('--timeout')&&argv[argv.indexOf('--timeout')+1]==='0'))throw Error('unsupported source fixture mode');
+  const startedAt=new Date().toISOString(),command=argv.at(-1);
+  const child=cp.spawn(process.execPath,['-e','('+sourceFixtureWriter.toString()+')('+JSON.stringify(control)+','+JSON.stringify(command)+','+JSON.stringify(startedAt)+')'],{env:process.env,cwd:process.env.FAKE_WORKER,stdio:'ignore'});
+  child.unref();
+  start={success:true,processId:child.pid,pid:child.pid,command,startedAt,commandId:'cmd_fixture'+child.pid};
+  fs.writeFileSync(path.join(control,'source-process-'+start.processId+'.start'),JSON.stringify(start));
+  fs.appendFileSync(path.join(control,'source-submissions'),JSON.stringify({mode,start})+'\n');
+  if(mode==='detach'){
+   if(flag('start-ack-loss'))process.exit(70);
+   const response=override('start',{...start});
+   if(flag('missing-started'))delete response.processId;
+   if(flag('launcher-failed'))response.success=false;
+   emit('detach',response);return true;
+  }
+ }else start=JSON.parse(fs.readFileSync(prefix+'.start'));
+ const file=path.join(control,'source-process-'+start.processId);
+ if(mode==='status'){
+  if(!fs.existsSync(file+'.status')){
+   emit('status',override('status',{...start,known:true,running:true,status:'running',exitCode:null,signal:null,oomKilled:false,finishedAt:null,stdout:'',stderr:''}));
+  }else{
+   const completed=JSON.parse(fs.readFileSync(file+'.status'));
+   delete completed.stdout;delete completed.stderr;
+   emit('status',override('status',{...completed,commandId:start.commandId,stdout:'',stderr:''}));
+  }
+  return true;
+ }
+ if(!flag('missing-started'))emit('attach',override('attached',{type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0}));
+ if(flag('stream-loss')){fs.writeFileSync(path.join(control,'writer-active'),'yes');process.exit(71);}
+ let cursor=0;
+ while(true){
+  const frames=fs.existsSync(file+'.frames')?fs.readFileSync(file+'.frames','utf8'):'';
+  const end=frames.lastIndexOf('\n')+1;
+  for(const line of frames.slice(cursor,end).split('\n').filter(Boolean))emit('attach',override('chunk',JSON.parse(line)));
+  cursor=end;
+  if(fs.existsSync(file+'.status')&&(!fs.existsSync(file+'.frames')||cursor===fs.statSync(file+'.frames').size))break;
+  await new Promise(resolve=>setTimeout(resolve,5));
+ }
+ const status=JSON.parse(fs.readFileSync(file+'.status'));
+ if(!flag('missing-terminal'))emit('attach',override('exit',{type:'exit',status:'exited',exitCode:status.exitCode,signal:status.signal,stdoutOffset:status.stdout,stderrOffset:status.stderr}));
+ return true;
+}
+if(await sourceCommandContract())process.exit(0);
+`;
+
 async function lockGenerationCheckout(
 	t,
 	{
@@ -1039,6 +1128,7 @@ if(argv.includes('--lockfile-only')){
  if(JSON.stringify(argv)!==JSON.stringify(['install','--lockfile-only','--no-frozen-lockfile','--ignore-scripts']))throw Error('generator flags changed');
  fs.appendFileSync(path.join(control,'old-locks'),JSON.stringify(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8'))+'\\n');
  fs.appendFileSync(path.join(control,'calls'),'generate\\n');
+ console.log('source fixture lock stdout');console.error('source fixture lock stderr');
  fs.writeFileSync(path.join(control,'entered'),'yes');
  (async()=>{while(fs.existsSync(path.join(control,'pause'))&&!fs.existsSync(path.join(control,'release')))await new Promise(r=>setTimeout(r,10));
  fs.writeFileSync(path.join(root,'pnpm-lock.yaml'),expected());
@@ -1154,6 +1244,7 @@ if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(contro
 if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')&&fs.existsSync(path.join(control,'fail-retire')))process.exit(31);
 if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
+${sourceCommandContractFixture.replace("if(await sourceCommandContract())process.exit(0);", "sourceCommandContract().then(handled=>{if(handled)process.exit(0);else runOrdinaryCommand();});\nfunction runOrdinaryCommand(){")}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
 if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'fail-bootstrap')))process.exit(45);
 if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'pause-bootstrap'))){fs.writeFileSync(path.join(control,'entered-bootstrap'),'yes');while(!fs.existsSync(path.join(control,'release-bootstrap')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
@@ -1161,6 +1252,7 @@ if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+
 if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
 if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){
+ if(fs.existsSync(path.join(control,'source-protocol-events')))fs.appendFileSync(path.join(control,'source-protocol-events'),JSON.stringify({phase:'collect'})+'\\n');
  fs.writeFileSync(path.join(control,'collecting'),'yes');
  if(fs.existsSync(path.join(control,'transfer-fail')))process.exit(31);
  if(fs.existsSync(path.join(control,'framed'))){console.log(JSON.stringify({type:'stdout',data:'invalid framed payload'}));process.exit(0);}
@@ -1177,6 +1269,7 @@ child.on('close',code=>{
  if(stream&&!fs.existsSync(path.join(control,'missing-terminal')))console.log(JSON.stringify({type:'exit',exitCode:code??1,finishedAt:new Date().toISOString(),launcherFailed:fs.existsSync(path.join(control,'launcher-failed')),timedOut:false,oomKilled:false,signal:null,success:code===0}));
  process.exit(code??1);
 });
+}
 `,
 		0o755,
 	);
@@ -3008,6 +3101,104 @@ console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
 			assert.match(result.output, /command deadline exhausted/);
 		}
 	});
+
+test("public lock generation accepts the documented detached source protocol once and preserves output", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local("patches/dependency.patch", "documented source contract patch\n");
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	const submissions = fs
+		.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(submissions.length, 1, "the generator must be submitted once");
+	const [{ mode, start }] = submissions;
+	assert.equal(mode, "detach");
+	assert.equal(start.success, true);
+	assert.ok(Number.isInteger(start.processId) && start.processId > 0);
+	assert.equal(start.pid, start.processId);
+	assert.match(start.commandId, /^cmd_/);
+	assert.equal(typeof start.startedAt, "string");
+	const calls = fs
+		.readFileSync(path.join(f.control, "transport"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.filter((args) => args.includes("exec"));
+	const launches = calls.filter((args) =>
+		args.at(-1).endsWith("PACKAGE=scripts SCRIPT=dependencies:lock"),
+	);
+	assert.equal(launches.length, 1);
+	assert.deepEqual(launches[0], [
+		"--no-update",
+		"--json",
+		"exec",
+		"fake-worker",
+		"--detach",
+		"--",
+		"bash",
+		"-lc",
+		start.command,
+	]);
+	for (const followup of ["--attach", "--status"])
+		assert.deepEqual(
+			calls.filter((args) => args.includes(followup)),
+			[["--no-update", "--json", "exec", "fake-worker", followup, String(start.processId)]],
+			"follow-ups must use only the owned worker and process",
+		);
+	const events = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.deepEqual(events[0], { phase: "detach", value: start });
+	const frames = events
+		.filter((event) => event.phase === "attach")
+		.map((event) => event.value);
+	assert.deepEqual(frames[0], {
+		type: "attached",
+		processId: start.processId,
+		stdoutOffset: 0,
+		stderrOffset: 0,
+	});
+	for (const stream of ["stdout", "stderr"]) {
+		const chunks = frames.filter((frame) => frame.type === stream);
+		assert.ok(chunks.length > 0, `${stream} must survive attach`);
+		let offset = 0;
+		for (const chunk of chunks) {
+			offset += Buffer.byteLength(chunk.data);
+			assert.equal(chunk.nextOffset, offset);
+		}
+		assert.equal(frames.at(-1)[`${stream}Offset`], offset);
+		const expected = `source fixture lock ${stream}\n`;
+		assert.ok(chunks.map((chunk) => chunk.data).join("").includes(expected));
+		assert.equal(result.output.split(expected.trim()).length - 1, 1);
+	}
+	assert.deepEqual(Object.keys(frames.at(-1)).sort(), [
+		"exitCode", "signal", "status", "stderrOffset", "stdoutOffset", "type",
+	]);
+	assert.equal(frames.at(-1).status, "exited");
+	assert.equal(frames.at(-1).exitCode, 0);
+	const status = events.find((event) => event.phase === "status").value;
+	for (const name of ["processId", "command", "startedAt", "commandId"])
+		assert.equal(status[name], start[name]);
+	assert.equal(status.known, true);
+	assert.equal(status.running, false);
+	assert.equal(status.status, "exited");
+	assert.equal(status.exitCode, 0);
+	assert.equal(status.signal, null);
+	assert.equal(status.oomKilled, false);
+	assert.ok(Date.parse(status.finishedAt) >= Date.parse(start.startedAt));
+	assert.equal(Object.hasOwn(status, "launcherFailed"), false);
+	assert.ok(events.findIndex((event) => event.phase === "collect") > events.findIndex((event) => event.phase === "status"), "collection must follow terminal proof");
+	const accepted = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8");
+	assert.equal(JSON.parse(accepted).inputs["patches/dependency.patch"], "documented source contract patch\n");
+	assert.equal(fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"), accepted);
+	assert.equal(fs.readFileSync(path.join(f.root, "notes.txt"), "utf8"), "original unrelated source\n");
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/source-writer.json")), false);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+});
 
 test("public lock generation repairs stale dependency inputs before frozen preparation and returns only the lock", async (t) => {
 	const f = await lockGenerationCheckout(t);

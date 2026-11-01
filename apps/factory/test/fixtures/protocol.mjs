@@ -16,7 +16,12 @@ if (mcpSend) {
 const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
 if (config.planning && basename(process.argv[1]) === 'gh') {
-  if (args[1] === 'list') reply(config.planning.issues.map((i) => ({ number: i.number })));
+  if (args[1] === 'list')
+    reply(
+      (config.planning.candidates ?? config.planning.issues.map((i) => i.number)).map((number) => ({
+        number,
+      }))
+    );
   else if (args[0] === 'api' && args[1] === 'graphql')
     reply({
       data: {
@@ -32,8 +37,8 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
     );
 } else if (config.planner && args[1] === 'start' && !args.includes('--help')) {
   const prompt = args[3] === '-' ? readFileSync(0, 'utf8') : args[3];
-  const requestId = JSON.parse(prompt.split('Request: ')[1]).requestId;
-  writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ requestId }));
+  const request = JSON.parse(prompt.split('Request: ')[1]);
+  writeFileSync(join(config.directory, 'planner.json'), JSON.stringify(request));
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
 } else if (config.planner && args[1] === 'show') {
   const { requestId } = JSON.parse(readFileSync(join(config.directory, 'planner.json'), 'utf8'));

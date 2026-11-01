@@ -23,13 +23,14 @@ it('collects full trusted scope, fallback blockers, parent context and job state
   try {
     await host.save({
       planning: {
+        candidates: [580],
         issues: [
           issue,
           {
             ...issue,
             number: 577,
             url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
-            body: '',
+            body: 'Closed prerequisite requirements',
             state: 'CLOSED',
           },
           {
@@ -59,6 +60,9 @@ it('collects full trusted scope, fallback blockers, parent context and job state
       comments: [{ author: 'zero-two-rafaeltab', body: 'Only preview' }],
     });
     expect(result.issues.find((i) => i.number === 571)?.body).toBe('Full spec');
+    expect(result.issues.find((i) => i.number === 577)?.body).toBe(
+      'Closed prerequisite requirements'
+    );
     expect(result.job).toEqual({ kind: 'empty' });
     await host.save({
       planning: { issues: [{ ...issue, url: 'https://github.com/outsider/repo/issues/580' }] },

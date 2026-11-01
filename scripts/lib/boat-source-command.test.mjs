@@ -419,7 +419,10 @@ test("synthetic closure shares the exact decoded budget between remote output an
 						["decoded-cli-stderr", "l".repeat(localSize), local.length],
 					]) {
 						assert.equal(
-							fs.readFileSync(path.join(f.directory, `attach.${stream}`), "utf8"),
+							fs.readFileSync(
+								path.join(f.directory, `attach.${stream}`),
+								"utf8",
+							),
 							retained,
 							stream,
 						);

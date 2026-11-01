@@ -3,6 +3,7 @@ import { chmod, readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
+import { controlledStore } from './fixtures/store.js';
 import { fileStore } from '../src/adapters/store/index.js';
 import { t3Execution } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
@@ -929,3 +930,83 @@ it('exposes the current structured T3 question without establishing readiness', 
     await f.close();
   }
 });
+
+it.each(['SIMPLE', 'COMPLEX'] as const)(
+  'preserves the owning job readiness after verified %s recovery',
+  async (classification) => {
+    const f = await fixture({ conflict: true, restack: { outcome: classification, review: true } });
+    const store = controlledStore();
+    const intent = {
+      id: 'owner-C',
+      issue: 4,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+      base: f.host.base,
+      context: '',
+      branch: 'C',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+      prBase: 'A',
+    };
+    try {
+      await Effect.runPromise(store.reserve(intent));
+      for (const [index, stage] of (
+        ['implementation', 'review', 'publication', 'ci'] as const
+      ).entries())
+        await Effect.runPromise(
+          store.saveStage({
+            index,
+            stage,
+            threadId: 'owner',
+            commit: f.c,
+            previousRunId: index === 3 ? 'publication' : 'previous',
+          })
+        );
+      const instance = ManagedRuntime.make(
+        JobLive.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Layer.succeed(JobStore, store),
+              Layer.succeed(Issues, f.issues),
+              Layer.succeed(Time, { now: () => Effect.succeed(1) }),
+              Layer.succeed(Execution, {
+                launch: () => Effect.succeed({ kind: 'submitted' }),
+                sendStage: () => Effect.void,
+                interrupt: () => Effect.void,
+                observe: () =>
+                  Effect.succeed({
+                    kind: 'found',
+                    threadId: 'owner',
+                    status: 'completed',
+                    worktree: f.host.repository,
+                    branch: 'C',
+                    model: 'gpt-6.1-sol',
+                  }),
+                inspectStage: () =>
+                  Effect.succeed({
+                    runId: 'publication',
+                    ordinal: 3,
+                    commit: f.c,
+                    accepted: true,
+                    linked: ['https://github.com/rafaeltab/wallpaperdb/pull/104'],
+                  }),
+              })
+            )
+          )
+        )
+      );
+      const job = await instance.runPromise(Job);
+      try {
+        expect((await instance.runPromise(job.status())).kind).toBe('job');
+        for (let i = 0; i < 3; i++) await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+        const after = await instance.runPromise(job.status());
+        if (after.kind !== 'job') throw new Error('Missing owning job');
+        expect(after.delivery).toMatchObject({ ready: true, active: false, reviewedCommit: f.c });
+        expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(true);
+      } finally {
+        await instance.dispose();
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);

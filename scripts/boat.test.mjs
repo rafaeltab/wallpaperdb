@@ -10668,7 +10668,14 @@ async function freshCheckout(t) {
 	return f;
 }
 const freshCalls = (f) =>
-	fs.existsSync(path.join(f.control, "transport")) ? f.transport() : [];
+	fs.existsSync(path.join(f.control, "transport"))
+		? fs
+				.readFileSync(path.join(f.control, "transport"), "utf8")
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => JSON.parse(line))
+		: [];
 
 test("fresh lifecycle completed stop reconstructs before toolchain-only stale lock generation", async (t) => {
 	const f = await freshCheckout(t);
@@ -11566,5 +11573,72 @@ test("fresh lifecycle real daemon retains uncertain source writer as a truthful 
 	assert.equal(
 		liveOwnedProcess(f.root, f.json(".boat/state.json").daemon),
 		true,
+	);
+});
+
+test("fresh lifecycle successful migration reconstruction freezes captured dependencies before native append and local return", async (t) => {
+	const f = await migrationGenerationCheckout(t, reconstructionEvidence(t));
+	const before = migrationBytes(f.root),
+		oldJournal = f.json("apps/asset/drizzle/meta/_journal.json");
+	const lock = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+	const baseline = path.join(f.directory, "fresh-migration-baseline");
+	fs.cpSync(f.worker, baseline, { recursive: true });
+	f.env.FAKE_FRESH_BASELINE = baseline;
+	useFreshPolicy(f);
+	fs.rmSync(path.join(f.control, "installed-dependencies"), { force: true });
+	fs.rmSync(path.join(f.control, "calls"), { force: true });
+	const result = await f.migrations();
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		fs.readFileSync(path.join(f.control, "calls"), "utf8"),
+		"frozen\n",
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.control, "installed-dependencies")),
+		lock,
+	);
+	const starts = fs
+		.readFileSync(path.join(f.control, "migration-starts"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.deepEqual(starts, [oldJournal]);
+	const after = migrationBytes(f.root),
+		journal = f.json("apps/asset/drizzle/meta/_journal.json");
+	assert.equal(journal.entries.length, 19);
+	assert.equal(journal.entries.at(-1).idx, 18);
+	assert.deepEqual(journal.entries.slice(0, 18), oldJournal.entries);
+	assert.match(
+		after[`apps/asset/drizzle/${journal.entries.at(-1).tag}.sql`],
+		/CREATE TABLE "source_candidates"/,
+	);
+	assert.match(
+		after[`apps/asset/drizzle/${journal.entries.at(-1).tag}.sql`],
+		/next_candidate_ordinal/,
+	);
+	assert.equal(
+		JSON.parse(after["apps/asset/drizzle/meta/0018_snapshot.json"]).prevId,
+		JSON.parse(before["apps/asset/drizzle/meta/0017_snapshot.json"]).id,
+	);
+	assert.deepEqual(after, migrationBytes(f.worker));
+	for (const [name, bytes] of Object.entries(before))
+		if (!name.endsWith("/_journal.json")) assert.equal(after[name], bytes);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+		false,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-return-pending.json")),
+		false,
+	);
+	const retained = path.join(
+		f.directory,
+		"home/.local/state/wallpaperdb-boat/557",
+	);
+	assert.deepEqual(
+		fs.readdirSync(retained).filter((name) => name.startsWith("migrations-")),
+		[],
 	);
 });

@@ -1010,3 +1010,55 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
     }
   }
 );
+
+it('resumes a later conflict using the earlier durable replay head across committer-date changes', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  const previousDate = process.env.GIT_COMMITTER_DATE;
+  try {
+    f.git('switch', '-c', 'X', 'A');
+    await writeFile(join(f.host.repository, 'X.txt'), 'X');
+    f.git('add', '.');
+    f.git('commit', '-m', 'X');
+    const x = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', 'X');
+    f.git('switch', '--detach', f.host.base);
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    config.join.blockers = [
+      { number: 3, state: 'open' },
+      { number: 6, state: 'open' },
+      { number: 4, state: 'open' },
+    ];
+    config.join.prs['106'] = { branch: 'X', base: 'A' };
+    config.join.originalHeads['106'] = x;
+    config.join.evidence += `\nhttps://github.com/rafaeltab/wallpaperdb/pull/106 ${x}`;
+    await writeFile(f.host.configFile, JSON.stringify(config));
+    const reopen = () =>
+      githubIssues({
+        project: f.host.repository,
+        base: f.host.base,
+        prerequisites: [
+          { issue: 3, pr: 103, commit: f.d },
+          { issue: 6, pr: 106, commit: x },
+          { issue: 4, pr: 104, commit: f.c },
+        ],
+        joins: {
+          directory: join(f.host.directory, 'joins'),
+          binary: f.host.binary,
+          projectId: 'project-id',
+        },
+      });
+    process.env.GIT_COMMITTER_DATE = '2026-11-02T00:00:01Z';
+    await Effect.runPromise(reopen().prepare?.(5) ?? Effect.void);
+    expect((await Effect.runPromise(reopen().inspect(5))).blockersReady).toBe(false);
+    process.env.GIT_COMMITTER_DATE = '2026-11-02T00:00:05Z';
+    await Effect.runPromise(reopen().prepare?.(5) ?? Effect.void);
+    const result = await Effect.runPromise(reopen().inspect(5));
+    expect(result.blockersReady).toBe(true);
+    expect(f.git('log', '--format=%s', `${f.d}..${result.prerequisite?.base}`)).toBe('C\nX');
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(f.d);
+  } finally {
+    if (previousDate === undefined) delete process.env.GIT_COMMITTER_DATE;
+    else process.env.GIT_COMMITTER_DATE = previousDate;
+    await f.close();
+  }
+});

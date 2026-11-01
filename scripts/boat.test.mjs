@@ -889,10 +889,13 @@ function sourceFixtureWriter(control, command, startedAt) {
  const file=path.join(control,'source-process-'+process.pid),offsets={stdout:0,stderr:0};
  fs.writeFileSync(file+'.frames','');
  const child=cp.spawn('bash',['-c',command.replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER)],{env:process.env,stdio:['ignore','pipe','pipe']});
- for(const type of ['stdout','stderr'])child[type].on('data',bytes=>{
-  offsets[type]+=bytes.length;
-  fs.appendFileSync(file+'.frames',JSON.stringify({type,data:bytes.toString(),nextOffset:offsets[type]})+'\n');
- });
+ for(const type of ['stdout','stderr']){
+  child[type].setEncoding('utf8');
+  child[type].on('data',data=>{
+   offsets[type]+=Buffer.byteLength(data);
+   fs.appendFileSync(file+'.frames',JSON.stringify({type,data,nextOffset:offsets[type]})+'\n');
+  });
+ }
  child.on('close',(code,signal)=>{
   const status={success:true,processId:process.pid,pid:process.pid,command,startedAt,known:true,running:false,status:'exited',exitCode:code,signal,oomKilled:false,finishedAt:new Date().toISOString(),stdout:'',stderr:''};
   fs.writeFileSync(file+'.status.tmp',JSON.stringify({...status,...offsets}));

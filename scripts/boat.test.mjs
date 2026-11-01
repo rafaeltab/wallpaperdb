@@ -12198,6 +12198,7 @@ for (const exitCode of [0, 47, 48])
 				{
 					beforeStart: (fixture) => {
 						if (exitCode === 48) flag(fixture, "descendant-forward");
+						if (exitCode === 0) previewReapingFixture(fixture);
 					},
 				},
 			);
@@ -12215,6 +12216,7 @@ for (const exitCode of [0, 47, 48])
 				"post-ready failure did not naturally close command pipes",
 			);
 			assert.notEqual(result.status, 0);
+			if (exitCode === 0) assertPreviewReapingObserved(f);
 			assert.match(
 				result.output,
 				new RegExp(`forward exited after readiness \\(${exitCode}\\)`),
@@ -12240,6 +12242,89 @@ for (const exitCode of [0, 47, 48])
 			);
 		});
 	});
+
+test("preview reaping retains an uncaptured live group member", async (t) => {
+	let fixture;
+	t.after(async () => {
+		if (
+			!fixture ||
+			!fs.existsSync(
+				path.join(fixture.control, "reaping-unknown-identity.json"),
+			)
+		)
+			return;
+		const captured = fixture.json("../control/reaping-unknown-identity.json");
+		const current = fixtureProcess(captured.pid);
+		if (
+			current &&
+			current.startTicks === captured.startTicks &&
+			current.group === captured.group &&
+			current.session === captured.session &&
+			current.cwd === fixture.root
+		) {
+			process.kill(current.pid, "SIGTERM");
+			assert.equal(
+				await fixtureStopped(() => !fixtureProcess(current.pid)),
+				true,
+				"test-owned uncaptured member retires after the refusal assertion",
+			);
+		}
+	});
+	const archive = pendingPreviewEvidence(t);
+	await archive.scenario(async () => {
+		const f = await pendingUpgradePreview(
+			t,
+			"managed",
+			archive,
+			"uncaptured-after-reap",
+			{
+				beforeStart: (owned) => {
+					previewReapingFixture(owned);
+					flag(owned, "reaping-unknown-member");
+				},
+			},
+		);
+		fixture = f;
+		await f.healthy(true);
+		f.local("../control/exit-forward-code", "0");
+		flag(f, "exit-forward");
+		const result = await previewProbe(
+			f.command.done,
+			"unknown group member must produce bounded refusal",
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /uncaptured members/);
+		assertPreviewReapingObserved(f);
+		const captured = f.json("../control/reaping-unknown-identity.json");
+		const current = fixtureProcess(captured.pid);
+		assert.ok(
+			current,
+			"uncaptured member remains alive before independent fixture cleanup",
+		);
+		assert.equal(current.startTicks, captured.startTicks);
+		assert.equal(current.group, captured.group);
+		assert.equal(current.session, captured.session);
+		assert.equal(current.cwd, f.root);
+		const progress = fs
+			.readdirSync(path.join(f.root, ".boat"))
+			.find((name) => /^preview-progress-.*\.json$/.test(name));
+		assert.ok(progress);
+		const retained = f.json(`.boat/${progress}`);
+		assert.equal(retained.phase, "unresolved");
+		assert.match(retained.failure, /uncaptured members/);
+		assert.equal(
+			retained.captured.some((member) => member.pid === current.pid),
+			false,
+		);
+		f.receipts.uncapturedBeforeCleanup = {
+			captured,
+			current,
+			retained,
+			result,
+		};
+		f.phase("live uncaptured group refused before independent cleanup");
+	});
+});
 
 test("preview acquisition proves a descendant-owned forward listener", async (t) => {
 	const archive = pendingPreviewEvidence(t);
@@ -12683,6 +12768,29 @@ test("preview claim observer publishes complete receipts while writes are partia
 	});
 });
 
+function previewReapingFixture(f) {
+	for (const name of [
+		"preview-reaping-observer.mjs",
+		"preview-reaping-wait.py",
+	]) {
+		const relative = `scripts/test-fixtures/${name}`;
+		f.local(
+			relative,
+			fs.readFileSync(path.join(import.meta.dirname, "test-fixtures", name)),
+		);
+	}
+	f.env.NODE_OPTIONS =
+		`${f.env.NODE_OPTIONS ?? ""} --import=${path.join(f.root, "scripts/test-fixtures/preview-reaping-observer.mjs")}`.trim();
+}
+
+function assertPreviewReapingObserved(f) {
+	const observation = f.json("../control/reaping-observation.json");
+	assert.equal(observation.wait.qualified, true);
+	assert.equal(observation.wait.actual.state, "Z");
+	assert.equal(observation.groupPresentWhileZombie, true);
+	f.receipts.reapingObservation = observation;
+}
+
 function immutableClaimFixture(f, plan) {
 	const name = "scripts/test-fixtures/preview-claim-observer.mjs";
 	const bytes = fs.readFileSync(
@@ -12713,11 +12821,13 @@ for (const kind of ["progress", "replacement", "uncertainty"])
 				`immutable-${kind}`,
 				{
 					startupFailure: true,
-					beforeStart: (fixture) =>
+					beforeStart: (fixture) => {
 						immutableClaimFixture(fixture, {
 							replace: kind !== "progress",
 							denyForwardIdentity: kind === "uncertainty",
-						}),
+						});
+						if (kind === "replacement") previewReapingFixture(fixture);
+					},
 				},
 			);
 			await f.readiness.wait(
@@ -12874,6 +12984,7 @@ for (const kind of ["progress", "replacement", "uncertainty"])
 					);
 					assert.notEqual(result.status, 0);
 					assert.match(result.output, /acquisition ownership changed/);
+					assertPreviewReapingObserved(f);
 					assert.equal(retained.phase, "retired");
 					assert.equal(retained.closed, true);
 					assert.deepEqual(retained.unresolved, []);

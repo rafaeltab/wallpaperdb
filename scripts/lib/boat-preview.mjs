@@ -75,8 +75,24 @@ function ownedSession(record, root) {
 			"Preview forward session ownership unavailable; record retained",
 		);
 }
+function unreaped(record) {
+	try {
+		const text = fs.readFileSync(`/proc/${record.pid}/stat`, "utf8");
+		const fields = text.slice(text.lastIndexOf(")") + 2).split(" ");
+		return fields[0] === "Z" &&
+			fields[19] === record.startTicks &&
+			Number(fields[2]) === record.group &&
+			Number(fields[3]) === record.session
+			? { ...record, unreaped: true }
+			: null;
+	} catch (error) {
+		if (absent(error)) return null;
+		throw error;
+	}
+}
 // Follow only recorded identities and their children. Reparented captured
-// members remain obligations. A surviving uncaptured group fails closed.
+// members remain obligations. An owned zombie is pending reap, not proof that
+// its group is empty. A surviving uncaptured group still fails closed.
 function members(record, captured, root) {
 	ownedSession(record, root);
 	const leader = identity(record.pid);
@@ -123,12 +139,24 @@ function members(record, captured, root) {
 	visit(record);
 	for (const previous of [...captured.values()]) visit(previous);
 	if (live.length === 0) {
+		const pending = [
+			...new Map([
+				[`${record.pid}:${record.startTicks}`, record],
+				...captured,
+			]).values(),
+		]
+			.map(unreaped)
+			.filter(Boolean);
 		try {
 			process.kill(-record.group, 0);
 		} catch (error) {
 			if (absent(error)) return [];
 			throw error;
 		}
+		// Retain this exact dead identity until normal reaping removes it. Every
+		// caller continues observing inside its existing lifecycle deadline; no
+		// unknown member is signalled or acknowledged as retired by this witness.
+		if (pending.length) return pending;
 		throw Error("Preview session has uncaptured members; record retained");
 	}
 	return live;

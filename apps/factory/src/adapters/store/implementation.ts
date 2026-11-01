@@ -49,32 +49,7 @@ export function fileStore(directory: string): JobStore {
       Effect.tapError((error) => Effect.logError(error)),
       Effect.withSpan(`factory.store.${operation}`)
     );
-  const publish = async (name: string, value: unknown) => {
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    await syncDirectory(dirname(directory));
-    const temporary = join(directory, `.${randomUUID()}`);
-    const target = join(directory, name);
-    const handle = await open(temporary, 'wx', 0o600);
-    try {
-      await handle.writeFile(JSON.stringify(value));
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    try {
-      await link(temporary, target);
-      await syncDirectory(directory);
-      return true;
-    } catch (cause) {
-      if (code(cause, 'EEXIST')) {
-        await syncDirectory(directory);
-        return false;
-      }
-      throw cause;
-    } finally {
-      await unlink(temporary);
-    }
-  };
+  const publish = publisher(directory);
   const waitSchema = z
     .object({
       revision: z.number().int().nonnegative(),
@@ -206,5 +181,96 @@ export function fileStore(directory: string): JobStore {
     reserve: (intent: Intent) =>
       effect('reserve', () => publish('intent.json', intentSchema.parse(intent))),
     claimLaunch: () => effect('claimLaunch', () => publish('launch-claimed.json', { version: 1 })),
+  };
+}
+
+function publisher(directory: string) {
+  const publish = async (name: string, value: unknown) => {
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await syncDirectory(dirname(directory));
+    const temporary = join(directory, `.${randomUUID()}`);
+    const target = join(directory, name);
+    const handle = await open(temporary, 'wx', 0o600);
+    try {
+      await handle.writeFile(JSON.stringify(value));
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    try {
+      await link(temporary, target);
+      await syncDirectory(directory);
+      return true;
+    } catch (cause) {
+      if (code(cause, 'EEXIST')) {
+        await syncDirectory(directory);
+        return false;
+      }
+      throw cause;
+    } finally {
+      await unlink(temporary);
+    }
+  };
+  return publish;
+}
+
+const scheduleSchema = z
+  .object({
+    revision: z.number().int().nonnegative(),
+    concurrency: z
+      .number()
+      .int()
+      .refine((v) => v === -1 || v > 0),
+    allowance: z
+      .number()
+      .int()
+      .refine((v) => v === -1 || v > 0),
+    paused: z.boolean(),
+    admissions: z.array(
+      z
+        .object({
+          issue: z.number().int().positive(),
+          base: z.string().regex(/^[a-f0-9]{40}$/),
+          context: z.string().max(16000),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+export function fileScheduleStore(
+  directory: string
+): import('../../capabilities/plan/index.js').ScheduleStore {
+  const publish = publisher(directory);
+  const effect = <A>(operation: string, work: () => Promise<A>) =>
+    Effect.tryPromise({ try: work, catch: (cause) => new Unavailable({ operation, cause }) }).pipe(
+      Effect.tapError((error) => Effect.logError(error)),
+      Effect.withSpan('factory.store.schedule')
+    );
+  const read = async () => {
+    let latest: import('../../capabilities/plan/index.js').ScheduleState = {
+      revision: -1,
+      concurrency: 1,
+      allowance: 1,
+      paused: false,
+      admissions: [],
+    };
+    for (let revision = 0; ; revision++) {
+      try {
+        latest = scheduleSchema.parse(
+          JSON.parse(await readFile(join(directory, `schedule-${revision}.json`), 'utf8'))
+        );
+      } catch (cause) {
+        if (code(cause, 'ENOENT')) return latest;
+        throw cause;
+      }
+    }
+  };
+  return {
+    read: () => effect('read-schedule', read),
+    save: (state) =>
+      effect('save-schedule', async () => {
+        if (state.revision !== (await read()).revision + 1) return false;
+        return publish(`schedule-${state.revision}.json`, scheduleSchema.parse(state));
+      }),
   };
 }

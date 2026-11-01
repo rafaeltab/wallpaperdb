@@ -46,14 +46,27 @@ function selectionReason(
   if (excluded) return excluded;
   if (cyclic(item.issue)) return 'Cyclic explicit dependencies';
   if (duplicates) return 'Duplicate issue in proposal';
+  if (
+    issue.blockers.some((number) =>
+      (input.jobs ?? []).some(
+        (job) => job.kind === 'job' && job.intent.issue === number && !job.delivery?.ready
+      )
+    )
+  )
+    return 'Prerequisite job is active or parked';
   return semanticReason(item, input);
 }
 function semanticReason(item: Proposal['selected'][number], input: PlanningInput) {
   if (!item.reason.trim()) return 'Missing semantic rationale';
   if (item.dependsOn.length) return 'Inferred prerequisite requires resolution before selection';
   if (item.conflicts.length) return 'Semantic conflict requires resolution before selection';
-  if (input.job.kind === 'job' && input.job.intent.issue === item.issue)
+  if (
+    [input.job, ...(input.jobs ?? [])].some(
+      (job) => job.kind === 'job' && job.intent.issue === item.issue
+    )
+  )
     return 'Already active or parked';
+  if (input.admissions?.includes(item.issue)) return 'Already admitted';
   return undefined;
 }
 function repeated(issue: number, proposal: Proposal) {
@@ -62,7 +75,7 @@ function repeated(issue: number, proposal: Proposal) {
     proposal.deferred.some((i) => i.issue === issue)
   );
 }
-function validate(proposal: Proposal, input: PlanningInput) {
+export function validate(proposal: Proposal, input: PlanningInput) {
   const cyclic = cycleCheck(input.issues);
   const selected: Proposal['selected'][number][] = [];
   const rejected = input.issues.flatMap((i) => {
@@ -108,16 +121,7 @@ export const PlanLive = Layer.effect(
             const input = yield* source.read();
             const proposal = yield* planner.propose(input);
             const current = yield* source.read();
-            if (
-              JSON.stringify({
-                ...input,
-                job: input.job.kind === 'job' ? { ...input.job, elapsedMs: 0 } : input.job,
-              }) !==
-              JSON.stringify({
-                ...current,
-                job: current.job.kind === 'job' ? { ...current.job, elapsedMs: 0 } : current.job,
-              })
-            )
+            if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
               return {
                 kind: 'stale' as const,
                 selected: [],
@@ -138,3 +142,9 @@ export const PlanLive = Layer.effect(
     };
   })
 );
+
+function comparable(input: PlanningInput) {
+  const normalize = (job: PlanningInput['job']) =>
+    job.kind === 'job' ? { ...job, elapsedMs: 0 } : job;
+  return { ...input, job: normalize(input.job), jobs: input.jobs?.map(normalize) };
+}

@@ -476,7 +476,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   ) => {
     // The PR's old parent boundary is captured before any refs change.
     const parent = await git(['merge-base', item.parent, item.commit], signal);
-    const recovered = await read(dir, `resolved-${item.issue}.json`);
+    const recovered =
+      (await read(dir, `resolved-${item.issue}.json`)) ??
+      (await read(dir, `replay-${item.issue}.json`));
     if (recovered)
       return {
         ...layer.extend({ next: sha, onto: z.literal(onto), tree: sha }).parse(recovered),
@@ -500,7 +502,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       return;
     }
     const tree = (await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim();
-    return { ...item, parent, next, onto, target, tree };
+    await publish(dir, `replay-${item.issue}.json`, { ...item, parent, next, onto, target, tree });
+    return layer
+      .extend({ next: sha, onto: z.literal(onto), target: z.literal(target), tree: sha })
+      .parse(await read(dir, `replay-${item.issue}.json`));
   };
   const coveredBy = async (commit: string, heads: readonly string[], signal?: AbortSignal) => {
     for (const head of heads) if (await isAncestor(commit, head, signal)) return true;

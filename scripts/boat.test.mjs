@@ -8633,12 +8633,22 @@ async function assertSourceTransportFailure(t, fault) {
 						tail: raw.subarray(-256).toString(),
 					};
 				}
-				if (archive)
+				if (archive) {
 					fs.writeFileSync(
 						path.join(archive, "before-safety.json"),
 						JSON.stringify(observation, null, 2),
 						{ mode: 0o600 },
 					);
+					// Preserve actual private CLI bytes before independent fixture
+					// cleanup. A failed/incomplete capture remains a prefix, not proof.
+					for (const name of fs.readdirSync(path.join(f.root, ".boat")))
+						if (name.startsWith("source-command-"))
+							fs.cpSync(
+								path.join(f.root, ".boat", name),
+								path.join(archive, name),
+								{ recursive: true },
+							);
+				}
 				t.diagnostic(sourceObservationDiagnostic(archive, fault, observation));
 				return observation;
 			}

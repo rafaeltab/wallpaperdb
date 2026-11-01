@@ -2829,98 +2829,198 @@ test("Asset migration command expiry terminates its owned package process and sk
 	await assertAssetPackageExpiry(f, await startHeldAssetMigration(f));
 });
 
+async function heldPackageReport(runner, report, readiness, output) {
+	await readiness.wait(() => {
+		if (fs.existsSync(report)) return true;
+		// EXIT can precede CLOSE indefinitely when a descendant inherits pipes.
+		if (runner.exitCode !== null || runner.signalCode !== null)
+			throw new Error(
+				`Held-package runner exited before ownership report: status=${runner.exitCode}, signal=${runner.signalCode ?? "none"}; ${output.read()}`,
+			);
+		return false;
+	}, "held-package ownership report");
+}
+
 // These children exercise the actual test after hooks. The parent watchdog is
 // independent of both production expiry and the completion assertion under test.
 if (process.env.BOAT_PACKAGE_CLEANUP_SCENARIO) {
 	test("Asset migration intentional held-package failure", async (t) => {
 		const scenario = process.env.BOAT_PACKAGE_CLEANUP_SCENARIO;
 		const report = process.env.BOAT_PACKAGE_CLEANUP_REPORT;
-		const f = await assetExecutionCheckout(t, {
-			directory: process.env.BOAT_PACKAGE_CLEANUP_DIRECTORY,
-			cleanupReport: report,
+		const directory = process.env.BOAT_PACKAGE_CLEANUP_DIRECTORY;
+		const readiness = lockFixtureReadiness({
+			deadline: Number(process.env.BOAT_PACKAGE_READY_DEADLINE),
+			report,
 		});
-		const helper = "scripts/lib/boat-asset-migration.mjs";
-		const source = fs.readFileSync(path.join(f.root, helper), "utf8");
-		const anchor = /\$\{deadline\},\$\{request\.deadline\},\{fs/g;
-		assert.equal([...source.matchAll(anchor)].length, 1);
-		f.local(
-			helper,
-			source.replace(anchor, (match) =>
-				match.replace("request.deadline", "Infinity"),
-			),
-		);
-		if (scenario === "retention")
-			fs.writeFileSync(
-				path.join(f.directory, "home/.local/bin/fixture-sql"),
-				`#!${process.execPath}
+		// Retain the actual failed source proof before fixture after hooks run.
+		try {
+			if (scenario.startsWith("setup-")) {
+				const f = await lockGenerationCheckout(t, {
+					directory,
+					cleanupReport: report,
+					readiness,
+				});
+				flag(f, "fail");
+				fs.writeFileSync(
+					path.join(f.control, "source-diagnostic-stderr"),
+					"\u001b[31mheld setup generator failed 日本語\u001b[0m\n",
+				);
+				// More than one output tail proves diagnostics stay bounded.
+				process.stderr.write("x".repeat(20000) + "\n");
+				const result = await f.generate();
+				let pipeHolder;
+				if (scenario === "setup-pipes") {
+					const holder = spawn(
+						process.execPath,
+						["-e", "setInterval(()=>{},1000)"],
+						{
+							cwd: path.dirname(directory),
+							detached: true,
+							stdio: ["ignore", 1, 2],
+						},
+					);
+					pipeHolder = fixtureProcess(holder.pid);
+					holder.unref();
+				}
+				fs.writeFileSync(
+					`${report}.setup`,
+					JSON.stringify({
+						result,
+						pipeHolder,
+						processes: fixtureCensus(directory),
+						commands: f.commands.map((record) => ({
+							birth: record.birth,
+							closed: record.closed,
+							terminal: record.terminal,
+						})),
+					}),
+				);
+				process.stderr.write(
+					"\u001b[31mheld setup diagnostic tail 日本語\u001b[0m\n",
+				);
+				assert.equal(result.status, 0, result.output);
+				assert.fail("setup injection did not fail");
+			}
+			const f = await assetExecutionCheckout(t, {
+				directory,
+				cleanupReport: report,
+				readiness,
+			});
+			const helper = "scripts/lib/boat-asset-migration.mjs";
+			const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+			const anchor = /\$\{deadline\},\$\{request\.deadline\},\{fs/g;
+			assert.equal([...source.matchAll(anchor)].length, 1);
+			f.local(
+				helper,
+				source.replace(anchor, (match) =>
+					match.replace("request.deadline", "Infinity"),
+				),
+			);
+			if (scenario === "retention")
+				fs.writeFileSync(
+					path.join(f.directory, "home/.local/bin/fixture-sql"),
+					`#!${process.execPath}
 const fs=require('fs'),path=require('path'),c=process.env.FAKE_CONTROL;
 fs.writeFileSync(path.join(c,'sql-pid'),String(process.pid));
 process.on('SIGTERM',()=>{process.chdir(process.env.BOAT_PACKAGE_ESCAPE_DIRECTORY);fs.writeFileSync(path.join(c,'moved'),'yes');});
 process.on('SIGHUP',()=>{});
 setInterval(()=>{},1000);
 `,
-			);
-
-		const running = await startHeldAssetMigration(f);
-		if (scenario === "expiry") {
-			const packageProcess = fixtureCensus(f.directory).find(
-				(p) =>
-					p.cwd === path.join(f.runtime, "apps/asset") &&
-					p.pid !== p.group &&
-					p.group === p.session,
-			);
-			assert.ok(
-				packageProcess,
-				"held package descendant is independently inspectable",
-			);
-			for (const mismatch of [
-				{ startTicks: "0" },
-				{ session: 0 },
-				{ cwd: f.root },
-			])
-				assert.equal(
-					signalFixtureGroup(
-						{ ...packageProcess, ...mismatch },
-						"SIGTERM",
-						f.directory,
-					),
-					false,
-					"stale package identity cannot authorize group termination",
 				);
-			assert.deepEqual(fixtureProcess(packageProcess.pid), packageProcess);
-		}
-		fs.writeFileSync(
-			report,
-			JSON.stringify({
-				processes: fixtureCensus(f.directory),
-				command: fixtureProcess(running.child.pid),
-				startedAt: fixtureNow(),
-				receipt: fs.readFileSync(
-					path.join(f.root, ".boat/asset-migration-active.json"),
-					"utf8",
-				),
-			}),
-		);
-		try {
-			if (scenario !== "expiry")
-				assert.fail("intentional assertion before held-package completion");
-			await assertAssetPackageExpiry(f, running);
-		} catch (error) {
-			// Capture the failing assertion before any after hook can retire SQL.
+
+			const running = await startHeldAssetMigration(f);
+			if (scenario === "missing-report") {
+				fs.writeFileSync(
+					`${report}.parked`,
+					JSON.stringify({ processes: fixtureCensus(directory) }),
+				);
+				await new Promise(() => setInterval(() => {}, 1000));
+			}
+			if (scenario === "expiry") {
+				const packageProcess = fixtureCensus(f.directory).find(
+					(p) =>
+						p.cwd === path.join(f.runtime, "apps/asset") &&
+						p.pid !== p.group &&
+						p.group === p.session,
+				);
+				assert.ok(
+					packageProcess,
+					"held package descendant is independently inspectable",
+				);
+				for (const mismatch of [
+					{ startTicks: "0" },
+					{ session: 0 },
+					{ cwd: f.root },
+				])
+					assert.equal(
+						signalFixtureGroup(
+							{ ...packageProcess, ...mismatch },
+							"SIGTERM",
+							f.directory,
+						),
+						false,
+						"stale package identity cannot authorize group termination",
+					);
+				assert.deepEqual(fixtureProcess(packageProcess.pid), packageProcess);
+			}
 			fs.writeFileSync(
-				`${report}.failure`,
+				report,
 				JSON.stringify({
-					message: error.message,
-					at: fixtureNow(),
 					processes: fixtureCensus(f.directory),
+					command: fixtureProcess(running.child.pid),
+					startedAt: fixtureNow(),
+					receipt: fs.readFileSync(
+						path.join(f.root, ".boat/asset-migration-active.json"),
+						"utf8",
+					),
 				}),
 			);
+			try {
+				if (scenario !== "expiry")
+					assert.fail("intentional assertion before held-package completion");
+				await assertAssetPackageExpiry(f, running);
+			} catch (error) {
+				// Capture the failing assertion before any after hook can retire SQL.
+				fs.writeFileSync(
+					`${report}.failure`,
+					JSON.stringify({
+						message: error.message,
+						at: fixtureNow(),
+						processes: fixtureCensus(f.directory),
+					}),
+				);
+				throw error;
+			}
+		} catch (error) {
+			const archive = process.env.BOAT_PACKAGE_CLEANUP_EVIDENCE;
+			if (archive && fs.existsSync(directory)) {
+				fs.mkdirSync(archive, { recursive: true });
+				fs.cpSync(directory, path.join(archive, "before-child-cleanup"), {
+					recursive: true,
+				});
+				fs.writeFileSync(
+					path.join(archive, "failure.json"),
+					JSON.stringify({
+						message: error.message,
+						stack: error.stack,
+						at: fixtureNow(),
+						processes: fixtureCensus(directory),
+					}),
+				);
+			}
 			throw error;
 		}
 	});
 }
 
-for (const scenario of ["expiry", "early", "retention"])
+for (const scenario of [
+	"expiry",
+	"early",
+	"retention",
+	"setup-exit",
+	"setup-pipes",
+	"missing-report",
+])
 	test(`Asset migration held-package cleanup after ${scenario} failure`, async (t) => {
 		const directory = fs.mkdtempSync(
 			path.join(os.tmpdir(), "boat-package-cleanup-"),
@@ -2934,6 +3034,7 @@ for (const scenario of ["expiry", "early", "retention"])
 		const readiness = lockFixtureReadiness();
 		let runner,
 			runnerIdentity,
+			exitedAt,
 			closed = false,
 			done,
 			canary,
@@ -2943,6 +3044,29 @@ for (const scenario of ["expiry", "early", "retention"])
 		const output = lockFixtureOutput();
 		// Safety cleanup runs only after the assertions below have fixed the verdict.
 		t.after(async () => {
+			const archive = process.env.BOAT_PACKAGE_CLEANUP_EVIDENCE;
+			if (archive) {
+				const destination = path.join(
+					archive,
+					scenario,
+					"before-parent-safety",
+				);
+				fs.mkdirSync(destination, { recursive: true });
+				fs.cpSync(directory, path.join(destination, "fixture"), {
+					recursive: true,
+				});
+				fs.writeFileSync(
+					path.join(destination, "runner.json"),
+					JSON.stringify({
+						runnerIdentity,
+						status: runner?.exitCode,
+						signal: runner?.signalCode,
+						closed,
+						processes: fixtureCensus(owned),
+						output: output.read(),
+					}),
+				);
+			}
 			t.diagnostic(
 				JSON.stringify({
 					safetyBefore: fixtureCensus(owned),
@@ -2950,6 +3074,12 @@ for (const scenario of ["expiry", "early", "retention"])
 					output: output.read(),
 				}),
 			);
+			if (fs.existsSync(`${report}.setup`)) {
+				const holder = JSON.parse(
+					fs.readFileSync(`${report}.setup`, "utf8"),
+				).pipeHolder;
+				if (holder) signalFixtureGroup(holder, "SIGKILL", directory);
+			}
 			for (const record of before?.processes ?? []) {
 				const current = fixtureProcess(record.pid);
 				if (
@@ -3010,6 +3140,9 @@ for (const scenario of ["expiry", "early", "retention"])
 			process.execPath,
 			[
 				"--test",
+				...(scenario === "setup-pipes"
+					? ["--experimental-test-isolation=none"]
+					: []),
 				"--test-name-pattern=^Asset migration intentional held-package failure$",
 				fileURLToPath(import.meta.url),
 			],
@@ -3020,6 +3153,10 @@ for (const scenario of ["expiry", "early", "retention"])
 					...process.env,
 					NODE_OPTIONS: "",
 					NODE_TEST_CONTEXT: undefined,
+					BOAT_PACKAGE_READY_DEADLINE: String(readiness.deadline),
+					BOAT_PACKAGE_CLEANUP_EVIDENCE:
+						process.env.BOAT_PACKAGE_CLEANUP_EVIDENCE &&
+						path.join(process.env.BOAT_PACKAGE_CLEANUP_EVIDENCE, scenario),
 					BOAT_PACKAGE_CLEANUP_SCENARIO: scenario,
 					BOAT_PACKAGE_CLEANUP_DIRECTORY: owned,
 					BOAT_PACKAGE_CLEANUP_REPORT: report,
@@ -3030,14 +3167,178 @@ for (const scenario of ["expiry", "early", "retention"])
 		runnerIdentity = fixtureProcess(runner.pid);
 		runner.stdout.on("data", output.capture);
 		runner.stderr.on("data", output.capture);
+		runner.once("exit", () => {
+			exitedAt = fixtureNow();
+		});
 		done = once(runner, "close").then((result) => {
 			closed = true;
 			return result;
 		});
-		await readiness.wait(
-			() => fs.existsSync(report),
-			"held-package ownership report",
-		);
+		const waiting = heldPackageReport(runner, report, readiness, output);
+		if (scenario.startsWith("setup-") || scenario === "missing-report") {
+			// Observation shares the absolute allowance, without replacing the
+			// report waiter's diagnostic phase while both waits are active.
+			const observation = lockFixtureReadiness({
+				deadline: readiness.deadline,
+			});
+			let outcome, diagnosedAt;
+			waiting.then(
+				() => {
+					outcome = "report";
+				},
+				(error) => {
+					outcome = error;
+					diagnosedAt = fixtureNow();
+				},
+			);
+			if (scenario.startsWith("setup-")) {
+				await observation.wait(
+					() => runner.exitCode !== null || runner.signalCode !== null,
+					"setup runner exit",
+				);
+				assert.ok(
+					await fixtureStopped(() => outcome !== undefined),
+					"early setup failure must surface promptly after EXIT without waiting for report or CLOSE",
+				);
+				assert.ok(outcome instanceof Error);
+				assert.ok(
+					diagnosedAt - exitedAt < 1000 && diagnosedAt < readiness.deadline,
+				);
+				assert.match(outcome.message, /held setup diagnostic tail 日本語/);
+				assert.match(
+					outcome.message,
+					/Held-package runner exited before ownership report: status=1, signal=none/,
+				);
+				assert.match(outcome.message, /Lock generator failed/);
+				assert.match(outcome.message, /held setup generator failed 日本語/);
+				assert.doesNotMatch(outcome.message, /Readiness deadline exhausted/);
+				assert.equal(outcome.message.includes("\u001b"), false);
+				assert.ok(
+					outcome.message.length < 17000,
+					"bounded sanitized diagnostic tail",
+				);
+				assert.equal(fs.existsSync(report), false);
+				const setup = JSON.parse(fs.readFileSync(`${report}.setup`, "utf8"));
+				assert.equal(setup.result.status, 2, setup.result.output);
+				assert.match(setup.result.output, /Lock generator failed/);
+				assert.ok(setup.commands.length > 0);
+				assert.equal(setup.commands[0].closed, true);
+				assert.equal(setup.commands[0].terminal.status, 2);
+				if (scenario === "setup-pipes") {
+					assert.equal(
+						closed,
+						false,
+						"EXIT is observed while inherited pipes remain open",
+					);
+					assert.deepEqual(
+						fixtureProcess(setup.pipeHolder.pid),
+						setup.pipeHolder,
+					);
+					assert.equal(
+						signalFixtureGroup(
+							{ ...setup.pipeHolder, startTicks: "0" },
+							"SIGTERM",
+							directory,
+						),
+						false,
+					);
+					assert.equal(
+						signalFixtureGroup(setup.pipeHolder, "SIGTERM", directory),
+						true,
+					);
+					assert.ok(
+						await fixtureStopped(
+							() => !fixtureProcess(setup.pipeHolder.pid) && closed,
+						),
+						"exact pipe holder retires and runner pipes drain before safety cleanup",
+					);
+				}
+				await observation.wait(
+					() => closed,
+					"early setup runner pipe drainage",
+				);
+				assert.deepEqual(await done, [1, null]);
+				const cleanup = JSON.parse(
+					fs.readFileSync(`${report}.cleanup`, "utf8"),
+				);
+				assert.equal(cleanup.errors, undefined);
+				for (const record of cleanup.processes) {
+					assert.equal(record.closed, true);
+					assert.equal(record.retired, true);
+				}
+				for (const record of setup.processes)
+					assert.notEqual(
+						fixtureProcess(record.pid)?.startTicks,
+						record.startTicks,
+					);
+				assert.deepEqual(fixtureCensus(owned), []);
+				assert.equal(processGroupRunning(runner.pid), false);
+				assert.equal(fs.existsSync(owned), false);
+				assert.deepEqual(fixtureProcess(canary.pid), siblingIdentity);
+				t.diagnostic(
+					JSON.stringify({
+						scenario,
+						exitedAt,
+						diagnosedAt,
+						outcome: outcome.message,
+						setup,
+						cleanup,
+						closed,
+						siblingIdentity,
+					}),
+				);
+				return;
+			}
+			await observation.wait(
+				() => fs.existsSync(`${report}.parked`),
+				"live held migration before missing report",
+			);
+			const parked = JSON.parse(fs.readFileSync(`${report}.parked`, "utf8"));
+			await assert.rejects(
+				waiting,
+				/Readiness deadline exhausted during held-package ownership report/,
+			);
+			assert.ok(fixtureNow() >= readiness.deadline);
+			assert.equal(runner.exitCode, null);
+			assert.equal(runner.signalCode, null);
+			assert.equal(closed, false);
+			assert.equal(fs.existsSync(report), false);
+			const cleanup = await emergencyLockFixtureCleanup({
+				runner,
+				runnerIdentity,
+				done,
+				directory: owned,
+				beforeRunnerStop: async () => {
+					const archive = process.env.BOAT_PACKAGE_CLEANUP_EVIDENCE;
+					if (archive)
+						fs.cpSync(
+							directory,
+							path.join(archive, scenario, "before-emergency-cleanup"),
+							{ recursive: true },
+						);
+				},
+			});
+			for (const record of parked.processes)
+				assert.notEqual(
+					fixtureProcess(record.pid)?.startTicks,
+					record.startTicks,
+				);
+			assert.deepEqual(fixtureCensus(owned), []);
+			assert.equal(closed, true);
+			assert.deepEqual(fixtureProcess(canary.pid), siblingIdentity);
+			t.diagnostic(
+				JSON.stringify({
+					scenario,
+					parked,
+					cleanup,
+					deadline: readiness.deadline,
+					at: fixtureNow(),
+					closed,
+				}),
+			);
+			return;
+		}
+		await waiting;
 		before = JSON.parse(fs.readFileSync(report, "utf8"));
 		t.diagnostic(
 			JSON.stringify({ scenario, before, runnerIdentity, siblingIdentity }),

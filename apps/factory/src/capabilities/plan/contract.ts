@@ -13,6 +13,11 @@ export interface PlanningIssue {
   readonly parents: readonly number[];
   readonly blockersReady: boolean;
   readonly prerequisiteEvidence: string;
+  readonly prerequisite?: {
+    readonly base: string;
+    readonly prBase: string;
+    readonly evidence: string;
+  };
 }
 export interface PlanningInput {
   readonly issues: readonly PlanningIssue[];

@@ -127,6 +127,7 @@ export function githubPlanning(
           enriched.push({
             ...issue,
             blockersReady: readiness.blockersReady,
+            prerequisite: readiness.prerequisite,
             prerequisiteEvidence: JSON.stringify(
               config.prerequisites.filter((p) => issue.blockers.includes(p.issue))
             ),

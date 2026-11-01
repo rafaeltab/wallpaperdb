@@ -74,6 +74,27 @@ it('continues admitted work through publication without an operations-page obser
     expect((await running.app.inject('/api/job')).json()).toMatchObject({
       delivery: { stage: 'ci', ready: true, landed: false },
     });
+    // Discovery must derive the prerequisite assertion from this completed job.
+    // Missing issue evidence still prevents a child launch.
+    await host.save({
+      complete: true,
+      base: host.base,
+      blockers: [{ number: 577, state: 'open' }],
+      prHead: host.base,
+    });
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/job', payload: { issue: 578 } }))
+        .statusCode
+    ).toBe(422);
+    expect(
+      (await host.calls()).some(
+        (call) =>
+          call.binary === 'gh' &&
+          call.args[0] === 'pr' &&
+          call.args[1] === 'view' &&
+          call.args[2] === '999'
+      )
+    ).toBe(true);
     const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
     pr.statusCheckRollup[0].conclusion = 'FAILURE';
     await host.save({

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 import { publication } from './publication.js';
+import { prerequisiteReadiness, type VerifiedPrerequisite } from './prerequisites.js';
 const issueSchema = z.object({
   number: z.number().int(),
   state: z.enum(['OPEN', 'CLOSED']),
@@ -20,69 +21,13 @@ export function githubIssues(config: {
   project: string;
   base: string;
   prBase?: string;
-  prerequisites: readonly { issue: number; pr: number; commit: string }[];
+  prerequisites: readonly VerifiedPrerequisite[];
+  readyPrerequisites?: () => Effect.Effect<readonly VerifiedPrerequisite[], Unavailable>;
 }): Issues {
   const gh = (args: string[], signal?: AbortSignal) =>
     command('gh', args, config.project, signal).then((text) => JSON.parse(text));
-  async function verifyBlockers(
-    numbers: readonly number[],
-    signal?: AbortSignal
-  ): Promise<boolean> {
-    if (numbers.length > 100) return false;
-    let blockersReady = true;
-    for (const blocker of numbers) {
-      const observation = issueSchema.parse(
-        await gh(
-          [
-            'issue',
-            'view',
-            String(blocker),
-            '--repo',
-            'rafaeltab/wallpaperdb',
-            '--json',
-            'number,state,author,url,body,labels',
-          ],
-          signal
-        )
-      );
-      if (observation.state === 'CLOSED') continue;
-      const verified = config.prerequisites.find((item) => item.issue === blocker);
-      if (!verified) {
-        blockersReady = false;
-        continue;
-      }
-      const pr = z
-        .object({ headRefOid: z.string(), state: z.enum(['OPEN', 'MERGED', 'CLOSED']) })
-        .parse(
-          await gh(
-            [
-              'pr',
-              'view',
-              String(verified.pr),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'headRefOid,state',
-            ],
-            signal
-          )
-        );
-      if (pr.headRefOid !== verified.commit || pr.state === 'CLOSED') {
-        blockersReady = false;
-        continue;
-      }
-      await command(
-        'git',
-        ['merge-base', '--is-ancestor', verified.commit, config.base],
-        config.project,
-        signal
-      );
-    }
-
-    return blockersReady;
-  }
   return {
-    pullRequest: publication(gh, config.prBase ?? 'main'),
+    pullRequest: (intent) => publication(gh, targetBase(intent.prBase, config.prBase))(intent),
     inspect: (number) =>
       Effect.tryPromise({
         try: async (signal) => {
@@ -120,14 +65,22 @@ export function githubIssues(config: {
             )
             .flat();
           const numbers = blockerNumbers(native, issue.body);
-          const blockersReady = await verifyBlockers(numbers, signal);
+          const dynamic = config.readyPrerequisites
+            ? await Effect.runPromise(config.readyPrerequisites(), { signal })
+            : [];
+          const readiness = await prerequisiteReadiness(
+            { ...config, prerequisites: [...dynamic, ...config.prerequisites] },
+            numbers,
+            gh,
+            signal
+          );
           return {
             open: issue.state === 'OPEN',
             author: issue.author.login,
             labels: issue.labels.map((label) => label.name),
             url: issue.url,
             blockers: numbers,
-            blockersReady,
+            ...readiness,
           };
         },
         catch: (cause) => new Unavailable({ operation: 'inspect-issue', cause }),
@@ -149,4 +102,8 @@ export function blockerNumbers(native: readonly { number: number }[], body: stri
     ].map((match) => Number(match[1]))
   );
   return [...new Set([...native.map((blocker) => blocker.number), ...fallback])];
+}
+
+function targetBase(jobBase?: string, configuredBase = 'main') {
+  return jobBase ?? configuredBase;
 }

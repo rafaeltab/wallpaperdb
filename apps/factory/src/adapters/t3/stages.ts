@@ -74,7 +74,12 @@ export function stageExecution(
             )
               throw new Error('Accepted commit changed before stage delivery');
             if (sendMcp) {
-              await sendMcp(intent, request, stagePrompt(intent, request, prBase), signal);
+              await sendMcp(
+                intent,
+                request,
+                stagePrompt(intent, request, publicationBase(intent, prBase)),
+                signal
+              );
               return;
             }
             const help = await sendHelp(signal);
@@ -82,7 +87,12 @@ export function stageExecution(
               ? ['--client-request-id', `${intent.id}:stage:${request.index}`]
               : [];
             await call(
-              ['send', request.threadId, stagePrompt(intent, request, prBase), ...key],
+              [
+                'send',
+                request.threadId,
+                stagePrompt(intent, request, publicationBase(intent, prBase)),
+                ...key,
+              ],
               signal
             );
           },
@@ -279,4 +289,8 @@ function currentResume(
 
 function deliveryIdentity(intent: Intent, request: StageRequest) {
   return `${intent.id}:${request.deliveryIndex ?? request.index}`;
+}
+
+function publicationBase(intent: Intent, fallback: string) {
+  return intent.prBase ?? fallback;
 }

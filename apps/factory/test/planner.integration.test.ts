@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
@@ -27,18 +27,36 @@ it('translates a bound assistant proposal and rejects malformed or user messages
           author: 'rafaeltab',
           open: true,
           labels: ['ready-for-agent'],
-          comments: [],
-          blockers: [],
-          parents: [],
+          comments: [{ author: 'rafaeltab', body: 'Preview only; preserve this scope' }],
+          blockers: [577],
+          parents: [571],
           blockersReady: true,
-          prerequisiteEvidence: '',
+          prerequisiteEvidence: 'Verified prerequisite commit and independent reviews',
         },
       ],
-      job: { kind: 'empty' as const },
+      job: {
+        kind: 'job' as const,
+        intent: {
+          id: 'parked',
+          issue: 579,
+          issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/579',
+          base: 'a'.repeat(40),
+          context: 'Existing implementation scope',
+          branch: 'factory/579',
+          createdAt: 0,
+          expectedStage: 'implementation' as const,
+        },
+        execution: { kind: 'absent' as const },
+        elapsedMs: 100,
+        resume: { index: 0, questionId: 'pending-question' },
+      },
       capacity: { concurrency: 1 as const, admission: 1 as const },
     };
     await host.save({ planner: { proposal } });
     expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
+    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
+      input
+    );
     for (const patch of [{ role: 'user' }, { malformed: true }, { status: 'failed' }]) {
       await host.save({ planner: { proposal, ...patch } });
       await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({

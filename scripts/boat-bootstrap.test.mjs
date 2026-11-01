@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -118,13 +119,38 @@ for (const optimized of [false, true])
 			.readdirSync(path.dirname(f.installed))
 			.filter((name) => name !== "boat.download" && name.endsWith(".download"));
 		assert.equal(downloads.length, 1);
+		const firstPath = path.join(path.dirname(f.installed), downloads[0]);
+		const firstBytes = fs.readFileSync(firstPath);
+		assert.equal(firstBytes.toString(), sentinel);
+		const firstHash = createHash("sha256").update(firstBytes).digest("hex");
+
+		const secondBytes = Buffer.from(`${sentinel}# second rejected response\n`);
+		fs.writeFileSync(path.join(f.directory, "download"), secondBytes);
+		f.run({ PYTHONOPTIMIZE: optimized ? "1" : "" });
+		assert.equal(fs.existsSync(f.installed), false);
 		assert.equal(
-			fs.readFileSync(
-				path.join(path.dirname(f.installed), downloads[0]),
-				"utf8",
-			),
-			sentinel,
+			fs.existsSync(firstPath),
+			true,
+			"first rejection path survives retry",
 		);
+		assert.deepEqual(
+			fs.readFileSync(firstPath),
+			firstBytes,
+			"first rejected bytes survive the second rejection",
+		);
+		assert.equal(
+			createHash("sha256").update(fs.readFileSync(firstPath)).digest("hex"),
+			firstHash,
+		);
+		const afterRetry = fs
+			.readdirSync(path.dirname(f.installed))
+			.filter((name) => name !== "boat.download" && name.endsWith(".download"));
+		assert.equal(afterRetry.length, 2);
+		const secondName = afterRetry.find((name) => name !== downloads[0]);
+		assert.notEqual(secondName, undefined);
+		const secondPath = path.join(path.dirname(f.installed), secondName);
+		assert.notEqual(secondPath, firstPath);
+		assert.deepEqual(fs.readFileSync(secondPath), secondBytes);
 	});
 
 for (const source of ["installed", "retained"])

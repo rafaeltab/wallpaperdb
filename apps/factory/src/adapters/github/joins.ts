@@ -109,6 +109,24 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const value = await git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], signal);
     return value.split(/\s/)[0];
   };
+  const containsPrerequisite = async (
+    layers: readonly Layer[],
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    for (const item of layers) if (await isAncestor(item.commit, head, signal)) return true;
+    return false;
+  };
+  const affectedBranch = async (
+    layers: readonly Layer[],
+    branch: string | null,
+    signal?: AbortSignal
+  ) => {
+    if (!branch) return false;
+    if (layers.some((item) => item.branch === branch)) return true;
+    const head = await git(['rev-parse', '--verify', `refs/heads/${branch}^{commit}`], signal);
+    return containsPrerequisite(layers, head, signal);
+  };
   const writers = async (layers: readonly Layer[], signal?: AbortSignal) => {
     const listed = z
       .array(z.object({ threadId: z.string() }))
@@ -143,10 +161,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           )
         ).thread;
       if (detail.projectId !== config.projectId) throw new Error('Mismatched writer project');
-      if (
-        layers.some((item) => item.branch === detail.branch) &&
-        (!['completed', 'idle'].includes(detail.status) || detail.pendingRequestCount !== 0)
-      )
+      if (!idleWriter(detail) && (await affectedBranch(layers, detail.branch, signal)))
         return false;
     }
     return await cleanWorktrees(layers, signal);
@@ -154,8 +169,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const cleanWorktrees = async (layers: readonly Layer[], signal?: AbortSignal) => {
     const worktrees = await git(['worktree', 'list', '--porcelain'], signal);
     for (const block of worktrees.split('\n\n')) {
-      if (!layers.some((item) => block.split('\n').includes(`branch refs/heads/${item.branch}`)))
-        continue;
+      const head = block.match(/^HEAD ([a-f0-9]{40})$/m)?.[1];
+      if (!head || !(await containsPrerequisite(layers, head, signal))) continue;
       const path = block.split('\n')[0]?.slice('worktree '.length);
       if (!path || (await command('git', ['status', '--porcelain'], path, signal)).trim())
         return false;
@@ -284,6 +299,56 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return undefined;
   };
+  const orderedMembers = async (
+    members: readonly number[],
+    replay: Intent['replay'],
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const nodes = await Promise.all(
+      members.map(async (number) => {
+        const current = z
+          .object({ headRefName: z.string(), headRefOid: sha, baseRefName: z.string() })
+          .parse(
+            await gh(
+              [
+                'pr',
+                'view',
+                String(number),
+                '--repo',
+                'rafaeltab/wallpaperdb',
+                '--json',
+                'headRefName,headRefOid,baseRefName',
+              ],
+              signal
+            )
+          );
+        const changed = replay.find((item) => item.pr === number);
+        const head = changed?.next ?? current.headRefOid;
+        return {
+          number,
+          branch: current.headRefName,
+          head,
+          parent: changed?.target ?? current.baseRefName,
+          depth: Number(await git(['rev-list', '--count', `${base}..${head}`], signal)),
+        };
+      })
+    );
+    nodes.sort((first, second) => first.depth - second.depth || first.number - second.number);
+    for (let index = 1; index < nodes.length; index++) {
+      const previous = nodes[index - 1];
+      const node = nodes[index];
+      if (!previous || !node) throw new Error('Missing native join member');
+      if (
+        node.parent !== previous.branch ||
+        !(await isAncestor(previous.head, node.head, signal))
+      ) {
+        await publish(dir, 'blocked.json', { kind: 'grouping-needs-dependent-replay', members });
+        return null;
+      }
+    }
+    return nodes.map((node) => node.number);
+  };
   const build = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
     const dir = directory(numbers);
     await publish(dir, 'seed.json', candidates);
@@ -307,16 +372,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     ranked.sort((a, b) => b.depth - a.depth || a.item.issue - b.item.issue);
     const replay = await combine(ranked, dir, signal);
     if (!replay?.length) return;
-    const groups: z.infer<typeof group>[] = [];
-    for (const { item } of ranked) {
-      const observed = z
-        .array(group)
-        .parse(
-          await gh(['api', `repos/rafaeltab/wallpaperdb/stacks?pull_request=${item.pr}`], signal)
-        );
-      for (const value of observed)
-        if (!groups.some((known) => known.number === value.number)) groups.push(value);
-    }
+    const groups = await groupsFor(
+      ranked.map(({ item }) => item.pr),
+      signal
+    );
     const replayed = new Set(replay.map((item) => item.pr));
     const members = [
       ...new Set([
@@ -325,7 +384,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ]),
     ].filter((number) => !replayed.has(number));
     members.push(...replay.map((item) => item.pr));
-    await publish(dir, 'intent.json', { numbers, layers, replay, groups, members });
+    const ordered = await orderedMembers(members, replay, dir, signal);
+    if (!ordered) return;
+    await publish(dir, 'intent.json', { numbers, layers, replay, groups, members: ordered });
     return await load(numbers);
   };
   const validate = async (item: Intent['replay'][number], dir: string, signal?: AbortSignal) => {
@@ -532,7 +593,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         '--repo',
         'rafaeltab/wallpaperdb',
         '--body',
-        `Automatic issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Original independent review commit ${item.reviewedCommit ?? item.commit}; prior published head ${item.commit}. This is a CI-verified replay, not a fresh review.`,
+        `Automatic issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Original independent review commit ${reviewOrigin(item)}; prior published head ${item.commit}. This is a CI-verified replay, not a fresh review.`,
       ],
       project,
       signal
@@ -707,4 +768,12 @@ function allowedPublication(
     [item.commit, item.next].includes(current.headRefOid) &&
     [item.prBase, item.target].includes(current.baseRefName)
   );
+}
+
+function idleWriter(detail: { status: string; pendingRequestCount: number }) {
+  return ['completed', 'idle'].includes(detail.status) && detail.pendingRequestCount === 0;
+}
+
+function reviewOrigin(item: Layer) {
+  return item.reviewedCommit ?? item.commit;
 }

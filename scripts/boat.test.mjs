@@ -994,9 +994,19 @@ async function sourceCommandContract() {
  if(generator){
   if(mode==='implicit'&&!(argv.includes('--timeout')&&argv[argv.indexOf('--timeout')+1]==='0'))throw Error('unsupported source fixture mode');
   const startedAt=new Date().toISOString(),command=argv.at(-1);
-  const child=cp.spawn(process.execPath,['-e','('+sourceFixtureWriter.toString()+')('+JSON.stringify(control)+','+JSON.stringify(command)+','+JSON.stringify(startedAt)+')'],{env:process.env,cwd:process.env.FAKE_WORKER,stdio:'ignore'});
-  child.unref();
-  start={success:true,processId:child.pid,pid:child.pid,command,startedAt,commandId:'cmd_fixture'+child.pid};
+  let pid;
+  if(flag('source-independent-writer.json')){
+   const owned=JSON.parse(fs.readFileSync(path.join(control,'source-independent-writer.json')));
+   const stat=fs.readFileSync('/proc/'+owned.pid+'/stat','utf8'),fields=stat.slice(stat.lastIndexOf(')')+2).split(' ');
+   if(fields[19]!==owned.birth)throw Error('independent fixture writer birth changed');
+   pid=owned.pid;
+   const job=path.join(control,'source-writer-job.json');
+   fs.writeFileSync(job+'.tmp',JSON.stringify({command,startedAt}));fs.renameSync(job+'.tmp',job);
+  }else{
+   const child=cp.spawn(process.execPath,['-e','('+sourceFixtureWriter.toString()+')('+JSON.stringify(control)+','+JSON.stringify(command)+','+JSON.stringify(startedAt)+')'],{env:process.env,cwd:process.env.FAKE_WORKER,stdio:'ignore'});
+   child.unref();pid=child.pid;
+  }
+  start={success:true,processId:pid,pid,command,startedAt,commandId:'cmd_fixture'+pid};
   fs.writeFileSync(path.join(control,'source-process-'+start.processId+'.start'),JSON.stringify(start));
   fs.appendFileSync(path.join(control,'source-submissions'),JSON.stringify({mode,start})+'\n');
   if(mode==='detach'){
@@ -1004,7 +1014,13 @@ async function sourceCommandContract() {
    const response=override('start',{...start});
    if(flag('missing-started'))delete response.processId;
    if(flag('launcher-failed'))response.success=false;
-   emit('detach',response);return true;
+   emit('detach',response);
+   if(flag('source-held-detach')){
+    await new Promise(resolve=>process.stdout.write('',resolve));
+    fs.writeFileSync(path.join(control,'source-detach-barrier.json'),JSON.stringify({pid:process.pid,start}));
+    while(!flag('source-detach-release'))await new Promise(resolve=>setTimeout(resolve,5));
+   }
+   return true;
   }
  }else start=JSON.parse(fs.readFileSync(prefix+'.start'));
  const file=path.join(control,'source-process-'+start.processId);
@@ -1095,6 +1111,7 @@ async function lockGenerationCheckout(
 				"release-daemon-generation",
 				"release-ordinary-generation",
 				"release-bootstrap",
+				"source-detach-release",
 			])
 				fs.writeFileSync(path.join(control, name), "yes");
 		let commandCleanup;
@@ -1477,11 +1494,43 @@ child.on('close',code=>{
 		run,
 		shutdownTunnel: () =>
 			start(background, "python", ["scripts/shutdown-tunnel.py"]),
-		writer: () =>
-			start(background, process.execPath, [
+		writer: ({ sourceCommand = false } = {}) => {
+			if (sourceCommand) {
+				const beginning = "function sourceFixtureWriter(";
+				const end = "async function sourceCommandContract()";
+				for (const anchor of [beginning, end])
+					assert.equal(sourceCommandContractFixture.split(anchor).length, 2);
+				const declaration = sourceCommandContractFixture.slice(
+					sourceCommandContractFixture.indexOf(beginning),
+					sourceCommandContractFixture.indexOf(end),
+				);
+				const program = path.join(control, "source-independent-writer.cjs");
+				fs.writeFileSync(
+					program,
+					`${declaration}
+const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;
+(async()=>{
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ const owned={pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};
+ const ready=path.join(control,'source-independent-writer.json');
+ fs.writeFileSync(ready+'.tmp',JSON.stringify(owned));fs.renameSync(ready+'.tmp',ready);
+ const jobFile=path.join(control,'source-writer-job.json');
+ while(!fs.existsSync(jobFile))await new Promise(resolve=>setTimeout(resolve,5));
+ const job=JSON.parse(fs.readFileSync(jobFile));
+ fs.writeFileSync(path.join(control,'source-writer-job-accepted.json'),JSON.stringify(job));
+ while(!fs.existsSync(path.join(control,'writer-release')))await new Promise(resolve=>setTimeout(resolve,5));
+ sourceFixtureWriter(control,job.command,job.startedAt);
+})();
+`,
+					{ mode: 0o600 },
+				);
+				return start(background, process.execPath, [program]);
+			}
+			return start(background, process.execPath, [
 				"-e",
 				`const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;fs.writeFileSync(path.join(control,'writer-entered'),'yes');const tick=()=>{if(fs.existsSync(path.join(control,'writer-active'))){fs.writeFileSync(path.join(process.env.FAKE_WORKER,'apps/asset/drizzle/9999_live_writer.sql'),'remote writer still owns outputs');fs.writeFileSync(path.join(control,'writer-mutated'),'yes');}if(fs.existsSync(path.join(control,'writer-release')))process.exit(0);};tick();setInterval(tick,10);`,
-			]),
+			]);
+		},
 		daemon: () =>
 			start(background, process.execPath, ["scripts/boat.mjs", "daemon"]),
 		generate: () =>
@@ -9109,13 +9158,179 @@ for (const fault of [
 	});
 
 test("source healthy silent attachment stays alive beyond two seconds until explicit release", async (t) => {
-	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
+	let archive;
+	if (destination) {
+		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+		archive = fs.mkdtempSync(path.join(destination, "C-healthy-held-"));
+	}
+	const retain = (name, value) => {
+		if (archive)
+			fs.writeFileSync(
+				path.join(archive, name),
+				JSON.stringify(value, null, 2),
+				{
+					mode: 0o600,
+				},
+			);
+	};
+	const f = await lockGenerationCheckout(t, {
+		ownPackageGroups: true,
+		cleanupReport: archive && path.join(archive, "fixture"),
+	});
+	f.local("patches/dependency.patch", "healthy independent writer input\n");
+	const writer = f.writer({ sourceCommand: true });
+	const readyFile = path.join(f.control, "source-independent-writer.json");
+	await f.readiness.wait(() => {
+		assert.equal(writer.terminal, null, writer.output());
+		return fs.existsSync(readyFile);
+	}, "test-owned source writer identity published before CLI launch");
+	const publishedWriter = JSON.parse(fs.readFileSync(readyFile));
+	const independent = fixtureProcess(writer.child.pid);
+	assert.ok(
+		independent,
+		"actual independent writer acquired before CLI launch",
+	);
+	assert.equal(publishedWriter.pid, independent.pid);
+	assert.equal(publishedWriter.birth, independent.startTicks);
+	assert.equal(publishedWriter.parent, process.pid);
+	assert.equal(publishedWriter.group, independent.group);
+	assert.equal(publishedWriter.session, independent.session);
+	assert.equal(publishedWriter.cwd, independent.cwd);
+	const writerReady = {
+		at: fixtureNow(),
+		published: publishedWriter,
+		current: independent,
+	};
+	retain("writer-before-cli.json", writerReady);
+	const retainSource = (stage) => {
+		if (!archive) return;
+		const target = path.join(archive, stage);
+		fs.mkdirSync(target);
+		for (const name of fs.readdirSync(path.join(f.root, ".boat")))
+			if (name.startsWith("source-command-") || name === "source-writer.json")
+				fs.cpSync(path.join(f.root, ".boat", name), path.join(target, name), {
+					recursive: true,
+				});
+	};
 	flag(f, "pause");
+	flag(f, "source-held-detach");
 	fs.writeFileSync(
 		path.join(f.control, "source-silent-attach"),
 		"healthy-held",
 	);
+	const artifacts = {
+		controller: path.join(f.root, "scripts/boat.mjs"),
+		controlCli: path.join(f.root, ".mise/boat/boat"),
+		testSource: import.meta.filename,
+		writerProgram: path.join(f.control, "source-independent-writer.cjs"),
+	};
+	retain(
+		"source-before-launch.json",
+		Object.fromEntries(
+			Object.entries(artifacts).map(([name, file]) => [
+				name,
+				{
+					file,
+					sha256: createHash("sha256")
+						.update(fs.readFileSync(file))
+						.digest("hex"),
+				},
+			]),
+		),
+	);
+	if (archive)
+		for (const [name, file] of Object.entries(artifacts))
+			fs.copyFileSync(file, path.join(archive, `${name}.mjs`));
+	const launchedAt = fixtureNow();
 	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
+	const barrierFile = path.join(f.control, "source-detach-barrier.json");
+	await f.readiness.wait(() => {
+		assert.equal(command.terminal, null, command.output());
+		if (!fs.existsSync(barrierFile)) return false;
+		const barrier = JSON.parse(fs.readFileSync(barrierFile));
+		const writer = fixtureProcess(barrier.start.processId);
+		const detach = fixtureProcess(barrier.pid);
+		if (!writer || !detach) return false;
+		if (
+			writer.group === detach.group &&
+			!fs.existsSync(path.join(f.control, "entered"))
+		)
+			return false;
+		if (
+			writer.group !== detach.group &&
+			!fs.existsSync(path.join(f.control, "source-writer-job-accepted.json"))
+		)
+			return false;
+		const observed = f.json(".boat/source-writer.json").phases.start
+			.localOwnership.observed;
+		// Hold the old local child until its durable capture, so the old-origin
+		// rejection cannot depend on whether a polling tick happened to see it.
+		return observed.some(
+			(p) =>
+				p.pid === (writer.group === detach.group ? writer.pid : detach.pid),
+		);
+	}, "held detach acknowledgement and durable source ownership acquired");
+	const barrier = JSON.parse(fs.readFileSync(barrierFile));
+	const detach = fixtureProcess(barrier.pid);
+	const detachWriter = fixtureProcess(barrier.start.processId);
+	const parent = Number(
+		fs
+			.readFileSync(`/proc/${detachWriter.pid}/stat`, "utf8")
+			.split(") ")
+			.at(-1)
+			.split(" ")[1],
+	);
+	const origin = {
+		at: fixtureNow(),
+		launchedAt,
+		writerReady,
+		detach,
+		writer: detachWriter,
+		parent,
+		start: barrier.start,
+		source: f.json(".boat/source-writer.json"),
+		detachReleased: fs.existsSync(
+			path.join(f.control, "source-detach-release"),
+		),
+		attachStarted: fs.existsSync(
+			path.join(f.control, "source-silent-leader.json"),
+		),
+		generatorEntered: fs.existsSync(path.join(f.control, "entered")),
+	};
+	retain("origin-before-release.json", origin);
+	retainSource("origin-source");
+	t.diagnostic(JSON.stringify({ archive, origin }));
+	assert.notEqual(
+		parent,
+		detach.pid,
+		"healthy source writer must be independent of detach CLI before acknowledgement release",
+	);
+	assert.notEqual(detachWriter.group, detach.group);
+	assert.notEqual(detachWriter.session, detach.session);
+	assert.deepEqual(detachWriter, independent);
+	assert.equal(origin.start.processId, writer.child.pid);
+	assert.equal(origin.start.pid, writer.child.pid);
+	assert.ok(writerReady.at <= launchedAt && launchedAt < origin.at);
+	assert.deepEqual(
+		JSON.parse(
+			fs.readFileSync(path.join(f.control, "source-writer-job-accepted.json")),
+		),
+		{
+			command: origin.start.command,
+			startedAt: origin.start.startedAt,
+		},
+	);
+	assert.equal(
+		origin.source.phases.start.localOwnership.observed.some(
+			(p) => p.pid === detachWriter.pid,
+		),
+		false,
+	);
+	assert.equal(origin.detachReleased, false);
+	assert.equal(origin.attachStarted, false);
+	assert.equal(origin.generatorEntered, false);
+	flag(f, "source-detach-release");
 	const leaderFile = path.join(f.control, "source-silent-leader.json");
 	await f.readiness.wait(() => {
 		assert.equal(command.terminal, null, command.output());
@@ -9134,24 +9349,31 @@ test("source healthy silent attachment stays alive beyond two seconds until expl
 	assert.equal(leader.cwd, published.cwd);
 	assert.equal(leader.group, published.group);
 	assert.equal(leader.session, published.session);
+	assert.deepEqual(remote, independent);
+	assert.equal(source.start.processId, writer.child.pid);
 	await f.readiness.wait(
-		() => fs.existsSync(path.join(f.control, "source-silent-ready")),
+		() =>
+			fs.existsSync(path.join(f.control, "source-silent-ready")) &&
+			f.json(".boat/source-writer.json").attached?.processId ===
+				writer.child.pid,
 		"healthy silent attach ready",
 	);
 	const heldAt = fixtureNow(),
-		checkpoint = heldAt + 2100;
+		checkpoint = heldAt + 2101;
 	while (fixtureNow() < checkpoint) {
 		assert.equal(command.terminal, null, command.output());
 		assert.equal(command.closed, false);
 		assert.deepEqual(fixtureProcess(leader.pid), leader);
 		assert.deepEqual(fixtureProcess(remote.pid), remote);
+		assert.equal(writer.closed, false);
+		assert.equal(writer.terminal, null);
 		await new Promise((resolve) =>
 			setTimeout(resolve, Math.min(10, Math.max(1, checkpoint - fixtureNow()))),
 		);
 	}
 	const observation = {
 		provenance:
-			"actual local synthetic CLI and paused synthetic worker before explicit release",
+			"actual local synthetic CLI and independently started test-owned source writer before explicit release",
 		heldAt,
 		observedAt: fixtureNow(),
 		identities: { leader, remote },
@@ -9162,36 +9384,102 @@ test("source healthy silent attachment stays alive beyond two seconds until expl
 		command: { terminal: command.terminal, closed: command.closed },
 		source: f.json(".boat/source-writer.json"),
 		released: fs.existsSync(path.join(f.control, "source-fault-release")),
+		writerReleased: fs.existsSync(path.join(f.control, "writer-release")),
+		writerStatusPublished: fs.existsSync(
+			path.join(f.control, `source-process-${writer.child.pid}.status`),
+		),
+		generatorEntered: fs.existsSync(path.join(f.control, "entered")),
+		collecting: fs.existsSync(path.join(f.control, "collecting")),
 	};
-	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
-	let archive;
-	if (destination) {
-		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
-		archive = fs.mkdtempSync(path.join(destination, "C-healthy-held-"));
-		fs.writeFileSync(
-			path.join(archive, "before-release.json"),
-			JSON.stringify(observation, null, 2),
-			{ mode: 0o600 },
-		);
-	}
+	retain("before-release.json", observation);
+	retainSource("held-source");
 	t.diagnostic(
 		sourceObservationDiagnostic(archive, "healthy-held", observation),
 	);
-	assert.ok(observation.observedAt - heldAt > 2000);
+	assert.ok(observation.observedAt - heldAt > 2100);
 	assert.deepEqual(observation.current.leader, leader);
 	assert.deepEqual(observation.current.remote, remote);
 	assert.equal(observation.command.terminal, null);
 	assert.equal(observation.command.closed, false);
 	assert.equal(observation.released, false);
+	assert.equal(observation.writerReleased, false);
+	assert.equal(observation.writerStatusPublished, false);
+	assert.equal(observation.generatorEntered, false);
+	assert.equal(observation.collecting, false);
 	assert.equal(observation.source.protocolError, false);
+	assert.equal(observation.source.terminal, null);
+	assert.equal(observation.source.status, null);
 	assert.equal(
 		fs.existsSync(path.join(f.control, "source-leader-term")),
 		false,
 	);
 	flag(f, "release");
+	flag(f, "writer-release");
 	flag(f, "source-fault-release");
+	await f.readiness.wait(
+		() => command.closed && writer.closed,
+		"explicitly released source writer and Make finish",
+	);
 	const result = await command.done;
+	const writerResult = await writer.done;
+	retainSource("completed-source");
+	retain("after-completion.json", {
+		at: fixtureNow(),
+		result,
+		writerResult,
+		writerCurrent: fixtureProcess(writer.child.pid),
+	});
 	assert.equal(result.status, 0, result.output);
+	assert.equal(result.signal, null);
+	assert.equal(writerResult.status, 0, writerResult.output);
+	assert.equal(writerResult.signal, null);
+	assert.equal(fixtureProcess(writer.child.pid), null);
+	assert.equal(fs.existsSync(path.join(f.control, "entered")), true);
+	assert.equal(fs.existsSync(path.join(f.control, "collecting")), true);
+	const events = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const status = events.find((event) => event.phase === "status").value;
+	for (const key of ["processId", "pid", "command", "startedAt", "commandId"])
+		assert.equal(status[key], origin.start[key]);
+	assert.equal(status.exitCode, 0);
+	assert.equal(status.running, false);
+	assert.equal(status.signal, null);
+	const frames = events
+		.filter((event) => event.phase === "attach")
+		.map((event) => event.value);
+	assert.equal(frames[0].processId, writer.child.pid);
+	assert.equal(frames.at(-1).exitCode, 0);
+	for (const stream of ["stdout", "stderr"]) {
+		const chunks = frames.filter((frame) => frame.type === stream);
+		let offset = 0;
+		for (const chunk of chunks) {
+			offset += Buffer.byteLength(chunk.data);
+			assert.equal(chunk.nextOffset, offset);
+		}
+		assert.equal(frames.at(-1)[`${stream}Offset`], offset);
+		assert.ok(
+			chunks
+				.map((chunk) => chunk.data)
+				.join("")
+				.includes(`source fixture lock ${stream}\n`),
+		);
+	}
+	assert.ok(
+		events.findIndex((event) => event.phase === "collect") >
+			events.findIndex((event) => event.phase === "status"),
+	);
+	const accepted = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8");
+	assert.equal(
+		JSON.parse(accepted).inputs["patches/dependency.patch"],
+		"healthy independent writer input\n",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+		accepted,
+	);
 	assert.equal(
 		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
 		false,

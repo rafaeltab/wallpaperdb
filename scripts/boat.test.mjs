@@ -888,13 +888,20 @@ function sourceFixtureWriter(control, command, startedAt) {
  if(fs.existsSync(path.join(control,'stream-loss')))return;
  const file=path.join(control,'source-process-'+process.pid),offsets={stdout:0,stderr:0};
  fs.writeFileSync(file+'.frames','');
+ const output=(type,data)=>{
+  offsets[type]+=Buffer.byteLength(data);
+  fs.appendFileSync(file+'.frames',JSON.stringify({type,data,nextOffset:offsets[type]})+'\n');
+ };
+ // Synthetic LOCAL CLI output makes the next forwarded attached frame fast.
+ // The pinned CLI filters heartbeat/reconnecting frames before forwarding it.
+ if(fs.existsSync(path.join(control,'source-subsequent-attached'))){
+  output('stdout','synthetic LOCAL CLI before continuation stdout ✓\n');
+  output('stderr','synthetic LOCAL CLI before continuation stderr 日本語\n');
+ }
  const child=cp.spawn('bash',['-c',command.replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER)],{env:process.env,stdio:['ignore','pipe','pipe']});
  for(const type of ['stdout','stderr']){
   child[type].setEncoding('utf8');
-  child[type].on('data',data=>{
-   offsets[type]+=Buffer.byteLength(data);
-   fs.appendFileSync(file+'.frames',JSON.stringify({type,data,nextOffset:offsets[type]})+'\n');
-  });
+  child[type].on('data',data=>output(type,data));
  }
  child.on('close',(code,signal)=>{
   const status={success:true,processId:process.pid,pid:process.pid,command,startedAt,known:true,running:false,status:'exited',exitCode:code,signal,oomKilled:false,finishedAt:new Date().toISOString(),stdout:'',stderr:''};
@@ -955,11 +962,21 @@ async function sourceCommandContract() {
  }
  if(!flag('missing-started'))emit('attach',override('attached',{type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0}));
  if(flag('stream-loss')){fs.writeFileSync(path.join(control,'writer-active'),'yes');process.exit(71);}
- let cursor=0;
+ let cursor=0,subsequent=false;
+ const forwarded={stdout:0,stderr:0};
  while(true){
   const frames=fs.existsSync(file+'.frames')?fs.readFileSync(file+'.frames','utf8'):'';
   const end=frames.lastIndexOf('\n')+1;
-  for(const line of frames.slice(cursor,end).split('\n').filter(Boolean))emit('attach',override('chunk',JSON.parse(line)));
+  for(const line of frames.slice(cursor,end).split('\n').filter(Boolean)){
+   let frame=override('chunk',JSON.parse(line));
+   if(subsequent)frame=override('continuation',frame);
+   emit('attach',frame);
+   forwarded[frame.type]=frame.nextOffset;
+   if(flag('source-subsequent-attached')&&!subsequent&&forwarded.stdout>0&&forwarded.stderr>0){
+    emit('attach',override('subsequent-attached',{type:'attached',processId:start.processId,stdoutOffset:forwarded.stdout,stderrOffset:forwarded.stderr}));
+    subsequent=true;
+   }
+  }
   cursor=end;
   if(fs.existsSync(file+'.status')&&(!fs.existsSync(file+'.frames')||cursor===fs.readFileSync(file+'.frames','utf8').length))break;
   await new Promise(resolve=>setTimeout(resolve,5));
@@ -7975,6 +7992,296 @@ test("generation rejects symlinked inputs without reading the outside target", a
 	assert.equal(fs.existsSync(readFlag), false);
 	assert.equal(fs.readlinkSync(schema), outside);
 });
+
+function subsequentAttachedEvidence(t, f) {
+	const destination = process.env.BOAT_SOURCE_PROTOCOL_EVIDENCE_DIRECTORY;
+	if (!destination) return () => {};
+	fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+	const archive = fs.mkdtempSync(
+		path.join(destination, "subsequent-attached-"),
+	);
+	fs.chmodSync(archive, 0o700);
+	const files = {};
+	const retain = (name, bytes) => {
+		fs.writeFileSync(path.join(archive, name), bytes, { mode: 0o600 });
+		files[name] = {
+			bytes: Buffer.byteLength(bytes),
+			sha256: createHash("sha256").update(bytes).digest("hex"),
+		};
+	};
+	retain(
+		"synthetic-local-cli.cjs",
+		fs.readFileSync(path.join(f.root, ".mise/boat/boat")),
+	);
+	retain("source-contract-fixture.cjs", sourceCommandContractFixture);
+	retain("boat.test.mjs", fs.readFileSync(fileURLToPath(import.meta.url)));
+	const manifest = {
+		provenance:
+			"Synthetic LOCAL CLI only. Not historical or provider evidence. No real CLI or worker was invoked.",
+		test: t.name,
+		executedTrackedTree: process.env.BOAT_SOURCE_PROTOCOL_EXECUTED_TREE ?? null,
+		beforePublicMake: true,
+		files,
+	};
+	retain("before-public-make.json", `${JSON.stringify(manifest, null, 2)}\n`);
+	t.diagnostic(JSON.stringify({ archive, ...manifest }));
+	return (result) => {
+		for (const entry of fs.readdirSync(path.join(f.root, ".boat")))
+			if (entry.startsWith("source-command-"))
+				fs.cpSync(
+					path.join(f.root, ".boat", entry),
+					path.join(archive, entry),
+					{
+						recursive: true,
+					},
+				);
+		for (const entry of fs.readdirSync(f.control))
+			if (entry.startsWith("source-") || ["transport", "calls"].includes(entry))
+				retain(entry, fs.readFileSync(path.join(f.control, entry)));
+		retain("make-output.log", result.output);
+		retain(
+			"result.json",
+			`${JSON.stringify({ status: result.status, files }, null, 2)}\n`,
+		);
+	};
+}
+
+test("synthetic LOCAL CLI subsequent attached preserves owned process cumulative offsets and collection", {
+	timeout: 5000,
+}, async (t) => {
+	const f = await lockGenerationCheckout(t);
+	flag(f, "source-subsequent-attached");
+	const retain = subsequentAttachedEvidence(t, f);
+	const result = await f.generate();
+	retain(result);
+	const events = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const submissions = fs
+		.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(
+		submissions.length,
+		1,
+		"continuation must not resubmit the generator",
+	);
+	const [{ mode, start }] = submissions;
+	assert.equal(mode, "detach");
+	assert.deepEqual(events[0], { phase: "detach", value: start });
+	const frames = events
+		.filter((event) => event.phase === "attach")
+		.map((event) => event.value);
+	const initial = {
+		type: "attached",
+		processId: start.processId,
+		stdoutOffset: 0,
+		stderrOffset: 0,
+	};
+	assert.deepEqual(frames[0], initial);
+	const attachments = frames.filter((frame) => frame.type === "attached");
+	assert.equal(attachments.length, 2);
+	const written = fs
+		.readFileSync(
+			path.join(f.control, `source-process-${start.processId}.frames`),
+			"utf8",
+		)
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const next = frames.indexOf(attachments[1]);
+	assert.deepEqual(frames.map((frame) => frame.type).slice(0, next + 1), [
+		"attached",
+		"stdout",
+		"stderr",
+		"attached",
+	]);
+	const offsets = { stdout: 0, stderr: 0 };
+	for (const frame of frames) {
+		if (frame.type === "attached") {
+			assert.equal(frame.processId, start.processId);
+			assert.equal(frame.stdoutOffset, offsets.stdout);
+			assert.equal(frame.stderrOffset, offsets.stderr);
+		} else if (frame.type === "stdout" || frame.type === "stderr") {
+			offsets[frame.type] += Buffer.byteLength(frame.data);
+			assert.equal(frame.nextOffset, offsets[frame.type]);
+		} else
+			assert.equal(frame.type, "exit", "only forwarded CLI frames belong here");
+	}
+	for (const stream of ["stdout", "stderr"]) {
+		assert.ok(attachments[1][`${stream}Offset`] > 0);
+		assert.ok(frames.slice(next + 1).some((frame) => frame.type === stream));
+		const prefix = `synthetic LOCAL CLI before continuation ${stream} ${stream === "stdout" ? "✓" : "日本語"}\n`;
+		const output = `source fixture lock ${stream}\n`;
+		const decoded = frames
+			.filter((frame) => frame.type === stream)
+			.map((frame) => frame.data)
+			.join("");
+		assert.equal(
+			decoded,
+			written
+				.filter((frame) => frame.type === stream)
+				.map((frame) => frame.data)
+				.join(""),
+		);
+		assert.ok(decoded.startsWith(prefix));
+		for (const text of [prefix, output])
+			assert.equal(
+				result.output.split(text).length - 1,
+				1,
+				`${stream} output must appear once`,
+			);
+		assert.equal(frames.at(-1)[`${stream}Offset`], offsets[stream]);
+	}
+	assert.deepEqual(frames.at(-1), {
+		type: "exit",
+		status: "exited",
+		exitCode: 0,
+		signal: null,
+		stdoutOffset: offsets.stdout,
+		stderrOffset: offsets.stderr,
+	});
+	// These fixture assertions precede the red verdict so a malformed sequence
+	// cannot masquerade as the reported valid-continuation rejection.
+	assert.equal(result.status, 0, result.output);
+	const receipts = fs
+		.readdirSync(path.join(f.root, ".boat"))
+		.filter((name) => /^source-command-.*\.json$/.test(name));
+	assert.equal(receipts.length, 1);
+	const receipt = f.json(`.boat/${receipts[0]}`);
+	assert.deepEqual(
+		receipt.start,
+		start,
+		"the original receipt must survive continuation",
+	);
+	assert.deepEqual(
+		receipt.attached,
+		initial,
+		"the initial zero-offset attachment must survive continuation",
+	);
+	assert.deepEqual(receipt.offsets, offsets);
+	assert.equal(receipt.protocolError, false);
+	assert.deepEqual(receipt.terminal, frames.at(-1));
+	const statuses = events.filter((event) => event.phase === "status");
+	assert.equal(statuses.length, 1);
+	const status = statuses[0].value;
+	for (const name of ["processId", "command", "startedAt", "commandId"])
+		assert.equal(status[name], start[name]);
+	assert.equal(status.success, true);
+	assert.equal(status.known, true);
+	assert.equal(status.running, false);
+	assert.equal(status.status, "exited");
+	assert.equal(status.exitCode, 0);
+	assert.equal(status.signal, null);
+	assert.equal(status.oomKilled, false);
+	assert.ok(Date.parse(status.finishedAt) >= Date.parse(start.startedAt));
+	assert.deepEqual(receipt.status, status);
+	assert.equal(events.filter((event) => event.phase === "collect").length, 1);
+	assert.equal(events.at(-1).phase, "collect");
+	const calls = fs
+		.readFileSync(path.join(f.control, "transport"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.filter((args) => args.includes("exec"));
+	for (const followup of ["--attach", "--status"])
+		assert.deepEqual(
+			calls.filter((args) => args.includes(followup)),
+			[
+				[
+					"--no-update",
+					"--json",
+					"exec",
+					"fake-worker",
+					followup,
+					String(start.processId),
+				],
+			],
+		);
+	assert.equal(calls.filter((args) => args.includes("--detach")).length, 1);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+	);
+});
+
+for (const [name, faults] of [
+	[
+		"wrong process",
+		{ "source-subsequent-attached-override.json": { processId: 1 } },
+	],
+	[
+		"stdout gap",
+		{ "source-subsequent-attached-override.json": { stdoutOffset: 1000000 } },
+	],
+	[
+		"stderr gap",
+		{ "source-subsequent-attached-override.json": { stderrOffset: 1000000 } },
+	],
+	[
+		"rewound stdout",
+		{ "source-subsequent-attached-override.json": { stdoutOffset: 0 } },
+	],
+	[
+		"rewound stderr",
+		{ "source-subsequent-attached-override.json": { stderrOffset: 0 } },
+	],
+	[
+		"conflicting continuation offset",
+		{ "source-continuation-override.json": { nextOffset: 0 } },
+	],
+])
+	test(`synthetic LOCAL CLI subsequent attached rejects ${name} without collection`, {
+		timeout: 5000,
+	}, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+		flag(f, "source-subsequent-attached");
+		for (const [name, value] of Object.entries(faults))
+			fs.writeFileSync(path.join(f.control, name), JSON.stringify(value));
+		const retain = subsequentAttachedEvidence(t, f);
+		const result = await f.generate();
+		retain(result);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /completion is uncertain/);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+			before,
+		);
+		assert.equal(fs.existsSync(path.join(f.control, "collecting")), false);
+		const ownership = f.json(".boat/source-writer.json");
+		assert.equal(ownership.protocolError, true);
+		const submissions = fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(submissions.length, 1);
+		assert.equal(submissions[0].mode, "detach");
+		assert.deepEqual(ownership.start, submissions[0].start);
+		const events = fs
+			.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(
+			events.filter(
+				(event) => event.phase === "attach" && event.value.type === "attached",
+			).length,
+			2,
+		);
+		assert.equal(
+			events.some((event) => event.phase === "collect"),
+			false,
+		);
+	});
 
 test("documented source protocol preserves Unicode diagnostics and byte offsets", {
 	timeout: 5000,

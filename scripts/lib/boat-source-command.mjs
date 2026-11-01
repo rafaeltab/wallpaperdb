@@ -339,13 +339,15 @@ export async function runOwnedSourceCommand({
 				}
 				if (frame.type === "attached") {
 					if (
-						record.attached ||
 						frame.processId !== record.start.processId ||
-						frame.stdoutOffset !== 0 ||
-						frame.stderrOffset !== 0
+						frame.stdoutOffset !== record.offsets.stdout ||
+						frame.stderrOffset !== record.offsets.stderr
 					)
 						record.protocolError = true;
-					record.attached = frame;
+					// The CLI filters reconnect but forwards each new attached interval.
+					// Preserve the first receipt; continuation starts at delivered bytes.
+					if (!record.attached) record.attached = frame;
+					else record.lastAttached = frame;
 					checkpoint();
 				} else if (!record.attached) record.protocolError = true;
 				else if (frame.type === "stdout" || frame.type === "stderr") {

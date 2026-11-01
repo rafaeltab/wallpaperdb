@@ -47,6 +47,80 @@ export function githubIssues(config: {
       Effect.tapError((error) => Effect.logError(error)),
       Effect.withSpan('factory.github.inspect')
     );
+  async function joinContext(numbers: readonly number[], signal: AbortSignal) {
+    const dynamic = config.readyPrerequisites
+      ? await Effect.runPromise(config.readyPrerequisites(), { signal })
+      : [];
+    const pending = await joins?.state(numbers);
+    const currentAssertions = [...dynamic, ...config.prerequisites];
+    // The join retains the original accepted/reviewed association even after
+    // retargeting makes the old owning job's publication observation stale.
+    const assertions = retainAssertions(currentAssertions, pending?.operation?.layers ?? []);
+    const bound = pending?.operation?.layers.every((layer) =>
+      assertions.some((item) => sameBinding(item, layer))
+    );
+    return { assertions, pending, bound };
+  }
+  type JoinContext = Awaited<ReturnType<typeof joinContext>>;
+  type Readiness = Awaited<ReturnType<typeof prerequisiteReadiness>>;
+  async function recover(numbers: readonly number[], context: JoinContext, signal: AbortSignal) {
+    const { pending, bound } = context;
+    if (pending?.operation && bound && !pending.blocked)
+      await joins?.prepare(numbers, null, signal);
+  }
+  async function prepareFresh(
+    numbers: readonly number[],
+    readiness: Readiness,
+    pending: JoinContext['pending'],
+    bound: JoinContext['bound'],
+    signal: AbortSignal
+  ) {
+    if (readiness.joinRequired && joins && (!pending?.operation || bound))
+      await joins.prepare(numbers, readiness.join, signal);
+  }
+  function joinRequired(
+    readiness: Readiness,
+    pending: JoinContext['pending'],
+    bound: JoinContext['bound']
+  ) {
+    if (readiness.blockersReady || pending?.blocked) return false;
+    return readiness.joinRequired || !!(pending?.operation && bound);
+  }
+  function publicReadiness(
+    readiness: Readiness,
+    pending: JoinContext['pending'],
+    bound: JoinContext['bound']
+  ) {
+    const { join: _join, joinRequired: _required, ...core } = readiness;
+    return {
+      ...core,
+      ...(joins ? { joinRequired: joinRequired(readiness, pending, bound) } : {}),
+      ...(pending?.blocked
+        ? { blockedReason: `Prerequisite join blocked: ${JSON.stringify(pending.blocked)}` }
+        : {}),
+    };
+  }
+  async function joinReadiness(
+    numbers: readonly number[],
+    prepare: boolean,
+    signal: AbortSignal,
+    candidate?: Parameters<Issues['inspect']>[1]
+  ) {
+    const context = await joinContext(numbers, signal);
+    const { assertions, pending, bound } = context;
+    if (prepare) await recover(numbers, context, signal);
+    const replay = bound ? ((await joins?.evidence(numbers)) ?? []) : [];
+    const effective = replayAssertions(assertions, replay);
+    const readiness = await prerequisiteReadiness(
+      { ...config, prerequisites: effective },
+      numbers,
+      gh,
+      signal,
+      candidate
+    );
+    if (prepare) await prepareFresh(numbers, readiness, pending, bound, signal);
+    return publicReadiness(readiness, pending, bound);
+  }
   async function inspectIssue(
     number: number,
     prepare: boolean,
@@ -87,45 +161,7 @@ export function githubIssues(config: {
       )
       .flat();
     const numbers = blockerNumbers(native, issue.body);
-    const dynamic = config.readyPrerequisites
-      ? await Effect.runPromise(config.readyPrerequisites(), { signal })
-      : [];
-    const pending = await joins?.state(numbers);
-    const currentAssertions = [...dynamic, ...config.prerequisites];
-    // The join retains the original accepted/reviewed association even after
-    // retargeting makes the old owning job's publication observation stale.
-    const assertions = [
-      ...currentAssertions,
-      ...(pending?.operation?.layers ?? []).filter(
-        (layer) => !currentAssertions.some((item) => item.issue === layer.issue)
-      ),
-    ];
-    const bound = pending?.operation?.layers.every((layer) =>
-      assertions.some(
-        (item) => item.issue === layer.issue && item.pr === layer.pr && item.commit === layer.commit
-      )
-    );
-    if (prepare && pending?.operation && bound && !pending.blocked)
-      await joins?.prepare(numbers, null, signal);
-
-    const replay = bound ? ((await joins?.evidence(numbers)) ?? []) : [];
-    const effective = assertions.map((item) => {
-      const changed = replay.find(
-        (layer) =>
-          layer.issue === item.issue && layer.commit === item.commit && layer.pr === item.pr
-      );
-      return changed ? { ...item, commit: changed.next } : item;
-    });
-    const readiness = await prerequisiteReadiness(
-      { ...config, prerequisites: effective, replayed: replay.map((item) => item.next) },
-      numbers,
-      gh,
-      signal,
-      candidate
-    );
-    if (prepare && readiness.joinRequired && joins) {
-      await joins.prepare(numbers, readiness.join, signal);
-    }
+    const readiness = await joinReadiness(numbers, prepare, signal, candidate);
     return {
       open: issue.state === 'OPEN',
       author: issue.author.login,
@@ -133,18 +169,23 @@ export function githubIssues(config: {
       url: issue.url,
       blockers: numbers,
       ...readiness,
-      joinRequired:
-        !!joins &&
-        !readiness.blockersReady &&
-        !pending?.blocked &&
-        (readiness.joinRequired || !!(pending?.operation && bound)),
-      blockedReason: pending?.blocked
-        ? `Prerequisite join blocked: ${JSON.stringify(pending.blocked)}`
-        : undefined,
     };
   }
   return {
-    pullRequest: (intent) => publication(gh, targetBase(intent.prBase, config.prBase))(intent),
+    pullRequest: (intent) =>
+      Effect.gen(function* () {
+        const replay = yield* Effect.tryPromise({
+          try: () => joins?.replayFor(intent.issue) ?? Promise.resolve(null),
+          catch: (cause) => new Unavailable({ operation: 'replay-publication', cause }),
+        });
+        const observed = yield* publication(
+          gh,
+          replay?.target ?? targetBase(intent.prBase, config.prBase)
+        )(intent);
+        if (replayMatches(replay, observed, intent.branch))
+          return { ...observed, reviewedCommit: originalReview(replay) };
+        return observed;
+      }),
     inspect: (number, candidate) => inspect(number, false, candidate),
     prepare: (number) => Effect.asVoid(inspect(number, true)),
   };
@@ -165,4 +206,44 @@ export function blockerNumbers(native: readonly { number: number }[], body: stri
 
 function targetBase(jobBase?: string, configuredBase = 'main') {
   return jobBase ?? configuredBase;
+}
+
+function sameBinding(first: VerifiedPrerequisite, second: VerifiedPrerequisite) {
+  return first.issue === second.issue && first.pr === second.pr && first.commit === second.commit;
+}
+function retainAssertions(
+  current: readonly VerifiedPrerequisite[],
+  recorded: readonly VerifiedPrerequisite[]
+) {
+  return [
+    ...current,
+    ...recorded.filter((layer) => !current.some((item) => item.issue === layer.issue)),
+  ];
+}
+function replayAssertions(
+  assertions: readonly VerifiedPrerequisite[],
+  replay: readonly (VerifiedPrerequisite & { next: string })[]
+) {
+  return assertions.map((item) => {
+    const changed = replay.find((layer) => sameBinding(item, layer));
+    return changed ? { ...item, commit: changed.next } : item;
+  });
+}
+
+type Replay = Awaited<ReturnType<ReturnType<typeof prerequisiteJoin>['replayFor']>>;
+function replayMatches(
+  replay: Replay,
+  observed: import('../../capabilities/job/index.js').PullRequestObservation,
+  branch: string
+) {
+  return (
+    replay &&
+    observed.kind === 'found' &&
+    replay.branch === branch &&
+    observed.commit === replay.next &&
+    observed.url === replay.url
+  );
+}
+function originalReview(replay: Replay) {
+  return replay?.reviewedCommit ?? replay?.commit;
 }

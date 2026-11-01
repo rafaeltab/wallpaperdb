@@ -42,6 +42,7 @@ export const SchedulerLive = Layer.effect(
     const source = yield* PlanningSource;
     const writers = yield* Semaphore.make(1);
     let lastInput: string | undefined;
+    let retryPreview: Preview | undefined;
     const observe = (
       state: ScheduleState
     ): Effect.Effect<ScheduleStatus, import('../job/index.js').Unavailable> =>
@@ -89,12 +90,25 @@ export const SchedulerLive = Layer.effect(
         }
         return null;
       });
+    const prepareIssue = (
+      number: number,
+      jobs: readonly Status[],
+      initial?: Effect.Success<ReturnType<Issues['inspect']>>
+    ) =>
+      Effect.gen(function* () {
+        let issue = initial ?? (yield* issues.inspect(number));
+        if (issue.joinRequired && !locallyBlocked(issue.blockers, jobs)) {
+          yield* issues.prepare?.(number) ?? Effect.void;
+          issue = yield* issues.inspect(number);
+        }
+        return issue;
+      });
     const dispatch = (preview: Preview, base: string, initialRevision: number) =>
       Effect.gen(function* () {
         let revision = initialRevision;
         for (const selection of preview.selected) {
           const current = yield* status();
-          if (current.state.revision !== revision) break;
+          if (!currentDispatch(current, revision)) break;
           const validated = validate(
             { selected: [selection], deferred: [] },
             {
@@ -105,18 +119,21 @@ export const SchedulerLive = Layer.effect(
           );
           if (!validated.selected.length) continue;
           const planned = plannedStart(selection, preview, base);
-          if (!available(current.state, current.jobs)) break;
-          let inspected = yield* issues.inspect(selection.issue);
-          if (inspected.joinRequired && !locallyBlocked(inspected.blockers, current.jobs)) {
-            yield* issues.prepare?.(selection.issue) ?? Effect.void;
-            inspected = yield* issues.inspect(selection.issue);
-          }
-          if (!dispatchable(inspected, current.jobs)) continue;
+
+          const inspected = yield* prepareIssue(selection.issue, current.jobs);
+          const after = yield* status();
+          if (after.state.revision !== current.state.revision) break;
+          if (!dispatchable(inspected, after.jobs)) continue;
           const command = prerequisiteStart(planned, inspected.prerequisite);
-          if (!(yield* reserve(command, current))) continue;
+          if (!(yield* reserve(command, after))) continue;
           revision++;
           yield* (yield* pool.job(selection.issue)).start(command);
         }
+      });
+    const retry = (preview: Preview | undefined, base: string, revision: number) =>
+      Effect.gen(function* () {
+        if (preview) yield* dispatch(preview, base, revision);
+        return yield* status();
       });
     const claimResume = (claim: ResumeClaim, target: Status, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
@@ -160,19 +177,13 @@ export const SchedulerLive = Layer.effect(
         Effect.gen(function* () {
           if (!validStart(command)) return { kind: 'rejected' as const };
           let issue = yield* issues.inspect(command.issue);
+          if (!eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }))
+            return { kind: 'rejected' as const };
           const before = yield* status();
           if (!available(before.state, before.jobs)) return { kind: 'occupied' as const };
-          if (
-            eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }) &&
-            !locallyBlocked(issue.blockers, before.jobs) &&
-            issue.joinRequired
-          ) {
-            yield* issues.prepare?.(command.issue) ?? Effect.void;
-            issue = yield* issues.inspect(command.issue);
-          }
-          if (!eligible(issue)) return { kind: 'rejected' as const };
+          issue = yield* prepareIssue(command.issue, before.jobs, issue);
           const snapshot = yield* status();
-          if (locallyBlocked(issue.blockers, snapshot.jobs)) return { kind: 'rejected' as const };
+          if (!dispatchable(issue, snapshot.jobs)) return { kind: 'rejected' as const };
           const resolved = prerequisiteStart(command, issue.prerequisite);
           if (!(yield* reserve(resolved, snapshot))) return { kind: 'occupied' as const };
           return yield* (yield* pool.job(command.issue)).start(resolved);
@@ -189,10 +200,14 @@ export const SchedulerLive = Layer.effect(
             jobs: input.jobs?.map(normalize),
           };
           const signature = JSON.stringify(normalized);
-          if (signature === lastInput || !hasFrontier(input, snapshot.state)) return snapshot;
+          if (!hasFrontier(input, snapshot.state)) return snapshot;
+          if (signature === lastInput) {
+            return yield* retry(retryPreview, base, snapshot.state.revision);
+          }
           const preview = yield* plan.preview();
           if (preview.kind === 'stale') return yield* status();
           lastInput = signature;
+          retryPreview = joinPreview(preview);
           // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.
           if (preview.input.scheduleRevision !== snapshot.state.revision) return yield* status();
           yield* dispatch(preview, base, snapshot.state.revision);
@@ -333,4 +348,16 @@ function dispatchable(
   jobs: readonly Status[]
 ) {
   return eligible(issue) && !locallyBlocked(issue.blockers, jobs);
+}
+
+function currentDispatch(snapshot: ScheduleStatus, revision: number) {
+  return snapshot.state.revision === revision && available(snapshot.state, snapshot.jobs);
+}
+
+function joinPreview(preview: Preview) {
+  return preview.selected.some((selection) =>
+    preview.input.issues.some((issue) => issue.number === selection.issue && issue.joinRequired)
+  )
+    ? preview
+    : undefined;
 }

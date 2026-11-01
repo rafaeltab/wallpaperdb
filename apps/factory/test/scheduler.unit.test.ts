@@ -248,9 +248,14 @@ it('releases a parked slot without satisfying its dependent and admits unrelated
         landed: false,
       },
     });
-    f.setIssues([issue(1), { ...issue(2), blockers: [1] }, issue(3)]);
+    f.setIssues([
+      issue(1),
+      { ...issue(2), blockers: [1], blockersReady: false, joinRequired: true },
+      issue(3),
+    ]);
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([1, 3]);
+    expect(f.preparations).toEqual([]);
   } finally {
     await f.runtime.dispose();
   }
@@ -522,7 +527,11 @@ it('does not manually admit a dependent of parked work even with claimed prerequ
         landed: false,
       },
     });
-    f.setIssues([issue(1), { ...issue(2), blockers: [1] }, issue(3)]);
+    f.setIssues([
+      issue(1),
+      { ...issue(2), blockers: [1], blockersReady: false, joinRequired: true },
+      issue(3),
+    ]);
     expect(await f.run((s) => s.start({ issue: 2, base, context: '' }))).toEqual({
       kind: 'rejected',
     });
@@ -531,6 +540,7 @@ it('does not manually admit a dependent of parked work even with claimed prerequ
       kind: 'job',
     });
     expect(f.launches).toEqual([1, 3]);
+    expect(f.preparations).toEqual([]);
   } finally {
     await f.runtime.dispose();
   }
@@ -614,6 +624,41 @@ it('prepares a divergent join before reserving E and launches only from its veri
       intent: { base: 'b'.repeat(40), prBase: 'factory/C' },
     });
     expect(f.launches).toEqual([5]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('retries selected join preparation without asking the advisory planner again for unchanged input', async () => {
+  const f = fixture();
+  let plans = 0;
+  f.duringPlan(() => {
+    plans++;
+  });
+  f.setIssues([{ ...issue(5), blockers: [3, 4], blockersReady: false, joinRequired: true }]);
+  try {
+    await f.run((s) => s.tick(base));
+    f.prepareSucceeds();
+    await f.run((s) => s.tick(base));
+    expect(plans).toBe(1);
+    expect(f.preparations).toEqual([5, 5]);
+    expect(f.launches).toEqual([5]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('rejects cyclic join proposals before preparing any branches', async () => {
+  const f = fixture();
+  f.setIssues([
+    { ...issue(4), blockers: [5], blockersReady: false, joinRequired: true },
+    { ...issue(5), blockers: [4], blockersReady: false, joinRequired: true },
+  ]);
+  try {
+    await f.run((s) => s.tick(base));
+    expect(f.preparations).toEqual([]);
+    expect(f.launches).toEqual([]);
+    expect(f.snapshot().admissions).toEqual([]);
   } finally {
     await f.runtime.dispose();
   }

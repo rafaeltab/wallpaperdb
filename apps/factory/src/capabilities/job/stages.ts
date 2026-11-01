@@ -101,7 +101,7 @@ function publicationMatches(
   return (
     evidence.runId === accepted.previousRunId &&
     evidence.commit === accepted.commit &&
-    pr.commit === accepted.commit &&
+    reviewedAssociation(pr, accepted.commit) &&
     Boolean(evidence.linked?.includes(pr.url))
   );
 }
@@ -117,7 +117,7 @@ function readiness(
     const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
-    if (matches && pr.kind === 'found' && pr.ci?.failed) {
+    if (requiresRepair(matches, pr)) {
       yield* dispatchRepair(store, execution, intent, accepted, evidence);
       return {
         stage: 'babysitting' as const,
@@ -129,7 +129,7 @@ function readiness(
     }
     return {
       stage: 'ci' as const,
-      commit: accepted.commit,
+      ...deliveryIdentity(pr, accepted.commit),
       pr,
       ready: matches && isReady(pr),
       landed: false,
@@ -440,4 +440,19 @@ function canRestoreQuestion(
 ): waiting is StageRequest & { observedRunId: string; question: { id: string; text: string } } {
   if (control.parked && control.parked.index >= waiting.index) return false;
   return waiting.observedRunId !== undefined && waiting.question !== undefined;
+}
+
+function reviewedAssociation(
+  pr: Extract<PullRequestObservation, { kind: 'found' }>,
+  commit: string
+) {
+  return pr.commit === commit || pr.reviewedCommit === commit;
+}
+function requiresRepair(matches: boolean, pr: PullRequestObservation) {
+  return matches && pr.kind === 'found' && pr.ci?.failed && !pr.reviewedCommit;
+}
+function deliveryIdentity(pr: PullRequestObservation, commit: string) {
+  return pr.kind === 'found'
+    ? { commit: pr.commit, reviewedCommit: pr.reviewedCommit }
+    : { commit };
 }

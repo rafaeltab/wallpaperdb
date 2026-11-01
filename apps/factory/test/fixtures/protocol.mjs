@@ -17,7 +17,7 @@ if (config.joinWriter && basename(process.argv[1]) === 't3') {
             thread: {
               projectId: 'project-id',
               branch: 'C',
-              status: 'running',
+              status: config.joinWriter === 'completed' ? 'completed' : 'running',
               pendingRequestCount: 0,
             },
           }
@@ -28,7 +28,14 @@ if (config.joinWriter && basename(process.argv[1]) === 't3') {
 if (config.join && basename(process.argv[1]) === 'gh') {
   const statePath = join(config.directory, 'join-live.json');
   const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : config.join;
-  const number = Number(args[2]);
+  const number =
+    args[0] === 'pr' && args[1] === 'list'
+      ? Number(
+          Object.entries(state.prs).find(
+            ([, value]) => value.branch === args[args.indexOf('--head') + 1]
+          )?.[0]
+        )
+      : Number(args[2]);
   const flag = (name) => args[args.indexOf(name) + 1];
   const git = (...values) =>
     execFileSync('git', ['-C', config.repository, ...values], { encoding: 'utf8' }).trim();
@@ -50,7 +57,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
         { number: 4, state: 'open' },
       ],
     ];
-  else if (args[0] === 'pr' && args[1] === 'view') {
+  else if (args[0] === 'pr' && ['view', 'list'].includes(args[1])) {
     const item = state.prs[String(number)];
     const head = git('ls-remote', '--heads', 'origin', `refs/heads/${item.branch}`).split(/\s/)[0];
     result = {
@@ -60,15 +67,24 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       baseRefName: item.base,
       baseRefOid: git('rev-parse', item.base),
       state: 'OPEN',
+      isDraft: false,
       mergeable: 'MERGEABLE',
       statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
-        (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+        (name) => ({
+          name,
+          status: 'COMPLETED',
+          conclusion:
+            head === state.originalHeads?.[String(number)] ? 'SUCCESS' : (state.newCI ?? 'SUCCESS'),
+        })
       ),
     };
+    if (args[1] === 'list') result = [result];
   } else if (args[0] === 'pr' && args[1] === 'edit')
     state.prs[String(number)].base = flag('--base');
   else if (args[0] === 'stack' && args[1] === 'link')
-    state.members = args.filter((value) => value.startsWith('https://'));
+    state.members = state.corruptGrouping
+      ? []
+      : args.filter((value) => value.startsWith('https://'));
   else if (args[0] === 'api' && args.includes('POST')) state.members = [];
   else if (args[0] === 'api' && args[1].includes('/stacks'))
     result = state.members.length

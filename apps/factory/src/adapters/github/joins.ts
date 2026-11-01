@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto';
-import { mkdir, open, readFile, link, unlink, mkdtemp } from 'node:fs/promises';
+import { mkdir, open, readFile, link, unlink, mkdtemp, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { command } from '../../platform/index.js';
+import { normalizeChecks, passingChecks } from './checks.js';
 
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
 const layer = z.object({
   issue: z.number().int().positive(),
   pr: z.number().int().positive(),
   commit: sha,
+  reviewedCommit: sha.optional(),
   branch: z.string(),
   url: z.string(),
   parent: sha,
@@ -33,34 +35,42 @@ export interface JoinConfiguration {
 }
 type Gh = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 
-/** Journal publication uses hard links and fsync, so competing processes adopt
- * the same immutable intent. Every external change is reconciled from it. */
-async function publish(directory: string, name: string, value: unknown) {
-  await mkdir(directory, { recursive: true });
-  const temporary = await mkdtemp(join(directory, '.write-'));
-  const path = join(temporary, 'value');
-  const file = await open(path, 'wx');
-  try {
-    await file.writeFile(JSON.stringify(value));
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-  let created = false;
-  try {
-    await link(path, join(directory, name));
-    created = true;
-  } catch (cause) {
-    if (!(cause instanceof Error && 'code' in cause && cause.code === 'EEXIST')) throw cause;
-  } finally {
-    await unlink(path);
-  }
+const errno = (cause: unknown, expected: string) =>
+  z.object({ code: z.literal(expected) }).safeParse(cause).success;
+async function syncDirectory(directory: string) {
   const handle = await open(directory, 'r');
   try {
     await handle.sync();
   } finally {
     await handle.close();
   }
+}
+async function writeDurable(path: string, value: unknown) {
+  const handle = await open(path, 'wx');
+  try {
+    await handle.writeFile(JSON.stringify(value));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+async function linkOnce(source: string, target: string) {
+  return link(source, target)
+    .then(() => true)
+    .catch((cause) => {
+      if (errno(cause, 'EEXIST')) return false;
+      throw cause;
+    });
+}
+/** Atomic immutable journal records precede every external publication. */
+async function publish(directory: string, name: string, value: unknown) {
+  await mkdir(directory, { recursive: true });
+  const temporary = await mkdtemp(join(directory, '.write-'));
+  const path = join(temporary, 'value');
+  await writeDurable(path, value);
+  const created = await linkOnce(path, join(directory, name));
+  await unlink(path);
+  await syncDirectory(directory);
   return created;
 }
 async function read(directory: string, name: string): Promise<unknown | null> {
@@ -128,24 +138,34 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       )
         return false;
     }
+    return await cleanWorktrees(layers, signal);
+  };
+  const cleanWorktrees = async (layers: readonly Layer[], signal?: AbortSignal) => {
     const worktrees = await git(['worktree', 'list', '--porcelain'], signal);
     for (const block of worktrees.split('\n\n')) {
-      if (!layers.some((item) => block.includes(`branch refs/heads/${item.branch}\n`))) continue;
+      if (!layers.some((item) => block.split('\n').includes(`branch refs/heads/${item.branch}`)))
+        continue;
       const path = block.split('\n')[0]?.slice('worktree '.length);
       if (!path || (await command('git', ['status', '--porcelain'], path, signal)).trim())
         return false;
     }
     return true;
   };
+  const released = async (key: string) =>
+    !!(await read(join(config.directory, key), 'complete.json'));
+  const ownerState = async (existing: unknown, key: string) => {
+    const owner = z.object({ key: z.string() }).parse(existing).key;
+    if (owner === key) return 'owned';
+    return (await released(owner)) ? 'released' : 'busy';
+  };
   const acquire = async (key: string) => {
     for (let index = 0; ; index++) {
       const name = `writer-${index}.json`;
       const existing = await read(config.directory, name);
       if (existing) {
-        const owner = z.object({ key: z.string() }).parse(existing).key;
-        if (owner === key) return true;
-        if (await read(join(config.directory, owner), 'complete.json')) continue;
-        return false;
+        const ownership = await ownerState(existing, key);
+        if (ownership === 'released') continue;
+        return ownership === 'owned';
       }
       await publish(config.directory, name, { key });
       const winner = z.object({ key: z.string() }).parse(await read(config.directory, name));
@@ -156,131 +176,157 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     operation: await load(numbers),
     blocked: await read(directory(numbers), 'blocked.json'),
   });
-  const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
+  const attemptRebase = async (
+    item: Layer,
+    onto: string,
+    parent: string,
+    path: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    try {
+      await command('git', ['rebase', '--onto', onto, parent], path, signal);
+    } catch (cause) {
+      const conflicts = (
+        await command('git', ['diff', '--name-only', '--diff-filter=U'], path, signal)
+      ).trim();
+      if (!conflicts) throw cause;
+      await publish(dir, 'blocked.json', {
+        kind: 'conflict',
+        files: conflicts,
+        issue: item.issue,
+        oldHead: item.commit,
+        oldParent: parent,
+        onto,
+        worktree: path,
+      });
+      return false;
+    }
+    return true;
+  };
+  const replayLayer = async (
+    item: Layer,
+    onto: string,
+    target: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    // The PR's old parent boundary is captured before any refs change.
+    const parent = await git(['merge-base', item.parent, item.commit], signal);
+    if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
+    if (await isAncestor(item.commit, onto)) return 'contained' as const;
+    if (!(await isAncestor(parent, onto))) return;
+    await mkdir(dir, { recursive: true });
+    const path = await mkdtemp(join(dir, 'replay-'));
+    await git(['worktree', 'add', '--detach', path, item.commit], signal);
+    if (!(await attemptRebase(item, onto, parent, path, dir, signal))) return;
+    const next = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
+    const tree = (await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim();
+    return { ...item, parent, next, onto, target, tree };
+  };
+  const combine = async (
+    ranked: readonly { item: Layer; depth: number }[],
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const first = ranked[0];
+    if (!first) return;
+    let onto = first.item.commit;
+    let target = first.item.branch;
+    const replay: Intent['replay'] = [];
+    for (const { item } of ranked.slice(1)) {
+      const result = await replayLayer(item, onto, target, dir, signal);
+      if (result === 'contained') continue;
+      if (!result) return;
+      replay.push(result);
+      onto = result.next;
+      target = item.branch;
+    }
+    return replay;
+  };
+  const invalidLayers = async (layers: readonly Layer[], signal?: AbortSignal) => {
+    for (const item of layers) {
+      if (!(await isAncestor(base, item.commit))) return 'baseline-not-contained';
+      if (await git(['rev-list', '--merges', `${base}..${item.commit}`], signal))
+        return 'nonlinear-prerequisite';
+    }
+    return undefined;
+  };
+  const build = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
     const dir = directory(numbers);
-    if (!(await acquire(id(numbers)))) return;
-    if (await read(dir, 'blocked.json')) return;
-    let operation = await load(numbers);
-    if (!operation) {
-      await publish(dir, 'seed.json', candidates);
-      const layers = z
-        .array(layer)
-        .min(2)
-        .max(100)
-        .parse(await read(dir, 'seed.json'));
-      if (!(await writers(layers, signal))) return;
-      const ranked = await Promise.all(
-        layers.map(async (item) => ({
-          item,
-          depth: Number(await git(['rev-list', '--count', `${base}..${item.commit}`], signal)),
-        }))
+    await publish(dir, 'seed.json', candidates);
+    const layers = z
+      .array(layer)
+      .min(2)
+      .max(100)
+      .parse(await read(dir, 'seed.json'));
+    const invalid = await invalidLayers(layers, signal);
+    if (invalid) {
+      await publish(dir, 'blocked.json', { kind: invalid });
+      return;
+    }
+    if (!(await writers(layers, signal))) return;
+    const ranked = await Promise.all(
+      layers.map(async (item) => ({
+        item,
+        depth: Number(await git(['rev-list', '--count', `${base}..${item.commit}`], signal)),
+      }))
+    );
+    ranked.sort((a, b) => b.depth - a.depth || a.item.issue - b.item.issue);
+    const replay = await combine(ranked, dir, signal);
+    if (!replay?.length) return;
+    const groups: z.infer<typeof group>[] = [];
+    for (const { item } of ranked) {
+      const observed = z
+        .array(group)
+        .parse(
+          await gh(['api', `repos/rafaeltab/wallpaperdb/stacks?pull_request=${item.pr}`], signal)
+        );
+      for (const value of observed)
+        if (!groups.some((known) => known.number === value.number)) groups.push(value);
+    }
+    const replayed = new Set(replay.map((item) => item.pr));
+    const members = [
+      ...new Set([
+        ...groups.flatMap((value) => value.pull_requests.map((item) => item.number)),
+        ...layers.map((item) => item.pr),
+      ]),
+    ].filter((number) => !replayed.has(number));
+    members.push(...replay.map((item) => item.pr));
+    await publish(dir, 'intent.json', { layers, replay, groups, members });
+    return await load(numbers);
+  };
+  const validate = async (item: Intent['replay'][number], dir: string, signal?: AbortSignal) => {
+    const observed = z
+      .object({
+        headRefOid: sha,
+        statusCheckRollup: z.array(
+          z.union([
+            z.object({ name: z.string(), status: z.string(), conclusion: z.string().nullable() }),
+            z.object({ context: z.string(), state: z.string() }),
+          ])
+        ),
+      })
+      .parse(
+        await gh(
+          [
+            'pr',
+            'view',
+            String(item.pr),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'headRefOid,statusCheckRollup',
+          ],
+          signal
+        )
       );
-      ranked.sort((a, b) => b.depth - a.depth || a.item.issue - b.item.issue);
-      const first = ranked[0];
-      if (!first) return;
-      let onto = first.item.commit;
-      let target = first.item.branch;
-      const replay: Intent['replay'] = [];
-      for (const { item } of ranked.slice(1)) {
-        // The PR's old parent boundary is captured before any refs change.
-        const parent = await git(['merge-base', item.parent, item.commit], signal);
-        if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
-        if (await isAncestor(item.commit, onto)) continue;
-        if (!(await isAncestor(parent, onto))) return;
-        await mkdir(dir, { recursive: true });
-        const path = await mkdtemp(join(dir, 'replay-'));
-        await git(['worktree', 'add', '--detach', path, item.commit], signal);
-        try {
-          await command('git', ['rebase', '--onto', onto, parent], path, signal);
-        } catch (cause) {
-          await publish(dir, 'blocked.json', {
-            kind: 'conflict',
-            issue: item.issue,
-            oldHead: item.commit,
-            oldParent: parent,
-            onto,
-            worktree: path,
-          });
-          return;
-        }
-        const next = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
-        const tree = (await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim();
-        replay.push({ ...item, parent, next, onto, target, tree });
-        onto = next;
-        target = item.branch;
-      }
-      if (!replay.length) return;
-      const groups: z.infer<typeof group>[] = [];
-      for (const { item } of ranked) {
-        const observed = z
-          .array(group)
-          .parse(
-            await gh(['api', `repos/rafaeltab/wallpaperdb/stacks?pull_request=${item.pr}`], signal)
-          );
-        for (const value of observed)
-          if (!groups.some((known) => known.number === value.number)) groups.push(value);
-      }
-      const replayed = new Set(replay.map((item) => item.pr));
-      const members = [
-        ...new Set([
-          ...groups.flatMap((value) => value.pull_requests.map((item) => item.number)),
-          ...layers.map((item) => item.pr),
-        ]),
-      ].filter((number) => !replayed.has(number));
-      members.push(...replay.map((item) => item.pr));
-      await publish(dir, 'intent.json', { layers, replay, groups, members });
-      operation = await load(numbers);
-    }
-    if (!operation || !(await writers(operation.layers, signal))) return;
-    // No automatic resolution of a recorded conflict or uncertain validation.
-    if (await read(dir, 'blocked.json')) return;
-    for (const item of operation.replay) {
-      const receipt = await read(dir, `ci-${item.next}.json`);
-      if (receipt) {
-        z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(receipt);
-        continue;
-      }
-      if (
-        !(await publish(dir, `ci-claim-${item.next}.json`, { commit: item.next, tree: item.tree }))
-      )
-        return;
-      const path = await mkdtemp(join(dir, 'validation-'));
-      await git(['worktree', 'add', '--detach', path, item.next], signal);
-      try {
-        await command(
-          'timeout',
-          ['3600', 'make', 'install'],
-          path,
-          signal,
-          undefined,
-          undefined,
-          3610000
-        );
-        await command(
-          'timeout',
-          ['3600', 'make', 'ci', 'SHELL=/bin/sh', 'CI_CONCURRENCY=1'],
-          path,
-          signal,
-          {
-            TURBO_EXPERIMENTAL_OTEL_ENDPOINT: undefined,
-            TURBO_EXPERIMENTAL_OTEL_PROTOCOL: undefined,
-          },
-          undefined,
-          3610000
-        );
-        if ((await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim() !== item.tree)
-          throw new Error('Validation tree changed');
-        await publish(dir, `ci-${item.next}.json`, { commit: item.next, tree: item.tree });
-      } catch (cause) {
-        await publish(dir, 'blocked.json', {
-          kind: 'ci-failed',
-          commit: item.next,
-          tree: item.tree,
-        });
-        throw cause;
-      }
-    }
-    if (!(await writers(operation.layers, signal))) return;
+    if (observed.headRefOid !== item.next) return false;
+    if (!passingChecks(normalizeChecks(observed.statusCheckRollup))) return false;
+    await publish(dir, `ci-${item.next}.json`, { commit: item.next, tree: item.tree });
+    return true;
+  };
+  const verifyHeads = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     for (const item of operation.layers) {
       const changed = operation.replay.find((replay) => replay.pr === item.pr);
       const head = await remote(item.branch, signal);
@@ -291,81 +337,89 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           expected: item.commit,
           actual: head,
         });
-        return;
+        return false;
       }
     }
-    for (const item of operation.replay) {
-      if ((await remote(item.branch, signal)) !== item.next) {
-        await git(
+    return true;
+  };
+  const publishLayer = async (item: Intent['replay'][number], signal?: AbortSignal) => {
+    if ((await remote(item.branch, signal)) !== item.next) {
+      await git(
+        [
+          'push',
+          `--force-with-lease=refs/heads/${item.branch}:${item.commit}`,
+          'origin',
+          `${item.next}:refs/heads/${item.branch}`,
+        ],
+        signal
+      );
+    }
+    if ((await remote(item.branch, signal)) !== item.next) return false;
+    const current = z
+      .object({ headRefOid: sha, baseRefName: z.string() })
+      .parse(
+        await gh(
           [
-            'push',
-            `--force-with-lease=refs/heads/${item.branch}:${item.commit}`,
-            'origin',
-            `${item.next}:refs/heads/${item.branch}`,
+            'pr',
+            'view',
+            String(item.pr),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'headRefOid,baseRefName',
           ],
           signal
-        );
-      }
-      if ((await remote(item.branch, signal)) !== item.next) return;
-      const current = z
-        .object({ headRefOid: sha, baseRefName: z.string() })
+        )
+      );
+    if (
+      current.headRefOid !== item.next ||
+      ![item.prBase, item.target].includes(current.baseRefName)
+    )
+      return false;
+    if (current.baseRefName !== item.target)
+      await gh(
+        ['pr', 'edit', String(item.pr), '--repo', 'rafaeltab/wallpaperdb', '--base', item.target],
+        signal
+      );
+    return true;
+  };
+  const groupsFor = async (numbers: readonly number[], signal?: AbortSignal) => {
+    const result: z.infer<typeof group>[] = [];
+    for (const number of numbers) {
+      const values = z
+        .array(group)
         .parse(
-          await gh(
-            [
-              'pr',
-              'view',
-              String(item.pr),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'headRefOid,baseRefName',
-            ],
-            signal
-          )
+          await gh(['api', `repos/rafaeltab/wallpaperdb/stacks?pull_request=${number}`], signal)
         );
-      if (
-        current.headRefOid !== item.next ||
-        ![item.prBase, item.target].includes(current.baseRefName)
-      )
-        return;
-      if (current.baseRefName !== item.target)
-        await gh(
-          ['pr', 'edit', String(item.pr), '--repo', 'rafaeltab/wallpaperdb', '--base', item.target],
-          signal
-        );
+      for (const value of values)
+        if (!result.some((known) => known.number === value.number)) result.push(value);
     }
-    const observedGroups = async () => {
-      const result: z.infer<typeof group>[] = [];
-      for (const number of operation.members) {
-        const values = z
-          .array(group)
-          .parse(
-            await gh(['api', `repos/rafaeltab/wallpaperdb/stacks?pull_request=${number}`], signal)
-          );
-        for (const value of values)
-          if (!result.some((known) => known.number === value.number)) result.push(value);
-      }
-      return result;
-    };
+    return result;
+  };
+  const dissolve = async (groups: Intent['groups'], operation: Intent, signal?: AbortSignal) => {
+    for (const value of groups) {
+      const old = operation.groups.find((item) => item.number === value.number);
+      if (!old || JSON.stringify(old) !== JSON.stringify(value)) return false;
+    }
+    for (const value of groups) {
+      await gh(
+        ['api', '--method', 'POST', `repos/rafaeltab/wallpaperdb/stacks/${value.number}/unstack`],
+        signal
+      );
+    }
+    return true;
+  };
+  const regroup = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     const matches = (value: z.infer<typeof group>) =>
       JSON.stringify(value.pull_requests.map((item) => item.number)) ===
       JSON.stringify(operation.members);
-    let groups = await observedGroups();
+    let groups = await groupsFor(operation.members, signal);
     if (!groups.some(matches)) {
       // Reconcile existing grouping before a possibly non-idempotent creation.
       // Do not dissolve a group changed externally since the recorded intent.
-      for (const value of groups) {
-        const old = operation.groups.find((item) => item.number === value.number);
-        if (!old || JSON.stringify(old) !== JSON.stringify(value)) return;
-      }
-      for (const value of groups) {
-        await gh(
-          ['api', '--method', 'POST', `repos/rafaeltab/wallpaperdb/stacks/${value.number}/unstack`],
-          signal
-        );
-      }
-      if ((await observedGroups()).length) return;
-      if (!(await publish(dir, 'group-claim.json', { members: operation.members }))) return;
+      if (!(await dissolve(groups, operation, signal))) return false;
+      if ((await groupsFor(operation.members, signal)).length) return false;
+      if (!(await publish(dir, 'group-claim.json', { members: operation.members }))) return false;
       await command(
         'gh',
         [
@@ -380,77 +434,123 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         project,
         signal
       );
-      groups = await observedGroups();
-      if (!groups.some(matches)) return;
+      groups = await groupsFor(operation.members, signal);
+      if (!groups.some(matches)) return false;
     }
-    for (const item of operation.replay) {
-      const current = z
-        .object({ headRefOid: sha, baseRefName: z.string() })
-        .parse(
-          await gh(
-            [
-              'pr',
-              'view',
-              String(item.pr),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'headRefOid,baseRefName',
-            ],
-            signal
-          )
-        );
-      if (current.headRefOid !== item.next || current.baseRefName !== item.target) return;
-      const recorded = z
-        .object({
-          body: z.string(),
-          comments: z
-            .array(
-              z.object({ body: z.string(), author: z.object({ login: z.string() }).nullable() })
-            )
-            .optional(),
-        })
-        .parse(
-          await gh(
-            [
-              'issue',
-              'view',
-              String(item.issue),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'body,comments',
-            ],
-            signal
-          )
-        );
-      const body = [
-        recorded.body,
-        ...(recorded.comments ?? [])
-          .filter(
-            (comment) =>
-              comment.author && ['rafaeltab', 'zero-two-rafaeltab'].includes(comment.author.login)
-          )
-          .map((comment) => comment.body),
-      ].join('\n');
-      if (body.includes(item.next) && body.includes(item.url)) continue;
-      if (!(await publish(dir, `evidence-claim-${item.pr}.json`, { commit: item.next }))) return;
-      await command(
-        'gh',
-        [
-          'issue',
-          'comment',
-          String(item.issue),
-          '--repo',
-          'rafaeltab/wallpaperdb',
-          '--body',
-          `Automatic issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Acceptance and original independent reviews are retained from ${item.commit}; this is not a fresh review.`,
-        ],
-        project,
-        signal
+    return true;
+  };
+  const recordEvidence = async (
+    item: Intent['replay'][number],
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const current = z
+      .object({ headRefOid: sha, baseRefName: z.string() })
+      .parse(
+        await gh(
+          [
+            'pr',
+            'view',
+            String(item.pr),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'headRefOid,baseRefName',
+          ],
+          signal
+        )
       );
-    }
-    await publish(dir, 'complete.json', { commit: operation.replay.at(-1)?.next });
+    if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
+    const recorded = z
+      .object({
+        body: z.string(),
+        comments: z
+          .array(z.object({ body: z.string(), author: z.object({ login: z.string() }).nullable() }))
+          .optional(),
+      })
+      .parse(
+        await gh(
+          [
+            'issue',
+            'view',
+            String(item.issue),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'body,comments',
+          ],
+          signal
+        )
+      );
+    const body = [
+      recorded.body,
+      ...(recorded.comments ?? [])
+        .filter(
+          (comment) =>
+            comment.author && ['rafaeltab', 'zero-two-rafaeltab'].includes(comment.author.login)
+        )
+        .map((comment) => comment.body),
+    ].join('\n');
+    if (body.includes(item.next) && body.includes(item.url)) return true;
+    if (!(await publish(dir, `evidence-claim-${item.pr}.json`, { commit: item.next })))
+      return false;
+    await command(
+      'gh',
+      [
+        'issue',
+        'comment',
+        String(item.issue),
+        '--repo',
+        'rafaeltab/wallpaperdb',
+        '--body',
+        `Automatic issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Acceptance and original independent reviews are retained from ${item.commit}; this is not a fresh review.`,
+      ],
+      project,
+      signal
+    );
+    return true;
+  };
+  const validateOperation = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    for (const item of operation.replay) if (!(await validate(item, dir, signal))) return false;
+    if (!(await writers(operation.layers, signal))) return false;
+    if (!(await verifyHeads(operation, dir, signal))) return false;
+    return true;
+  };
+  const publishComparisons = async (operation: Intent, signal?: AbortSignal) => {
+    for (const item of operation.replay) if (!(await publishLayer(item, signal))) return false;
+    return true;
+  };
+  const refreshAssertions = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    for (const item of operation.replay)
+      if (!(await recordEvidence(item, dir, signal))) return false;
+    return true;
+  };
+  const deliver = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    if (!(await regroup(operation, dir, signal))) return;
+    if (!(await refreshAssertions(operation, dir, signal))) return;
+    await publish(dir, 'complete.json', { commit: replayTip(operation) });
+  };
+  const operationFor = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal
+  ) => {
+    const dir = directory(numbers);
+    if (!(await acquire(id(numbers)))) return null;
+    if (await read(dir, 'blocked.json')) return null;
+    let operation = await load(numbers);
+    if (!operation) operation = (await build(numbers, candidates, signal)) ?? null;
+    return operation;
+  };
+  const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
+    const dir = directory(numbers);
+    const operation = await operationFor(numbers, candidates, signal);
+    if (!operation || !(await writers(operation.layers, signal))) return;
+
+    if (!(await verifyHeads(operation, dir, signal))) return;
+    if (!(await publishComparisons(operation, signal))) return;
+    if (!(await validateOperation(operation, dir, signal))) return;
+    await deliver(operation, dir, signal);
   };
   async function isAncestor(parent: string, child: string) {
     try {
@@ -461,9 +561,35 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       throw cause;
     }
   }
+  const metadataMatches = async (operation: Intent) => {
+    for (const item of operation.replay) {
+      const current = z
+        .object({ headRefOid: sha, baseRefName: z.string() })
+        .parse(
+          await gh([
+            'pr',
+            'view',
+            String(item.pr),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'headRefOid,baseRefName',
+          ])
+        );
+      if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
+    }
+    const groups = await groupsFor(operation.members);
+    return groups.some((value) =>
+      containsMembers(
+        value.pull_requests.map((item) => item.number),
+        operation.members
+      )
+    );
+  };
   const evidence = async (numbers: readonly number[]) => {
     const operation = await load(numbers);
     if (!operation || !(await read(directory(numbers), 'complete.json'))) return [];
+    if (!(await metadataMatches(operation))) return [];
     for (const item of operation.replay) {
       z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
         await read(directory(numbers), `ci-${item.next}.json`)
@@ -473,5 +599,46 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return operation.replay;
   };
-  return { prepare, evidence, state };
+  const completedReplay = async (key: string, issue: number) => {
+    const saved = await read(join(config.directory, key), 'intent.json');
+    if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
+    const operation = intent.parse(saved);
+    const item = operation.replay.find((value) => value.issue === issue);
+    if (!item || !(await metadataMatches(operation))) return null;
+    z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
+      await read(join(config.directory, key), `ci-${item.next}.json`)
+    );
+    return item;
+  };
+  const operationDirectories = async () => {
+    let entries: string[];
+    try {
+      entries = await readdir(config.directory);
+    } catch (cause) {
+      if (errno(cause, 'ENOENT')) return [];
+      throw cause;
+    }
+    return entries;
+  };
+  const replayFor = async (issue: number) => {
+    const entries = await operationDirectories();
+    for (const key of entries.filter((value) => /^[a-f0-9]{64}$/.test(value))) {
+      const item = await completedReplay(key, issue);
+      if (item) return item;
+    }
+    return null;
+  };
+  return { prepare, evidence, state, replayFor };
+}
+
+function replayTip(operation: Intent) {
+  return operation.replay.at(-1)?.next;
+}
+
+function containsMembers(actual: readonly number[], expected: readonly number[]) {
+  return expected.every(
+    (number, index) =>
+      actual.indexOf(number) >= index &&
+      (index === 0 || actual.indexOf(number) > actual.indexOf(expected[index - 1] ?? 0))
+  );
 }

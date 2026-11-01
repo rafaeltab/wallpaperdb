@@ -93,6 +93,7 @@ async function stagesFixture() {
   let accepted = true;
   let links = ['https://github.com/rafaeltab/wallpaperdb/pull/999'];
   let prCommit = commit;
+  let reviewedCommit: string | undefined;
   let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
   let sends = 0;
   let interrupts = 0;
@@ -124,6 +125,7 @@ async function stagesFixture() {
                 kind: 'found' as const,
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
+                reviewedCommit,
                 ready: !failed,
                 ci: { failed, progress },
                 landed: false,
@@ -191,6 +193,7 @@ async function stagesFixture() {
       accepted?: boolean;
       links?: string[];
       prCommit?: string;
+      reviewedCommit?: string;
       prKind?: typeof prKind;
       failed?: boolean;
       now?: number;
@@ -207,6 +210,7 @@ async function stagesFixture() {
       accepted = value.accepted ?? accepted;
       links = value.links ?? links;
       prCommit = value.prCommit ?? prCommit;
+      reviewedCommit = value.reviewedCommit ?? reviewedCommit;
       prKind = value.prKind ?? prKind;
       failed = value.failed ?? failed;
       now = value.now ?? now;
@@ -717,4 +721,28 @@ it('recovers the question recorded with an adopted run before control publicatio
     ordinal: 3,
   });
   expect(job.sends()).toBe(0);
+});
+
+it('retains original review provenance and current CI binding after a verified issue-only replay', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({ prCommit: 'c'.repeat(40), reviewedCommit: 'b'.repeat(40) });
+  expect(await job.status()).toMatchObject({
+    delivery: { ready: true, commit: 'c'.repeat(40), reviewedCommit: 'b'.repeat(40) },
+  });
+  expect(job.sends()).toBe(2);
+  job.change({ failed: true });
+  expect(await job.status()).toMatchObject({ delivery: { ready: false } });
+  expect(job.sends()).toBe(2);
+});
+
+it('rejects a replay association that does not bind the actually accepted original review', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({ prCommit: 'c'.repeat(40), reviewedCommit: 'd'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { ready: false } });
 });

@@ -7,13 +7,12 @@ export async function command(
   cwd: string,
   signal?: AbortSignal,
   environment?: NodeJS.ProcessEnv,
-  input?: string,
-  timeoutMs = 30000
+  input?: string
 ): Promise<string> {
   const pending = execute(binary, [...args], {
     cwd,
     env: environment ? { ...process.env, ...environment } : process.env,
-    timeout: timeoutMs,
+    timeout: 30000,
     killSignal: 'SIGKILL',
     maxBuffer: 4 * 1024 * 1024,
     encoding: 'utf8',

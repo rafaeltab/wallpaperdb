@@ -6,6 +6,7 @@ export interface VerifiedPrerequisite {
   readonly issue: number;
   readonly pr: number;
   readonly commit: string;
+  readonly reviewedCommit?: string;
 }
 const issue = z.object({
   number: z.number(),
@@ -49,7 +50,6 @@ export async function prerequisiteReadiness(
     base: string;
     prBase?: string;
     prerequisites: readonly VerifiedPrerequisite[];
-    replayed?: readonly string[];
   },
   numbers: readonly number[],
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
@@ -89,7 +89,7 @@ export async function prerequisiteReadiness(
   return candidateReadiness(config, readiness, [...verified, ...landed], candidate, signal);
 }
 async function openPrerequisite(
-  config: { prerequisites: readonly VerifiedPrerequisite[]; replayed?: readonly string[] },
+  config: { prerequisites: readonly VerifiedPrerequisite[] },
   number: number,
   evidence: string,
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
@@ -111,7 +111,7 @@ async function openPrerequisite(
       signal
     )
   );
-  if (!valid(assertion, current, evidence, config.replayed?.includes(assertion.commit) ?? false)) return null;
+  if (!valid(assertion, current, evidence)) return null;
   return { ...assertion, branch: current.headRefName, url: current.url, parent: current.baseRefOid, prBase: current.baseRefName };
 }
 async function selectBase(
@@ -159,12 +159,7 @@ function configuredReadiness(
       }
     : { blockersReady: true };
 }
-function valid(
-  assertion: VerifiedPrerequisite,
-  current: z.infer<typeof pr>,
-  body: string,
-  replayed: boolean
-) {
+function valid(assertion: VerifiedPrerequisite, current: z.infer<typeof pr>, body: string) {
   const checks = normalizeChecks(current.statusCheckRollup);
   return (
     /^[a-f0-9]{40}$/.test(assertion.commit) &&
@@ -173,9 +168,16 @@ function valid(
     current.mergeable === 'MERGEABLE' &&
     current.url === `https://github.com/rafaeltab/wallpaperdb/pull/${assertion.pr}` &&
     /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(current.headRefName) &&
-    recordedEvidence(body, current.url, assertion.commit) &&
-    (replayed || passingChecks(checks))
+    evidenceReady(body, current.url, assertion.commit, checks)
   );
+}
+function evidenceReady(
+  body: string,
+  url: string,
+  commit: string,
+  checks: ReturnType<typeof normalizeChecks>
+) {
+  return recordedEvidence(body, url, commit) && passingChecks(checks);
 }
 
 function recordedEvidence(body: string, url: string, commit: string) {

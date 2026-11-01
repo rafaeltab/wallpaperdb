@@ -966,6 +966,7 @@ async function lockGenerationCheckout(
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
 		"scripts/lib/boat-snapshot.mjs",
+		"scripts/lib/boat-reconstruction.mjs",
 		"scripts/lib/boat-shutdown.mjs",
 		"scripts/lib/boat-preview.mjs",
 		"scripts/lib/boat-source-generation.mjs",
@@ -1121,11 +1122,12 @@ if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  }
  console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
 }
+if(argv.includes('stop')&&argv.includes('fake-new-worker')){fs.writeFileSync(path.join(control,'candidate-stopped'),'yes');console.log('{}');process.exit(0);}
 if(argv.includes('stop')){fs.writeFileSync(path.join(control,'shutdown-request-state'),fs.readFileSync('.boat/state.json'));fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
-if(argv.includes('info')&&argv.includes('fake-new-worker')){console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
+if(argv.includes('info')&&argv.includes('fake-new-worker')){if(fs.existsSync(path.join(control,'candidate-stopped'))){const a=JSON.parse(fs.readFileSync('.boat/state.json')).admission;console.log(JSON.stringify({sandbox:{id:'fake-new-worker',name:a.name,type:a.size,state:'stopped'}}));process.exit(0);}if(fs.existsSync(path.join(control,'candidate-kill'))){fs.unlinkSync(path.join(control,'candidate-kill'));process.kill(process.ppid,'SIGKILL');process.exit(1);}if(fs.existsSync(path.join(control,'candidate-info'))){const info=JSON.parse(fs.readFileSync(path.join(control,'candidate-info'),'utf8'));info.sandbox.name??=JSON.parse(fs.readFileSync('.boat/state.json')).admission?.name;console.log(JSON.stringify(info));process.exit(0);}console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
 if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
-if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
-if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
+if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(fs.existsSync(path.join(control,'limits'))?fs.readFileSync(path.join(control,'limits'),'utf8'):JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
+if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));if(process.env.FAKE_FRESH_BASELINE){fs.rmSync(process.env.FAKE_WORKER,{recursive:true,force:true});fs.cpSync(process.env.FAKE_FRESH_BASELINE,process.env.FAKE_WORKER,{recursive:true});}if(fs.existsSync(path.join(control,'ambiguous-create')))process.exit(44);console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
 if(argv.includes('usage')){if(fs.existsSync(path.join(control,'fail-usage')))process.exit(43);console.log('{}');process.exit(0);}
 if(argv.includes('snapshot')&&argv.includes('latest')){console.log(JSON.stringify({snapshot:{id:'snapshot-current',sandboxId:'fake-worker',chainId:'chain-current',generation:3,status:'completed',kind:'incremental',origin:'captured',createdAt:'2026-10-31T01:00:00Z',completedAt:'2026-10-31T01:00:01Z',fileCount:42}}));process.exit(0);}
 if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(control,'audit-startup')))fs.appendFileSync(path.join(control,'startup-state'),JSON.stringify(JSON.parse(fs.readFileSync('.boat/state.json','utf8')))+'\\n');
@@ -1133,6 +1135,7 @@ if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')&&fs.existsSync(path.joi
 if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
+if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'fail-bootstrap')))process.exit(45);
 if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
 if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){
@@ -10598,3 +10601,477 @@ for (const kind of ["progress", "replacement", "uncertainty"])
 			);
 		});
 	});
+
+// Public Make exercises the opt-in lifecycle; only the external CLI is controlled.
+async function freshCheckout(t) {
+	const f = await developmentCheckout(t, { prepare: false });
+	const baseline = path.join(f.directory, "fresh-empty-worker");
+	fs.cpSync(f.worker, baseline, { recursive: true });
+	f.env.FAKE_FRESH_BASELINE = baseline;
+	const config = f.json(".boat/enrollment.json");
+	f.local(
+		".boat/enrollment.json",
+		JSON.stringify({ ...config, lifecycle: "fresh-after-stop" }),
+	);
+	const info = {
+		sandbox: {
+			id: "fake-worker",
+			state: "stopped",
+			stop: {
+				id: "stop-fresh",
+				status: "completed",
+				forced: false,
+				error: null,
+				endedAt: "2026-11-01T00:00:00Z",
+			},
+		},
+	};
+	fs.writeFileSync(path.join(f.control, "provider-info"), JSON.stringify(info));
+	fs.writeFileSync(
+		path.join(f.control, "candidate-info"),
+		JSON.stringify({
+			sandbox: { id: "fake-new-worker", state: "ready", type: "large" },
+		}),
+	);
+	return f;
+}
+const freshCalls = (f) =>
+	fs.existsSync(path.join(f.control, "transport")) ? f.transport() : [];
+
+test("fresh lifecycle completed stop reconstructs before toolchain-only stale lock generation", async (t) => {
+	const f = await freshCheckout(t);
+	const old = {
+		...f.json(".boat/state.json"),
+		cost: 1.0288,
+		watcher: { processId: 19 },
+		developmentDependencies: { id: "fake-worker", dependencies: "old" },
+	};
+	f.local(".boat/state.json", JSON.stringify(old));
+	f.local(
+		".boat/prepared.json",
+		JSON.stringify({ dependencies: "stale-worker" }),
+	);
+	f.local("notes.txt", "local authoritative sentinel\n");
+	const git = fs.readFileSync(path.join(f.root, ".git/HEAD"));
+	const cache = path.join(
+		f.directory,
+		"home/.local/state/wallpaperdb-boat/557/cache/sentinel",
+	);
+	fs.mkdirSync(path.dirname(cache), { recursive: true });
+	fs.writeFileSync(cache, "external Turbo sentinel");
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	assert.match(result.output, /scratch.*(reset|reconstruct)/i);
+	const calls = freshCalls(f),
+		creates = calls.filter((a) => a.includes("new"));
+	assert.equal(creates.length, 1);
+	assert.equal(
+		calls.some((a) => a.includes("resume")),
+		false,
+	);
+	assert.equal(creates[0].includes("--from"), false);
+	assert.equal(creates[0][creates[0].indexOf("--type") + 1], "large");
+	assert.equal(creates[0][creates[0].indexOf("--ttl") + 1], "2100");
+	const intent = JSON.parse(
+		fs.readFileSync(path.join(f.control, "creation-state")),
+	).admission;
+	assert.equal(intent.previousWorkerId, "fake-worker");
+	assert.match(intent.token, /^[a-f0-9-]{36}$/);
+	assert.equal(creates[0][creates[0].indexOf("--name") + 1], intent.name);
+	const state = f.json(".boat/state.json");
+	assert.equal(state.id, "fake-new-worker");
+	assert.ok(state.cost >= 1.0288);
+	assert.equal(state.retiredWorkers.at(-1).id, "fake-worker");
+	assert.equal(
+		state.retiredWorkers.at(-1).shutdownAttempt.completion.provider.stop.forced,
+		false,
+	);
+	assert.equal(state.watcher, undefined);
+	assert.equal(state.developmentDependencies, undefined);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assert.equal(
+		fs.readFileSync(path.join(f.control, "calls"), "utf8"),
+		"generate\n",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"local authoritative sentinel\n",
+	);
+	assert.deepEqual(fs.readFileSync(path.join(f.root, ".git/HEAD")), git);
+	assert.equal(fs.readFileSync(cache, "utf8"), "external Turbo sentinel");
+});
+
+test("fresh lifecycle ambiguous create remains an unknown obligation despite empty list", async (t) => {
+	const f = await freshCheckout(t);
+	flag(f, "ambiguous-create");
+	const first = await f.generate();
+	assert.notEqual(first.status, 0);
+	const intent = f.json(".boat/state.json").admission;
+	assert.ok(intent);
+	const second = await f.generate();
+	assert.notEqual(second.status, 0);
+	assert.match(
+		second.output,
+		/unknown.*(create|admission)|admission.*unknown/i,
+	);
+	assert.deepEqual(f.json(".boat/state.json").admission, intent);
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		freshCalls(f).some((a) => a.includes("ssh") || a.includes("exec")),
+		false,
+	);
+});
+
+test("fresh lifecycle candidate survives crash before publication without another create", async (t) => {
+	const f = await freshCheckout(t);
+	flag(f, "candidate-kill");
+	const first = await f.generate();
+	assert.notEqual(first.status, 0);
+	const pending = f.json(".boat/state.json");
+	assert.equal(pending.id, "fake-worker");
+	assert.equal(pending.admission.candidate.id, "fake-new-worker");
+	const second = await f.generate();
+	assert.equal(second.status, 0, second.output);
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		f.json(".boat/state.json").retiredWorkers.at(-1).id,
+		"fake-worker",
+	);
+});
+
+for (const evidence of [
+	"missing",
+	"failed",
+	"forced",
+	"wrong-worker",
+	"wrong-stop",
+	"stopping",
+	"ready-dirty",
+])
+	test(`fresh lifecycle rejects ${evidence} stop evidence without admission`, async (t) => {
+		const f = await freshCheckout(t),
+			info = JSON.parse(fs.readFileSync(path.join(f.control, "provider-info")));
+		if (evidence === "missing") delete info.sandbox.stop;
+		if (evidence === "failed") info.sandbox.stop.status = "failed";
+		if (evidence === "forced") info.sandbox.stop.forced = true;
+		if (evidence === "wrong-worker") info.sandbox.id = "foreign";
+		if (evidence === "wrong-stop") info.sandbox.stop.endedAt = "invalid";
+		if (evidence === "stopping") info.sandbox.state = "stopping";
+		if (evidence === "ready-dirty") {
+			info.sandbox.state = "ready";
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					snapshotRecovery: { status: "DIRTY", workerId: "fake-worker" },
+				}),
+			);
+		}
+		fs.writeFileSync(
+			path.join(f.control, "provider-info"),
+			JSON.stringify(info),
+		);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /stop|identity|DIRTY/i);
+		assert.equal(
+			freshCalls(f).some(
+				(a) =>
+					a.includes("new") ||
+					a.includes("resume") ||
+					a.includes("ssh") ||
+					a.includes("exec"),
+			),
+			false,
+		);
+		assert.equal(f.json(".boat/state.json").id, "fake-worker");
+	});
+
+for (const failure of ["bootstrap", "frozen"])
+	test(`fresh lifecycle ${failure} failure retains candidate ownership and both accounting records`, async (t) => {
+		const f = await freshCheckout(t);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				cost: 1,
+				developmentWanted: true,
+			}),
+		);
+		flag(f, "audit-startup");
+		if (failure === "bootstrap") flag(f, "fail-bootstrap");
+		const result = await (failure === "bootstrap" ? f.generate() : f.normal());
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			failure === "frozen" ? /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/ : /45/,
+		);
+		const state = f.json(".boat/state.json"),
+			ledger = JSON.parse(
+				fs.readFileSync(
+					path.join(
+						f.directory,
+						"home/.local/state/wallpaperdb-boat/557/fixture.worker.json",
+					),
+				),
+			);
+		assert.equal(state.id, "fake-new-worker");
+		assert.deepEqual(ledger, state);
+		assert.ok(state.runningSince);
+		assert.ok(state.cost >= 1);
+		assert.equal(state.retiredWorkers.at(-1).id, "fake-worker");
+		assert.equal(state.developmentWanted, true);
+		assert.equal(state.reconciliationPending, true);
+		for (const row of fs
+			.readFileSync(path.join(f.control, "startup-state"), "utf8")
+			.trim()
+			.split("\n"))
+			assert.equal(JSON.parse(row).id, "fake-new-worker");
+		assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+		if (failure === "bootstrap") {
+			fs.rmSync(path.join(f.control, "fail-bootstrap"));
+			const retry = await f.generate();
+			assert.equal(retry.status, 0, retry.output);
+			assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+		}
+	});
+
+for (const changed of ["id", "name", "type", "state"])
+	test(`fresh lifecycle wrong candidate ${changed} retains intent without bootstrap`, async (t) => {
+		const f = await freshCheckout(t);
+		const info = JSON.parse(
+			fs.readFileSync(path.join(f.control, "candidate-info")),
+		);
+		info.sandbox[changed] = changed === "state" ? "stopped" : "foreign";
+		fs.writeFileSync(
+			path.join(f.control, "candidate-info"),
+			JSON.stringify(info),
+		);
+		const first = await f.generate();
+		assert.notEqual(first.status, 0);
+		assert.match(first.output, /Candidate identity/);
+		const pending = f.json(".boat/state.json");
+		assert.equal(pending.id, "fake-worker");
+		assert.equal(pending.admission.candidate.id, "fake-new-worker");
+		const second = await f.generate();
+		assert.notEqual(second.status, 0);
+		assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+		assert.equal(
+			freshCalls(f).some((a) => a.includes("ssh") || a.includes("exec")),
+			false,
+		);
+	});
+
+test("fresh lifecycle stop cleans an unpublished owned candidate and retains both histories", async (t) => {
+	const f = await freshCheckout(t);
+	flag(f, "candidate-kill");
+	const interrupted = await f.generate();
+	assert.notEqual(interrupted.status, 0);
+	const before = f.json(".boat/state.json");
+	assert.ok(before.admission.candidate);
+	const result = await f.run("boat-stop").done;
+	assert.equal(result.status, 0, result.output);
+	const after = f.json(".boat/state.json");
+	assert.equal(after.id, "fake-worker");
+	assert.equal(after.admission.candidate.id, "fake-new-worker");
+	assert.equal(after.admission.runningSince, null);
+	assert.ok(after.admission.cost > 0);
+	assert.equal(
+		after.admission.shutdownAttempt.completion.workerId,
+		"fake-new-worker",
+	);
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		freshCalls(f).some((a) => a.includes("delete") || a.includes("resume")),
+		false,
+	);
+});
+
+for (const blocker of ["owner", "source-writer", "migration"])
+	test(`fresh lifecycle preserves ${blocker} uncertainty and blocks admission`, async (t) => {
+		const f = await freshCheckout(t);
+		if (blocker === "owner")
+			f.local(
+				".boat/command-777.json",
+				JSON.stringify(f.json(".boat/state.json").daemon),
+			);
+		if (blocker === "source-writer")
+			f.local(
+				".boat/source-writer.json",
+				JSON.stringify({
+					workerId: "fake-worker",
+					commandId: "cmd_uncertain",
+					terminal: null,
+				}),
+			);
+		if (blocker === "migration")
+			f.local(
+				".boat/asset-migration-active.json",
+				JSON.stringify({ workerId: "fake-worker" }),
+			);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /owner|uncertain/i);
+		assert.equal(
+			freshCalls(f).some(
+				(a) => a.includes("new") || a.includes("ssh") || a.includes("exec"),
+			),
+			false,
+		);
+		if (blocker === "source-writer")
+			assert.equal(f.json(".boat/source-writer.json").terminal, null);
+		assert.equal(
+			liveOwnedProcess(f.root, f.json(".boat/state.json").daemon),
+			true,
+		);
+	});
+
+for (const gate of ["cost", "limits", "paid-start"])
+	test(`fresh lifecycle ${gate} admission refusal preserves old ownership`, async (t) => {
+		const f = await freshCheckout(t);
+		if (gate === "cost") {
+			const ledger = path.join(
+				f.directory,
+				"home/.local/state/wallpaperdb-boat/557",
+			);
+			fs.mkdirSync(ledger, { recursive: true });
+			fs.writeFileSync(
+				path.join(ledger, "prior.worker.json"),
+				JSON.stringify({ cost: 9.9 }),
+			);
+		} else
+			fs.writeFileSync(
+				path.join(f.control, "limits"),
+				JSON.stringify({
+					canStart: gate !== "limits",
+					nextStartDollars: gate === "paid-start" ? 0.1 : 0,
+				}),
+			);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /cutoff|admission refused/);
+		assert.equal(f.json(".boat/state.json").id, "fake-worker");
+		assert.equal(
+			freshCalls(f).some((a) => a.includes("new")),
+			false,
+		);
+	});
+
+test("fresh lifecycle status inspects pending unknown admission without creating or resuming", async (t) => {
+	const f = await freshCheckout(t);
+	flag(f, "ambiguous-create");
+	await f.generate();
+	const before = f.json(".boat/state.json"),
+		calls = freshCalls(f);
+	const result = await f.run("boat-status").done;
+	assert.equal(result.status, 0, result.output);
+	assert.match(result.output, /create-unknown/);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.deepEqual(freshCalls(f), calls);
+});
+
+function useFreshPolicy(f) {
+	f.local(
+		".boat/enrollment.json",
+		JSON.stringify({
+			...f.json(".boat/enrollment.json"),
+			lifecycle: "fresh-after-stop",
+		}),
+	);
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify({
+			sandbox: {
+				id: "fake-worker",
+				state: "stopped",
+				stop: {
+					id: "stop-fresh",
+					status: "completed",
+					forced: false,
+					error: null,
+					endedAt: "2026-11-01T00:00:00Z",
+				},
+			},
+		}),
+	);
+	fs.writeFileSync(
+		path.join(f.control, "candidate-info"),
+		JSON.stringify({
+			sandbox: { id: "fake-new-worker", state: "ready", type: "large" },
+		}),
+	);
+}
+
+test("fresh lifecycle migration generation retains captured frozen prerequisite", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	useFreshPolicy(f);
+	f.local("pnpm-lock.yaml", "stale reconstruction lock\n");
+	fs.rmSync(path.join(f.control, "installed-dependencies"), { force: true });
+	const result = await f.migrations();
+	assert.notEqual(result.status, 0);
+	assert.match(result.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.equal(fs.existsSync(path.join(f.control, "migration-entered")), false);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	assert.equal(
+		f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+		18,
+	);
+});
+
+test("fresh lifecycle committed publication recovers locally before replacement without old-worker delivery acknowledgement", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	const baseline = path.join(f.directory, "fresh-empty-worker");
+	fs.cpSync(f.worker, baseline, { recursive: true });
+	const intent = await crashMigrationPublication(f, "journal-commit");
+	const accepted = migrationBytes(f.root);
+	assert.equal(
+		f.json(".boat/migration-return-pending.json").workerId,
+		"fake-worker",
+	);
+	useFreshPolicy(f);
+	f.env.FAKE_FRESH_BASELINE = baseline;
+	f.local("notes.txt", "publication successor source\n");
+	const next = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.equal(next.status, 0, next.output);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	assert.deepEqual(migrationBytes(f.root), accepted);
+	assert.deepEqual(migrationBytes(f.worker), accepted);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+		false,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-return-pending.json")),
+		false,
+	);
+	assert.equal(fs.existsSync(intent.proposal), true);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"publication successor source\n",
+	);
+});
+
+test("fresh lifecycle awake active owner keeps the current worker and sibling helper", async (t) => {
+	const f = await freshCheckout(t);
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify({ sandbox: { id: "fake-worker", state: "ready" } }),
+	);
+	const sibling = f.json(".boat/state.json").daemon;
+	f.local(".boat/command-777.json", JSON.stringify(sibling));
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/state.json").id, "fake-worker");
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+	assert.equal(
+		freshCalls(f).some(
+			(a) => a.includes("new") || a.includes("resume") || a.includes("stop"),
+		),
+		false,
+	);
+});

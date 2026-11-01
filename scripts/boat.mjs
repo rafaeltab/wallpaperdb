@@ -24,6 +24,7 @@ import {
 	retireShutdownTunnel,
 } from "./lib/boat-shutdown.mjs";
 import { runPreview } from "./lib/boat-preview.mjs";
+import { freshWorker, assertAdmission } from "./lib/boat-reconstruction.mjs";
 import { snapshotLifecycle, snapshotExpired } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -53,11 +54,27 @@ const remote = "/home/user/wallpaperdb";
 const [action, ...args] = process.argv.slice(2);
 const read = (p, fallback = {}) =>
 	fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : fallback;
-function write(p, value) {
+function write(p, value, durable = false) {
 	fs.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
 	const tmp = `${p}.${process.pid}`;
 	fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 });
+	if (durable) {
+		const fd = fs.openSync(tmp, "r");
+		try {
+			fs.fsyncSync(fd);
+		} finally {
+			fs.closeSync(fd);
+		}
+	}
 	fs.renameSync(tmp, p);
+	if (durable) {
+		const fd = fs.openSync(path.dirname(p), "r");
+		try {
+			fs.fsyncSync(fd);
+		} finally {
+			fs.closeSync(fd);
+		}
+	}
 }
 const config = read(configFile, null);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -318,14 +335,22 @@ function accounting() {
 		if (!name.endsWith(".worker.json")) continue;
 		const s = read(path.join(runDir, name));
 		dollars += s.cost ?? 0;
+		if (s.admission?.status !== "published") dollars += s.admission?.cost ?? 0;
+		if (s.admission?.status !== "published" && s.admission?.runningSince)
+			dollars += estimate(
+				s.admission.size,
+				Date.now() - s.admission.runningSince,
+			);
 		if (s.runningSince)
 			dollars += estimate(s.size, Date.now() - s.runningSince);
 	}
 	return dollars;
 }
-function save(state) {
-	write(stateFile, state);
-	write(path.join(runDir, `${config.key}.worker.json`), state);
+function save(state, durable = false) {
+	if (durable)
+		write(path.join(runDir, `${config.key}.worker.json`), state, true);
+	write(stateFile, state, durable);
+	if (!durable) write(path.join(runDir, `${config.key}.worker.json`), state);
 }
 const snapshots = snapshotLifecycle({
 	load: () => read(stateFile),
@@ -340,6 +365,27 @@ function admit() {
 async function ensure() {
 	return lock(async () => {
 		admit();
+		if (config.lifecycle === "fresh-after-stop") {
+			const s = await lock(
+				() =>
+					freshWorker({
+						root,
+						config,
+						load: () => read(stateFile),
+						persist: (s) => save(s, true),
+						json,
+						admit,
+						snapshots,
+						preflight: () => {
+							assertSourceWriterStopped();
+							recoverPublication(root, acceptSource);
+						},
+					}),
+				"source",
+			);
+			await bootstrap(s.id);
+			return { id: s.id, resumed: false };
+		}
 		let s = read(stateFile);
 		let existingInfo;
 		if (s.id) {
@@ -438,12 +484,15 @@ async function ensure() {
 		s = snapshots.startup();
 		s.lastActivity = Date.now();
 		save(s);
-		await ssh(
-			s.id,
-			`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
-		);
+		await bootstrap(s.id);
 		return { id: s.id, resumed: false };
 	});
+}
+async function bootstrap(id) {
+	await ssh(
+		id,
+		`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
+	);
 }
 function sourceNames() {
 	const files = execFileSync(
@@ -915,6 +964,62 @@ async function disposeShutdownTunnel(id, protectedPids, budget) {
 	);
 	fs.rmSync(tunnelFile, { force: true });
 }
+// Pending candidates are independently owned compute, even before main identity
+// publication. Stop them without creating, bootstrapping or discarding intent.
+async function stopAdmission(budget) {
+	const state = read(stateFile),
+		a = state.admission;
+	if (!a || a.status === "published") return;
+	assertAdmission(state, config);
+	if (!a.candidate)
+		throw new Error(
+			`Unknown create obligation ${a.token}; stop cannot resolve an unobserved candidate`,
+		);
+	const info = await json(["info", a.candidate.id], {
+		shutdown: budget.phase("initial"),
+	});
+	const worker = info?.sandbox ?? info;
+	if (
+		worker?.id !== a.candidate.id ||
+		worker.name !== a.name ||
+		worker.type !== a.size
+	)
+		throw new Error(
+			"Candidate stop identity mismatch; preserve unknown obligation",
+		);
+	const candidateSnapshots = snapshotLifecycle({
+		load: () => {
+			const current = read(stateFile).admission;
+			return {
+				id: current.candidate.id,
+				size: current.size,
+				cost: current.cost ?? 0,
+				runningSince: current.runningSince,
+				shutdownAttempt: current.shutdownAttempt,
+			};
+		},
+		persist: (candidate) => {
+			const current = read(stateFile);
+			Object.assign(current.admission, {
+				cost: candidate.cost,
+				runningSince: candidate.runningSince,
+				shutdownAttempt: candidate.shutdownAttempt,
+			});
+			save(current, true);
+		},
+	});
+	const result = await candidateSnapshots.stopCompute({
+		budget,
+		inspect: (opts) => json(["info", a.candidate.id], opts),
+		retire: (opts) => retireWatchers(a.candidate.id, opts),
+		request: (opts) => json(["stop", a.candidate.id], opts),
+		wait,
+	});
+	if (result.error) throw new Error(result.error);
+	console.log(
+		`Stopped owned candidate ${a.candidate.id}; admission history retained, no replacement admitted.`,
+	);
+}
 async function stop(remove = false, targets, { preserveIntent = false } = {}) {
 	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
 		fs.appendFileSync(
@@ -933,8 +1038,17 @@ async function stop(remove = false, targets, { preserveIntent = false } = {}) {
 	try {
 		return await lock(
 			async () => {
+				const errors = [];
+				try {
+					await stopAdmission(budget);
+				} catch (error) {
+					errors.push(error.message);
+				}
 				let s = read(stateFile);
-				if (!s.id) return;
+				if (!s.id) {
+					if (errors.length) throw new Error(errors.join("; "));
+					return;
+				}
 				let result;
 				const protectedPids = [
 					process.pid,
@@ -942,7 +1056,6 @@ async function stop(remove = false, targets, { preserveIntent = false } = {}) {
 					s.daemon?.pid,
 					s.watcher?.pid,
 				];
-				const errors = [];
 				try {
 					result = await snapshots.stopCompute({
 						budget,
@@ -971,6 +1084,10 @@ async function stop(remove = false, targets, { preserveIntent = false } = {}) {
 						wait,
 					});
 					s = read(stateFile);
+					if (config.lifecycle === "fresh-after-stop")
+						console.log(
+							"Next execution reconstructs scratch DB, dependencies and Docker state on a fresh worker; local source/Git and external Turbo cache are preserved.",
+						);
 					event("stopped", {
 						id: s.id,
 						estimatedCost: s.cost,
@@ -1727,7 +1844,14 @@ async function watchDevelopment(id) {
 }
 try {
 	if (action === "enroll") {
-		const [mode = "validation", size = "large", cohort = "smoke"] = args;
+		const [
+			mode = "validation",
+			size = "large",
+			cohort = "smoke",
+			lifecycle = "snapshot",
+		] = args;
+		if (!["snapshot", "fresh-after-stop"].includes(lifecycle))
+			throw new Error("Invalid lifecycle policy");
 		if (!fs.statSync(".git").isFile())
 			throw new Error("Enrollment requires an isolated linked worktree");
 		if (
@@ -1750,6 +1874,7 @@ try {
 			size,
 			cohort,
 			cacheNamespace,
+			lifecycle,
 			base,
 			key: hash(root).slice(0, 12),
 		});

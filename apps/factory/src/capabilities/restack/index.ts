@@ -1,2 +1,3 @@
-export type { Resolution, RecoveryPorts } from './contract.js';
-export { recover } from './implementation.js';
+export type { Resolution, RecoveryOutcome } from './contract.js';
+export { RecoveryPorts, Restack } from './contract.js';
+export { RestackLive } from './implementation.js';

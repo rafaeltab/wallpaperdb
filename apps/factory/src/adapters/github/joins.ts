@@ -12,8 +12,13 @@ import {
 } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { z } from 'zod';
-import { Effect } from 'effect';
-import { recover } from '../../capabilities/restack/index.js';
+import { Effect, Layer as EffectLayer } from 'effect';
+import {
+  RecoveryPorts,
+  Restack,
+  RestackLive,
+  type RecoveryOutcome,
+} from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { t3Restacker } from '../t3/index.js';
 import { command } from '../../platform/index.js';
@@ -427,8 +432,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       }
     );
     let reviewed = false;
-    const result = await Effect.runPromise(
-      recover({
+    const result = await runRecovery(
+      {
         resolve: () => agent.resolve(),
         review: (commit) =>
           agent.review(commit).pipe(
@@ -440,7 +445,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           ),
         // Publication and hosted CI use the join's durable intent and expected-head lease below.
         verify: () => Effect.succeed(false),
-      })
+      },
+      signal
     );
     const progressPath = join(await mkdtemp(join(dir, '.progress-')), 'value');
     await writeDurable(progressPath, { ...result, issue: item.issue, pr: item.url });
@@ -453,7 +459,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     dir: string,
     item: Layer,
     value: { worktree: string; oldParent: string; onto: string },
-    result: Effect.Success<ReturnType<typeof recover>>,
+    result: RecoveryOutcome,
     reviewed: boolean,
     signal?: AbortSignal
   ) => {
@@ -987,8 +993,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           reviewed: z.boolean(),
         })
         .parse(saved);
-      const result = await Effect.runPromise(
-        recover({
+      const result = await runRecovery(
+        {
           resolve: () =>
             Effect.succeed({
               commit: item.next,
@@ -1001,7 +1007,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
               try: () => validate(item, dir, signal),
               catch: (cause) => new Unavailable({ operation: 'restack-ci', cause }),
             }),
-        })
+        },
+        signal
       );
       if (!result.ready) return false;
     }
@@ -1368,6 +1375,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return result;
   };
   return { prepare, evidence, state, replayFor, reconcile, recoveries };
+}
+
+function runRecovery(ports: RecoveryPorts, signal?: AbortSignal) {
+  const layer = RestackLive.pipe(EffectLayer.provide(EffectLayer.succeed(RecoveryPorts, ports)));
+  return Effect.runPromise(
+    Effect.flatMap(Restack, (restack) => restack.advance()).pipe(Effect.provide(layer)),
+    { signal }
+  );
 }
 
 function replayTip(operation: Intent) {

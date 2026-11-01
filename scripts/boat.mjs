@@ -44,6 +44,11 @@ import {
 	captureAssetMigration,
 } from "./lib/boat-asset-migration.mjs";
 
+import {
+	runOwnedSourceCommand,
+	provenOwnedSourceExit,
+} from "./lib/boat-source-command.mjs";
+
 const root = process.cwd();
 const dir = path.join(root, ".boat");
 const configFile = path.join(dir, "enrollment.json");
@@ -101,6 +106,7 @@ function execute(
 		maxCaptureBytes = Infinity,
 		onFrame = () => {},
 		shutdown,
+		sourceObservation,
 	} = {},
 ) {
 	return new Promise((resolve, reject) => {
@@ -126,6 +132,39 @@ function execute(
 				capture || streamFrames || shutdown ? "pipe" : "inherit",
 			],
 		});
+		let sourceAborted = false,
+			sourceError,
+			sourceDisposal,
+			sourcePipeDisposal;
+		const abortSource = () => {
+			if (sourceAborted) return;
+			sourceAborted = true;
+			sourceError = { code: "source_capture_aborted" };
+			child.kill("SIGTERM");
+			// Failure disposal is finite; the normal owned attach has no deadline.
+			sourceDisposal = setTimeout(() => {
+				child.kill("SIGKILL");
+				sourcePipeDisposal = setTimeout(() => {
+					child.stdout.destroy();
+					child.stderr.destroy();
+					reject(
+						new Error("Source CLI pipes did not close after capture failure"),
+					);
+				}, 1000);
+			}, 1000);
+		};
+		if (sourceObservation) {
+			// Observe actual CLI bytes before JSON parsing or decoded projection.
+			for (const stream of ["stdout", "stderr"])
+				child[stream].on("data", (bytes) => {
+					if (!sourceObservation.raw(stream, bytes)) {
+						abortSource();
+					}
+				});
+			child.on("error", (error) => {
+				sourceError = error;
+			});
+		}
 		let out = "",
 			err = "",
 			decoded = "",
@@ -144,6 +183,9 @@ function execute(
 			child.stderr.on("data", (b) => forward(process.stderr, b));
 		}
 		if (capture) {
+			const decoder = sourceObservation
+				? new TextDecoder("utf-8", { fatal: true })
+				: null;
 			child.stdout.on("data", (b) => {
 				if (
 					Buffer.byteLength(out) + b.length >
@@ -151,15 +193,34 @@ function execute(
 				) {
 					captureOverflow = true;
 					child.kill("SIGTERM");
-				} else out += b;
+				} else {
+					try {
+						out += decoder ? decoder.decode(b, { stream: true }) : b;
+					} catch {
+						sourceObservation.malformed();
+						abortSource();
+					}
+				}
 			});
+			if (decoder)
+				child.stdout.on("end", () => {
+					try {
+						out += decoder.decode();
+					} catch {
+						sourceObservation.malformed();
+					}
+				});
 			child.stderr.on("data", (b) => {
-				err = (err + b).slice(shutdown ? -1000 : 0);
+				if (!sourceObservation) err = (err + b).slice(shutdown ? -1000 : 0);
 			});
 		}
 		if (streamFrames) {
 			let pending = "";
 			const emit = (data, stderr = false) => {
+				if (sourceObservation && !sourceObservation.output(data, stderr)) {
+					abortSource();
+					return;
+				}
 				if (collectOutput) {
 					decoded += data;
 					if (Buffer.byteLength(decoded) > 8 * 1024 * 1024) {
@@ -184,6 +245,9 @@ function execute(
 						event("startup-progress", { phase, elapsedMs: Date.now() - start });
 				}
 			};
+			const decoder = sourceObservation
+				? new TextDecoder("utf-8", { fatal: true })
+				: null;
 			const line = (value) => {
 				try {
 					const frame = JSON.parse(value);
@@ -192,11 +256,19 @@ function execute(
 						emit(frame.data, frame.type === "stderr");
 					else if (frame.event === "error") emit(`${frame.error}\n`, true);
 				} catch {
-					emit(`${value}\n`);
+					if (sourceObservation) sourceObservation.malformed();
+					else emit(`${value}\n`);
 				}
 			};
 			child.stdout.on("data", (bytes) => {
-				pending += bytes;
+				if (sourceAborted) return;
+				try {
+					pending += decoder ? decoder.decode(bytes, { stream: true }) : bytes;
+				} catch {
+					sourceObservation.malformed();
+					abortSource();
+					return;
+				}
 				let at = pending.indexOf("\n");
 				while (at >= 0) {
 					line(pending.slice(0, at));
@@ -205,7 +277,14 @@ function execute(
 				}
 			});
 			child.stdout.on("end", () => {
-				if (pending) line(pending);
+				if (decoder && !sourceAborted) {
+					try {
+						pending += decoder.decode();
+					} catch {
+						sourceObservation.malformed();
+					}
+				}
+				if (pending && !sourceAborted) line(pending);
 			});
 			child.stderr.on("data", (bytes) => emit(bytes, true));
 		}
@@ -213,8 +292,12 @@ function execute(
 			child.stdin.on("error", () => {});
 			child.stdin.end(input);
 		}
-		if (!shutdown) child.on("error", reject);
+		if (!shutdown && !sourceObservation) child.on("error", reject);
 		const complete = (code, signal) => {
+			clearTimeout(sourceDisposal);
+			clearTimeout(sourcePipeDisposal);
+			if (sourceObservation)
+				sourceObservation.close({ code, signal, error: sourceError });
 			const status = code ?? (signal === "SIGINT" ? 130 : 143);
 			if (captureOverflow || forwardingOverflow) {
 				reject(new Error("Captured transport output limit exceeded"));
@@ -700,80 +783,38 @@ function provenSourceExit(record) {
 function assertSourceWriterStopped() {
 	const file = path.join(dir, "source-writer.json");
 	if (!fs.existsSync(file)) return;
-	if (!provenSourceExit(read(file)))
+	const record = read(file);
+	if (
+		!(record.protocol === undefined
+			? provenSourceExit(record)
+			: record.workerId === read(stateFile).id && provenOwnedSourceExit(record))
+	)
 		throw new Error(
 			`Source writer completion is uncertain; source synchronization and generation blocked. Preserve the active worker tree; ownership evidence at ${file}`,
 		);
 	fs.rmSync(file);
 }
+
 async function runSourceCommand(id, started, kind) {
 	const file = path.join(dir, "source-writer.json");
 	const evidence = path.join(
 		dir,
 		`source-command-${started}-${process.pid}.json`,
 	);
-	const record = {
+	const result = await runOwnedSourceCommand({
 		workerId: id,
 		kind,
-		startedAt: new Date().toISOString(),
-		commandId: null,
-		terminal: null,
-	};
-	const persist = () => {
-		write(evidence, record);
-		write(file, record);
-	};
-	// Persist uncertainty BEFORE submission. CLI loss cannot authorize another writer.
-	persist();
-	const result = await boat(
-		[
-			"--json",
-			"exec",
-			id,
-			"--timeout",
-			"0",
-			"--stream",
-			"--",
-			"bash",
-			"-lc",
-			`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run ${kind === "lock" ? "PACKAGE=scripts SCRIPT=dependencies:lock" : "PACKAGE=asset SCRIPT=db:generate"}`,
-		],
-		{
-			allowFailure: true,
-			collectOutput: kind === "migrations",
-			streamFrames: true,
-			logPath: path.join(dir, `command-${started}.log`),
-			onFrame: (frame) => {
-				if (frame.type === "started" && typeof frame.commandId === "string") {
-					if (
-						(record.commandId && record.commandId !== frame.commandId) ||
-						record.terminal
-					)
-						record.protocolError = true;
-					record.commandId = frame.commandId;
-					persist();
-				}
-				if (frame.type === "exit") {
-					if (!record.commandId) record.protocolError = true;
-					record.terminal = Object.fromEntries(
-						[
-							"type",
-							"exitCode",
-							"finishedAt",
-							"launcherFailed",
-							"timedOut",
-							"oomKilled",
-							"signal",
-							"success",
-						].map((name) => [name, frame[name]]),
-					);
-					persist();
-				}
-			},
+		cli,
+		execute,
+		directory: path.join(dir, `source-command-${started}-${process.pid}`),
+		command: `export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run ${kind === "lock" ? "PACKAGE=scripts SCRIPT=dependencies:lock" : "PACKAGE=asset SCRIPT=db:generate"}`,
+		persist: (record) => {
+			write(evidence, record, true);
+			write(file, record, true);
 		},
-	);
+	});
 	assertSourceWriterStopped();
-	return { ...result, status: result.status || record.terminal.exitCode };
+	return result;
 }
 
 async function generate(id, started, kind) {

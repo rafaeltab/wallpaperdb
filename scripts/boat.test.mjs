@@ -917,6 +917,8 @@ async function sourceCommandContract() {
  };
  const emit=(phase,value)=>{
   fs.appendFileSync(path.join(control,'source-protocol-events'),JSON.stringify({phase,value})+'\n');
+  const raw=path.join(control,'source-'+phase+'-raw');
+  if(fs.existsSync(raw)){process.stdout.write(fs.readFileSync(raw));return;}
   console.log(JSON.stringify(value));
  };
  let start;
@@ -938,6 +940,7 @@ async function sourceCommandContract() {
  }else start=JSON.parse(fs.readFileSync(prefix+'.start'));
  const file=path.join(control,'source-process-'+start.processId);
  if(mode==='status'){
+  if(flag('source-status-loss'))process.exit(72);
   if(!fs.existsSync(file+'.status')){
    emit('status',override('status',{...start,known:true,running:true,status:'running',exitCode:null,signal:null,oomKilled:false,finishedAt:null,stdout:'',stderr:''}));
   }else{
@@ -955,11 +958,13 @@ async function sourceCommandContract() {
   const end=frames.lastIndexOf('\n')+1;
   for(const line of frames.slice(cursor,end).split('\n').filter(Boolean))emit('attach',override('chunk',JSON.parse(line)));
   cursor=end;
-  if(fs.existsSync(file+'.status')&&(!fs.existsSync(file+'.frames')||cursor===fs.statSync(file+'.frames').size))break;
+  if(fs.existsSync(file+'.status')&&(!fs.existsSync(file+'.frames')||cursor===fs.readFileSync(file+'.frames','utf8').length))break;
   await new Promise(resolve=>setTimeout(resolve,5));
  }
  const status=JSON.parse(fs.readFileSync(file+'.status'));
  if(!flag('missing-terminal'))emit('attach',override('exit',{type:'exit',status:'exited',exitCode:status.exitCode,signal:status.signal,stdoutOffset:status.stdout,stderrOffset:status.stderr}));
+ if(flag('source-extra-exit.json'))emit('attach',JSON.parse(fs.readFileSync(path.join(control,'source-extra-exit.json'))));
+ process.exitCode=status.exitCode??1;
  return true;
 }
 if(await sourceCommandContract())process.exit(0);
@@ -1071,6 +1076,7 @@ async function lockGenerationCheckout(
 		"scripts/lib/boat-shutdown.mjs",
 		"scripts/lib/boat-preview.mjs",
 		"scripts/lib/boat-source-generation.mjs",
+		"scripts/lib/boat-source-command.mjs",
 		"scripts/lib/boat-asset-migration.mjs",
 		"scripts/package.json",
 	]) {
@@ -1129,6 +1135,7 @@ if(argv.includes('--lockfile-only')){
  fs.appendFileSync(path.join(control,'old-locks'),JSON.stringify(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8'))+'\\n');
  fs.appendFileSync(path.join(control,'calls'),'generate\\n');
  console.log('source fixture lock stdout');console.error('source fixture lock stderr');
+ for(const stream of ['stdout','stderr']){const diagnostic=path.join(control,'source-diagnostic-'+stream);if(fs.existsSync(diagnostic))process[stream].write(fs.readFileSync(diagnostic));}
  fs.writeFileSync(path.join(control,'entered'),'yes');
  (async()=>{while(fs.existsSync(path.join(control,'pause'))&&!fs.existsSync(path.join(control,'release')))await new Promise(r=>setTimeout(r,10));
  fs.writeFileSync(path.join(root,'pnpm-lock.yaml'),expected());
@@ -1244,7 +1251,7 @@ if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(contro
 if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')&&fs.existsSync(path.join(control,'fail-retire')))process.exit(31);
 if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
-${sourceCommandContractFixture.replace("if(await sourceCommandContract())process.exit(0);", "sourceCommandContract().then(handled=>{if(handled)process.exit(0);else runOrdinaryCommand();});\nfunction runOrdinaryCommand(){")}
+${sourceCommandContractFixture.replace("if(await sourceCommandContract())process.exit(0);", "sourceCommandContract().then(handled=>{if(!handled)runOrdinaryCommand();});\nfunction runOrdinaryCommand(){")}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
 if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'fail-bootstrap')))process.exit(45);
 if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'pause-bootstrap'))){fs.writeFileSync(path.join(control,'entered-bootstrap'),'yes');while(!fs.existsSync(path.join(control,'release-bootstrap')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
@@ -3102,10 +3109,97 @@ console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
 		}
 	});
 
+function retainSourceProtocolEvidence(t, f, status) {
+	const destination = process.env.BOAT_SOURCE_PROTOCOL_EVIDENCE_DIRECTORY;
+	if (!destination) return;
+	fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+	const archive = fs.mkdtempSync(
+		path.join(destination, "public-source-protocol-"),
+	);
+	fs.chmodSync(archive, 0o700);
+	const entries = fs.readdirSync(path.join(f.root, ".boat"), {
+		withFileTypes: true,
+	});
+	for (const entry of entries.filter((entry) =>
+		entry.name.startsWith("source-command-"),
+	))
+		fs.cpSync(
+			path.join(f.root, ".boat", entry.name),
+			path.join(archive, entry.name),
+			{ recursive: true },
+		);
+	for (const name of [
+		"source-submissions",
+		"source-protocol-events",
+		"transport",
+	])
+		fs.copyFileSync(path.join(f.control, name), path.join(archive, name));
+	const files = [];
+	const phases = [];
+	function inventory(directory) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const file = path.join(directory, entry.name);
+			if (entry.isDirectory()) {
+				fs.chmodSync(file, 0o700);
+				inventory(file);
+			} else {
+				fs.chmodSync(file, 0o600);
+				const bytes = fs.readFileSync(file);
+				files.push({
+					name: path.relative(archive, file),
+					bytes: bytes.length,
+					sha256: createHash("sha256").update(bytes).digest("hex"),
+					mode: fs.statSync(file).mode & 0o777,
+				});
+				if (["start.json", "attach.json", "status.json"].includes(entry.name)) {
+					const metadata = JSON.parse(bytes);
+					phases.push({
+						name: entry.name,
+						events: metadata.events,
+						complete: metadata.complete,
+						localExit: metadata.localExit,
+						streams: metadata.streams,
+					});
+				}
+			}
+		}
+	}
+	inventory(archive);
+	const manifest = {
+		provenance:
+			"Actual private raw bytes observed from the local synthetic documented-contract CLI fixture. Not a qualified CLI/provider capture or a historical transcript.",
+		publicMakeArgv: [
+			"make",
+			"run",
+			"BOAT_EXEC=local",
+			"PACKAGE=scripts",
+			"SCRIPT=test:boat-focused",
+			"ARGS=--test-name-pattern='^public lock generation accepts the documented detached source protocol once and preserves output' boat.test.mjs",
+		],
+		publicMakeStatus: status,
+		files,
+		phases,
+	};
+	fs.writeFileSync(
+		path.join(archive, "manifest.json"),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+		{ mode: 0o600 },
+	);
+	t.diagnostic(
+		JSON.stringify({
+			provenance: "local synthetic external CLI",
+			archive,
+			publicMakeStatus: status,
+			phases,
+		}),
+	);
+}
+
 test("public lock generation accepts the documented detached source protocol once and preserves output", async (t) => {
 	const f = await lockGenerationCheckout(t);
 	f.local("patches/dependency.patch", "documented source contract patch\n");
 	const result = await f.generate();
+	retainSourceProtocolEvidence(t, f, result.status);
 	assert.equal(result.status, 0, result.output);
 	const submissions = fs
 		.readFileSync(path.join(f.control, "source-submissions"), "utf8")
@@ -3144,7 +3238,16 @@ test("public lock generation accepts the documented detached source protocol onc
 	for (const followup of ["--attach", "--status"])
 		assert.deepEqual(
 			calls.filter((args) => args.includes(followup)),
-			[["--no-update", "--json", "exec", "fake-worker", followup, String(start.processId)]],
+			[
+				[
+					"--no-update",
+					"--json",
+					"exec",
+					"fake-worker",
+					followup,
+					String(start.processId),
+				],
+			],
 			"follow-ups must use only the owned worker and process",
 		);
 	const events = fs
@@ -3172,11 +3275,21 @@ test("public lock generation accepts the documented detached source protocol onc
 		}
 		assert.equal(frames.at(-1)[`${stream}Offset`], offset);
 		const expected = `source fixture lock ${stream}\n`;
-		assert.ok(chunks.map((chunk) => chunk.data).join("").includes(expected));
+		assert.ok(
+			chunks
+				.map((chunk) => chunk.data)
+				.join("")
+				.includes(expected),
+		);
 		assert.equal(result.output.split(expected.trim()).length - 1, 1);
 	}
 	assert.deepEqual(Object.keys(frames.at(-1)).sort(), [
-		"exitCode", "signal", "status", "stderrOffset", "stdoutOffset", "type",
+		"exitCode",
+		"signal",
+		"status",
+		"stderrOffset",
+		"stdoutOffset",
+		"type",
 	]);
 	assert.equal(frames.at(-1).status, "exited");
 	assert.equal(frames.at(-1).exitCode, 0);
@@ -3191,12 +3304,28 @@ test("public lock generation accepts the documented detached source protocol onc
 	assert.equal(status.oomKilled, false);
 	assert.ok(Date.parse(status.finishedAt) >= Date.parse(start.startedAt));
 	assert.equal(Object.hasOwn(status, "launcherFailed"), false);
-	assert.ok(events.findIndex((event) => event.phase === "collect") > events.findIndex((event) => event.phase === "status"), "collection must follow terminal proof");
+	assert.ok(
+		events.findIndex((event) => event.phase === "collect") >
+			events.findIndex((event) => event.phase === "status"),
+		"collection must follow terminal proof",
+	);
 	const accepted = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8");
-	assert.equal(JSON.parse(accepted).inputs["patches/dependency.patch"], "documented source contract patch\n");
-	assert.equal(fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"), accepted);
-	assert.equal(fs.readFileSync(path.join(f.root, "notes.txt"), "utf8"), "original unrelated source\n");
-	assert.equal(fs.existsSync(path.join(f.root, ".boat/source-writer.json")), false);
+	assert.equal(
+		JSON.parse(accepted).inputs["patches/dependency.patch"],
+		"documented source contract patch\n",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+		accepted,
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, "notes.txt"), "utf8"),
+		"original unrelated source\n",
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
 	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
 });
 
@@ -4423,6 +4552,43 @@ for (const [name, edit] of [
 		assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
 	});
 
+test("public lock generation rejects a concurrent source command helper edit and retains the proposal", async (t) => {
+	const f = await pausedGeneration(t);
+	const name = "scripts/lib/boat-source-command.mjs";
+	const captured = fs.readFileSync(path.join(f.root, name), "utf8");
+	const edited = `${captured}\n// concurrent source command helper edit\n`;
+	const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+	f.local(name, edited);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Local dependency inputs or old lock changed: scripts\/lib\/boat-source-command\.mjs/,
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+		before,
+	);
+	assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
+	assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
+	const proposal = result.output.match(
+		/proposal retained at (.+\/pnpm-lock.yaml)/,
+	)?.[1];
+	assert.ok(proposal, result.output);
+	assert.equal(path.relative(f.root, proposal).startsWith(".."), true);
+	assert.deepEqual(
+		fs.readFileSync(proposal),
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+	);
+	assert.equal(
+		JSON.parse(fs.readFileSync(proposal)).inputs["patches/dependency.patch"],
+		"original patch\n",
+	);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
+});
+
 test("captured dependency bytes reach the worker even when local inputs change during upload", async (t) => {
 	const f = await pausedGeneration(t, "sync");
 	f.local("patches/dependency.patch", "edited while transporting\n");
@@ -4719,7 +4885,13 @@ for (const targets of [
 				undefined,
 			);
 			assert.equal(
-				f.transport().some((argv) => argv.includes("--detach")),
+				f
+					.transport()
+					.some(
+						(argv) =>
+							argv.includes("--detach") &&
+							argv.at(-1).includes("SCRIPT=boat:watch"),
+					),
 				false,
 			);
 			f.local("notes.txt", "source changed while development stays awake\n");
@@ -4978,7 +5150,13 @@ for (const failure of ["fail-build", "fail-apps", "fail-watch"])
 			2,
 		);
 		assert.equal(
-			f.transport().filter((argv) => argv.includes("--detach")).length,
+			f
+				.transport()
+				.filter(
+					(argv) =>
+						argv.includes("--detach") &&
+						argv.at(-1).includes("SCRIPT=boat:watch"),
+				).length,
 			failure === "fail-watch" ? 2 : 1,
 		);
 	});
@@ -4998,7 +5176,12 @@ test("awake pending preview reconciles development despite a healthy readiness p
 	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 	assert.equal(f.json(".boat/state.json").watcher, 557);
 	const calls = f.transport();
-	assert.ok(calls.some((argv) => argv.includes("--detach")));
+	assert.ok(
+		calls.some(
+			(argv) =>
+				argv.includes("--detach") && argv.at(-1).includes("SCRIPT=boat:watch"),
+		),
+	);
 	assert.ok(calls.some((argv) => argv.at(-1).includes("ARGS=--once")));
 	assert.equal(
 		calls.filter((argv) =>
@@ -7790,6 +7973,361 @@ test("generation rejects symlinked inputs without reading the outside target", a
 	assert.equal(fs.readlinkSync(schema), outside);
 });
 
+test("documented source protocol preserves Unicode diagnostics and byte offsets", {
+	timeout: 5000,
+}, async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const expected = {
+		stdout: "✓ ➜ 🚀 source output\n",
+		stderr: "日本語 stderr diagnostic\n",
+	};
+	for (const [stream, text] of Object.entries(expected))
+		fs.writeFileSync(path.join(f.control, `source-diagnostic-${stream}`), text);
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	const frames = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.filter((event) => event.phase === "attach")
+		.map((event) => event.value);
+	for (const [stream, text] of Object.entries(expected)) {
+		assert.ok(Buffer.byteLength(text) > text.length);
+		assert.equal(result.output.split(text).length - 1, 1);
+		const chunks = frames.filter((frame) => frame.type === stream);
+		assert.ok(
+			chunks
+				.map((frame) => frame.data)
+				.join("")
+				.includes(text),
+		);
+		let bytes = 0;
+		for (const frame of chunks) {
+			bytes += Buffer.byteLength(frame.data);
+			assert.equal(frame.nextOffset, bytes);
+		}
+		assert.equal(frames.at(-1)[`${stream}Offset`], bytes);
+	}
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+});
+
+test("legacy proven source completion permits the next public lock generation", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const legacy = {
+		workerId: "fake-worker",
+		kind: "lock",
+		startedAt: "2026-10-31T01:00:00.000Z",
+		commandId: "cmd_legacyfixture",
+		terminal: {
+			type: "exit",
+			exitCode: 0,
+			launcherFailed: false,
+			timedOut: false,
+			oomKilled: false,
+			signal: null,
+			success: true,
+			finishedAt: "2026-10-31T01:00:01.000Z",
+		},
+	};
+	f.local(".boat/source-writer.json", JSON.stringify(legacy));
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+	assert.equal(
+		fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n").length,
+		1,
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+	);
+});
+
+test("historical-shaped uncertain source projection blocks sync and both generators without clearing ownership", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	// A synthetic record with the diagnosed retained projection's uncertainty.
+	// This is not a reconstruction of the historical CLI's missing raw frames.
+	const uncertain = {
+		workerId: "fake-worker",
+		kind: "lock",
+		startedAt: "2026-10-31T01:00:00.000Z",
+		commandId: null,
+		protocolError: true,
+		terminal: { type: "exit", exitCode: 0, signal: null },
+	};
+	f.local(".boat/source-writer.json", JSON.stringify(uncertain));
+	const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+	const remote = fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"));
+	for (const result of [
+		await f.run("build", "PACKAGE=asset").done,
+		await f.generate(),
+		await f.run("run", "PACKAGE=asset", "SCRIPT=db:generate").done,
+	]) {
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /completion is uncertain/);
+	}
+	assert.deepEqual(f.json(".boat/source-writer.json"), uncertain);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+		before,
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+		remote,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.control, "source-submissions")),
+		false,
+	);
+	assert.equal(fs.existsSync(path.join(f.control, "collecting")), false);
+});
+
+test("documented source protocol accepts absent optional history without losing process ownership", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	for (const phase of ["start", "status"])
+		fs.writeFileSync(
+			path.join(f.control, `source-${phase}-override.json`),
+			JSON.stringify({ commandId: "__missing__" }),
+		);
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	const events = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const start = events.find((event) => event.phase === "detach").value;
+	const status = events.find((event) => event.phase === "status").value;
+	assert.ok(Number.isInteger(start.processId) && start.processId > 0);
+	assert.equal(status.processId, start.processId);
+	assert.equal(Object.hasOwn(start, "commandId"), false);
+	assert.equal(Object.hasOwn(status, "commandId"), false);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+	);
+});
+
+for (const [name, faults] of [
+	["start acknowledgement loss", { "start-ack-loss": "yes" }],
+	["malformed start JSON", { "source-detach-raw": "not JSON\n" }],
+	["null start receipt", { "source-detach-raw": "null\n" }],
+	[
+		"missing start timestamp",
+		{ "source-start-override.json": { startedAt: "__missing__" } },
+	],
+	["invalid start process", { "source-start-override.json": { processId: 0 } }],
+	[
+		"malformed optional history",
+		{ "source-start-override.json": { commandId: "not-a-history-id" } },
+	],
+	["post-start transport loss", { "stream-loss": "yes" }],
+	["malformed attach frames", { "source-attach-raw": "{broken frame}\n" }],
+	[
+		"missing attached process",
+		{ "source-attached-override.json": { processId: "__missing__" } },
+	],
+	[
+		"conflicting attached process",
+		{ "source-attached-override.json": { processId: 1 } },
+	],
+	[
+		"nonzero initial output offset",
+		{ "source-attached-override.json": { stdoutOffset: 1 } },
+	],
+	[
+		"missing chunk offset",
+		{ "source-chunk-override.json": { nextOffset: "__missing__" } },
+	],
+	[
+		"conflicting chunk offset",
+		{ "source-chunk-override.json": { nextOffset: 0 } },
+	],
+	[
+		"missing exit offset",
+		{ "source-exit-override.json": { stderrOffset: "__missing__" } },
+	],
+	[
+		"conflicting exit offset",
+		{ "source-exit-override.json": { stdoutOffset: 0 } },
+	],
+	[
+		"conflicting terminal frames",
+		{
+			"source-extra-exit.json": {
+				type: "exit",
+				status: "exited",
+				exitCode: 23,
+				signal: null,
+				stdoutOffset: 0,
+				stderrOffset: 0,
+			},
+		},
+	],
+	["status transport loss", { "source-status-loss": "yes" }],
+	["malformed status JSON", { "source-status-raw": "{broken status}\n" }],
+	["null status receipt", { "source-status-raw": "null\n" }],
+	[
+		"missing status process",
+		{ "source-status-override.json": { processId: "__missing__" } },
+	],
+	[
+		"reused status process",
+		{ "source-status-override.json": { processId: 1 } },
+	],
+	[
+		"conflicting status command",
+		{ "source-status-override.json": { command: "another generator" } },
+	],
+	[
+		"conflicting status start time",
+		{
+			"source-status-override.json": { startedAt: "2026-10-31T01:00:00.000Z" },
+		},
+	],
+	[
+		"conflicting status history",
+		{ "source-status-override.json": { commandId: "cmd_anotherhistory" } },
+	],
+	[
+		"missing tracked status",
+		{ "source-status-override.json": { known: "__missing__" } },
+	],
+	["untracked status", { "source-status-override.json": { known: false } }],
+	[
+		"running status",
+		{
+			"source-status-override.json": {
+				running: true,
+				status: "running",
+				exitCode: null,
+			},
+		},
+	],
+	["lost status", { "source-status-override.json": { status: "lost" } }],
+	[
+		"failed launch status",
+		{ "source-status-override.json": { status: "failed" } },
+	],
+	[
+		"timed out status",
+		{ "source-status-override.json": { status: "timed_out" } },
+	],
+	["null exit status", { "source-status-override.json": { exitCode: null } }],
+	[
+		"conflicting exit status",
+		{ "source-status-override.json": { exitCode: 23 } },
+	],
+	[
+		"signalled status",
+		{ "source-status-override.json": { signal: "SIGTERM" } },
+	],
+	["OOM status", { "source-status-override.json": { oomKilled: true } }],
+	[
+		"missing OOM evidence",
+		{ "source-status-override.json": { oomKilled: "__missing__" } },
+	],
+	[
+		"incomplete finish metadata",
+		{ "source-status-override.json": { finishedAt: null } },
+	],
+	[
+		"finish before start",
+		{
+			"source-status-override.json": { finishedAt: "2026-10-31T01:00:00.000Z" },
+		},
+	],
+])
+	test(`documented source protocol rejects ${name} and keeps source ownership`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+		for (const [file, value] of Object.entries(faults))
+			fs.writeFileSync(
+				path.join(f.control, file),
+				typeof value === "string" ? value : JSON.stringify(value),
+			);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /completion is uncertain/);
+		const ownership = fs.readFileSync(
+			path.join(f.root, ".boat/source-writer.json"),
+		);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+			before,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "collecting")),
+			false,
+			"an unproved result must not be collected",
+		);
+		const submissions = fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(
+			submissions.length,
+			1,
+			"uncertainty cannot resubmit the generator",
+		);
+		if (!Object.hasOwn(faults, "stream-loss"))
+			await observed(
+				() =>
+					fs.existsSync(
+						path.join(
+							f.control,
+							`source-process-${submissions[0].start.processId}.status`,
+						),
+					),
+				"fixture source generator finished independently",
+			);
+		const remote = fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"));
+		for (const file of Object.keys(faults))
+			fs.unlinkSync(path.join(f.control, file));
+		for (const next of [
+			await f.run("build", "PACKAGE=asset").done,
+			await f.generate(),
+			await f.run("run", "PACKAGE=asset", "SCRIPT=db:generate").done,
+		]) {
+			assert.notEqual(next.status, 0, next.output);
+			assert.match(next.output, /completion is uncertain/);
+		}
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, ".boat/source-writer.json")),
+			ownership,
+		);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+			before,
+		);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+			remote,
+		);
+		assert.equal(
+			fs
+				.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+				.trim()
+				.split("\n").length,
+			1,
+		);
+	});
+
 for (const mode of ["missing-terminal", "missing-started", "launcher-failed"])
 	test(`source command ownership blocks restoration after ${mode} without terminal proof`, async (t) => {
 		const f = await migrationGenerationCheckout(t),
@@ -7846,7 +8384,10 @@ test("transport loss leaves an independently live remote writer owned and blocks
 	assertWriterRunning();
 	const remote = migrationBytes(f.worker),
 		ownership = f.json(".boat/source-writer.json");
-	assert.match(ownership.commandId, /^cmd_/);
+	const submission = JSON.parse(
+		fs.readFileSync(path.join(f.control, "source-submissions"), "utf8").trim(),
+	);
+	assert.equal(ownership.start.processId, submission.start.processId);
 	assert.equal(ownership.terminal, null);
 	for (const next of [
 		await f.run("build", "PACKAGE=asset").done,
@@ -7864,8 +8405,8 @@ test("transport loss leaves an independently live remote writer owned and blocks
 	assert.deepEqual(migrationBytes(f.root), before);
 	assert.deepEqual(migrationBytes(f.worker), remote);
 	assert.equal(
-		f.json(".boat/source-writer.json").commandId,
-		ownership.commandId,
+		f.json(".boat/source-writer.json").start.processId,
+		ownership.start.processId,
 	);
 	flag(f, "writer-release");
 	const finished = await writer.done;
@@ -7878,7 +8419,11 @@ test("transport loss leaves an independently live remote writer owned and blocks
 	assert.match(stillBlocked.output, /completion is uncertain/);
 });
 
-for (const name of ["scripts/boat-shell.mjs", "scripts/lib/boat-shutdown.mjs"])
+for (const name of [
+	"scripts/boat-shell.mjs",
+	"scripts/lib/boat-shutdown.mjs",
+	"scripts/lib/boat-source-command.mjs",
+])
 	test(`concurrent maintained execution wrapper ${name} edit rejects migration source acceptance`, async (t) => {
 		const f = await pausedMigrations(t);
 		const before = migrationBytes(f.root),

@@ -137,7 +137,10 @@ function validateMigrations(files) {
 	return journal;
 }
 function inputState(source, kind, outputs, root) {
-	const names = installationInputs(Object.keys(source));
+	const names = [
+		...installationInputs(Object.keys(source)),
+		"scripts/lib/boat-source-command.mjs",
+	];
 	if (kind === "migrations")
 		names.push(
 			"Makefile",

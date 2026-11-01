@@ -18,7 +18,15 @@ export async function command(
     encoding: 'utf8',
     signal,
   });
-  if (input !== undefined) pending.child.stdin?.end(input);
-  const result = await pending;
+  const written = new Promise<void>((resolve, reject) => {
+    const stdin = pending.child.stdin;
+    if (input === undefined || !stdin) return resolve();
+    stdin.on('error', (error) => {
+      pending.child.kill('SIGKILL');
+      reject(error);
+    });
+    stdin.end(input, resolve);
+  });
+  const [result] = await Promise.all([pending, written]);
   return result.stdout;
 }

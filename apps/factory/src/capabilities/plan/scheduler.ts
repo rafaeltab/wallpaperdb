@@ -11,8 +11,9 @@ import {
   type Preview,
   type PlanningInput,
   type Proposal,
+  type ResumeClaim,
 } from './contract.js';
-import { validate } from './implementation.js';
+import { validate, locallyBlocked } from './implementation.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
 const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
 function holdsSlot(job: Status, resuming: boolean): boolean {
@@ -22,7 +23,10 @@ function holdsSlot(job: Status, resuming: boolean): boolean {
 }
 const slots = (state: ScheduleState, jobs: readonly Status[]) =>
   jobs.filter((job, index) =>
-    holdsSlot(job, (state.resuming ?? []).includes(state.admissions[index]?.issue ?? 0))
+    holdsSlot(
+      job,
+      (state.resuming ?? []).some((claim) => claim.issue === state.admissions[index]?.issue)
+    )
   ).length;
 const available = (state: ScheduleState, jobs: readonly Status[]) =>
   !state.paused &&
@@ -37,12 +41,20 @@ export const SchedulerLive = Layer.effect(
     const issues = yield* Issues;
     const source = yield* PlanningSource;
     let lastInput: string | undefined;
-    const observe = (state: ScheduleState) =>
+    const observe = (
+      state: ScheduleState
+    ): Effect.Effect<ScheduleStatus, import('../job/index.js').Unavailable> =>
       Effect.gen(function* () {
         const jobs: Status[] = [];
         for (const admission of state.admissions) {
           const job = yield* pool.job(admission.issue);
           jobs.push(yield* job.status());
+        }
+        const remaining = (state.resuming ?? []).filter((claim) => !recoveredResume(claim, jobs));
+        if (remaining.length !== state.resuming?.length && state.resuming) {
+          const next = { ...state, revision: state.revision + 1, resuming: remaining };
+          if (yield* store.save(next)) return { state: next, jobs };
+          return yield* observe(yield* store.read());
         }
         return { state, jobs };
       });
@@ -97,18 +109,19 @@ export const SchedulerLive = Layer.effect(
           yield* (yield* pool.job(selection.issue)).start(command);
         }
       });
-    const claimResume = (issue: number, target: Status, snapshot: ScheduleStatus) =>
+    const claimResume = (claim: ResumeClaim, target: Status, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
         const { state } = snapshot;
-        if (state.resuming?.includes(issue)) return true;
+        // A prior uncertain send must be reconciled, never retried based on a rejected stale command.
+        if (state.resuming?.some((existing) => existing.issue === claim.issue)) return false;
         if (!resumeCapacity(target, snapshot)) return false;
         return yield* store.save({
           ...state,
           revision: state.revision + 1,
-          resuming: [...(state.resuming ?? []), issue],
+          resuming: [...(state.resuming ?? []), claim],
         });
       });
-    const releaseResume = (issue: number) =>
+    const releaseResume = (claim: ResumeClaim) =>
       Effect.gen(function* () {
         for (;;) {
           const current = yield* store.read();
@@ -117,7 +130,7 @@ export const SchedulerLive = Layer.effect(
             yield* store.save({
               ...current,
               revision: current.revision + 1,
-              resuming: claims.filter((number) => number !== issue),
+              resuming: claims.filter((existing) => !sameResume(existing, claim)),
             })
           )
             return;
@@ -137,8 +150,10 @@ export const SchedulerLive = Layer.effect(
       start: (command) =>
         Effect.gen(function* () {
           if (!validStart(command)) return { kind: 'rejected' as const };
-          if (!eligible(yield* issues.inspect(command.issue))) return { kind: 'rejected' as const };
+          const issue = yield* issues.inspect(command.issue);
+          if (!eligible(issue)) return { kind: 'rejected' as const };
           const snapshot = yield* status();
+          if (locallyBlocked(issue.blockers, snapshot.jobs)) return { kind: 'rejected' as const };
           if (!(yield* reserve(command, snapshot))) return { kind: 'occupied' as const };
           return yield* (yield* pool.job(command.issue)).start(command);
         }).pipe(Effect.withSpan('factory.scheduler.start')),
@@ -171,10 +186,17 @@ export const SchedulerLive = Layer.effect(
           );
           if (target?.kind !== 'job') return { kind: 'rejected' as const };
           const issue = target.intent.issue;
-          if (!(yield* claimResume(issue, target, snapshot))) return { kind: 'occupied' as const };
+          const claim = {
+            issue,
+            index: command.index,
+            questionId: command.questionId,
+            run: observedRun(target),
+          };
+          if (!(yield* claimResume(claim, target, snapshot))) return { kind: 'occupied' as const };
           const job = yield* pool.job(issue);
           const result = yield* job.resume(command);
-          yield* releaseResume(issue);
+          if (result.kind === 'rejected' || resolvedStart(claim, result))
+            yield* releaseResume(claim);
           return result;
         }).pipe(Effect.withSpan('factory.scheduler.resume')),
       cancel: (id) =>
@@ -243,4 +265,30 @@ function plannedStart(
       preview.input.issues.find((issue) => issue.number === selection.issue)
         ?.prerequisiteEvidence ?? '',
   };
+}
+
+function observedRun(job: Status) {
+  return job.kind === 'job' && job.execution.kind === 'found' ? job.execution.run : undefined;
+}
+function sameResume(first: ResumeClaim, second: ResumeClaim) {
+  return (
+    first.issue === second.issue &&
+    first.index === second.index &&
+    first.questionId === second.questionId
+  );
+}
+function recoveredResume(claim: ResumeClaim, jobs: readonly Status[]) {
+  const job = jobs.find((job) => job.kind === 'job' && job.intent.issue === claim.issue);
+  if (job?.kind !== 'job') return false;
+  if (finished(job)) return true;
+  const run = observedRun(job);
+  return successorRun(claim.run, run);
+}
+function successorRun(previous: ResumeClaim['run'], current: ResumeClaim['run']) {
+  if (!previous || !current) return false;
+  return current.id !== previous.id && current.ordinal > previous.ordinal;
+}
+
+function resolvedStart(claim: ResumeClaim, result: import('../job/index.js').StartResult) {
+  return result.kind === 'job' && recoveredResume(claim, [result]);
 }

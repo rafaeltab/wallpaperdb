@@ -14,7 +14,7 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
     concurrency: -1,
     allowance: 3,
     paused: true,
-    resuming: [1],
+    resuming: [{ issue: 1, index: 0, questionId: 'q', run: { id: 'run-1', ordinal: 1 } }],
     admissions: [{ issue: 1, base: 'a'.repeat(40), context: 'Approved scope' }],
   };
   const competing = await Promise.all([
@@ -27,7 +27,7 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
     revision: 0,
     allowance: 3,
     paused: true,
-    resuming: [1],
+    resuming: [{ issue: 1, index: 0, questionId: 'q', run: { id: 'run-1', ordinal: 1 } }],
     admissions: first.admissions,
   });
   expect(await Effect.runPromise(store.save({ ...read, revision: 0 }))).toBe(false);

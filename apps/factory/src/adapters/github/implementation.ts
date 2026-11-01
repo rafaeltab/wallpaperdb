@@ -126,6 +126,7 @@ export function githubIssues(config: {
             author: issue.author.login,
             labels: issue.labels.map((label) => label.name),
             url: issue.url,
+            blockers: numbers,
             blockersReady,
           };
         },

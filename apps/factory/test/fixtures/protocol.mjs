@@ -16,7 +16,7 @@ if (config.joinWriter && basename(process.argv[1]) === 't3') {
         : {
             thread: {
               projectId: 'project-id',
-              branch: 'C',
+              branch: config.joinWriterBranch ?? 'C',
               status: config.joinWriter === 'completed' ? 'completed' : 'running',
               pendingRequestCount: 0,
             },
@@ -85,22 +85,41 @@ if (config.join && basename(process.argv[1]) === 'gh') {
     args[0] === 'api' &&
     args.includes('POST') &&
     args.includes('repos/rafaeltab/wallpaperdb/stacks')
-  )
+  ) {
     state.members = state.corruptGrouping
       ? []
       : args
           .filter((value) => value.startsWith('pull_requests[]='))
           .map((value) => `https://github.com/rafaeltab/wallpaperdb/pull/${value.split('=')[1]}`);
-  else if (args[0] === 'api' && args.includes('POST')) state.members = [];
-  else if (args[0] === 'api' && args[1].includes('/stacks'))
-    result = state.members.length
+    state.groups = state.members.length
       ? [
           {
-            number: 9,
+            number: 900,
             pull_requests: state.members.map((url) => ({ number: Number(url.split('/').at(-1)) })),
           },
         ]
       : [];
+  } else if (args[0] === 'api' && args.includes('POST')) {
+    const path = args.find((value) => value.includes('/unstack'));
+    const number = Number(path.split('/').at(-2));
+    if (state.groups) state.groups = state.groups.filter((group) => group.number !== number);
+    else state.members = [];
+  } else if (args[0] === 'api' && args[1].includes('/stacks')) {
+    const groups =
+      state.groups ??
+      (state.members.length
+        ? [
+            {
+              number: 9,
+              pull_requests: state.members.map((url) => ({
+                number: Number(url.split('/').at(-1)),
+              })),
+            },
+          ]
+        : []);
+    const requested = Number(args[1].match(/pull_request=(\d+)/)?.[1]);
+    result = groups.filter((group) => group.pull_requests.some((pr) => pr.number === requested));
+  }
   const boundary =
     args.includes('repos/rafaeltab/wallpaperdb/stacks') && args.includes('POST')
       ? 'group'

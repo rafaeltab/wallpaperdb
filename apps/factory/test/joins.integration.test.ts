@@ -14,6 +14,8 @@ async function fixture(
     conflict?: boolean;
     duplicate?: boolean;
     multiple?: boolean;
+    groups?: boolean;
+    descendant?: boolean;
     merge?: boolean;
     writer?: boolean | 'completed';
     owningWorktree?: 'clean' | 'dirty';
@@ -44,6 +46,7 @@ async function fixture(
     git('commit', '-m', name);
     return git('rev-parse', 'HEAD');
   };
+  const rootBranch = git('branch', '--show-current');
   git('config', 'user.name', 'Test');
   git('config', 'user.email', 'test@example.invalid');
   execFileSync('git', ['init', '--bare', join(host.directory, 'remote.git')]);
@@ -51,7 +54,7 @@ async function fixture(
   git('switch', '-c', 'A');
   const a = await commit('A');
   git('switch', '-c', 'B');
-  await commit('B');
+  const b = await commit('B');
   git('switch', '-c', 'D');
   let d = await commit('D');
   if (options.merge) {
@@ -65,6 +68,7 @@ async function fixture(
   let c = await commit('C');
   if (options.multiple) c = await commit('C2');
   git('push', 'origin', 'A', 'B', 'C', 'D');
+  if (options.descendant) git('branch', 'F', c);
   git('switch', '--detach', host.base);
   if (options.owningWorktree) {
     const path = join(host.directory, 'owning-C');
@@ -84,14 +88,26 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
   }
   await host.save({
     lost: false,
-    joinWriter: options.writer,
+    joinWriter: options.descendant ? true : options.writer,
+    joinWriterBranch: options.descendant ? 'F' : 'C',
     join: {
       lose: options.lose,
-      originalHeads: { 103: d, 104: c },
+      originalHeads: { 101: a, 102: b, 103: d, 104: c },
+      groups: options.groups
+        ? [
+            { number: 9, pull_requests: [{ number: 101 }, { number: 104 }] },
+            { number: 10, pull_requests: [{ number: 102 }, { number: 103 }] },
+          ]
+        : undefined,
       newCI: options.ciFails ? 'FAILURE' : 'SUCCESS',
       corruptGrouping: options.corruptGrouping,
       evidence: `https://github.com/rafaeltab/wallpaperdb/pull/103 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/104 ${c}`,
-      prs: { 103: { branch: 'D', base: 'B' }, 104: { branch: 'C', base: 'A' } },
+      prs: {
+        101: { branch: 'A', base: rootBranch },
+        102: { branch: 'B', base: 'A' },
+        103: { branch: 'D', base: 'B' },
+        104: { branch: 'C', base: 'A' },
+      },
       members: [101, 102, 103].map(
         (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
       ),
@@ -490,6 +506,36 @@ it('keeps an empty issue comparison blocked rather than publishing duplicate pre
       blockersReady: false,
       blockedReason: expect.stringContaining('empty-replay'),
     });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+  } finally {
+    await f.close();
+  }
+});
+
+it('combines separate A-C and B-D native groups in valid A-B-D-C order', async () => {
+  const f = await fixture({ groups: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({ blockersReady: true });
+    const metadata = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    expect(metadata.members).toEqual(
+      [101, 102, 103, 104].map(
+        (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
+      )
+    );
+    expect(metadata.prs['103'].base).toBe('B');
+  } finally {
+    await f.close();
+  }
+});
+
+it('waits for an active descendant writer before rewriting its prerequisite', async () => {
+  const f = await fixture({ descendant: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({ blockersReady: false });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
   } finally {
     await f.close();

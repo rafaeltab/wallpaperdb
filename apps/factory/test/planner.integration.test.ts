@@ -67,15 +67,18 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     const observations = (await host.calls()).filter((call) => call.args[1] === 'show').length;
     const abort = new AbortController();
     const pending = Effect.runPromise(adapter.propose(input), { signal: abort.signal });
-    const interrupted = expect(pending).rejects.toBeDefined();
-    try {
-      await expect
-        .poll(async () => (await host.calls()).filter((call) => call.args[1] === 'show').length)
-        .toBeGreaterThan(observations);
-    } finally {
-      abort.abort();
-    }
-    await interrupted;
+    await Promise.all([
+      expect(pending).rejects.toBeDefined(),
+      (async () => {
+        try {
+          await expect
+            .poll(async () => (await host.calls()).filter((call) => call.args[1] === 'show').length)
+            .toBeGreaterThan(observations);
+        } finally {
+          abort.abort();
+        }
+      })(),
+    ]);
     const starts = (await host.calls()).filter((call) => call.args[1] === 'start').length;
     await expect(
       Effect.runPromise(adapter.propose(input), { signal: AbortSignal.timeout(5000) })

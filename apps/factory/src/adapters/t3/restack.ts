@@ -94,7 +94,8 @@ export function t3Restacker(
     const count = await git(['rev-list', '--count', `${operation.onto}..${head}`]);
     if (
       count === '0' ||
-      count !== (await git(['rev-list', '--count', `${operation.parent}..${operation.oldHead}`]))
+      Number(count) <
+        Number(await git(['rev-list', '--count', `${operation.parent}..${operation.oldHead}`]))
     )
       return false;
     if (!(await git(['diff', '--name-only', operation.onto, head]))) return false;

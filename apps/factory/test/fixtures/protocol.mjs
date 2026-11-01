@@ -155,7 +155,7 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
         'resolved D and C after independent review'
       );
       git(state.thread.worktreePath, 'add', 'shared.txt');
-      git(state.thread.worktreePath, 'commit', '--amend', '--no-edit');
+      git(state.thread.worktreePath, 'commit', '-m', 'Repair C conflict after review');
       state.head = git(state.thread.worktreePath, 'rev-parse', 'HEAD');
     }
     state.thread.runCount = 2;

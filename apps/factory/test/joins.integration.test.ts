@@ -846,7 +846,9 @@ it.each([
     if (scenario.ready) {
       const head = ready.prerequisite?.base;
       expect(f.git('show', `${head}:shared.txt`)).toContain('resolved');
-      expect(f.git('log', '--format=%s', `${f.d}..${head}`)).toBe('C');
+      expect(f.git('log', '--format=%s', `${f.d}..${head}`)).toBe(
+        'repair' in scenario && scenario.repair ? 'Repair C conflict after review\nC' : 'C'
+      );
       expect(f.git('rev-list', '--merges', `${f.host.base}..${head}`)).toBe('');
       console.log(
         JSON.stringify({

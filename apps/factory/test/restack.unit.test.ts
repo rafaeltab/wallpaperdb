@@ -1,6 +1,6 @@
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { recover } from '../src/capabilities/restack/index.js';
+import { Restack, RestackLive, RecoveryPorts } from '../src/capabilities/restack/index.js';
 
 it.each(['SIMPLE', 'COMPLEX', undefined] as const)(
   'gates %s conflict resolution on its required verification',
@@ -19,17 +19,41 @@ it.each(['SIMPLE', 'COMPLEX', undefined] as const)(
         return Effect.succeed(ci);
       },
     };
-    expect((await Effect.runPromise(recover(ports))).ready).toBe(false);
+    expect(
+      (
+        await Effect.runPromise(
+          Effect.flatMap(Restack, (restack) => restack.advance()).pipe(
+            Effect.provide(RestackLive.pipe(Layer.provide(Layer.succeed(RecoveryPorts, ports))))
+          )
+        )
+      ).ready
+    ).toBe(false);
     expect(calls).toEqual(
       classification === 'SIMPLE' ? ['ci'] : classification === 'COMPLEX' ? ['review'] : []
     );
     reviewed = true;
     calls.length = 0;
-    expect((await Effect.runPromise(recover(ports))).ready).toBe(false);
+    expect(
+      (
+        await Effect.runPromise(
+          Effect.flatMap(Restack, (restack) => restack.advance()).pipe(
+            Effect.provide(RestackLive.pipe(Layer.provide(Layer.succeed(RecoveryPorts, ports))))
+          )
+        )
+      ).ready
+    ).toBe(false);
     expect(calls).toEqual(
       classification === 'COMPLEX' ? ['review', 'ci'] : classification === 'SIMPLE' ? ['ci'] : []
     );
     ci = true;
-    expect((await Effect.runPromise(recover(ports))).ready).toBe(Boolean(classification));
+    expect(
+      (
+        await Effect.runPromise(
+          Effect.flatMap(Restack, (restack) => restack.advance()).pipe(
+            Effect.provide(RestackLive.pipe(Layer.provide(Layer.succeed(RecoveryPorts, ports))))
+          )
+        )
+      ).ready
+    ).toBe(Boolean(classification));
   }
 );

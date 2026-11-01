@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
+import type { RecoveryPorts } from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion } from './questions.js';
 import { command } from '../../platform/index.js';
@@ -44,7 +45,7 @@ export function t3Restacker(
   },
   operation: RestackOperation,
   journal: Journal
-) {
+): Pick<RecoveryPorts, 'resolve' | 'review'> {
   const title = `Factory restack ${operation.id}`;
   const branch = `factory-restack/${operation.id}`;
   const call = async (args: string[], signal?: AbortSignal) =>

@@ -38,6 +38,9 @@ function selectionReason(
   if (excluded) return excluded;
   if (cyclic(item.issue, input.issues)) return 'Cyclic explicit dependencies';
   if (duplicates) return 'Duplicate issue in proposal';
+  return semanticReason(item, input);
+}
+function semanticReason(item: Proposal['selected'][number], input: PlanningInput) {
   if (!item.reason.trim()) return 'Missing semantic rationale';
   if (item.dependsOn.length) return 'Inferred prerequisite requires resolution before selection';
   if (item.conflicts.length) return 'Semantic conflict requires resolution before selection';
@@ -69,7 +72,15 @@ function validate(proposal: Proposal, input: PlanningInput) {
     )
       rejected.push({ issue: issue.number, reason: 'Not selected by semantic planner' });
   }
-  return { selected, rejected };
+  return {
+    selected,
+    rejected: rejected.filter(
+      (item, index) =>
+        rejected.findIndex(
+          (other) => other.issue === item.issue && other.reason === item.reason
+        ) === index
+    ),
+  };
 }
 export const PlanLive = Layer.effect(
   Plan,

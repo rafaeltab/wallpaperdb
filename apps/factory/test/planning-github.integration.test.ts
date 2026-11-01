@@ -60,6 +60,12 @@ it('collects full trusted scope, fallback blockers, parent context and job state
     });
     expect(result.issues.find((i) => i.number === 571)?.body).toBe('Full spec');
     expect(result.job).toEqual({ kind: 'empty' });
+    await host.save({
+      planning: { issues: [{ ...issue, url: 'https://github.com/outsider/repo/issues/580' }] },
+    });
+    await expect(Effect.runPromise(source.read())).rejects.toMatchObject({ _tag: 'Unavailable' });
+    await host.save({ planning: { issues: Array.from({ length: 1000 }, () => issue) } });
+    await expect(Effect.runPromise(source.read())).rejects.toMatchObject({ _tag: 'Unavailable' });
   } finally {
     process.env.PATH = previous.path;
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;

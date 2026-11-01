@@ -183,3 +183,78 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
     await host.cleanup();
   }
 });
+
+it('previews automatically discovered work without starting an implementation worker', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const issue = {
+    number: 580,
+    title: 'Plan preview',
+    body: 'Preview only',
+    state: 'OPEN',
+    url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+    author: { login: 'rafaeltab' },
+    labels: [{ name: 'ready-for-agent' }],
+    comments: [],
+  };
+  await host.save({
+    planning: {
+      issues: [
+        issue,
+        {
+          ...issue,
+          number: 579,
+          url: 'https://github.com/rafaeltab/wallpaperdb/issues/579',
+          labels: [{ name: 'future-work' }],
+        },
+      ],
+    },
+    planner: {
+      proposal: {
+        selected: [
+          { issue: 580, reason: 'Thin end-to-end experiment', dependsOn: [], conflicts: [] },
+          { issue: 579, reason: 'Try deferred work', dependsOn: [], conflicts: [] },
+        ],
+        deferred: [],
+      },
+    },
+  });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: `${host.directory}/state`,
+      FACTORY_PORT: '0',
+    });
+    try {
+      const page = await browser.newPage();
+      const address = running.app.server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing listener');
+      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.getByRole('button', { name: 'Generate plan preview' }).click();
+      await browserExpect(page.locator('#plan')).toContainText('Validated advisory proposal');
+      await browserExpect(page.locator('#plan')).toContainText('#580: Thin end-to-end experiment');
+      await browserExpect(page.locator('#plan')).toContainText('Not ready for agent');
+      await browserExpect(page.locator('#plan')).toContainText('No work was dispatched.');
+      expect((await running.app.inject('/api/job')).json()).toEqual({ kind: 'empty' });
+      const launches = (await host.calls()).filter(
+        (c) => c.args[1] === 'start' && !c.args.includes('--help')
+      );
+      expect(launches).toHaveLength(1);
+      expect(launches[0].args).not.toContain('--worktree');
+    } finally {
+      await running.close();
+    }
+  } finally {
+    await browser.close();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

@@ -30,7 +30,7 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
     reply(
       config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context
     );
-} else if (config.planner && args[1] === 'start') {
+} else if (config.planner && args[1] === 'start' && !args.includes('--help')) {
   const requestId = JSON.parse(args[3].split('Request: ')[1]).requestId;
   writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ requestId }));
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
@@ -40,7 +40,7 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
     thread: {
       threadId: 'planner-thread',
       latestRunId: 'planner-run',
-      status: 'completed',
+      status: config.planner.status ?? 'completed',
       providerInstanceId: 'codex',
       model: 'gpt-6.1-sol',
     },

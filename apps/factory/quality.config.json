@@ -8,7 +8,5 @@
     "composition",
     "adapters/clock"
   ],
-  "allowedCapabilityDependencies": {
-    "plan": ["job"]
-  }
+  "allowedCapabilityDependencies": {}
 }

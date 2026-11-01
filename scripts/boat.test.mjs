@@ -885,7 +885,10 @@ function lockFixtureReadiness({
 const sourceCommandContractFixture = String.raw`
 function sourceLocalPipeHolder(control) {
  const fs=require('fs'),path=require('path');
- process.on('SIGTERM',()=>fs.writeFileSync(path.join(control,'source-helper-term'),'yes'));
+ process.on('SIGTERM',()=>{
+  const file=path.join(control,'source-helper-term');
+  fs.writeFileSync(file+'.tmp',JSON.stringify({pid:process.pid,monoMs:Number(process.hrtime.bigint()/1000000n)}));fs.renameSync(file+'.tmp',file);
+ });
  const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
  fs.writeFileSync(path.join(control,'source-local-helper.json'),JSON.stringify({pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
  setInterval(()=>{},1000);
@@ -901,7 +904,10 @@ async function sourceLocalStderr(control) {
 }
 async function sourceSilentAttach(control,start,scenario) {
  const fs=require('fs'),path=require('path'),cp=require('child_process');
- process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
+ process.on('SIGTERM',()=>{
+  const file=path.join(control,'source-leader-term');
+  fs.writeFileSync(file+'.tmp',JSON.stringify({pid:process.pid,monoMs:Number(process.hrtime.bigint()/1000000n)}));fs.renameSync(file+'.tmp',file);process.exit(74);
+ });
  const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
  fs.writeFileSync(path.join(control,'source-silent-leader.json'),JSON.stringify({pid:process.pid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
  const write=bytes=>new Promise(resolve=>process.stdout.write(bytes,resolve));
@@ -1016,7 +1022,10 @@ async function sourceCommandContract() {
  if(!flag('missing-started'))emit('attach',override('attached',{type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0}));
  await sourceLocalStderr(control);
  if(flag('source-local-capture-overflow')){
-  process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
+  process.on('SIGTERM',()=>{
+   const file=path.join(control,'source-leader-term');
+   fs.writeFileSync(file+'.tmp',JSON.stringify({pid:process.pid,monoMs:Number(process.hrtime.bigint()/1000000n)}));fs.renameSync(file+'.tmp',file);process.exit(74);
+  });
   cp.spawn(process.execPath,['-e','('+sourceLocalPipeHolder.toString()+')('+JSON.stringify(control)+')'],{env:process.env,stdio:['ignore',1,2]});
   while(!flag('source-fault-release'))await new Promise(resolve=>setTimeout(resolve,5));
   fs.writeFileSync(path.join(control,'writer-active'),'yes');
@@ -8590,6 +8599,7 @@ function sourceObservationDiagnostic(archive, kind, observation) {
 			cutoff: observation.cutoff,
 			observedAt: observation.observedAt,
 			faultLower: observation.faultLower,
+			signalTiming: observation.signalTiming,
 		},
 		identities: observation.identities,
 		retirementStatus: Object.fromEntries(
@@ -8607,8 +8617,94 @@ function sourceObservationDiagnostic(archive, kind, observation) {
 	});
 }
 
+function assertSourceFailureTiming(observation) {
+	const { faultLower, signalTiming } = observation;
+	assert.ok(
+		Number.isFinite(faultLower) && faultLower >= observation.releasedAt,
+	);
+	for (const name of ["leader", "helper"]) {
+		const term = signalTiming[`${name}Term`];
+		assert.equal(
+			term?.pid,
+			observation.identities[name].pid,
+			`actual ${name} must receive TERM before fixture safety`,
+		);
+		assert.ok(
+			Number.isFinite(term.monoMs) &&
+				term.monoMs >= faultLower &&
+				term.monoMs <= observation.observedAt,
+			`actual ${name} TERM timestamp belongs to this fault observation`,
+		);
+	}
+	// This checks the existing KILL-at-1000 schedule. A sample crossing that
+	// boundary cannot establish premature death, regardless of its result.
+	assert.ok(
+		signalTiming.samples.every(
+			(sample) =>
+				sample.startedAt < faultLower ||
+				sample.finishedAt >= faultLower + 1000 ||
+				sample.helperAlive,
+		),
+		"TERM-ignoring helper must remain alive in every wholly pre-1000 ms sample before fixture safety",
+	);
+	assert.ok(
+		signalTiming.samples.some(
+			(sample) =>
+				sample.startedAt >= faultLower + 900 &&
+				sample.finishedAt < faultLower + 1000 &&
+				sample.helperAlive,
+		),
+		"independent live checkpoint must qualify the 900–1000 ms window; a missed CI clock window is not timing proof",
+	);
+}
+
 async function assertSourceTransportFailure(t, fault) {
-	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
+	let archive;
+	if (destination) {
+		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+		archive = fs.mkdtempSync(
+			path.join(
+				destination,
+				fault === "capture-overflow" ? "B-local-transport-" : `C-${fault}-`,
+			),
+		);
+	}
+	const f = await lockGenerationCheckout(t, {
+		ownPackageGroups: true,
+		cleanupReport: archive && path.join(archive, "fixture"),
+	});
+	const controllerName = "scripts/boat.mjs";
+	const controller = fs.readFileSync(path.join(f.root, controllerName), "utf8");
+	const earlyKill = process.env.BOAT_SOURCE_EARLY_KILL_COUNTERFACTUAL === "1";
+	if (earlyKill) {
+		const anchor = "performance.now() + 2000,";
+		assert.equal(controller.split(anchor).length, 2);
+		// Private fixture only: preserve disposalMs and exercise KILL at 500 ms.
+		f.local(
+			controllerName,
+			controller.replace(anchor, "performance.now() + 1500,"),
+		);
+	}
+	const controllerHashes = {
+		counterfactual: earlyKill,
+		root: createHash("sha256").update(controller).digest("hex"),
+		fixture: createHash("sha256")
+			.update(fs.readFileSync(path.join(f.root, controllerName)))
+			.digest("hex"),
+	};
+	if (archive) {
+		fs.writeFileSync(
+			path.join(archive, "controller-before-launch.json"),
+			JSON.stringify(controllerHashes, null, 2),
+			{ mode: 0o600 },
+		);
+		fs.copyFileSync(
+			path.join(f.root, controllerName),
+			path.join(archive, "controller.mjs"),
+		);
+	}
+	t.diagnostic(JSON.stringify({ controllerHashes, archive }));
 	const sibling = fs.mkdtempSync(
 		path.join(os.tmpdir(), "boat-source-sibling-"),
 	);
@@ -8700,17 +8796,6 @@ async function assertSourceTransportFailure(t, fault) {
 	const alive = (expected) =>
 		fixtureProcess(expected.pid)?.startTicks === expected.startTicks;
 	const receipt = () => f.json(".boat/source-writer.json");
-	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
-	let archive;
-	if (destination) {
-		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
-		archive = fs.mkdtempSync(
-			path.join(
-				destination,
-				fault === "capture-overflow" ? "B-local-transport-" : `C-${fault}-`,
-			),
-		);
-	}
 	if (fault !== "capture-overflow") {
 		await f.readiness.wait(() => {
 			assert.equal(command.terminal, null, command.output());
@@ -8749,14 +8834,34 @@ async function assertSourceTransportFailure(t, fault) {
 	// awaiting Make or invoking fixture cleanup. No completion await extends it.
 	const releasedAt = fixtureNow(),
 		cutoff = releasedAt + 2000;
+	const samples = [];
+	const term = (name) => {
+		const file = path.join(f.control, `source-${name}-term`);
+		return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : null;
+	};
 	const observe = async () => {
 		for (;;) {
+			const faultFile = path.join(f.control, "source-fault-lower");
+			const faultLower = fs.existsSync(faultFile)
+				? Number(fs.readFileSync(faultFile))
+				: null;
+			const startedAt = fixtureNow();
+			const helperAlive = alive(helper);
+			const finishedAt = fixtureNow();
+			const sample = { startedAt, finishedAt, helperAlive };
+			samples.push(sample);
+			const earlyDeath =
+				faultLower > 0 &&
+				startedAt >= faultLower &&
+				finishedAt < faultLower + 1000 &&
+				!helperAlive;
 			const source = receipt(),
 				ownership = source.phases.attach.localOwnership;
 			const localResolved =
 				!alive(helper) ||
 				ownership?.unresolved?.some((p) => matches(p, helper));
 			if (
+				earlyDeath ||
 				(command.closed && command.terminal?.status !== 0 && localResolved) ||
 				fixtureNow() >= cutoff
 			) {
@@ -8767,11 +8872,23 @@ async function assertSourceTransportFailure(t, fault) {
 					releasedAt,
 					cutoff,
 					observedAt: fixtureNow(),
-					faultLower: fs.existsSync(path.join(f.control, "source-fault-lower"))
-						? Number(
-								fs.readFileSync(path.join(f.control, "source-fault-lower")),
-							)
-						: null,
+					faultLower,
+					signalTiming: {
+						pollMs: 10,
+						killOffsetMs: 1000,
+						checkpointFromMs: 900,
+						leaderTerm: term("leader"),
+						helperTerm: term("helper"),
+						maxSampleGapMs: Math.max(
+							0,
+							...samples
+								.slice(1)
+								.map(
+									(entry, index) => entry.startedAt - samples[index].finishedAt,
+								),
+						),
+						samples,
+					},
 					identities: {
 						leader,
 						helper,
@@ -8833,6 +8950,25 @@ async function assertSourceTransportFailure(t, fault) {
 	const pendingObservation = observe();
 	flag(f, "source-fault-release");
 	const observation = await pendingObservation;
+	try {
+		assertSourceFailureTiming(observation);
+		if (archive)
+			fs.writeFileSync(
+				path.join(archive, "timing-verdict-before-safety.json"),
+				JSON.stringify({ passed: true, at: fixtureNow() }),
+				{ mode: 0o600 },
+			);
+	} catch (error) {
+		const verdict = { passed: false, at: fixtureNow(), message: error.message };
+		if (archive)
+			fs.writeFileSync(
+				path.join(archive, "timing-verdict-before-safety.json"),
+				JSON.stringify(verdict, null, 2),
+				{ mode: 0o600 },
+			);
+		t.diagnostic(JSON.stringify({ timingVerdictBeforeSafety: verdict }));
+		throw error;
+	}
 	retainLocalStderr({ ...command.terminal, output: command.output() });
 	const ownership = observation.source.phases.attach.localOwnership;
 	const unresolved = ownership?.unresolved?.some((p) => matches(p, helper));

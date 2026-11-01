@@ -890,6 +890,31 @@ function sourceLocalPipeHolder(control) {
  fs.writeFileSync(path.join(control,'source-local-helper.json'),JSON.stringify({pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
  setInterval(()=>{},1000);
 }
+async function sourceSilentAttach(control,start,scenario) {
+ const fs=require('fs'),path=require('path'),cp=require('child_process');
+ process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ fs.writeFileSync(path.join(control,'source-silent-leader.json'),JSON.stringify({pid:process.pid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
+ const write=bytes=>new Promise(resolve=>process.stdout.write(bytes,resolve));
+ if(scenario!=='healthy-held')cp.spawn(process.execPath,['-e','('+sourceLocalPipeHolder.toString()+')('+JSON.stringify(control)+')'],{env:process.env,stdio:['ignore',1,2]});
+ if(scenario==='event-limit'){
+  const chunk=JSON.stringify({type:'stdout',data:'',nextOffset:0})+'\n';
+  for(let left=65534;left>0;left-=Math.min(left,1024))await write(chunk.repeat(Math.min(left,1024)));
+  // Initial attached + 65534 chunks + continuation attached = 65536 events.
+  // The continuation checkpoints the actual production-consumed prefix.
+  await write(JSON.stringify({type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0})+'\n');
+ }
+ fs.writeFileSync(path.join(control,'source-silent-ready'),'yes');
+ while(!fs.existsSync(path.join(control,'source-fault-release')))await new Promise(resolve=>setTimeout(resolve,5));
+ if(scenario==='healthy-held')return;
+ fs.writeFileSync(path.join(control,'writer-active'),'yes');
+ fs.writeFileSync(path.join(control,'source-fault-lower'),String(Number(process.hrtime.bigint()/1000000n)));
+ if(scenario==='malformed-json')await write('{broken frame}\n');
+ else if(scenario==='conflicting-process')await write(JSON.stringify({type:'attached',processId:1,stdoutOffset:0,stderrOffset:0})+'\n');
+ else if(scenario==='event-limit')await write(JSON.stringify({type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0})+'\n');
+ else throw Error('unknown synthetic silent attach case');
+ await new Promise(()=>setInterval(()=>{},1000));
+}
 function sourceFixtureWriter(control, command, startedAt) {
  const fs=require('fs'),cp=require('child_process'),path=require('path');
  if(fs.existsSync(path.join(control,'stream-loss')))return;
@@ -978,6 +1003,7 @@ async function sourceCommandContract() {
   emit('attach',{type:'stdout',data,nextOffset:Buffer.byteLength(data)});
   await new Promise(()=>setInterval(()=>{},1000));
  }
+ if(flag('source-silent-attach'))await sourceSilentAttach(control,start,fs.readFileSync(path.join(control,'source-silent-attach'),'utf8'));
  if(flag('stream-loss')){fs.writeFileSync(path.join(control,'writer-active'),'yes');process.exit(71);}
  let cursor=0,subsequent=false;
  const forwarded={stdout:0,stderr:0};
@@ -8348,7 +8374,70 @@ test("documented source protocol preserves Unicode diagnostics and byte offsets"
 	);
 });
 
-test("source capture failure retires its captured local pipe descendant and protects independent writers", async (t) => {
+function sourceObservationDiagnostic(archive, kind, observation) {
+	const phases = Object.fromEntries(
+		Object.entries(observation.source.phases).map(([name, phase]) => {
+			const events = phase.events ?? [];
+			const runs = [];
+			for (const type of events) {
+				const last = runs.at(-1);
+				if (last?.type === type) last.count++;
+				else runs.push({ type, count: 1 });
+			}
+			return [
+				name,
+				{
+					complete: phase.complete,
+					closed: phase.closed,
+					overflow: phase.overflow,
+					malformed: phase.malformed === true,
+					streams: phase.streams,
+					events: {
+						count: events.length,
+						sha256: createHash("sha256")
+							.update(JSON.stringify(events))
+							.digest("hex"),
+						sequence: runs.slice(0, 16),
+						omittedRuns: Math.max(0, runs.length - 16),
+					},
+					ownership: phase.localOwnership && {
+						stage: phase.localOwnership.stage,
+						retired: phase.localOwnership.retired,
+						pipesClosed: phase.localOwnership.pipesClosed,
+						observedCount: phase.localOwnership.observed.length,
+						unresolvedCount: phase.localOwnership.unresolved.length,
+					},
+				},
+			];
+		}),
+	);
+	return JSON.stringify({
+		archive,
+		kind,
+		timing: {
+			releasedAt: observation.releasedAt,
+			heldAt: observation.heldAt,
+			cutoff: observation.cutoff,
+			observedAt: observation.observedAt,
+			faultLower: observation.faultLower,
+		},
+		identities: observation.identities,
+		retirementStatus: Object.fromEntries(
+			Object.entries(observation.identities).map(([name, original]) => [
+				name,
+				{
+					originalBirth: original.startTicks,
+					currentBirth: observation.current[name]?.startTicks,
+					originalStillRunning:
+						observation.current[name]?.startTicks === original.startTicks,
+				},
+			]),
+		),
+		phases,
+	});
+}
+
+async function assertSourceTransportFailure(t, fault) {
 	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
 	const sibling = fs.mkdtempSync(
 		path.join(os.tmpdir(), "boat-source-sibling-"),
@@ -8393,7 +8482,8 @@ test("source capture failure retires its captured local pipe descendant and prot
 	);
 	const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
 	flag(f, "stream-loss");
-	flag(f, "source-local-capture-overflow");
+	if (fault === "capture-overflow") flag(f, "source-local-capture-overflow");
+	else fs.writeFileSync(path.join(f.control, "source-silent-attach"), fault);
 	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
 	const helperFile = path.join(f.control, "source-local-helper.json");
 	await f.readiness.wait(() => {
@@ -8441,7 +8531,46 @@ test("source capture failure retires its captured local pipe descendant and prot
 	let archive;
 	if (destination) {
 		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
-		archive = fs.mkdtempSync(path.join(destination, "B-local-transport-"));
+		archive = fs.mkdtempSync(
+			path.join(
+				destination,
+				fault === "capture-overflow" ? "B-local-transport-" : `C-${fault}-`,
+			),
+		);
+	}
+	if (fault !== "capture-overflow") {
+		await f.readiness.wait(() => {
+			assert.equal(command.terminal, null, command.output());
+			return (
+				fs.existsSync(path.join(f.control, "source-silent-ready")) &&
+				(fault !== "event-limit" ||
+					receipt().phases.attach.events.length === 65536)
+			);
+		}, "valid silent attachment prefix consumed before fault release");
+		const prefix = {
+			at: fixtureNow(),
+			fault,
+			events: receipt().phases.attach.events.length,
+			leader: fixtureProcess(leader.pid),
+			helper: fixtureProcess(helper.pid),
+			writer: fixtureProcess(writerIdentity.pid),
+			sibling: fixtureProcess(siblingIdentity.pid),
+			command: { terminal: command.terminal, closed: command.closed },
+		};
+		if (archive)
+			fs.writeFileSync(
+				path.join(archive, "prefix-before-release.json"),
+				JSON.stringify(prefix, null, 2),
+				{ mode: 0o600 },
+			);
+		assert.deepEqual(prefix.leader, leader);
+		assert.deepEqual(prefix.helper, helper);
+		assert.deepEqual(prefix.writer, writerIdentity);
+		assert.deepEqual(prefix.sibling, siblingIdentity);
+		assert.equal(prefix.command.terminal, null);
+		assert.equal(prefix.command.closed, false);
+		assert.equal(receipt().protocolError, false);
+		assert.equal(receipt().phases.attach.overflow, false);
 	}
 	// Arm the independent cutoff before releasing the offending frame and before
 	// awaiting Make or invoking fixture cleanup. No completion await extends it.
@@ -8459,6 +8588,7 @@ test("source capture failure retires its captured local pipe descendant and prot
 				fixtureNow() >= cutoff
 			) {
 				const observation = {
+					fault,
 					provenance:
 						"local synthetic CLI and independently owned synthetic API writer; before fixture safety cleanup",
 					releasedAt,
@@ -8487,13 +8617,29 @@ test("source capture failure retires its captured local pipe descendant and prot
 					writerMutated: fs.existsSync(path.join(f.control, "writer-mutated")),
 					source,
 				};
+				if (fault !== "capture-overflow") {
+					const phaseDirectory = fs
+						.readdirSync(path.join(f.root, ".boat"), { withFileTypes: true })
+						.find(
+							(entry) =>
+								entry.isDirectory() && entry.name.startsWith("source-command-"),
+						);
+					assert.ok(phaseDirectory);
+					const raw = fs.readFileSync(
+						path.join(f.root, ".boat", phaseDirectory.name, "attach.stdout"),
+					);
+					observation.rawAttach = {
+						bytes: raw.length,
+						tail: raw.subarray(-256).toString(),
+					};
+				}
 				if (archive)
 					fs.writeFileSync(
 						path.join(archive, "before-safety.json"),
 						JSON.stringify(observation, null, 2),
 						{ mode: 0o600 },
 					);
-				t.diagnostic(JSON.stringify({ archive, ...observation }));
+				t.diagnostic(sourceObservationDiagnostic(archive, fault, observation));
 				return observation;
 			}
 			await new Promise((resolve) =>
@@ -8547,7 +8693,14 @@ test("source capture failure retires its captured local pipe descendant and prot
 		ownership.observed.some((p) => matches(p, helper)),
 		"durable receipt captures the actual local helper",
 	);
-	assert.equal(observation.source.phases.attach.overflow, true);
+	if (fault === "capture-overflow" || fault === "event-limit")
+		assert.equal(observation.source.phases.attach.overflow, true);
+	if (fault === "event-limit")
+		assert.equal(observation.source.phases.attach.events.length, 65536);
+	if (fault === "malformed-json")
+		assert.equal(observation.source.phases.attach.malformed, true);
+	if (fault === "conflicting-process")
+		assert.equal(observation.source.protocolError, true);
 	assert.equal(observation.source.phases.attach.complete, false);
 	const result = await command.done;
 	assert.match(result.output, /completion is uncertain/);
@@ -8575,6 +8728,112 @@ test("source capture failure retires its captured local pipe descendant and prot
 	);
 	assert.equal(alive(writerIdentity), true);
 	assert.equal(alive(siblingIdentity), true);
+}
+
+test("source capture failure retires its captured local pipe descendant and protects independent writers", async (t) => {
+	await assertSourceTransportFailure(t, "capture-overflow");
+});
+
+for (const fault of ["malformed-json", "conflicting-process", "event-limit"])
+	test(`source fatal ${fault} followed by silence disposes within the failure allowance`, async (t) => {
+		await assertSourceTransportFailure(t, fault);
+	});
+
+test("source healthy silent attachment stays alive beyond two seconds until explicit release", async (t) => {
+	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	flag(f, "pause");
+	fs.writeFileSync(
+		path.join(f.control, "source-silent-attach"),
+		"healthy-held",
+	);
+	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
+	const leaderFile = path.join(f.control, "source-silent-leader.json");
+	await f.readiness.wait(() => {
+		assert.equal(command.terminal, null, command.output());
+		return fs.existsSync(leaderFile);
+	}, "healthy attach identity published before readiness");
+	const published = JSON.parse(fs.readFileSync(leaderFile));
+	const leader = fixtureProcess(published.pid);
+	const source = f.json(".boat/source-writer.json");
+	const remote = fixtureProcess(source.start.processId);
+	assert.ok(leader, "actual local attach CLI acquired before hold readiness");
+	assert.ok(
+		remote,
+		"actual paused source fixture writer acquired before hold readiness",
+	);
+	assert.equal(leader.startTicks, published.birth);
+	assert.equal(leader.cwd, published.cwd);
+	assert.equal(leader.group, published.group);
+	assert.equal(leader.session, published.session);
+	await f.readiness.wait(
+		() => fs.existsSync(path.join(f.control, "source-silent-ready")),
+		"healthy silent attach ready",
+	);
+	const heldAt = fixtureNow(),
+		checkpoint = heldAt + 2100;
+	while (fixtureNow() < checkpoint) {
+		assert.equal(command.terminal, null, command.output());
+		assert.equal(command.closed, false);
+		assert.deepEqual(fixtureProcess(leader.pid), leader);
+		assert.deepEqual(fixtureProcess(remote.pid), remote);
+		await new Promise((resolve) =>
+			setTimeout(resolve, Math.min(10, Math.max(1, checkpoint - fixtureNow()))),
+		);
+	}
+	const observation = {
+		provenance:
+			"actual local synthetic CLI and paused synthetic worker before explicit release",
+		heldAt,
+		observedAt: fixtureNow(),
+		identities: { leader, remote },
+		current: {
+			leader: fixtureProcess(leader.pid),
+			remote: fixtureProcess(remote.pid),
+		},
+		command: { terminal: command.terminal, closed: command.closed },
+		source: f.json(".boat/source-writer.json"),
+		released: fs.existsSync(path.join(f.control, "source-fault-release")),
+	};
+	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
+	let archive;
+	if (destination) {
+		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+		archive = fs.mkdtempSync(path.join(destination, "C-healthy-held-"));
+		fs.writeFileSync(
+			path.join(archive, "before-release.json"),
+			JSON.stringify(observation, null, 2),
+			{ mode: 0o600 },
+		);
+	}
+	t.diagnostic(
+		sourceObservationDiagnostic(archive, "healthy-held", observation),
+	);
+	assert.ok(observation.observedAt - heldAt > 2000);
+	assert.deepEqual(observation.current.leader, leader);
+	assert.deepEqual(observation.current.remote, remote);
+	assert.equal(observation.command.terminal, null);
+	assert.equal(observation.command.closed, false);
+	assert.equal(observation.released, false);
+	assert.equal(observation.source.protocolError, false);
+	assert.equal(
+		fs.existsSync(path.join(f.control, "source-leader-term")),
+		false,
+	);
+	flag(f, "release");
+	flag(f, "source-fault-release");
+	const result = await command.done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+	assert.equal(
+		fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n").length,
+		1,
+	);
 });
 
 test("legacy proven source completion permits the next public lock generation", async (t) => {

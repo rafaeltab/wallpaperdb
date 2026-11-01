@@ -198,7 +198,8 @@ function execute(
 					Math.min(maxCaptureBytes, shutdown ? 1024 * 1024 : Infinity)
 				) {
 					captureOverflow = true;
-					child.kill("SIGTERM");
+					if (sourceObservation) abortSource();
+					else child.kill("SIGTERM");
 				} else {
 					try {
 						out += decoder ? decoder.decode(b, { stream: true }) : b;
@@ -214,6 +215,7 @@ function execute(
 						out += decoder.decode();
 					} catch {
 						sourceObservation.malformed();
+						abortSource();
 					}
 				});
 			child.stderr.on("data", (b) => {
@@ -257,13 +259,19 @@ function execute(
 			const line = (value) => {
 				try {
 					const frame = JSON.parse(value);
-					onFrame(frame);
+					const accepted = onFrame(frame);
+					if (sourceObservation && accepted === false) {
+						abortSource();
+						return;
+					}
 					if (frame.type === "stdout" || frame.type === "stderr")
 						emit(frame.data, frame.type === "stderr");
 					else if (frame.event === "error") emit(`${frame.error}\n`, true);
 				} catch {
-					if (sourceObservation) sourceObservation.malformed();
-					else emit(`${value}\n`);
+					if (sourceObservation) {
+						sourceObservation.malformed();
+						abortSource();
+					} else emit(`${value}\n`);
 				}
 			};
 			child.stdout.on("data", (bytes) => {
@@ -276,7 +284,7 @@ function execute(
 					return;
 				}
 				let at = pending.indexOf("\n");
-				while (at >= 0) {
+				while (at >= 0 && !sourceAborted) {
 					line(pending.slice(0, at));
 					pending = pending.slice(at + 1);
 					at = pending.indexOf("\n");
@@ -288,6 +296,7 @@ function execute(
 						pending += decoder.decode();
 					} catch {
 						sourceObservation.malformed();
+						abortSource();
 					}
 				}
 				if (pending && !sourceAborted) line(pending);

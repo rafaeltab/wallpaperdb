@@ -317,7 +317,9 @@ export async function runOwnedSourceCommand({
 				sourceObservation: observed.hook,
 				onFrame: (frame) => {
 					if (!observed.hook.frame(frame)) record.protocolError = true;
-					onFrame(frame);
+					else onFrame(frame);
+					if (record.protocolError) checkpoint();
+					return !record.protocolError;
 				},
 			});
 		} finally {
@@ -372,6 +374,14 @@ export async function runOwnedSourceCommand({
 						record.protocolError = true;
 					else record.offsets[frame.type] = frame.nextOffset;
 				} else if (frame.type === "exit") {
+					if (
+						frame.status !== "exited" ||
+						!exitCode(frame.exitCode) ||
+						frame.signal !== null ||
+						frame.stdoutOffset !== record.offsets.stdout ||
+						frame.stderrOffset !== record.offsets.stderr
+					)
+						record.protocolError = true;
 					record.terminal = frame;
 					checkpoint();
 				} else record.protocolError = true;

@@ -1081,3 +1081,22 @@ it('resumes a predecessor-format durable conflict record', async () => {
     await f.close();
   }
 });
+
+it('passes retained owning scope and its exact thread into the isolated recovery context', async () => {
+  const f = await fixture({
+    conflict: true,
+    context: 'Keep the accepted pixel format; no new test seams.',
+    owningThreadId: 'owner-C',
+    restack: { outcome: 'SIMPLE' },
+  });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    const launch = (await f.host.calls()).find((call) => call.args[1] === 'start');
+    expect(launch?.args[3]).toContain('Keep the accepted pixel format; no new test seams.');
+    expect(launch?.args[3]).toContain('owner-C');
+    expect(launch?.args[3]).toContain('parent');
+  } finally {
+    await f.close();
+  }
+});

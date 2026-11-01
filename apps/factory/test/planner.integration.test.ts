@@ -64,20 +64,68 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       });
     }
     await host.save({ planner: { proposal, status: 'running' } });
+    const observations = (await host.calls()).filter((call) => call.args[1] === 'show').length;
     const abort = new AbortController();
     const pending = Effect.runPromise(adapter.propose(input), { signal: abort.signal });
-    setTimeout(() => abort.abort(), 100);
-    await expect(pending).rejects.toBeDefined();
+    const interrupted = expect(pending).rejects.toBeDefined();
+    try {
+      await expect
+        .poll(async () => (await host.calls()).filter((call) => call.args[1] === 'show').length)
+        .toBeGreaterThan(observations);
+    } finally {
+      abort.abort();
+    }
+    await interrupted;
     const starts = (await host.calls()).filter((call) => call.args[1] === 'start').length;
     await expect(
-      Effect.runPromise(adapter.propose(input), { signal: AbortSignal.timeout(150) })
-    ).rejects.toBeDefined();
+      Effect.runPromise(adapter.propose(input), { signal: AbortSignal.timeout(5000) })
+    ).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      cause: expect.objectContaining({ message: 'Previous advisory planner is still outstanding' }),
+    });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
     await host.save({ planner: { proposal, status: 'completed' } });
     expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
       starts + 1
     );
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('retains uncertain launch responsibility after a lost start response', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({ planner: { lostStart: true } });
+    const adapter = t3Planner({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1 as const, admission: 1 as const },
+    };
+    await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
+      input
+    );
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      cause: expect.objectContaining({
+        message: 'Planner launch is uncertain; operator reconciliation required',
+      }),
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;

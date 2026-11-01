@@ -19,6 +19,8 @@ const pr = z.object({
   url: z.string(),
   headRefOid: z.string(),
   headRefName: z.string(),
+  baseRefName: z.string().optional(),
+  baseRefOid: z.string().optional(),
   state: z.enum(['OPEN', 'MERGED', 'CLOSED']),
   mergeable: z.string(),
   statusCheckRollup: z.array(
@@ -30,18 +32,30 @@ const pr = z.object({
 });
 /** Acceptance and independent review are asserted by the owning completed job or
  * operator configuration. Revalidate their exact PR, CI and linear ancestry here. */
+interface Readiness {
+  blockersReady: boolean;
+  prerequisite?: { base: string; prBase: string; evidence: string };
+  joinRequired?: boolean;
+  join?: readonly (VerifiedPrerequisite & {
+    branch: string;
+    url: string;
+    parent?: string;
+    prBase?: string;
+  })[];
+}
 export async function prerequisiteReadiness(
   config: {
     project: string;
     base: string;
     prBase?: string;
     prerequisites: readonly VerifiedPrerequisite[];
+    replayed?: readonly string[];
   },
   numbers: readonly number[],
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
   signal?: AbortSignal,
   candidate?: { readonly base: string; readonly prBase?: string }
-) {
+): Promise<Readiness> {
   if (numbers.length > 100) return { blockersReady: false };
   const verified = [];
   const landed: LandedPrerequisite[] = [];
@@ -75,7 +89,7 @@ export async function prerequisiteReadiness(
   return candidateReadiness(config, readiness, [...verified, ...landed], candidate, signal);
 }
 async function openPrerequisite(
-  config: { prerequisites: readonly VerifiedPrerequisite[] },
+  config: { prerequisites: readonly VerifiedPrerequisite[]; replayed?: readonly string[] },
   number: number,
   evidence: string,
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
@@ -92,17 +106,17 @@ async function openPrerequisite(
         '--repo',
         'rafaeltab/wallpaperdb',
         '--json',
-        'url,headRefOid,headRefName,state,mergeable,statusCheckRollup',
+        'url,headRefOid,headRefName,baseRefName,baseRefOid,state,mergeable,statusCheckRollup',
       ],
       signal
     )
   );
-  if (!valid(assertion, current, evidence)) return null;
-  return { ...assertion, branch: current.headRefName, url: current.url };
+  if (!valid(assertion, current, evidence, config.replayed?.includes(assertion.commit) ?? false)) return null;
+  return { ...assertion, branch: current.headRefName, url: current.url, parent: current.baseRefOid, prBase: current.baseRefName };
 }
 async function selectBase(
   config: { project: string; base: string; prBase?: string },
-  verified: readonly (VerifiedPrerequisite & { branch: string; url: string })[],
+  verified: readonly (VerifiedPrerequisite & { branch: string; url: string; parent?: string; prBase?: string })[],
   landed: readonly LandedPrerequisite[],
   signal?: AbortSignal
 ) {
@@ -127,7 +141,7 @@ async function selectBase(
   // A configured stack base may already contain all the prerequisites.
   for (const item of required)
     if (!(await ancestor(config.project, item.commit, config.base, signal)))
-      return { blockersReady: false };
+      return landed.length ? { blockersReady: false } : { blockersReady: false, joinRequired: true, join: verified };
   return configuredReadiness(config, required);
 }
 function configuredReadiness(
@@ -145,7 +159,12 @@ function configuredReadiness(
       }
     : { blockersReady: true };
 }
-function valid(assertion: VerifiedPrerequisite, current: z.infer<typeof pr>, body: string) {
+function valid(
+  assertion: VerifiedPrerequisite,
+  current: z.infer<typeof pr>,
+  body: string,
+  replayed: boolean
+) {
   const checks = normalizeChecks(current.statusCheckRollup);
   return (
     /^[a-f0-9]{40}$/.test(assertion.commit) &&
@@ -155,7 +174,7 @@ function valid(assertion: VerifiedPrerequisite, current: z.infer<typeof pr>, bod
     current.url === `https://github.com/rafaeltab/wallpaperdb/pull/${assertion.pr}` &&
     /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(current.headRefName) &&
     recordedEvidence(body, current.url, assertion.commit) &&
-    passingChecks(checks)
+    (replayed || passingChecks(checks))
   );
 }
 
@@ -174,10 +193,7 @@ function trustedComment(comment: { author: { login: string } | null }) {
 
 async function candidateReadiness(
   config: { project: string; base: string },
-  readiness: {
-    blockersReady: boolean;
-    prerequisite?: { base: string; prBase: string; evidence: string };
-  },
+  readiness: Readiness,
   required: readonly { commit: string }[],
   candidate: { base: string; prBase?: string } | undefined,
   signal?: AbortSignal

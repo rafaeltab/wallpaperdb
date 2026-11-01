@@ -116,6 +116,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           base: configuration.FACTORY_BASE,
           prerequisites: configuration.FACTORY_PREREQUISITES,
           readyPrerequisites,
+          joins: {
+            directory: resolve(configuration.FACTORY_STATE, 'joins'),
+            binary: configuration.FACTORY_T3_BINARY,
+            projectId: configuration.FACTORY_T3_PROJECT_ID,
+          },
         })
       ),
       Layer.succeed(
@@ -178,6 +183,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             prBase: configuration.FACTORY_PR_BASE,
             prerequisites: configuration.FACTORY_PREREQUISITES,
             readyPrerequisites,
+            joins: {
+              directory: resolve(configuration.FACTORY_STATE, 'joins'),
+              binary: configuration.FACTORY_T3_BINARY,
+              projectId: configuration.FACTORY_T3_PROJECT_ID,
+            },
           },
           job
         );

@@ -6,6 +6,8 @@ import { protocol } from './setup.js';
 export async function joinFixture(
   options: {
     conflict?: boolean;
+    context?: string;
+    owningThreadId?: string;
     restack?: {
       loseLaunch?: boolean;
       repair?: boolean;
@@ -144,7 +146,13 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
     base: host.base,
     prerequisites: [
       { issue: 3, pr: 103, commit: d },
-      { issue: 4, pr: 104, commit: c },
+      {
+        issue: 4,
+        pr: 104,
+        commit: c,
+        context: options.context,
+        owningThreadId: options.owningThreadId,
+      },
     ],
     joins: {
       directory: join(host.directory, 'joins'),
@@ -165,7 +173,13 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
         base: host.base,
         prerequisites: [
           { issue: 3, pr: 103, commit: d },
-          { issue: 4, pr: 104, commit: c },
+          {
+            issue: 4,
+            pr: 104,
+            commit: c,
+            context: options.context,
+            owningThreadId: options.owningThreadId,
+          },
         ],
         joins: {
           directory: join(host.directory, 'joins'),

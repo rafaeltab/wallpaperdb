@@ -74,6 +74,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               issue: z.number().int().positive(),
               pr: z.number().int().positive(),
               commit: z.string().regex(/^[a-f0-9]{40}$/),
+              context: z.string().optional(),
+              owningThreadId: z.string().min(1).optional(),
             })
           )
         ),
@@ -90,7 +92,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     throw new Error('T3 installation lacks required headless thread interface');
   const readyPrerequisites = () =>
     Effect.gen(function* () {
-      const result: { issue: number; pr: number; commit: string; reviewedCommit?: string }[] = [];
+      const result: {
+        issue: number;
+        pr: number;
+        commit: string;
+        reviewedCommit?: string;
+        context?: string;
+        owningThreadId?: string;
+      }[] = [];
       for (const admission of (yield* scheduleStore.read()).admissions) {
         const status = yield* (yield* pool.job(admission.issue)).status();
         if (status.kind !== 'job' || !status.delivery?.ready) continue;
@@ -101,6 +110,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             pr: Number(pr.url.split('/').at(-1)),
             commit: pr.commit,
             reviewedCommit: pr.reviewedCommit,
+            context: status.intent.context,
+            owningThreadId:
+              status.execution.kind === 'found' ? status.execution.threadId : undefined,
           });
       }
       return result;

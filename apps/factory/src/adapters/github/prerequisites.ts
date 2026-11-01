@@ -8,6 +8,8 @@ export interface VerifiedPrerequisite {
   readonly pr: number;
   readonly commit: string;
   readonly reviewedCommit?: string;
+  readonly context?: string;
+  readonly owningThreadId?: string;
 }
 const issue = z.object({
   number: z.number(),

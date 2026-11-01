@@ -935,6 +935,15 @@ async function lockGenerationCheckout(
 				JSON.stringify({
 					commands: commandCleanup,
 					background: backgroundCleanup,
+					processes: [...commands, ...background].map((record) => ({
+						birth: record.birth,
+						closed: record.closed,
+						terminal: record.terminal,
+						retired:
+							!!record.birth &&
+							fixtureProcess(record.birth.pid)?.startTicks !==
+								record.birth.startTicks,
+					})),
 					...(errors.length
 						? { errors: errors.map((error) => error.message) }
 						: {}),
@@ -1127,7 +1136,7 @@ if(argv.includes('stop')){fs.writeFileSync(path.join(control,'shutdown-request-s
 if(argv.includes('info')&&argv.includes('fake-new-worker')){if(fs.existsSync(path.join(control,'candidate-stopped'))){const a=JSON.parse(fs.readFileSync('.boat/state.json')).admission;console.log(JSON.stringify({sandbox:{id:'fake-new-worker',name:a.name,type:a.size,state:'stopped'}}));process.exit(0);}if(fs.existsSync(path.join(control,'candidate-kill'))){fs.unlinkSync(path.join(control,'candidate-kill'));process.kill(process.ppid,'SIGKILL');process.exit(1);}if(fs.existsSync(path.join(control,'candidate-info'))){const info=JSON.parse(fs.readFileSync(path.join(control,'candidate-info'),'utf8'));info.sandbox.name??=JSON.parse(fs.readFileSync('.boat/state.json')).admission?.name;console.log(JSON.stringify(info));process.exit(0);}console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
 if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
 if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(fs.existsSync(path.join(control,'limits'))?fs.readFileSync(path.join(control,'limits'),'utf8'):JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
-if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));if(process.env.FAKE_FRESH_BASELINE){fs.rmSync(process.env.FAKE_WORKER,{recursive:true,force:true});fs.cpSync(process.env.FAKE_FRESH_BASELINE,process.env.FAKE_WORKER,{recursive:true});}if(fs.existsSync(path.join(control,'ambiguous-create')))process.exit(44);console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
+if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));const cfg=JSON.parse(fs.readFileSync('.boat/enrollment.json'));fs.copyFileSync(path.join(process.env.HOME,'.local/state/wallpaperdb-boat/557',cfg.key+'.worker.json'),path.join(control,'creation-ledger'));if(process.env.FAKE_FRESH_BASELINE){fs.rmSync(process.env.FAKE_WORKER,{recursive:true,force:true});fs.cpSync(process.env.FAKE_FRESH_BASELINE,process.env.FAKE_WORKER,{recursive:true});}if(fs.existsSync(path.join(control,'ambiguous-create')))process.exit(44);console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
 if(argv.includes('usage')){if(fs.existsSync(path.join(control,'fail-usage')))process.exit(43);console.log('{}');process.exit(0);}
 if(argv.includes('snapshot')&&argv.includes('latest')){console.log(JSON.stringify({snapshot:{id:'snapshot-current',sandboxId:'fake-worker',chainId:'chain-current',generation:3,status:'completed',kind:'incremental',origin:'captured',createdAt:'2026-10-31T01:00:00Z',completedAt:'2026-10-31T01:00:01Z',fileCount:42}}));process.exit(0);}
 if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(control,'audit-startup')))fs.appendFileSync(path.join(control,'startup-state'),JSON.stringify(JSON.parse(fs.readFileSync('.boat/state.json','utf8')))+'\\n');
@@ -1190,6 +1199,13 @@ child.on('close',code=>{
 			});
 		});
 		owned.push(record);
+		if (cleanupReport) {
+			record.birth = fixtureProcess(child.pid);
+			assert.ok(
+				record.birth,
+				"Fixture process birth required before evidence publication",
+			);
+		}
 		return record;
 	};
 	readiness.enter("keeper startup");
@@ -4334,8 +4350,11 @@ test("tracked and previously synchronized untracked patch deletions reach genera
 	assert.equal(frozen.status, 0, frozen.output);
 });
 
-async function developmentCheckout(t, { prepare = true } = {}) {
-	const f = await lockGenerationCheckout(t);
+async function developmentCheckout(
+	t,
+	{ prepare = true, ...fixtureOptions } = {},
+) {
+	const f = await lockGenerationCheckout(t, fixtureOptions);
 	// Keep the real Make/controller path; control only remote process responses
 	// and Docker so restoration cannot touch a worker or the host's containers.
 	const transport = path.join(f.root, ".mise/boat/boat");
@@ -6252,8 +6271,8 @@ test("known-lost reconstruction preserves identity evidence and cost across fail
 
 // Native Drizzle runs without a database, using the descriptor's pinned old
 // migrations and a test-only append. Only transport and installation are controlled.
-async function migrationGenerationCheckout(t) {
-	const f = await lockGenerationCheckout(t);
+async function migrationGenerationCheckout(t, fixtureOptions) {
+	const f = await lockGenerationCheckout(t, fixtureOptions);
 	const repository = path.resolve(import.meta.dirname, "..");
 	for (const name of ["scripts/mise-shell.sh", "scripts/boat-shell.mjs"])
 		f.local(name, fs.readFileSync(path.join(repository, name)));
@@ -6418,8 +6437,8 @@ test("public migration generation returns native SQL, snapshot and journal as a 
 	assert.deepEqual(migrationBytes(f.worker), remote);
 });
 
-async function pausedMigrations(t, phase = "generate") {
-	const f = await migrationGenerationCheckout(t);
+async function pausedMigrations(t, phase = "generate", fixtureOptions) {
+	const f = await migrationGenerationCheckout(t, fixtureOptions);
 	flag(f, phase === "generate" ? "migration-pause" : `pause-${phase}`);
 	if (phase === "sync") f.local("notes.txt", "force captured upload\n");
 	const pending = f.migrations();
@@ -10604,7 +10623,10 @@ for (const kind of ["progress", "replacement", "uncertainty"])
 
 // Public Make exercises the opt-in lifecycle; only the external CLI is controlled.
 async function freshCheckout(t) {
-	const f = await developmentCheckout(t, { prepare: false });
+	const f = await developmentCheckout(t, {
+		prepare: false,
+		...reconstructionEvidence(t),
+	});
 	const baseline = path.join(f.directory, "fresh-empty-worker");
 	fs.cpSync(f.worker, baseline, { recursive: true });
 	f.env.FAKE_FRESH_BASELINE = baseline;
@@ -10672,9 +10694,16 @@ test("fresh lifecycle completed stop reconstructs before toolchain-only stale lo
 	assert.equal(creates[0].includes("--from"), false);
 	assert.equal(creates[0][creates[0].indexOf("--type") + 1], "large");
 	assert.equal(creates[0][creates[0].indexOf("--ttl") + 1], "2100");
-	const intent = JSON.parse(
+	const creationState = JSON.parse(
 		fs.readFileSync(path.join(f.control, "creation-state")),
-	).admission;
+	);
+	assert.deepEqual(
+		JSON.parse(fs.readFileSync(path.join(f.control, "creation-ledger"))),
+		creationState,
+	);
+	assert.equal(creationState.shutdownAttempt.status, "completed-observed");
+	const intent = creationState.admission;
+	assert.equal(intent.stopCompletion.provider.stop.id, "stop-fresh");
 	assert.equal(intent.previousWorkerId, "fake-worker");
 	assert.match(intent.token, /^[a-f0-9-]{36}$/);
 	assert.equal(creates[0][creates[0].indexOf("--name") + 1], intent.name);
@@ -10966,6 +10995,10 @@ test("fresh lifecycle status inspects pending unknown admission without creating
 	const result = await f.run("boat-status").done;
 	assert.equal(result.status, 0, result.output);
 	assert.match(result.output, /create-unknown/);
+	assert.ok(
+		Number(result.output.match(/"estimatedExperimentCost": ([0-9.e+-]+)/)[1]) >
+			before.cost,
+	);
 	assert.deepEqual(f.json(".boat/state.json"), before);
 	assert.deepEqual(freshCalls(f), calls);
 });
@@ -11003,7 +11036,7 @@ function useFreshPolicy(f) {
 }
 
 test("fresh lifecycle migration generation retains captured frozen prerequisite", async (t) => {
-	const f = await migrationGenerationCheckout(t);
+	const f = await migrationGenerationCheckout(t, reconstructionEvidence(t));
 	useFreshPolicy(f);
 	f.local("pnpm-lock.yaml", "stale reconstruction lock\n");
 	fs.rmSync(path.join(f.control, "installed-dependencies"), { force: true });
@@ -11019,7 +11052,7 @@ test("fresh lifecycle migration generation retains captured frozen prerequisite"
 });
 
 test("fresh lifecycle committed publication recovers locally before replacement without old-worker delivery acknowledgement", async (t) => {
-	const f = await migrationGenerationCheckout(t);
+	const f = await migrationGenerationCheckout(t, reconstructionEvidence(t));
 	const baseline = path.join(f.directory, "fresh-empty-worker");
 	fs.cpSync(f.worker, baseline, { recursive: true });
 	const intent = await crashMigrationPublication(f, "journal-commit");
@@ -11075,3 +11108,79 @@ test("fresh lifecycle awake active owner keeps the current worker and sibling he
 		false,
 	);
 });
+
+for (const failure of ["failed-stop-inspection", "incomplete-stop"])
+	test(`fresh lifecycle actual ${failure} cannot admit a replacement`, async (t) => {
+		const f = await freshCheckout(t);
+		fs.rmSync(path.join(f.control, "provider-info"));
+		flag(f, failure);
+		const before = f.json(".boat/state.json");
+		const stopped = await f.run("boat-stop").done;
+		assert.notEqual(stopped.status, 0, stopped.output);
+		const denied = await f.generate();
+		assert.notEqual(denied.status, 0, denied.output);
+		assert.equal(f.json(".boat/state.json").id, before.id);
+		assert.equal(f.json(".boat/state.json").runningSince, before.runningSince);
+		assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 0);
+		assert.ok(freshCalls(f).some((a) => a.includes("stop")));
+	});
+
+test("fresh lifecycle stale durable candidate owner fails visibly without another create", async (t) => {
+	const f = await freshCheckout(t);
+	flag(f, "candidate-kill");
+	await f.generate();
+	const state = f.json(".boat/state.json");
+	state.admission.owner.key = "foreign";
+	f.local(".boat/state.json", JSON.stringify(state));
+	const before = freshCalls(f).length;
+	const result = await f.generate();
+	assert.notEqual(result.status, 0);
+	assert.match(result.output, /Stale candidate/);
+	assert.equal(freshCalls(f).length, before);
+	assert.deepEqual(f.json(".boat/state.json"), state);
+});
+
+test("fresh lifecycle migration CAS includes the reconstructed controller module", async (t) => {
+	const f = await pausedMigrations(t, "generate", reconstructionEvidence(t));
+	f.local(
+		"scripts/lib/boat-reconstruction.mjs",
+		"// concurrent lifecycle implementation edit\n",
+	);
+	const before = migrationBytes(f.root);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Local generator inputs or old migration set changed: scripts\/lib\/boat-reconstruction.mjs/,
+	);
+	assert.deepEqual(migrationBytes(f.root), before);
+});
+
+for (const policy of ["snapshot", "fresh-after-stop"])
+	test(`fresh lifecycle public enrollment selects ${policy} without creating compute`, async (t) => {
+		const f = await lockGenerationCheckout(t, reconstructionEvidence(t));
+		fs.rmSync(path.join(f.root, ".boat/enrollment.json"));
+		fs.renameSync(path.join(f.root, ".git"), path.join(f.root, ".fixture-git"));
+		f.local(".git", "gitdir: .fixture-git\n");
+		f.local("scripts/boat-bootstrap.sh", "#!/bin/sh\nexit 0\n");
+		const result = await f.run("boat-enroll", `LIFECYCLE=${policy}`).done;
+		assert.equal(result.status, 0, result.output);
+		assert.match(result.output, /No worker created/);
+		assert.equal(f.json(".boat/enrollment.json").lifecycle, policy);
+		assert.equal(fs.existsSync(path.join(f.control, "transport")), false);
+	});
+
+function reconstructionEvidence(t) {
+	const evidence = process.env.BOAT_RECONSTRUCTION_EVIDENCE;
+	if (!evidence) return {};
+	// Caller supplies an existing private directory. The normal suite needs none.
+	assert.ok(fs.statSync(evidence).isDirectory());
+	return {
+		cleanupReport: path.join(
+			evidence,
+			createHash("sha256").update(t.name).digest("hex").slice(0, 16),
+		),
+		ownPackageGroups: true,
+	};
+}

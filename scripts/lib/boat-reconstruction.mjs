@@ -37,6 +37,7 @@ export async function freshWorker({
 	preflight,
 }) {
 	let state = load();
+	let observedStop;
 	const pending = state.admission && state.admission.status !== "published";
 	if (pending) assertAdmission(state, config);
 	if (!pending && state.id) {
@@ -59,6 +60,17 @@ export async function freshWorker({
 				throw new Error(
 					"Fresh admission requires an observed completed nonforced stop for the exact old worker; no create",
 				);
+			observedStop = {
+				workerId: state.id,
+				status: workerState(worker),
+				observedAt: new Date().toISOString(),
+				provider: {
+					id: worker.id,
+					state: worker.state,
+					status: worker.status,
+					stop: worker.stop,
+				},
+			};
 			// Reuse the existing completion/accounting transition. This does not
 			// qualify snapshot contents or require successful application cleanup.
 			await snapshots.stopCompute({
@@ -100,7 +112,7 @@ export async function freshWorker({
 			size: config.size,
 			status: "create-unknown",
 			runningSince: Date.now(),
-			stopCompletion: state.shutdownAttempt?.completion,
+			stopCompletion: observedStop,
 		};
 		state.admission = admission;
 		persist(state);
@@ -144,7 +156,11 @@ export async function freshWorker({
 	const candidate = admission.candidate;
 	if (state.id) {
 		const oldInfo = await json(["info", state.id]);
-		if (!completedStop(oldInfo?.sandbox ?? oldInfo, state.id))
+		if (
+			!completedStop(oldInfo?.sandbox ?? oldInfo, state.id) ||
+			(oldInfo?.sandbox ?? oldInfo).stop.id !==
+				admission.stopCompletion?.provider?.stop?.id
+		)
 			throw new Error(
 				"Fresh candidate blocked: old worker stop no longer completed; preserve both obligations",
 			);

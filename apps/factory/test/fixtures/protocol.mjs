@@ -15,7 +15,46 @@ if (mcpSend) {
 }
 const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
-if (basename(process.argv[1]) === 'gh') {
+if (config.planning && basename(process.argv[1]) === 'gh') {
+  if (args[1] === 'list') reply(config.planning.issues.map((i) => ({ number: i.number })));
+  else if (args[0] === 'api' && args[1] === 'graphql')
+    reply({
+      data: {
+        repository: {
+          issue: { parent: config.planning.parent ? { number: config.planning.parent } : null },
+        },
+      },
+    });
+  else if (args[0] === 'api') reply([config.planning.blockers ?? []]);
+  else
+    reply(
+      config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context
+    );
+} else if (config.planner && args[1] === 'start') {
+  const requestId = JSON.parse(args[3].split('Request: ')[1]).requestId;
+  writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ requestId }));
+  reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
+} else if (config.planner && args[1] === 'show') {
+  const { requestId } = JSON.parse(readFileSync(join(config.directory, 'planner.json'), 'utf8'));
+  reply({
+    thread: {
+      threadId: 'planner-thread',
+      latestRunId: 'planner-run',
+      status: 'completed',
+      providerInstanceId: 'codex',
+      model: 'gpt-6.1-sol',
+    },
+    messages: [
+      {
+        role: config.planner.role ?? 'assistant',
+        runId: 'planner-run',
+        text: config.planner.malformed
+          ? '{}'
+          : JSON.stringify({ requestId, ...config.planner.proposal }),
+      },
+    ],
+  });
+} else if (basename(process.argv[1]) === 'gh') {
   if (config.githubMalformed) console.log('{}');
   else if (args[0] === 'api')
     reply(args[1]?.includes('/actions/runs/') ? config.jobs : [config.blockers ?? []]);

@@ -4567,7 +4567,7 @@ test("public lock generation rejects a concurrent source command helper edit and
 	assert.notEqual(result.status, 0, result.output);
 	assert.match(
 		result.output,
-		/Local dependency inputs or old lock changed: scripts\/lib\/boat-source-command\.mjs/,
+		/Local dependency inputs or old lock changed; proposal retained/,
 	);
 	assert.deepEqual(
 		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
@@ -8369,6 +8369,22 @@ for (const mode of ["missing-terminal", "missing-started", "launcher-failed"])
 		const result = await f.migrations();
 		assert.notEqual(result.status, 0, result.output);
 		assert.match(result.output, /completion is uncertain/);
+		// A lost acknowledgement returns before the independent fixture writer.
+		// Observe its completion only to establish a stable preservation baseline;
+		// production must keep refusing it even after the writer disappears.
+		const submissions = fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		const owned = submissions.at(-1).start;
+		await observed(
+			() =>
+				fs.existsSync(
+					path.join(f.control, `source-process-${owned.processId}.status`),
+				),
+			"unproved fixture writer finishes independently",
+		);
 		const remote = migrationBytes(f.worker);
 		assert.deepEqual(migrationBytes(f.root), before);
 		assert.equal(
@@ -8417,10 +8433,20 @@ test("transport loss leaves an independently live remote writer owned and blocks
 	assertWriterRunning();
 	const remote = migrationBytes(f.worker),
 		ownership = f.json(".boat/source-writer.json");
-	const submission = JSON.parse(
-		fs.readFileSync(path.join(f.control, "source-submissions"), "utf8").trim(),
+	const submissions = fs
+		.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.filter(({ start }) =>
+			start.command.endsWith("PACKAGE=asset SCRIPT=db:generate"),
+		);
+	assert.equal(
+		submissions.length,
+		1,
+		"the migration writer is submitted once after lock fixture setup",
 	);
-	assert.equal(ownership.start.processId, submission.start.processId);
+	assert.equal(ownership.start.processId, submissions[0].start.processId);
 	assert.equal(ownership.terminal, null);
 	for (const next of [
 		await f.run("build", "PACKAGE=asset").done,

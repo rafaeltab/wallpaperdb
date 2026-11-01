@@ -825,6 +825,7 @@ it.each([
   { outcome: 'COMPLEX' as const, review: true, ready: true },
   { outcome: 'COMPLEX' as const, review: true, repair: true, ready: true },
   { outcome: 'SIMPLE' as const, staleRun: true, ready: false },
+  { outcome: 'SIMPLE' as const, responseThreadId: 'different-thread', ready: false },
   { outcome: 'COMPLEX' as const, review: false, ready: false },
   { outcome: undefined, review: false, ready: false },
   { outcome: 'SIMPLE' as const, review: false, stale: true, ready: false },
@@ -841,8 +842,13 @@ it.each([
     await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
     const ready = await Effect.runPromise(f.reopen().inspect(5));
     expect(ready.blockersReady).toBe(scenario.ready);
-    expect(await Effect.runPromise(f.issues.recoveries?.() ?? Effect.succeed([]))).toEqual([
-      expect.objectContaining({ issue: 4, threadId: 'restacker' }),
+    const recovery = await Effect.runPromise(f.issues.recoveries?.() ?? Effect.succeed([]));
+    expect(recovery).toEqual([
+      expect.objectContaining(
+        'responseThreadId' in scenario
+          ? { issue: 4, progress: 'Recovery launch pending reconciliation' }
+          : { issue: 4, threadId: 'restacker' }
+      ),
     ]);
     if (scenario.ready) {
       const head = ready.prerequisite?.base;

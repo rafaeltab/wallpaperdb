@@ -178,6 +178,8 @@ export type PullRequestObservation =
       readonly kind: 'found';
       readonly url: string;
       readonly commit: string;
+      /** Original accepted/reviewed commit of a durable, CI-verified issue-only replay. */
+      readonly reviewedCommit?: string;
       readonly ci?: { readonly failed: boolean; readonly progress: string };
       readonly ready: boolean;
       readonly landed: boolean;
@@ -198,6 +200,7 @@ export interface Delivery {
   readonly ready: boolean;
   readonly landed: boolean;
   readonly pr?: PullRequestObservation;
+  readonly reviewedCommit?: string;
 }
 
 export interface WaitState {

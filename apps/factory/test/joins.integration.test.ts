@@ -1,7 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
+import { fileStore } from '../src/adapters/store/index.js';
+import { t3Execution } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
 import { protocol } from './fixtures/setup.js';
@@ -9,10 +12,13 @@ import { protocol } from './fixtures/setup.js';
 async function fixture(
   options: {
     conflict?: boolean;
-    writer?: boolean;
+    merge?: boolean;
+    writer?: boolean | 'completed';
+    owningWorktree?: 'clean' | 'dirty';
     ciFails?: boolean;
     lose?: 'base' | 'group' | 'evidence';
     staleHead?: boolean;
+    corruptGrouping?: boolean;
   } = {}
 ) {
   const host = await protocol();
@@ -43,30 +49,42 @@ async function fixture(
   git('switch', '-c', 'B');
   await commit('B');
   git('switch', '-c', 'D');
-  const d = await commit('D');
+  let d = await commit('D');
+  if (options.merge) {
+    git('switch', '-c', 'side', a);
+    await commit('M');
+    git('switch', 'D');
+    git('merge', '--no-ff', 'side', '-m', 'merge');
+    d = git('rev-parse', 'HEAD');
+  }
   git('switch', '-c', 'C', a);
   const c = await commit('C');
   git('push', 'origin', 'A', 'B', 'C', 'D');
   git('switch', '--detach', host.base);
-  const make = join(host.directory, 'make');
-  await writeFile(
-    make,
-    '#!/bin/sh\nprintf "%s\\n" "$*" >> "' + join(host.directory, 'ci-calls') + '"\n'
-  );
-  await chmod(make, 0o700);
-  if (options.staleHead)
+  if (options.owningWorktree) {
+    const path = join(host.directory, 'owning-C');
+    git('worktree', 'add', path, 'C');
+    if (options.owningWorktree === 'dirty')
+      await writeFile(join(path, 'C.txt'), 'uncommitted writer change');
+  }
+  if (options.staleHead) {
+    const hook = join(host.repository, '.git', 'hooks', 'pre-push');
     await writeFile(
-      make,
+      hook,
       `#!/bin/sh
-if [ "$1" = ci ]; then git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${d}; fi
+git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${d}
 `
     );
-  if (options.ciFails) await writeFile(make, '#!/bin/sh\nexit 1\n');
+    await chmod(hook, 0o700);
+  }
   await host.save({
     lost: false,
     joinWriter: options.writer,
     join: {
       lose: options.lose,
+      originalHeads: { 103: d, 104: c },
+      newCI: options.ciFails ? 'FAILURE' : 'SUCCESS',
+      corruptGrouping: options.corruptGrouping,
       evidence: `https://github.com/rafaeltab/wallpaperdb/pull/103 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/104 ${c}`,
       prs: { 103: { branch: 'D', base: 'B' }, 104: { branch: 'C', base: 'A' } },
       members: [101, 102, 103].map(
@@ -93,7 +111,6 @@ if [ "$1" = ci ]; then git --git-dir='${join(host.directory, 'remote.git')}' upd
     d,
     c,
     issues,
-    make,
     reopen: () =>
       githubIssues({
         project: host.repository,
@@ -119,7 +136,7 @@ if [ "$1" = ci ]; then git --git-dir='${join(host.directory, 'remote.git')}' upd
 
 it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', async () => {
   const f = await fixture();
-  const { host, git, d, issues } = f;
+  const { host, git, d, c, issues } = f;
   try {
     expect(await Effect.runPromise(issues.inspect(5))).toMatchObject({
       blockersReady: false,
@@ -129,7 +146,29 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
     await Effect.runPromise(issues.prepare(5));
     const ready = await Effect.runPromise(issues.inspect(5));
     expect(ready.blockersReady).toBe(true);
+    await Effect.runPromise(issues.prepare(5));
     expect(ready.prerequisite?.prBase).toBe('C');
+    expect(
+      await Effect.runPromise(
+        issues.pullRequest({
+          id: 'C-job',
+          issue: 4,
+          issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+          base: host.base,
+          prBase: 'A',
+          branch: 'C',
+          context: '',
+          createdAt: 0,
+          expectedStage: 'implementation',
+        })
+      )
+    ).toMatchObject({
+      kind: 'found',
+      ready: true,
+      commit: ready.prerequisite?.base,
+      reviewedCommit: c,
+    });
+
     const head = ready.prerequisite?.base;
     if (!head) throw new Error('Missing join head');
     expect(git('ls-tree', '--name-only', head)).toBe('A.txt\nB.txt\nC.txt\nD.txt');
@@ -137,15 +176,58 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
     expect(git('diff', '--name-only', `${d}..${head}`)).toBe('C.txt');
     expect(git('rev-list', '--merges', `${host.base}..${head}`)).toBe('');
     expect(git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(d);
-    expect(await readFile(join(host.directory, 'join-live.json'), 'utf8')).toContain('"base":"D"');
-    expect(await readFile(join(host.directory, 'ci-calls'), 'utf8')).toBe(
-      'install\nci SHELL=/bin/sh CI_CONCURRENCY=1\n'
+    const metadata = JSON.parse(await readFile(join(host.directory, 'join-live.json'), 'utf8'));
+    expect(metadata.prs['104'].base).toBe('D');
+    expect(metadata.members).toEqual(
+      [101, 102, 103, 104].map(
+        (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
+      )
     );
+    const runtime = ManagedRuntime.make(
+      JobLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(JobStore, fileStore(join(host.directory, 'E-state'))),
+            Layer.succeed(Issues, issues),
+            Layer.succeed(Time, { now: () => Effect.succeed(5) }),
+            Layer.succeed(
+              Execution,
+              t3Execution({
+                project: host.repository,
+                projectId: 'project-id',
+                binary: host.binary,
+              })
+            )
+          )
+        )
+      )
+    );
+    let worker: string | undefined;
+    try {
+      const job = await runtime.runPromise(Job);
+      const e = await runtime.runPromise(
+        job.start({
+          issue: 5,
+          base: head,
+          prBase: 'C',
+          prerequisiteEvidence: ready.prerequisite?.evidence,
+          context: 'Join demo E',
+        })
+      );
+      if (e.kind !== 'job' || e.execution.kind !== 'found') throw new Error('Missing E worker');
+      worker = e.execution.worktree;
+      for (const name of ['A', 'B', 'C', 'D'])
+        expect(await readFile(join(worker, `${name}.txt`), 'utf8')).toBe(name);
+      expect(e.intent.prBase).toBe('C');
+    } finally {
+      await runtime.dispose();
+    }
     console.log(
       JSON.stringify({
         provenance:
           'Production GitHub Issues public port and real isolated Git/worktrees/bare remote. Controlled GitHub/T3 and CI execution protocols; original acceptance/review are operator assertions. No live model or project stack changes.',
         head,
+        worker,
         files: git('ls-tree', '--name-only', head),
         history: git('log', '--format=%s', `${host.base}..${head}`),
         prBase: ready.prerequisite?.prBase,
@@ -186,18 +268,24 @@ it('waits for an active prerequisite writer before replay or CI', async () => {
   }
 });
 
-it('keeps failed replay CI blocked across adapter reopen and preserves remote heads', async () => {
+it('keeps E blocked until the exact replayed head passes CI across adapter reopen', async () => {
   const f = await fixture({ ciFails: true });
   try {
     if (!f.issues.prepare) throw new Error('Missing preparation');
-    await expect(Effect.runPromise(f.issues.prepare(5))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-    });
+    await Effect.runPromise(f.issues.prepare(5));
     expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
       blockersReady: false,
-      blockedReason: expect.stringContaining('ci-failed'),
+      joinRequired: true,
     });
-    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(f.d);
+    const path = join(f.host.directory, 'join-live.json');
+    const state = JSON.parse(await readFile(path, 'utf8'));
+    state.newCI = 'SUCCESS';
+    await writeFile(path, JSON.stringify(state));
+    const reopened = f.reopen();
+    if (!reopened.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(reopened.prepare(5));
+    expect(await Effect.runPromise(reopened.inspect(5))).toMatchObject({ blockersReady: true });
   } finally {
     await f.close();
   }
@@ -238,6 +326,9 @@ it('preserves an externally changed remote head and exposes a blocked lease outc
   const f = await fixture({ staleHead: true });
   try {
     if (!f.issues.prepare) throw new Error('Missing preparation');
+    await expect(Effect.runPromise(f.issues.prepare(5))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
     await Effect.runPromise(f.issues.prepare(5));
     expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
       blockersReady: false,
@@ -245,6 +336,66 @@ it('preserves an externally changed remote head and exposes a blocked lease outc
     });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.d);
     expect((await f.host.calls()).some((call) => call.args[0] === 'stack')).toBe(false);
+  } finally {
+    await f.close();
+  }
+});
+
+it('waits for a dirty owning worktree while allowing a completed T3 writer', async () => {
+  const f = await fixture({ writer: 'completed', owningWorktree: 'dirty' });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({ blockersReady: false });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    expect(await readFile(join(f.host.directory, 'owning-C', 'C.txt'), 'utf8')).toBe(
+      'uncommitted writer change'
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+it('joins after a completed writer leaves a clean owning worktree', async () => {
+  const f = await fixture({ writer: 'completed', owningWorktree: 'clean' });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({ blockersReady: true });
+  } finally {
+    await f.close();
+  }
+});
+
+it('does not admit E until native grouping is independently read back, retaining an uncertain creation as pending', async () => {
+  const f = await fixture({ corruptGrouping: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+      blockersReady: false,
+      joinRequired: true,
+    });
+    const reopened = f.reopen();
+    if (!reopened.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(reopened.prepare(5));
+    expect(await Effect.runPromise(reopened.inspect(5))).toMatchObject({ blockersReady: false });
+    expect((await f.host.calls()).filter((call) => call.args[0] === 'stack')).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});
+
+it('rejects a nonlinear prerequisite before rewriting or publishing any branch', async () => {
+  const f = await fixture({ merge: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({
+      blockersReady: false,
+      blockedReason: expect.stringContaining('nonlinear-prerequisite'),
+    });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
   } finally {
     await f.close();
   }

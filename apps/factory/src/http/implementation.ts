@@ -5,7 +5,7 @@ import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
-import type { Plan } from '../capabilities/plan/index.js';
+import type { Plan, Scheduler } from '../capabilities/plan/index.js';
 import { page } from './page.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
@@ -17,6 +17,7 @@ export function operationsServer(config: {
   ) => Promise<A>;
   job: Job;
   plan?: Plan;
+  scheduler?: Scheduler;
 }) {
   const app = Fastify({ bodyLimit: 20000 });
   const problem = (status: number, type: string, title: string) => ({
@@ -83,12 +84,73 @@ export function operationsServer(config: {
         .send(problem(400, 'factory-request', 'Preview accepts no overrides'));
     return execute(request, 'factory.http.plan', config.plan.preview());
   });
+  if (config.scheduler) {
+    const scheduler = config.scheduler;
+    app.get('/api/scheduler', (request) =>
+      execute(request, 'factory.http.scheduler.status', scheduler.status())
+    );
+    app.post('/api/scheduler', async (request, reply) => {
+      const origin = request.headers.origin;
+      if (origin && origin !== `${request.protocol}://${request.headers.host}`)
+        return reply
+          .code(403)
+          .type('application/problem+json')
+          .send(problem(403, 'factory-origin', 'Request origin rejected'));
+      const limit = z
+        .number()
+        .int()
+        .safe()
+        .refine((v) => v === -1 || v > 0);
+      const parsed = z
+        .object({
+          revision: z.number().int().min(-1),
+          concurrency: limit,
+          allowance: limit,
+          paused: z.boolean(),
+        })
+        .strict()
+        .safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .type('application/problem+json')
+          .send(
+            problem(400, 'factory-request', 'Positive limits or -1 and current revision required')
+          );
+      const result = await execute(
+        request,
+        'factory.http.scheduler.configure',
+        scheduler.configure(parsed.data)
+      );
+      if (result !== 'saved')
+        return reply
+          .code(result === 'conflict' ? 409 : 422)
+          .type('application/problem+json')
+          .send(
+            problem(
+              result === 'conflict' ? 409 : 422,
+              'factory-command',
+              'Controls changed or limits invalid. Refresh observation.'
+            )
+          );
+      return schedulerStatus(request);
+    });
+    const schedulerStatus = (request: FastifyRequest) =>
+      execute(request, 'factory.http.scheduler.status', scheduler.status());
+  }
   app.get('/health', () => ({ status: 'ok' }));
   app.get('/api/job', (request) => execute(request, 'factory.http.status', config.job.status()));
   app.get('/', async (request, reply) =>
     reply
       .type('text/html')
-      .send(page(await execute(request, 'factory.http.page', config.job.status())))
+      .send(
+        page(
+          await execute(request, 'factory.http.page', config.job.status()),
+          config.scheduler
+            ? await execute(request, 'factory.http.scheduler.page', config.scheduler.status())
+            : undefined
+        )
+      )
   );
   app.post('/api/job', async (request, reply) => {
     const origin = request.headers.origin;
@@ -123,7 +185,13 @@ export function operationsServer(config: {
       return reply
         .code(409)
         .type('application/problem+json')
-        .send(problem(409, 'factory-occupied', 'The single admission is already reserved'));
+        .send(
+          problem(
+            409,
+            'factory-occupied',
+            'Admission paused, capacity full, or issue already reserved'
+          )
+        );
     if (result.kind === 'rejected')
       return reply
         .code(422)

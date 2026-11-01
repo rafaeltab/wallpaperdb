@@ -386,3 +386,67 @@ it('translates plan preview and rejects foreign origins without invoking plannin
     await app.close();
   }
 });
+
+it('translates scheduler controls including unlimited limits and stale revisions', async () => {
+  const commands: unknown[] = [];
+  const state = { revision: 4, concurrency: 1, allowance: 1, paused: true, admissions: [] };
+  const app = operationsServer({
+    base: 'a'.repeat(40),
+    job: idle,
+    run: Effect.runPromise,
+    scheduler: {
+      status: () => Effect.succeed({ state, jobs: [] }),
+      configure: (command) =>
+        Effect.sync(() => {
+          commands.push(command);
+          return command.revision === 4 ? ('saved' as const) : ('conflict' as const);
+        }),
+      tick: () => Effect.succeed({ state, jobs: [] }),
+      start: idle.start,
+      resume: idle.resume,
+      cancel: idle.cancel,
+    },
+  });
+  try {
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          payload: { revision: 4, concurrency: -1, allowance: -1, paused: false },
+        })
+      ).statusCode
+    ).toBe(200);
+    expect(commands).toEqual([{ revision: 4, concurrency: -1, allowance: -1, paused: false }]);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          payload: { revision: 3, concurrency: 2, allowance: 3, paused: false },
+        })
+      ).statusCode
+    ).toBe(409);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          payload: { revision: 4, concurrency: 0, allowance: 1, paused: false },
+        })
+      ).statusCode
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          headers: { origin: 'https://outside.invalid' },
+          payload: { revision: 4, concurrency: 1, allowance: 1, paused: false },
+        })
+      ).statusCode
+    ).toBe(403);
+  } finally {
+    await app.close();
+  }
+});

@@ -1100,3 +1100,23 @@ it('passes retained owning scope and its exact thread into the isolated recovery
     await f.close();
   }
 });
+
+it('reconciles the original join request when explicit blockers include a closed issue', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  try {
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    config.join.blockers = [
+      { number: 3, state: 'open' },
+      { number: 4, state: 'open' },
+      { number: 9, state: 'closed' },
+    ];
+    config.join.closedIssues = [9];
+    await writeFile(f.host.configFile, JSON.stringify(config));
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});

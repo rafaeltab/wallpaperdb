@@ -1076,6 +1076,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ))
     )
       return null;
+    await publish(dir, 'request.json', { numbers });
     if (!operation) operation = (await build(numbers, candidates, signal, requirements)) ?? null;
     return operation;
   };
@@ -1315,6 +1316,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return observeCompleted(records, signal);
   };
+  const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
+    const saved = await read(join(config.directory, key), 'request.json');
+    const numbers = saved
+      ? z.object({ numbers: z.array(z.number().int().positive()).max(100) }).parse(saved).numbers
+      : layers.map((item) => item.issue);
+    // Older records are usable only when their original identity is reconstructable.
+    return id(numbers) === key ? numbers : null;
+  };
   const reconcile = async (signal?: AbortSignal) => {
     for (const key of await operationDirectories()) {
       if (!/^[a-f0-9]{64}$/.test(key)) continue;
@@ -1324,11 +1333,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         const seed = await read(join(config.directory, key), 'seed.json');
         if (seed) {
           const layers = z.array(layer).parse(seed);
-          await prepare(
-            layers.map((item) => item.issue),
-            seed,
-            signal
-          );
+          const numbers = await recoveryNumbers(key, layers);
+          if (numbers) await prepare(numbers, seed, signal);
         }
         continue;
       }

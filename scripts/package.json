@@ -16,6 +16,7 @@
 		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs lib/boat-snapshot.mjs lib/boat-reconstruction.mjs lib/boat-shutdown.mjs lib/boat-preview.mjs test-fixtures/preview-claim-observer.mjs lib/boat-source-generation.mjs lib/boat-asset-migration.mjs",
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
+		"test:boat-bootstrap": "node --test boat-bootstrap.test.mjs",
 		"test:asset-migration": "node --test --test-name-pattern='Asset migration' boat.test.mjs",
 		"test:boat-reconstruction": "node --test --test-name-pattern='^fresh lifecycle' boat.test.mjs",
 		"test:boat-focused": "node --test",

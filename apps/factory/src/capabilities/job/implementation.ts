@@ -97,10 +97,13 @@ export const JobLive = Layer.effect(
           if (!validCommand(command)) return { kind: 'rejected' as const };
           const issue = yield* issues.inspect(command.issue);
           if (!eligible(issue)) return { kind: 'rejected' as const };
+          if (!matchesPrerequisite(command, issue.prerequisite))
+            return { kind: 'rejected' as const };
           const createdAt = yield* time.now();
           const id = `${createdAt}-${yield* Random.nextInt}-${yield* Random.nextInt}`;
           const intent: Intent = {
             ...command,
+            prBase: prerequisiteTarget(command, issue.prerequisite),
             id,
             createdAt,
             issueUrl: issue.url,
@@ -184,4 +187,12 @@ function resumeEvidence(
   if (observed.run)
     return Effect.succeed({ runId: observed.run.id, ordinal: observed.run.ordinal });
   return execution.inspectStage(intent, waiting);
+}
+
+function matchesPrerequisite(command: Start, prerequisite?: { base: string }) {
+  return !prerequisite || command.base === prerequisite.base;
+}
+
+function prerequisiteTarget(command: Start, prerequisite?: { prBase: string }) {
+  return prerequisite?.prBase ?? command.prBase;
 }

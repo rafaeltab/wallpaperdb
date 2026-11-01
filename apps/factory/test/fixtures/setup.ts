@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, chmod, copyFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, chmod, copyFile, readFile, rm, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -35,7 +35,11 @@ export async function protocol() {
     configFile,
     config,
     binary: join(directory, 't3'),
-    save: async (patch: object) => writeFile(configFile, JSON.stringify({ ...config, ...patch })),
+    save: async (patch: object) => {
+      const next = configFile + '.next';
+      await writeFile(next, JSON.stringify({ ...config, ...patch }));
+      await rename(next, configFile);
+    },
     calls: async () =>
       (await readFile(join(directory, 'calls.jsonl'), 'utf8'))
         .split('\n')

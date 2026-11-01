@@ -103,7 +103,10 @@ export const SchedulerLive = Layer.effect(
             }
           );
           if (!validated.selected.length) continue;
-          const command = plannedStart(selection, preview, base);
+          const planned = plannedStart(selection, preview, base);
+          const inspected = yield* issues.inspect(selection.issue);
+          if (!dispatchable(inspected, current.jobs)) continue;
+          const command = prerequisiteStart(planned, inspected.prerequisite);
           if (!(yield* reserve(command, current))) continue;
           revision++;
           yield* (yield* pool.job(selection.issue)).start(command);
@@ -154,8 +157,9 @@ export const SchedulerLive = Layer.effect(
           if (!eligible(issue)) return { kind: 'rejected' as const };
           const snapshot = yield* status();
           if (locallyBlocked(issue.blockers, snapshot.jobs)) return { kind: 'rejected' as const };
-          if (!(yield* reserve(command, snapshot))) return { kind: 'occupied' as const };
-          return yield* (yield* pool.job(command.issue)).start(command);
+          const resolved = prerequisiteStart(command, issue.prerequisite);
+          if (!(yield* reserve(resolved, snapshot))) return { kind: 'occupied' as const };
+          return yield* (yield* pool.job(command.issue)).start(resolved);
         }).pipe(Effect.withSpan('factory.scheduler.start')),
       tick: (base) =>
         Effect.gen(function* () {
@@ -291,4 +295,25 @@ function successorRun(previous: ResumeClaim['run'], current: ResumeClaim['run'])
 
 function resolvedStart(claim: ResumeClaim, result: import('../job/index.js').StartResult) {
   return result.kind === 'job' && recoveredResume(claim, [result]);
+}
+
+function prerequisiteStart(
+  command: Start,
+  prerequisite?: { base: string; prBase: string; evidence: string }
+): Start {
+  return prerequisite
+    ? {
+        ...command,
+        base: prerequisite.base,
+        prBase: prerequisite.prBase,
+        context: `${command.context}\nVerified prerequisite evidence: ${prerequisite.evidence}`,
+      }
+    : command;
+}
+
+function dispatchable(
+  issue: Parameters<typeof eligible>[0] & { blockers: readonly number[] },
+  jobs: readonly Status[]
+) {
+  return eligible(issue) && !locallyBlocked(issue.blockers, jobs);
 }

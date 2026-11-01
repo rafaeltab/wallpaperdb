@@ -11,6 +11,7 @@ export interface Intent {
   readonly id: string;
   readonly issue: number;
   readonly issueUrl: string;
+  readonly prBase?: string;
   readonly base: string;
   readonly context: string;
   readonly branch: string;
@@ -79,6 +80,7 @@ export interface Issues {
       labels: readonly string[];
       /** Complete explicit blocking issue identities, including native and fallback edges. */
       blockers: readonly number[];
+      prerequisite?: { readonly base: string; readonly prBase: string; readonly evidence: string };
       blockersReady: boolean;
       url: string;
     },
@@ -102,6 +104,7 @@ export interface Execution {
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
   readonly issue: number;
+  readonly prBase?: string;
   readonly base: string;
   readonly context: string;
 }

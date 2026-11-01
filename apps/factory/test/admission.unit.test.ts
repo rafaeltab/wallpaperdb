@@ -98,3 +98,33 @@ it('reserves competing requests once before external launch', async () => {
     await app.runtime.dispose();
   }
 });
+
+it.each(['a', 'b'])(
+  'binds launch to the currently verified prerequisite commit %s',
+  async (letter) => {
+    const app = setup({
+      ...facts,
+      prerequisite: {
+        base: letter.repeat(40),
+        prBase: 'factory/A',
+        evidence: 'Reviewed A and passing CI',
+      },
+    });
+    try {
+      const result = await app.start();
+      if (letter === 'b') {
+        expect(result).toEqual({ kind: 'rejected' });
+        expect(app.launches()).toBe(0);
+        expect(await app.saved()).toBeNull();
+      } else {
+        expect(result).toMatchObject({
+          kind: 'job',
+          intent: { base: 'a'.repeat(40), prBase: 'factory/A' },
+        });
+        expect(app.launches()).toBe(1);
+      }
+    } finally {
+      await app.runtime.dispose();
+    }
+  }
+);

@@ -88,6 +88,22 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   );
   if (!help.includes('--worktree') || !help.includes('--model'))
     throw new Error('T3 installation lacks required headless thread interface');
+  const readyPrerequisites = () =>
+    Effect.gen(function* () {
+      const result: { issue: number; pr: number; commit: string }[] = [];
+      for (const admission of (yield* scheduleStore.read()).admissions) {
+        const status = yield* (yield* pool.job(admission.issue)).status();
+        if (status.kind !== 'job' || !status.delivery?.ready) continue;
+        const pr = status.delivery.pr;
+        if (pr?.kind === 'found')
+          result.push({
+            issue: admission.issue,
+            pr: Number(pr.url.split('/').at(-1)),
+            commit: pr.commit,
+          });
+      }
+      return result;
+    });
   const jobDeps = (directory: string) =>
     Layer.mergeAll(
       Layer.succeed(Time, systemTime),
@@ -99,6 +115,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           prBase: configuration.FACTORY_PR_BASE,
           base: configuration.FACTORY_BASE,
           prerequisites: configuration.FACTORY_PREREQUISITES,
+          readyPrerequisites,
         })
       ),
       Layer.succeed(
@@ -160,6 +177,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             base: configuration.FACTORY_BASE,
             prBase: configuration.FACTORY_PR_BASE,
             prerequisites: configuration.FACTORY_PREREQUISITES,
+            readyPrerequisites,
           },
           job
         );

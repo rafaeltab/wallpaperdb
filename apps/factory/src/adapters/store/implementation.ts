@@ -9,6 +9,7 @@ const intentSchema = z
     id: z.string().min(1),
     issue: z.number().int().positive(),
     issueUrl: z.string().url(),
+    prBase: z.string().optional(),
     base: z.string().regex(/^[a-f0-9]{40}$/),
     context: z.string(),
     branch: z.string(),
@@ -244,6 +245,7 @@ const scheduleSchema = z
       z
         .object({
           issue: z.number().int().positive(),
+          prBase: z.string().optional(),
           base: z.string().regex(/^[a-f0-9]{40}$/),
           context: z.string().max(16000),
         })

@@ -40,10 +40,22 @@ it('translates external issue observations and rejects unverified or malformed d
     });
     await host.save({ blockers: [{ number: 573, state: 'open' }], prHead: host.base });
     expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: true });
-    await host.save({ body: 'Blocked by: #573\nParent: #571', prHead: host.base });
+    await host.save({
+      body: `Blocked by: #573\nParent: #571\nhttps://github.com/rafaeltab/wallpaperdb/pull/591 ${host.base}`,
+      prHead: host.base,
+    });
     expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: true });
     await host.save({ blockers: [{ number: 573, state: 'open' }], prHead: 'b'.repeat(40) });
     expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: false });
+    await host.save({
+      blockers: [{ number: 573, state: 'closed' }],
+      issueStates: { 573: 'CLOSED' },
+    });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: true });
+    await host.save({
+      blockers: Array.from({ length: 101 }, (_, index) => ({ number: index + 1, state: 'open' })),
+    });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
     await host.save({ githubMalformed: true });
     await expect(Effect.runPromise(adapter.inspect(576))).rejects.toMatchObject({
       _tag: 'Unavailable',
@@ -52,6 +64,77 @@ it('translates external issue observations and rejects unverified or malformed d
     process.env.PATH = path;
     if (fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = fixture;
+    await host.cleanup();
+  }
+});
+
+it('selects a verified child base and blocks divergent joins using real Git ancestry', async () => {
+  const host = await protocol();
+  const path = process.env.PATH;
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.PATH = host.directory + ':' + path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', host.repository, ...args], { encoding: 'utf8' }).trim();
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'A'
+    );
+    const a = git('rev-parse', 'HEAD');
+    git('checkout', '-b', 'fork', host.base);
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'divergent'
+    );
+    const divergent = git('rev-parse', 'HEAD');
+    const adapter = githubIssues({
+      project: host.repository,
+      base: host.base,
+      prerequisites: [
+        { issue: 573, pr: 591, commit: a },
+        { issue: 574, pr: 592, commit: divergent },
+      ],
+    });
+    await host.save({
+      blockers: [{ number: 573, state: 'open' }],
+      prerequisiteHeads: { 591: a, 592: divergent },
+    });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({
+      blockersReady: true,
+      prerequisite: { base: a, prBase: 'factory/pr-591' },
+    });
+    await host.save({
+      blockers: [
+        { number: 573, state: 'open' },
+        { number: 574, state: 'open' },
+      ],
+      prerequisiteHeads: { 591: a, 592: divergent },
+    });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
+    await host.save({
+      blockers: [{ number: 573, state: 'open' }],
+      prerequisiteHeads: { 591: a },
+      prerequisiteCI: 'FAILURE',
+    });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
+  } finally {
+    process.env.PATH = path;
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
     await host.cleanup();
   }
 });

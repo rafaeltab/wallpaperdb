@@ -129,6 +129,7 @@ function fixture() {
             blockers: candidate?.blockers ?? [],
             blockersReady: candidate?.blockersReady ?? false,
             url: issue(number).url,
+            prerequisite: candidate?.prerequisite,
           };
         }),
       pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
@@ -504,6 +505,45 @@ it('does not manually admit a dependent of parked work even with claimed prerequ
       kind: 'job',
     });
     expect(f.launches).toEqual([1, 3]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('admits both forks at the verified prerequisite tip and retains their PR target', async () => {
+  const f = fixture();
+  const a = 'b'.repeat(40);
+  try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 2, allowance: -1, paused: false }));
+    f.setIssues([issue(1)]);
+    await f.run((s) => s.tick(base));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing prerequisite');
+    f.statuses.set(1, {
+      ...first,
+      delivery: { stage: 'ci', commit: a, ready: true, landed: false },
+    });
+    f.setIssues(
+      [2, 3].map((number) => ({
+        ...issue(number),
+        blockers: [1],
+        prerequisite: {
+          base: a,
+          prBase: 'factory/A',
+          evidence: 'Issue 1, PR 10, reviewed A with passing CI',
+        },
+      }))
+    );
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1, 2, 3]);
+    expect(f.snapshot().admissions.slice(1)).toEqual(
+      [2, 3].map((number) => ({
+        issue: number,
+        base: a,
+        prBase: 'factory/A',
+        context: '\nVerified prerequisite evidence: Issue 1, PR 10, reviewed A with passing CI',
+      }))
+    );
   } finally {
     await f.runtime.dispose();
   }

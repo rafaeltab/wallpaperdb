@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
@@ -77,14 +77,29 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           ? [JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))]
           : [])
     );
-  else if (args[0] === 'pr') reply({ headRefOid: config.prHead ?? 'a'.repeat(40), state: 'OPEN' });
+  else if (args[0] === 'pr')
+    reply({
+      headRefOid: config.prerequisiteHeads?.[args[2]] ?? config.prHead ?? 'a'.repeat(40),
+      state: 'OPEN',
+      url: `https://github.com/rafaeltab/wallpaperdb/pull/${args[2]}`,
+      headRefName: `factory/pr-${args[2]}`,
+      mergeable: 'MERGEABLE',
+      statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
+        (name) => ({ name, status: 'COMPLETED', conclusion: config.prerequisiteCI ?? 'SUCCESS' })
+      ),
+    });
   else
     reply({
       number: Number(args[2]),
-      state: 'OPEN',
+      state: config.issueStates?.[args[2]] ?? 'OPEN',
       author: { login: 'rafaeltab' },
       url: `https://github.com/rafaeltab/wallpaperdb/issues/${args[2]}`,
-      body: config.body ?? '',
+      body:
+        config.body ??
+        Object.entries(config.prerequisiteHeads ?? { 591: config.prHead })
+          .filter(([, sha]) => sha)
+          .map(([pr, sha]) => `https://github.com/rafaeltab/wallpaperdb/pull/${pr} ${sha}`)
+          .join('\n'),
       labels: [{ name: 'ready-for-agent' }],
     });
 } else if (args[0] === 'acp-mcp-call') {
@@ -121,15 +136,21 @@ else if (args[1] === 'start') {
     args[2] !== 'project-id'
   )
     process.exit(3);
-  const worktree = join(config.directory, 'worker');
+  const worktree = join(
+    config.directory,
+    config.parallel ? `worker-${flag('--branch').replaceAll('/', '-')}` : 'worker'
+  );
   execFileSync('git', ['worktree', 'add', '-b', flag('--branch'), worktree, flag('--worktree')], {
     cwd: config.repository,
     stdio: 'pipe',
   });
   writeFileSync(
-    join(config.directory, 'resource.json'),
+    join(
+      config.directory,
+      config.parallel ? `resource-${flag('--branch').replaceAll('/', '-')}.json` : 'resource.json'
+    ),
     JSON.stringify({
-      threadId: 'thread-live',
+      threadId: config.parallel ? flag('--branch') : 'thread-live',
       projectId: 'project-id',
       title: flag('--title'),
       providerInstanceId: 'codex',
@@ -184,13 +205,28 @@ else if (args[1] === 'start') {
     writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));
     await new Promise((resolve) => setTimeout(resolve, 30000));
   }
-  const resource = existsSync(join(config.directory, 'resource.json'))
-    ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
-    : null;
+  const parallelResources = config.parallel
+    ? readdirSync(config.directory)
+        .filter((name) => name.startsWith('resource-'))
+        .map((name) => JSON.parse(readFileSync(join(config.directory, name), 'utf8')))
+    : [];
+  const resource = config.parallel
+    ? parallelResources.find((item) => item.threadId === args[2])
+    : existsSync(join(config.directory, 'resource.json'))
+      ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
+      : null;
   if (resource && args[1] === 'show') Object.assign(resource, config.overrides);
   if (config.malformed) console.log('{broken');
   else if (args[1] === 'list')
-    reply(resource ? (config.duplicate ? [resource, resource] : [resource]) : []);
+    reply(
+      config.parallel
+        ? parallelResources
+        : resource
+          ? config.duplicate
+            ? [resource, resource]
+            : [resource]
+          : []
+    );
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,

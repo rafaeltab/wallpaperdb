@@ -39,6 +39,7 @@ if (config.planning && basename(process.argv[1]) === 'gh') {
   const prompt = args[3] === '-' ? readFileSync(0, 'utf8') : args[3];
   const request = JSON.parse(prompt.split('Request: ')[1]);
   writeFileSync(join(config.directory, 'planner.json'), JSON.stringify(request));
+  if (config.planner.lostStart) process.exit(1);
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
 } else if (config.planner && args[1] === 'show') {
   const { requestId } = JSON.parse(readFileSync(join(config.directory, 'planner.json'), 'utf8'));

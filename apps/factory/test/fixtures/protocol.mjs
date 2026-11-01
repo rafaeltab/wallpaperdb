@@ -8,6 +8,94 @@ appendFileSync(
   join(config.directory, 'calls.jsonl'),
   JSON.stringify({ binary: basename(process.argv[1]), args }) + '\n'
 );
+if (config.joinWriter && basename(process.argv[1]) === 't3') {
+  console.log(
+    JSON.stringify(
+      args[1] === 'list'
+        ? [{ threadId: 'writer-C' }]
+        : {
+            thread: {
+              projectId: 'project-id',
+              branch: 'C',
+              status: 'running',
+              pendingRequestCount: 0,
+            },
+          }
+    )
+  );
+  process.exit(0);
+}
+if (config.join && basename(process.argv[1]) === 'gh') {
+  const statePath = join(config.directory, 'join-live.json');
+  const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : config.join;
+  const number = Number(args[2]);
+  const flag = (name) => args[args.indexOf(name) + 1];
+  const git = (...values) =>
+    execFileSync('git', ['-C', config.repository, ...values], { encoding: 'utf8' }).trim();
+  let result = {};
+  if (args[0] === 'issue' && args[1] === 'view')
+    result = {
+      number,
+      state: 'OPEN',
+      author: { login: 'rafaeltab' },
+      url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+      labels: [{ name: 'ready-for-agent' }],
+      body: state.evidence,
+    };
+  else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');
+  else if (args[0] === 'api' && args[1].includes('dependencies'))
+    result = [
+      [
+        { number: 3, state: 'open' },
+        { number: 4, state: 'open' },
+      ],
+    ];
+  else if (args[0] === 'pr' && args[1] === 'view') {
+    const item = state.prs[String(number)];
+    const head = git('ls-remote', '--heads', 'origin', `refs/heads/${item.branch}`).split(/\s/)[0];
+    result = {
+      url: `https://github.com/rafaeltab/wallpaperdb/pull/${number}`,
+      headRefOid: head,
+      headRefName: item.branch,
+      baseRefName: item.base,
+      baseRefOid: git('rev-parse', item.base),
+      state: 'OPEN',
+      mergeable: 'MERGEABLE',
+      statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
+        (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+      ),
+    };
+  } else if (args[0] === 'pr' && args[1] === 'edit')
+    state.prs[String(number)].base = flag('--base');
+  else if (args[0] === 'stack' && args[1] === 'link')
+    state.members = args.filter((value) => value.startsWith('https://'));
+  else if (args[0] === 'api' && args.includes('POST')) state.members = [];
+  else if (args[0] === 'api' && args[1].includes('/stacks'))
+    result = state.members.length
+      ? [
+          {
+            number: 9,
+            pull_requests: state.members.map((url) => ({ number: Number(url.split('/').at(-1)) })),
+          },
+        ]
+      : [];
+  const boundary =
+    args[0] === 'stack'
+      ? 'group'
+      : args[0] === 'pr' && args[1] === 'edit'
+        ? 'base'
+        : args[0] === 'issue' && args[1] === 'comment'
+          ? 'evidence'
+          : null;
+  if (state.lose === boundary && boundary) {
+    state.lose = null;
+    writeFileSync(statePath, JSON.stringify(state));
+    process.exit(1);
+  }
+  writeFileSync(statePath, JSON.stringify(state));
+  console.log(JSON.stringify(result));
+  process.exit(0);
+}
 const mcpSend = args[0] === 'acp-mcp-call' && args[1] === 't3_thread_send';
 if (mcpSend) {
   const input = JSON.parse(args[2]);

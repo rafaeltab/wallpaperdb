@@ -73,6 +73,9 @@ export interface Control {
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface Issues {
+  /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
+   * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
+  prepare?(issue: number): Effect.Effect<void, Unavailable>;
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
   /** A candidate is a previously selected launch comparison, not a replacement
    * operator pin. For prerequisites, return that exact base only after current
@@ -90,6 +93,8 @@ export interface Issues {
       blockers: readonly number[];
       prerequisite?: { readonly base: string; readonly prBase: string; readonly evidence: string };
       blockersReady: boolean;
+      joinRequired?: boolean;
+      blockedReason?: string;
       url: string;
     },
     Unavailable

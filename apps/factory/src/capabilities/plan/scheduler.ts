@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Semaphore } from 'effect';
 import { Issues, type Start, type Status } from '../job/index.js';
 import {
   Plan,
@@ -40,6 +40,7 @@ export const SchedulerLive = Layer.effect(
     const plan = yield* Plan;
     const issues = yield* Issues;
     const source = yield* PlanningSource;
+    const writers = yield* Semaphore.make(1);
     let lastInput: string | undefined;
     const observe = (
       state: ScheduleState
@@ -104,7 +105,12 @@ export const SchedulerLive = Layer.effect(
           );
           if (!validated.selected.length) continue;
           const planned = plannedStart(selection, preview, base);
-          const inspected = yield* issues.inspect(selection.issue);
+          if (!available(current.state, current.jobs)) break;
+          let inspected = yield* issues.inspect(selection.issue);
+          if (inspected.joinRequired && !locallyBlocked(inspected.blockers, current.jobs)) {
+            yield* issues.prepare?.(selection.issue) ?? Effect.void;
+            inspected = yield* issues.inspect(selection.issue);
+          }
           if (!dispatchable(inspected, current.jobs)) continue;
           const command = prerequisiteStart(planned, inspected.prerequisite);
           if (!(yield* reserve(command, current))) continue;
@@ -153,14 +159,24 @@ export const SchedulerLive = Layer.effect(
       start: (command) =>
         Effect.gen(function* () {
           if (!validStart(command)) return { kind: 'rejected' as const };
-          const issue = yield* issues.inspect(command.issue);
+          let issue = yield* issues.inspect(command.issue);
+          const before = yield* status();
+          if (!available(before.state, before.jobs)) return { kind: 'occupied' as const };
+          if (
+            eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }) &&
+            !locallyBlocked(issue.blockers, before.jobs) &&
+            issue.joinRequired
+          ) {
+            yield* issues.prepare?.(command.issue) ?? Effect.void;
+            issue = yield* issues.inspect(command.issue);
+          }
           if (!eligible(issue)) return { kind: 'rejected' as const };
           const snapshot = yield* status();
           if (locallyBlocked(issue.blockers, snapshot.jobs)) return { kind: 'rejected' as const };
           const resolved = prerequisiteStart(command, issue.prerequisite);
           if (!(yield* reserve(resolved, snapshot))) return { kind: 'occupied' as const };
           return yield* (yield* pool.job(command.issue)).start(resolved);
-        }).pipe(Effect.withSpan('factory.scheduler.start')),
+        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.start')),
       tick: (base) =>
         Effect.gen(function* () {
           yield* reconcile();
@@ -181,7 +197,7 @@ export const SchedulerLive = Layer.effect(
           if (preview.input.scheduleRevision !== snapshot.state.revision) return yield* status();
           yield* dispatch(preview, base, snapshot.state.revision);
           return yield* status();
-        }).pipe(Effect.withSpan('factory.scheduler.tick')),
+        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.tick')),
       resume: (command) =>
         Effect.gen(function* () {
           const snapshot = yield* status();
@@ -202,7 +218,7 @@ export const SchedulerLive = Layer.effect(
           if (result.kind === 'rejected' || resolvedStart(claim, result))
             yield* releaseResume(claim);
           return result;
-        }).pipe(Effect.withSpan('factory.scheduler.resume')),
+        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.resume')),
       cancel: (id) =>
         Effect.gen(function* () {
           const job = yield* commandJob(id);

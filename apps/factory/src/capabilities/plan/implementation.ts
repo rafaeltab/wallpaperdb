@@ -15,7 +15,8 @@ function exclusion(issue: PlanningIssue): string | undefined {
   if (!issue.labels.includes('ready-for-agent')) return 'Not ready for agent';
   if (issue.labels.includes('future-work')) return 'Postponed future work';
   if (issue.labels.includes('spec')) return 'Spec requires implementation tickets';
-  if (!issue.blockersReady) return 'Explicit blockers lack verified prerequisite readiness';
+  if (!issue.blockersReady && !issue.joinRequired)
+    return issue.blockedReason ?? 'Explicit blockers lack verified prerequisite readiness';
   return undefined;
 }
 function cycleCheck(issues: readonly PlanningIssue[]) {

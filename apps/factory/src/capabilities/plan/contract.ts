@@ -12,6 +12,8 @@ export interface PlanningIssue {
   readonly blockers: readonly number[];
   readonly parents: readonly number[];
   readonly blockersReady: boolean;
+  readonly joinRequired?: boolean;
+  readonly blockedReason?: string;
   readonly prerequisiteEvidence: string;
   readonly prerequisite?: {
     readonly base: string;

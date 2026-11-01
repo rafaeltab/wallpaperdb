@@ -30,6 +30,8 @@ const issue = (number: number): PlanningIssue => ({
 function fixture() {
   const store = controlledScheduleStore();
   const snapshot = () => Effect.runSync(store.read());
+  const preparations: number[] = [];
+  let prepared = false;
   let duringPlan: (() => void) | undefined;
   const statuses = new Map<number, Status>();
   const launches: number[] = [];
@@ -119,6 +121,25 @@ function fixture() {
   };
   const deps = Layer.mergeAll(
     Layer.succeed(Issues, {
+      prepare: (number) =>
+        Effect.sync(() => {
+          preparations.push(number);
+          if (prepared)
+            issues = issues.map((i) =>
+              i.number === number
+                ? {
+                    ...i,
+                    blockersReady: true,
+                    joinRequired: false,
+                    prerequisite: {
+                      base: 'b'.repeat(40),
+                      prBase: 'factory/C',
+                      evidence: 'CI verified join',
+                    },
+                  }
+                : i
+            );
+        }),
       inspect: (number) =>
         Effect.sync(() => {
           const candidate = issues.find((i) => i.number === number);
@@ -128,6 +149,7 @@ function fixture() {
             labels: candidate?.labels ?? [],
             blockers: candidate?.blockers ?? [],
             blockersReady: candidate?.blockersReady ?? false,
+            joinRequired: candidate?.joinRequired,
             url: issue(number).url,
             prerequisite: candidate?.prerequisite,
           };
@@ -161,6 +183,10 @@ function fixture() {
     statuses,
     launches,
     resumed,
+    preparations,
+    prepareSucceeds: () => {
+      prepared = true;
+    },
     setIssues: (next: PlanningIssue[]) => {
       issues = next;
     },
@@ -569,6 +595,25 @@ it('preserves the full supported maintainer context when binding prerequisite ev
       base: 'b'.repeat(40),
       prBase: 'factory/A',
     });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('prepares a divergent join before reserving E and launches only from its verified tree', async () => {
+  const f = fixture();
+  try {
+    f.setIssues([{ ...issue(5), blockers: [3, 4], blockersReady: false, joinRequired: true }]);
+    await f.run((s) => s.tick(base));
+    expect(f.preparations).toEqual([5]);
+    expect(f.launches).toEqual([]);
+    expect(f.snapshot().admissions).toEqual([]);
+    f.prepareSucceeds();
+    expect(await f.run((s) => s.start({ issue: 5, base, context: '' }))).toMatchObject({
+      kind: 'job',
+      intent: { base: 'b'.repeat(40), prBase: 'factory/C' },
+    });
+    expect(f.launches).toEqual([5]);
   } finally {
     await f.runtime.dispose();
   }

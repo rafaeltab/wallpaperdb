@@ -4,8 +4,9 @@ import { z } from 'zod';
 import { Execution, Issues, Job, JobLive, JobStore, Time } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
 import { fileStore } from '../adapters/store/index.js';
-import { githubIssues } from '../adapters/github/index.js';
-import { t3Execution } from '../adapters/t3/index.js';
+import { Plan, PlanLive, PlanningSource, IPlanner } from '../capabilities/plan/index.js';
+import { githubIssues, githubPlanning } from '../adapters/github/index.js';
+import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
@@ -94,9 +95,34 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       })
     )
   );
+  const jobLayer = JobLive.pipe(Layer.provide(deps));
+  const planningDeps = Layer.mergeAll(
+    Layer.effect(
+      PlanningSource,
+      Effect.map(Job, (job) =>
+        githubPlanning(
+          {
+            project,
+            base: configuration.FACTORY_BASE,
+            prBase: configuration.FACTORY_PR_BASE,
+            prerequisites: configuration.FACTORY_PREREQUISITES,
+          },
+          job
+        )
+      )
+    ),
+    Layer.succeed(
+      IPlanner,
+      t3Planner({
+        project,
+        binary: configuration.FACTORY_T3_BINARY,
+        projectId: configuration.FACTORY_T3_PROJECT_ID,
+      })
+    )
+  ).pipe(Layer.provideMerge(jobLayer));
   const runtime = ManagedRuntime.make(
-    JobLive.pipe(
-      Layer.provide(deps),
+    PlanLive.pipe(
+      Layer.provideMerge(planningDeps),
       Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
     )
   );
@@ -105,6 +131,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
     job,
+    plan: await runtime.runPromise(Plan),
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
   try {

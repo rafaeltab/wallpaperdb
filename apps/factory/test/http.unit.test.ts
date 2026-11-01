@@ -342,3 +342,47 @@ it('hides cancellation after its durable command is accepted', async () => {
     }
   );
 });
+
+it('translates plan preview and rejects foreign origins without invoking planning', async () => {
+  let calls = 0;
+  const result = {
+    kind: 'preview' as const,
+    selected: [],
+    rejected: [{ issue: 580, reason: 'API unsettled' }],
+    input: {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1 as const, admission: 1 as const },
+    },
+  };
+  const app = operationsServer({
+    base: 'a'.repeat(40),
+    job: idle,
+    run: Effect.runPromise,
+    plan: {
+      preview: () =>
+        Effect.sync(() => {
+          calls++;
+          return result;
+        }),
+    },
+  });
+  try {
+    expect((await app.inject({ method: 'POST', url: '/api/plan', payload: {} })).json()).toEqual(
+      result
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/plan',
+          payload: {},
+          headers: { origin: 'https://evil.test' },
+        })
+      ).statusCode
+    ).toBe(403);
+    expect(calls).toBe(1);
+  } finally {
+    await app.close();
+  }
+});

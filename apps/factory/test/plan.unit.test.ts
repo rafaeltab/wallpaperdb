@@ -28,11 +28,16 @@ const proposal: Proposal = {
   selected: [{ issue: 580, reason: 'User-facing bug', dependsOn: [], conflicts: [] }],
   deferred: [],
 };
-async function preview(issues = [issue], proposed = proposal, changed = false) {
+async function preview(
+  issues = [issue],
+  proposed = proposal,
+  changed = false,
+  job: PlanningInput['job'] = { kind: 'empty' }
+) {
   let reads = 0;
   const input: PlanningInput = {
     issues,
-    job: { kind: 'empty' },
+    job,
     capacity: { concurrency: 1, admission: 1 },
   };
   const runtime = ManagedRuntime.make(
@@ -98,4 +103,37 @@ it('rejects duplicate and stale proposals', async () => {
     ).selected
   ).toEqual([]);
   expect(await preview([issue], proposal, true)).toMatchObject({ kind: 'stale', selected: [] });
+});
+
+it('keeps inferred API blockers and unselected work visible', async () => {
+  const result = await preview([issue, { ...issue, number: 579 }], {
+    selected: [],
+    deferred: [{ issue: 580, reason: 'API contract unsettled with active work' }],
+  });
+  expect(result.selected).toEqual([]);
+  expect(result.rejected).toEqual([
+    { issue: 580, reason: 'API contract unsettled with active work' },
+    { issue: 579, reason: 'Not selected by semantic planner' },
+  ]);
+});
+it('does not propose an already parked job as fresh work', async () => {
+  const job: PlanningInput['job'] = {
+    kind: 'job',
+    intent: {
+      id: 'existing',
+      issue: 580,
+      issueUrl: issue.url,
+      base: 'a'.repeat(40),
+      context: '',
+      branch: 'factory/existing',
+      createdAt: 0,
+      expectedStage: 'implementation',
+    },
+    execution: { kind: 'absent' },
+    elapsedMs: 100,
+    resume: { index: 0, questionId: 'q' },
+  };
+  const result = await preview([issue], proposal, false, job);
+  expect(result.selected).toEqual([]);
+  expect(result.rejected).toContainEqual({ issue: 580, reason: 'Already active or parked' });
 });

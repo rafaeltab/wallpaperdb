@@ -5,6 +5,7 @@ import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
+import type { Plan } from '../capabilities/plan/index.js';
 import { page } from './page.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
@@ -15,6 +16,7 @@ export function operationsServer(config: {
     effect: import('effect').Effect.Effect<A, import('../capabilities/job/index.js').Unavailable>
   ) => Promise<A>;
   job: Job;
+  plan?: Plan;
 }) {
   const app = Fastify({ bodyLimit: 20000 });
   const problem = (status: number, type: string, title: string) => ({
@@ -62,6 +64,25 @@ export function operationsServer(config: {
     const observed = operation.pipe(Effect.withSpan(name));
     return config.run(parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed);
   };
+  app.post('/api/plan', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (origin && origin !== `${request.protocol}://${request.headers.host}`)
+      return reply
+        .code(403)
+        .type('application/problem+json')
+        .send(problem(403, 'factory-origin', 'Request origin rejected'));
+    if (!config.plan)
+      return reply
+        .code(503)
+        .type('application/problem+json')
+        .send(problem(503, 'factory-unavailable', 'Plan preview unavailable'));
+    if (!z.object({}).strict().safeParse(request.body).success)
+      return reply
+        .code(400)
+        .type('application/problem+json')
+        .send(problem(400, 'factory-request', 'Preview accepts no overrides'));
+    return execute(request, 'factory.http.plan', config.plan.preview());
+  });
   app.get('/health', () => ({ status: 'ok' }));
   app.get('/api/job', (request) => execute(request, 'factory.http.status', config.job.status()));
   app.get('/', async (request, reply) =>

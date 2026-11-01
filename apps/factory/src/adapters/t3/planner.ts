@@ -78,12 +78,7 @@ export function t3Planner(config: {
               })
               .parse(await call(['show', launched.threadId, '--messages', '20'], signal));
             if (detail.thread.status === 'completed' || detail.thread.status === 'idle') {
-              const final = detail.messages
-                .filter((m) => m.role === 'assistant' && m.runId === launched.runId)
-                .at(-1);
-              const proposal = proposalSchema.parse(JSON.parse(final?.text ?? 'null'));
-              if (proposal.requestId !== requestId) throw new Error('Planner request mismatch');
-              return { selected: proposal.selected, deferred: proposal.deferred };
+              return translateProposal(detail.messages, launched.runId, requestId);
             }
             if (!['preparing', 'queued', 'starting', 'running'].includes(detail.thread.status))
               throw new Error('Planner did not complete');
@@ -97,4 +92,15 @@ export function t3Planner(config: {
         Effect.withSpan('factory.t3.plan')
       ),
   };
+}
+
+function translateProposal(
+  messages: readonly { role: string; runId?: string; text: string }[],
+  runId: string,
+  requestId: string
+) {
+  const final = messages.filter((m) => m.role === 'assistant' && m.runId === runId).at(-1);
+  const proposal = proposalSchema.parse(JSON.parse(final?.text ?? 'null'));
+  if (proposal.requestId !== requestId) throw new Error('Planner request mismatch');
+  return { selected: proposal.selected, deferred: proposal.deferred };
 }

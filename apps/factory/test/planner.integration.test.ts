@@ -23,12 +23,17 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     };
     await host.save({ planner: { proposal } });
     expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
-    for (const patch of [{ role: 'user' }, { malformed: true }]) {
+    for (const patch of [{ role: 'user' }, { malformed: true }, { status: 'failed' }]) {
       await host.save({ planner: { proposal, ...patch } });
       await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
         _tag: 'Unavailable',
       });
     }
+    await host.save({ planner: { proposal, status: 'running' } });
+    const abort = new AbortController();
+    const pending = Effect.runPromise(adapter.propose(input), { signal: abort.signal });
+    setTimeout(() => abort.abort(), 100);
+    await expect(pending).rejects.toBeDefined();
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;

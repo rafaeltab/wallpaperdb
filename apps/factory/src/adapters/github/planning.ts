@@ -53,9 +53,8 @@ export function githubPlanning(
             if (candidates.length >= 1000) throw new Error('Discovery exceeds supported bound');
             const queue = candidates.map((i) => i.number);
             const result: Omit<PlanningIssue, 'blockersReady' | 'prerequisiteEvidence'>[] = [];
-            while (queue.length) {
-              const number = queue.shift();
-              if (!number || result.some((i) => i.number === number)) continue;
+            for (const number of queue) {
+              if (result.some((i) => i.number === number)) continue;
               if (result.length >= 1000) throw new Error('Context exceeds supported bound');
               const issue = issueSchema.parse(
                 await gh(
@@ -111,32 +110,9 @@ export function githubPlanning(
                     signal
                   )
                 ).data.repository.issue.parent;
-              const parents = [
-                ...new Set([
-                  ...(parent ? [parent.number] : []),
-                  ...[
-                    ...issue.body.matchAll(
-                      /(?:^#{1,6} +Parent[^\n]*\n(?:\s*\n)*|^Parent:\s*)(?:https:\/\/github.com\/rafaeltab\/wallpaperdb\/issues\/|#)(\d+)/gim
-                    ),
-                  ].map((m) => Number(m[1])),
-                ]),
-              ];
-              const blockers = blockerNumbers(native, issue.body);
-              result.push({
-                number,
-                url: issue.url,
-                title: issue.title,
-                body: issue.body,
-                author: issue.author.login,
-                open: issue.state === 'OPEN',
-                labels: issue.labels.map((l) => l.name),
-                comments: issue.comments
-                  .filter((c) => c.author && trusted(c.author.login))
-                  .map((c) => ({ author: c.author?.login ?? '', body: c.body })),
-                blockers,
-                parents,
-              });
-              queue.push(...blockers, ...parents);
+              const translated = planningContext(issue, parent, native);
+              result.push(translated);
+              queue.push(...translated.blockers, ...translated.parents);
             }
             return result;
           },
@@ -162,5 +138,38 @@ export function githubPlanning(
           capacity: { concurrency: 1 as const, admission: 1 as const },
         };
       }),
+  };
+}
+
+function planningContext(
+  issue: z.infer<typeof issueSchema>,
+  parent: { number: number } | null,
+  native: readonly { number: number }[]
+) {
+  const number = issue.number;
+  const parents = [
+    ...new Set([
+      ...(parent ? [parent.number] : []),
+      ...[
+        ...issue.body.matchAll(
+          /(?:^#{1,6} +Parent[^\n]*\n(?:\s*\n)*|^Parent:\s*)(?:https:\/\/github.com\/rafaeltab\/wallpaperdb\/issues\/|#)(\d+)/gim
+        ),
+      ].map((m) => Number(m[1])),
+    ]),
+  ];
+  const blockers = blockerNumbers(native, issue.body);
+  return {
+    number,
+    url: issue.url,
+    title: issue.title,
+    body: issue.body,
+    author: issue.author.login,
+    open: issue.state === 'OPEN',
+    labels: issue.labels.map((l) => l.name),
+    comments: issue.comments
+      .filter((c) => c.author && trusted(c.author.login))
+      .map((c) => ({ author: c.author?.login ?? '', body: c.body })),
+    blockers,
+    parents,
   };
 }

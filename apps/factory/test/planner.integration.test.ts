@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
@@ -52,6 +53,44 @@ it('translates a bound assistant proposal and rejects malformed or user messages
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('returns Unavailable when the planner exits before consuming large context', async () => {
+  const host = await protocol();
+  try {
+    await writeFile(host.binary, '#!/bin/sh\nexit 1\n');
+    const adapter = t3Planner({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    await expect(
+      Effect.runPromise(
+        adapter.propose({
+          issues: [
+            {
+              number: 580,
+              url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+              title: 'Large context',
+              body: 'x'.repeat(150000),
+              author: 'rafaeltab',
+              open: true,
+              labels: ['ready-for-agent'],
+              comments: [],
+              parents: [],
+              blockers: [],
+              blockersReady: true,
+              prerequisiteEvidence: '',
+            },
+          ],
+          job: { kind: 'empty' },
+          capacity: { concurrency: 1, admission: 1 },
+        })
+      )
+    ).rejects.toMatchObject({ _tag: 'Unavailable' });
+  } finally {
     await host.cleanup();
   }
 });

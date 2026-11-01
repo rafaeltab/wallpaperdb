@@ -906,6 +906,7 @@ async function lockGenerationCheckout(
 				"release-stop-completion",
 				"release-daemon-generation",
 				"release-ordinary-generation",
+				"release-bootstrap",
 			])
 				fs.writeFileSync(path.join(control, name), "yes");
 		let commandCleanup;
@@ -1155,6 +1156,8 @@ if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
 if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'fail-bootstrap')))process.exit(45);
+if(argv.includes('ssh')&&command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')&&fs.existsSync(path.join(control,'pause-bootstrap'))){fs.writeFileSync(path.join(control,'entered-bootstrap'),'yes');while(!fs.existsSync(path.join(control,'release-bootstrap')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
+
 if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
 if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){
@@ -11364,7 +11367,12 @@ for (const variant of [
 		assert.equal(liveOwnedProcess(f.root, before.daemon), true);
 	});
 
-for (const transition of ["replacement", "replacement-idle", "same-worker"])
+for (const transition of [
+	"replacement",
+	"replacement-idle",
+	"replacement-bootstrap",
+	"same-worker",
+])
 	test(`fresh lifecycle real daemon retains automatic source and renewal across ${transition}`, async (t) => {
 		const f = await freshCheckout(t),
 			sibling = f.json(".boat/state.json").daemon;
@@ -11416,12 +11424,15 @@ if(process.argv[2]==='daemon'){
  let captured,held=false;
  fs.readFileSync=function(name,...args){const bytes=read.call(this,name,...args);if(String(name)===path.join(process.cwd(),'.boat/state.json'))captured=JSON.parse(bytes.toString());return bytes;};
  fs.mkdirSync=function(name,...args){
- if(!held&&/\\.boat\\/(source|lifecycle)\\.lock$/.test(String(name))){held=true;
+ if(!held&&path.basename(name)===${JSON.stringify(transition === "replacement-idle" ? "lifecycle.lock" : "source.lock")}){held=true;
  const tmp=path.join(control,'daemon-generation.tmp'),receipt=path.join(control,'daemon-generation.json');
  fs.writeFileSync(tmp,JSON.stringify({workerId:captured.id,requestedLock:path.basename(name),pid:process.pid}));fs.renameSync(tmp,receipt);
  while(!fs.existsSync(path.join(control,'release-daemon-generation')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  }
- return mkdir.call(this,name,...args);};
+ try {return mkdir.call(this,name,...args);} catch(error){
+ if(error.code==='EEXIST'&&held&&path.basename(name)==='lifecycle.lock')fs.writeFileSync(path.join(control,'daemon-bootstrap-wait'),'yes');
+ throw error;
+ }};
 }`,
 		);
 		f.env.NODE_OPTIONS = `--require=${hook}`;
@@ -11449,7 +11460,33 @@ if(process.argv[2]==='daemon'){
 				daemonPid: identity.pid,
 			}),
 		);
-		const foreground = await f.generate();
+		if (transition === "replacement-bootstrap") flag(f, "pause-bootstrap");
+		const pending = f.generate();
+		if (transition === "replacement-bootstrap") {
+			await observed(
+				() => fs.existsSync(path.join(f.control, "entered-bootstrap")),
+				"published candidate waiting for bootstrap",
+			);
+			assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+			flag(f, "release-daemon-generation");
+			await observed(
+				() => fs.existsSync(path.join(f.control, "daemon-bootstrap-wait")),
+				"daemon lifecycle gate waits for bootstrap",
+			);
+			assert.equal(
+				fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+				"original unrelated source\n",
+			);
+			assert.equal(
+				freshCalls(f).some(
+					(a) => a.includes("extend") || a.at(-1).includes("tar -xzf -"),
+				),
+				false,
+			);
+			assert.equal(daemon.terminal, null, daemon.output());
+			flag(f, "release-bootstrap");
+		}
+		const foreground = await pending;
 		assert.equal(foreground.status, 0, foreground.output);
 		const id = transition !== "same-worker" ? "fake-new-worker" : "fake-worker";
 		assert.equal(f.json(".boat/state.json").id, id);

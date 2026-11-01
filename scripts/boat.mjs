@@ -269,13 +269,7 @@ function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(
-	fn,
-	name = "lifecycle",
-	deadline = Infinity,
-	shutdown,
-	{ waitForOwner = true } = {},
-) {
+async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
 		if (shutdown && performance.now() >= shutdown.deadline)
@@ -295,7 +289,6 @@ async function lock(
 				pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
 			} catch (error) {
 				if (error.code !== "ENOENT") throw error;
-				if (!waitForOwner) return null;
 				if (attempt > 600) throw new Error("Lifecycle lock timed out");
 				// mkdir/pid publication and owner release are separate filesystem steps.
 				// Missing publication never authorizes removing another owner's lock.
@@ -317,7 +310,6 @@ async function lock(
 				fs.rmSync(lockDir, { recursive: true, force: true });
 				continue;
 			}
-			if (!waitForOwner) return null;
 			if (attempt > 600) throw new Error("Lifecycle lock timed out");
 			await wait(
 				Math.max(
@@ -1499,31 +1491,35 @@ async function runDaemon() {
 			if (stopped === false) continue;
 			return;
 		}
-		// Select and use one generation after bootstrap, in lifecycle -> source
-		// order. A busy source owner yields the lifecycle lock immediately so other
-		// foreground commands can publish leases and wait on source normally.
+		// Selection waits for lifecycle/bootstrap, then releases it before waiting
+		// for source. Source ownership prevents publication from splitting sync and
+		// renewal; a changed selection explicitly supersedes only this daemon cycle.
+		const selected = await lock(() => {
+			const current = read(stateFile);
+			return current.id && current.runningSince ? current.id : null;
+		});
+		if (!selected) return;
 		const running = await lock(async () => {
 			const current = read(stateFile);
-			if (!current.id || !current.runningSince) return false;
-			return lock(
-				async () => {
-					await syncOwned(current.id);
-					const fresh = read(stateFile);
-					if (
-						Date.now() - extended > 60000 &&
-						(active || Date.now() - fresh.lastActivity < 60000)
-					) {
-						await boat(["extend", current.id, "--ttl", "2100"]);
-						extended = Date.now();
-					}
-					return true;
-				},
-				"source",
-				Infinity,
-				undefined,
-				{ waitForOwner: false },
-			);
-		});
+			if (current.id !== selected) return "superseded";
+			if (!current.runningSince) return false;
+			await syncOwned(selected);
+			const fresh = read(stateFile);
+			// Stop may run while source is owned, as before. Never renew its stopped or
+			// DIRTY generation after an in-flight flush completes.
+			if (
+				fresh.id === selected &&
+				fresh.runningSince &&
+				fresh.snapshotRecovery?.status === "ACTIVE" &&
+				Date.now() - extended > 60000 &&
+				(active || Date.now() - fresh.lastActivity < 60000)
+			) {
+				await boat(["extend", selected, "--ttl", "2100"]);
+				extended = Date.now();
+			}
+			return true;
+		}, "source");
+		if (running === "superseded") continue;
 		if (running === false) return;
 		event("resources", {
 			local: resourceSample(),

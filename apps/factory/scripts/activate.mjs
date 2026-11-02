@@ -42,6 +42,7 @@ After=network-online.target
 Type=simple
 WorkingDirectory=${dirname(config)}
 Environment="PATH=${process.env.PATH.replaceAll('%', '%%').replaceAll('"', '\\"')}"
+EnvironmentFile=${config}
 ExecStart=/usr/bin/flock --nonblock --no-fork ${state}/service.lock ${installation.node} --env-file=${config} ${release}/main.js
 Restart=on-failure
 RestartSec=5

@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { chmod, readFile, writeFile, readdir, rename } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -1116,8 +1115,23 @@ it('reconciles the original join request when explicit blockers include a closed
       { number: 4, state: 'open' },
       { number: 9, state: 'closed' },
     ];
+    const landed = f.git('rev-parse', 'A');
+    f.git('push', 'origin', 'A:main');
     config.join.closedIssues = [9];
-    await writeFile(f.host.configFile, JSON.stringify(config));
+    config.issueStates = { 9: 'CLOSED' };
+    config.defaultBranch = { name: 'main', tip: landed };
+    config.landedPrerequisites = { 9: [101] };
+    config.mergedPrerequisites = {
+      101: {
+        merged: true,
+        merge_commit_sha: landed,
+        head: { sha: landed },
+        html_url: 'https://github.com/rafaeltab/wallpaperdb/pull/101',
+        base: { ref: 'main', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+      },
+    };
+    config.join.prs[101].state = 'MERGED';
+    await f.host.save(config);
     await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
     await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
     expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { writeFile, readFile, rename } from 'node:fs/promises';
+import { writeFile, readFile, rename, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -9,7 +9,12 @@ import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
 import { protocol } from './fixtures/setup.js';
 
-async function fixture(pin = false, retarget = false, multipleClosed = false) {
+async function fixture(
+  pin = false,
+  retarget = false,
+  multipleClosed = false,
+  recovery?: { outcome?: 'SIMPLE' | 'COMPLEX'; review?: boolean }
+) {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
@@ -25,6 +30,8 @@ async function fixture(pin = false, retarget = false, multipleClosed = false) {
   git('switch', '-c', 'A');
   const commit = async (name: string) => {
     await writeFile(join(host.repository, `${name}.txt`), name);
+    if (recovery && ['B', 'C'].includes(name))
+      await writeFile(join(host.repository, 'shared.txt'), name);
     git('add', '.');
     git('commit', '-m', name);
     return git('rev-parse', 'HEAD');
@@ -83,6 +90,7 @@ async function fixture(pin = false, retarget = false, multipleClosed = false) {
   };
   let config = {
     lost: false,
+    restack: recovery,
     issueStates: { 1: 'CLOSED', ...(multipleClosed ? { 9: 'CLOSED' } : {}) },
     defaultBranch: { name: 'primary', tip: landed },
     landedPrerequisites: { 1: [101], ...(multipleClosed ? { 9: [199] } : {}) },
@@ -574,3 +582,142 @@ it.each([
     await f.close();
   }
 });
+
+it.each([
+  { outcome: 'SIMPLE' as const, review: false, accepted: true },
+  { outcome: 'COMPLEX' as const, review: true, accepted: true },
+  { outcome: 'COMPLEX' as const, review: false, accepted: false },
+  { outcome: undefined, review: false, accepted: false },
+])(
+  'retains the mixed landed boundary through classified conflict recovery, $outcome/$review',
+  async (recovery) => {
+    const f = await fixture(true, true, false, recovery);
+    try {
+      await f.mutate({ newCI: 'FAILURE' });
+      const issues = f.issues();
+      if (!issues.prepare) throw new Error('Missing prepare');
+      await Effect.runPromise(issues.prepare(4));
+      expect((await Effect.runPromise(issues.inspect(4))).blockersReady).toBe(false);
+      const reopened = f.issues();
+      if (!reopened.reconcile) throw new Error('Missing reconcile');
+      await Effect.runPromise(reopened.reconcile());
+      expect((await Effect.runPromise(reopened.inspect(4))).blockersReady).toBe(false);
+      await f.mutate({ newCI: 'SUCCESS' });
+      await Effect.runPromise(reopened.reconcile());
+      const ready = await Effect.runPromise(reopened.inspect(4));
+      expect(ready.blockersReady).toBe(recovery.accepted);
+      console.log(
+        JSON.stringify({
+          demo: 'mixed-landed-conflict-recovery',
+          provenance:
+            'Production Issues/Git/T3 adapters, real isolated worktrees and local bare remote; controlled GitHub/T3/resolution/review/CI protocols and original operator assertions. No live model or fixture PR publication.',
+          expectedOutcome: recovery.outcome ?? 'unknown',
+          reviewAccepted: recovery.review,
+          blockersReady: ready.blockersReady,
+          head: ready.prerequisite?.base,
+          tree: ready.prerequisite
+            ? f.git('rev-parse', `${ready.prerequisite.base}^{tree}`)
+            : undefined,
+          recovery: await Effect.runPromise(reopened.recoveries?.() ?? Effect.succeed([])),
+        })
+      );
+      const calls = await f.host.calls();
+      const launches = calls.filter((call) => call.args[1] === 'start');
+      expect(launches).toHaveLength(1);
+      const prompt = launches[0]?.args[3] ?? '';
+      expect(prompt).toContain(f.base);
+      expect(prompt).toContain(f.landed);
+      expect(prompt).toContain(f.original);
+      expect(calls.filter((call) => call.args[1] === 'send')).toHaveLength(
+        recovery.outcome === 'COMPLEX' ? 1 : 0
+      );
+      if (!recovery.accepted) return;
+      const head = ready.prerequisite?.base;
+      if (!head) throw new Error('Missing recovered join head');
+      expect(f.git('show', `${head}:A.txt`)).toBe('A landed');
+      expect(f.git('show', `${head}:shared.txt`)).toBe(
+        recovery.outcome === 'COMPLEX'
+          ? "export const behavior = () => 'resolved D and C behavior';"
+          : 'resolved D and C behavior'
+      );
+      for (const name of ['B', 'C', 'operator', 'upstream'])
+        expect(f.git('show', `${head}:${name}.txt`)).toBe(name);
+      expect(f.git('merge-base', '--is-ancestor', f.base, head)).toBe('');
+      expect(f.git('merge-base', '--is-ancestor', f.landed, head)).toBe('');
+      expect(f.git('log', '--format=%s', `${f.base}..${head}`)).toBe('C\nB');
+      expect(f.git('rev-list', '--merges', `${f.base}..${head}`)).toBe('');
+      const metadata = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+      expect(metadata.prs['101'].base).toBe('primary');
+      expect(metadata.prs['102'].base).toBe('operator/base');
+      expect(metadata.prs['103'].base).toBe('B');
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it('withholds a recovery launch when its durable landed facts drift before restart', async () => {
+  const f = await fixture(true, false, false, { outcome: 'SIMPLE' });
+  try {
+    const issues = f.issues();
+    if (!issues.prepare) throw new Error('Missing prepare');
+    await Effect.runPromise(issues.prepare(4));
+    await f.set({
+      ...f.observation,
+      mergedPrerequisites: {
+        ...f.observation.mergedPrerequisites,
+        101: { ...f.observation.mergedPrerequisites[101], merged: false },
+      },
+    });
+    const reopened = f.issues();
+    if (!reopened.reconcile) throw new Error('Missing reconcile');
+    await Effect.runPromise(reopened.reconcile());
+    expect((await Effect.runPromise(reopened.inspect(4))).blockersReady).toBe(false);
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(0);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each([false, true])(
+  'resumes a legacy partial conflict only with an open-only request, closed=%s',
+  async (closed) => {
+    const f = await fixture(false, false, false, { outcome: 'SIMPLE' });
+    try {
+      if (!closed)
+        await f.mutate({
+          blockers: [
+            { number: 2, state: 'open' },
+            { number: 3, state: 'open' },
+          ],
+        });
+      const issues = f.issues();
+      if (!issues.prepare) throw new Error('Missing prepare');
+      await Effect.runPromise(issues.prepare(4));
+      const root = join(f.host.directory, 'joins');
+      const key = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
+      if (!key) throw new Error('Missing mixed conflict journal');
+      // A predecessor-format partial operation has no retained boundary record.
+      await unlink(join(root, key, 'boundary.json'));
+      const reopened = f.issues();
+      if (!reopened.reconcile) throw new Error('Missing reconcile');
+      await Effect.runPromise(reopened.reconcile());
+      const ready = await Effect.runPromise(reopened.inspect(4));
+      expect(ready.blockersReady).toBe(!closed);
+      expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
+        closed ? 0 : 1
+      );
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0]).toBe(f.b);
+      const remote = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+      if (closed) expect(remote).toBe(f.c);
+      else {
+        expect(remote).toBe(ready.prerequisite?.base);
+        expect(f.git('log', '--format=%s', `${f.b}..${remote}`)).toBe('C');
+        expect(f.git('show', `${remote}:shared.txt`)).toBe('resolved D and C behavior');
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);

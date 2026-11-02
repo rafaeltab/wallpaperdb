@@ -1392,6 +1392,82 @@ async function runAssetMigration(id, started, targets, expected, deadline) {
 	};
 }
 
+// Worker-only half of the owned phase. Compose resolves its own image authority;
+// never print the resolved environment or persist an image-readiness cache.
+function prepareInfraImages() {
+	if (
+		process.env.WALLPAPERDB_BOAT_WORKER !== "1" ||
+		args.length !== 1 ||
+		!args[0]
+	)
+		throw new Error(
+			"Infrastructure image acquisition requires the selected worker",
+		);
+	const project = args[0];
+	const compose = ["compose", "-p", project, "-f", "infra/docker-compose.yml"];
+	const env = { ...process.env, COMPOSE_PROFILES: "" };
+	const inspect = (...argv) =>
+		JSON.parse(
+			execFileSync("docker", argv, {
+				env,
+				encoding: "utf8",
+				maxBuffer: 8 * 1024 * 1024,
+			}),
+		);
+	const selection = () => {
+		const model = inspect(...compose, "config", "--format", "json");
+		if (
+			model.name !== project ||
+			!model.services ||
+			typeof model.services !== "object"
+		)
+			throw new Error("Invalid infrastructure Compose project");
+		const selected = Object.entries(model.services)
+			.filter(([, service]) => {
+				if (
+					!service ||
+					(service.profiles !== undefined && !Array.isArray(service.profiles))
+				)
+					throw new Error("Invalid infrastructure Compose profiles");
+				return !service.profiles?.length;
+			})
+			.map(([name, service]) => {
+				if (typeof service.image !== "string" || !service.image.trim())
+					throw new Error("Selected infrastructure service requires an image");
+				return [name, service.image];
+			});
+		if (!selected.length)
+			throw new Error("No default infrastructure images selected");
+		return selected;
+	};
+	const selected = selection();
+	execFileSync(
+		"docker",
+		[...compose, "pull", ...selected.map(([name]) => name)],
+		{
+			env,
+			stdio: "inherit",
+		},
+	);
+	const images = [...new Set(selected.map(([, image]) => image))].map(
+		(reference) => {
+			const result = inspect("image", "inspect", reference);
+			if (
+				!Array.isArray(result) ||
+				result.length !== 1 ||
+				!/^sha256:[a-f0-9]{64}$/.test(result[0]?.Id)
+			)
+				throw new Error("Invalid selected image identity");
+			return { reference, id: result[0].Id };
+		},
+	);
+	if (JSON.stringify(selection()) !== JSON.stringify(selected))
+		throw new Error(
+			"Infrastructure image selection changed during acquisition",
+		);
+	console.log(`BOAT_INFRA_IMAGES ${JSON.stringify({ project, images })}`);
+}
+
 async function command() {
 	const entered = Date.now();
 	owned();
@@ -1463,6 +1539,28 @@ async function command() {
 			return;
 		}
 		const dependencies = await prepare(id);
+		if (targets[0] === "boat-prepare-infra-images") {
+			let completed = false;
+			try {
+				await lock(async () => {
+					startupWorker(id);
+					await ssh(
+						id,
+						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make boat-prepare-infra-images BOAT_EXEC=worker`,
+					);
+					startupWorker(id);
+					completed = true;
+				});
+			} finally {
+				event("infra-image-preparation", {
+					workerId: id,
+					ms: Date.now() - entered,
+					completed,
+				});
+			}
+			// Image acquisition never consumes still-wanted process restoration.
+			return;
+		}
 		await cache(id);
 		await reconcileDevelopment(id, dependencies, {
 			foreground: targets[0] === "dev",
@@ -1985,7 +2083,8 @@ async function watchDevelopment(id) {
 	event("development-watcher", { processId: state.watcher });
 }
 try {
-	if (action === "enroll") {
+	if (action === "prepare-infra-images") prepareInfraImages();
+	else if (action === "enroll") {
 		const [
 			mode = "validation",
 			size = "large",

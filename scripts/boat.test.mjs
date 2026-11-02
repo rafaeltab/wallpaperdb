@@ -15407,3 +15407,260 @@ for (const origin of ["default", "independent"])
 			},
 		});
 	});
+
+async function infraImagesCheckout(t, fresh = false) {
+	const f = await toolchainCheckout(t, fresh);
+	f.local(
+		".worktree",
+		"INGRESS_PORT=9120\nCOMPOSE_PROJECT_NAME=fixture-images\n",
+	);
+	const model = {
+		name: "fixture-images",
+		services: {
+			database: { image: "fixture/database:1" },
+			lgtm: { image: "fixture/observability:latest" },
+			admin: { image: "fixture/admin:1", profiles: ["admin"] },
+		},
+	};
+	f.local("infra/docker-compose.yml", JSON.stringify(model));
+	const bin = path.join(f.directory, "home/.local/bin"),
+		docker = path.join(bin, "docker");
+	fs.renameSync(docker, `${docker}-ordinary`);
+	fs.writeFileSync(
+		docker,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
+const log=stage=>{const s=fs.readFileSync('/proc/self/stat','utf8'),v=s.slice(s.lastIndexOf(')')+2).split(' ');fs.appendFileSync(path.join(c,'image-log'),JSON.stringify({stage,argv:a,profiles:process.env.COMPOSE_PROFILES,pid:process.pid,startTicks:v[19]})+'\\n');};
+const model=()=>JSON.parse(fs.readFileSync('infra/docker-compose.yml','utf8'));
+if(a[0]==='compose'&&a.includes('config')){log('config');console.log(JSON.stringify(model()));process.exit(0);}
+if(a[0]==='compose'&&a.includes('pull')){
+ log('pull-entered');console.log('pull reported success before actual acquisition');fs.writeFileSync(path.join(c,'image-entered'),'yes');
+ while(fs.existsSync(path.join(c,'hold-images'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ if(fs.existsSync(path.join(c,'fail-images'))){console.error('native acquisition failed');process.exit(23);}
+ const names=a.slice(a.indexOf('pull')+1);const expected=['database','lgtm'];if(JSON.stringify(names)!==JSON.stringify(expected))throw Error('incomplete/default profile selection');
+ const present=Object.fromEntries(names.map((n,i)=>[model().services[n].image,'sha256:'+String(i+1).repeat(64)]));
+ if(fs.existsSync(path.join(c,'missing-image')))delete present['fixture/observability:latest'];
+ fs.writeFileSync(path.join(c,'present-images'),JSON.stringify(present));log('acquired');console.error('native acquisition stderr drained');process.exit(0);
+}
+if(a[0]==='image'&&a[1]==='inspect'){
+ log('inspect');const present=JSON.parse(fs.readFileSync(path.join(c,'present-images'),'utf8'));const reference=a[2];if(!present[reference]){console.error('selected image absent');process.exit(17);}
+ console.log(JSON.stringify([{Id:fs.existsSync(path.join(c,'invalid-image-id'))?'not-an-image-id':present[reference]}]));process.exit(0);
+}
+process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process.env,stdio:'inherit'}).status??1);
+`,
+		{ mode: 0o755 },
+	);
+	return {
+		...f,
+		imageLog: () =>
+			fs.existsSync(path.join(f.control, "image-log"))
+				? fs
+						.readFileSync(path.join(f.control, "image-log"), "utf8")
+						.trim()
+						.split("\n")
+						.map(JSON.parse)
+				: [],
+	};
+}
+
+function assertImagePreparationOnly(f) {
+	const state = f.json(".boat/state.json");
+	assert.equal(state.developmentWanted, true);
+	assert.equal(state.reconciliationPending, true);
+	assert.equal(state.developmentDependencies, undefined);
+	assert.equal(
+		fs.existsSync(path.join(f.control, "docker")),
+		false,
+		"no infra/apps/watch effect",
+	);
+	assert.equal(fs.existsSync(path.join(f.control, "validation")), false);
+	assert.equal(
+		f.log().some((x) => x.stage === "restore"),
+		false,
+	);
+	assert.equal(
+		freshCalls(f).some((a) =>
+			a.at(-1)?.includes("cat > /home/user/wallpaperdb/.boat/cache.json"),
+		),
+		false,
+	);
+}
+
+async function imageNextOrdinaryUser(t, f) {
+	const at = f.log().length;
+	f.local("package.json", '{"private":true,"nextOrdinary":true}\n');
+	await toolchainUser(t, f);
+	const stages = f
+		.log()
+		.slice(at)
+		.map((x) => x.stage);
+	assert.ok(stages.indexOf("frozen") >= 0);
+	assert.ok(stages.indexOf("frozen") < stages.indexOf("restore"));
+	assert.ok(stages.indexOf("restore") < stages.indexOf("native"));
+	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+	assert.equal(f.json(".boat/state.json").developmentWanted, true);
+}
+
+test("infra image phase awaits complete acquisition on the selected fresh worker without restoring wanted development", async (t) => {
+	const f = await infraImagesCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			cost: 1.0288,
+		}),
+	);
+	flag(f, "hold-images");
+	const command = f.run("boat-prepare-infra-images");
+	await f.readiness.wait(() => {
+		assert.equal(
+			command.closed,
+			false,
+			`phase exited before actual image acquisition: ${command.output()}`,
+		);
+		return fs.existsSync(path.join(f.control, "image-entered"));
+	}, "native image acquisition barrier");
+	assertImagePreparationOnly(f);
+	assert.equal(fs.existsSync(path.join(f.control, "present-images")), false);
+	assert.equal(
+		f.imageLog().some((x) => x.stage === "inspect"),
+		false,
+	);
+	flag(f, "release");
+	const result = await f.observe(command);
+	assert.equal(result.status, 0, result.output);
+	assert.match(result.stderr, /native acquisition stderr drained/);
+	const proof = JSON.parse(result.stdout.match(/BOAT_INFRA_IMAGES (.+)/)[1]);
+	assert.deepEqual(proof, {
+		project: "fixture-images",
+		images: [
+			{ reference: "fixture/database:1", id: "sha256:" + "1".repeat(64) },
+			{
+				reference: "fixture/observability:latest",
+				id: "sha256:" + "2".repeat(64),
+			},
+		],
+	});
+	for (const call of f.imageLog().filter((x) => x.argv[0] === "compose")) {
+		assert.equal(call.profiles, "");
+		assert.deepEqual(call.argv.slice(0, 5), [
+			"compose",
+			"-p",
+			"fixture-images",
+			"-f",
+			"infra/docker-compose.yml",
+		]);
+	}
+	assertImagePreparationOnly(f);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	assert.ok(f.json(".boat/state.json").cost >= 1.0288);
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		freshCalls(f).some((a) => a.includes("--from") || a.includes("resume")),
+		false,
+	);
+	t.diagnostic(JSON.stringify({ imageProof: proof, imagePort: f.imageLog() }));
+	await imageNextOrdinaryUser(t, f);
+});
+
+for (const failure of ["fail-images", "missing-image", "invalid-image-id"])
+	test(`infra image phase refuses ${failure} and preserves pending restoration`, async (t) => {
+		const f = await infraImagesCheckout(t);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				developmentWanted: true,
+				reconciliationPending: true,
+			}),
+		);
+		flag(f, failure);
+		const result = await f.observe(f.run("boat-prepare-infra-images"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			failure === "fail-images"
+				? /native acquisition failed/
+				: failure === "missing-image"
+					? /selected image absent/
+					: /Invalid selected image identity/,
+		);
+		assert.doesNotMatch(result.stdout, /BOAT_INFRA_IMAGES/);
+		assertImagePreparationOnly(f);
+		assert.ok(
+			f.json(".boat/prepared.json").dependencies,
+			"real frozen preparation may acknowledge dependencies",
+		);
+		t.diagnostic(JSON.stringify({ imagePort: f.imageLog() }));
+		if (failure === "fail-images") await imageNextOrdinaryUser(t, f);
+	});
+
+test("infra image phase leaves standalone ordinary infra and exact no-pull ARGS supported", async (t) => {
+	const f = await infraImagesCheckout(t);
+	for (const args of [[], ["ARGS=--pull=never"]]) {
+		const result = await f.observe(f.run("infra-start", ...args));
+		assert.equal(result.status, 0, result.output);
+	}
+	const calls = fs
+		.readFileSync(path.join(f.control, "docker"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.deepEqual(
+		calls.filter((a) => a.includes("up")).map((a) => a.slice(a.indexOf("up"))),
+		[
+			["up", "-d"],
+			["up", "-d", "--pull=never"],
+		],
+	);
+	assert.deepEqual(
+		f.imageLog(),
+		[],
+		"ordinary infra is not silently turned into the optional phase",
+	);
+});
+
+test("infra image phase rejects stale frozen preparation before acquisition", async (t) => {
+	const f = await infraImagesCheckout(t);
+	f.local("pnpm-lock.yaml", "stale dependency lock\n");
+	const result = await f.observe(f.run("boat-prepare-infra-images"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.deepEqual(f.imageLog(), []);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+});
+
+test("infra image phase cannot complete after the selected worker generation changes", async (t) => {
+	const f = await infraImagesCheckout(t);
+	flag(f, "hold-images");
+	const command = f.run("boat-prepare-infra-images");
+	await f.readiness.wait(() => {
+		assert.equal(command.closed, false, command.output());
+		return fs.existsSync(path.join(f.control, "image-entered"));
+	}, "image acquisition before generation replacement");
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			id: "replacement-worker",
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "release");
+	const result = await f.observe(command);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation changed/);
+	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
+	assertImagePreparationOnly(f);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.findLast((x) => x.kind === "infra-image-preparation");
+	assert.equal(event.workerId, "fake-worker");
+	assert.equal(event.completed, false);
+});

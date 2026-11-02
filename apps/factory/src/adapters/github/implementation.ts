@@ -76,7 +76,7 @@ export function githubIssues(config: {
     signal: AbortSignal
   ) {
     if (readiness.joinRequired && joins && (!pending?.operation || bound))
-      await joins.prepare(numbers, readiness.join, signal);
+      await joins.prepare(numbers, readiness.join, signal, readiness.joinBoundary);
   }
   function joinRequired(
     readiness: Readiness,
@@ -91,7 +91,7 @@ export function githubIssues(config: {
     pending: JoinContext['pending'],
     bound: JoinContext['bound']
   ) {
-    const { join: _join, joinRequired: _required, ...core } = readiness;
+    const { join: _join, joinRequired: _required, joinBoundary: _boundary, ...core } = readiness;
     return {
       ...core,
       ...(joins ? { joinRequired: joinRequired(readiness, pending, bound) } : {}),

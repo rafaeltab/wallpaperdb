@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { passingChecks, normalizeChecks } from './checks.js';
 import { ancestor } from './ancestry.js';
+import { containsRequired, type JoinBoundary } from './join-boundary.js';
 import { landedPrerequisite, type LandedPrerequisite } from './landed-prerequisite.js';
 export interface VerifiedPrerequisite {
   readonly issue: number;
@@ -37,6 +38,8 @@ interface Readiness {
   blockersReady: boolean;
   prerequisite?: { base: string; prBase: string; evidence: string };
   joinRequired?: boolean;
+  joinBoundary?: JoinBoundary;
+  blockedReason?: string;
   join?: readonly (VerifiedPrerequisite & {
     branch: string;
     url: string;
@@ -112,23 +115,31 @@ async function openPrerequisite(
     )
   );
   if (!valid(assertion, current, evidence)) return null;
-  return { ...assertion, branch: current.headRefName, url: current.url, parent: current.baseRefOid, prBase: current.baseRefName };
+  return {
+    ...assertion,
+    branch: current.headRefName,
+    url: current.url,
+    parent: current.baseRefOid,
+    prBase: current.baseRefName,
+  };
 }
 async function selectBase(
   config: { project: string; base: string; prBase?: string },
-  verified: readonly (VerifiedPrerequisite & { branch: string; url: string; parent?: string; prBase?: string })[],
+  verified: readonly (VerifiedPrerequisite & {
+    branch: string;
+    url: string;
+    parent?: string;
+    prBase?: string;
+  })[],
   landed: readonly LandedPrerequisite[],
   signal?: AbortSignal
 ) {
-  // No merge or replay is authorized in this slice. A single existing tip must
-  // contain the configured baseline and every prerequisite commit.
+  // Prefer a containing tip. A divergent join must retain the exact operator
+  // pin and verified landing facts separately from replayable open PR layers.
   const required = [...verified, ...landed];
   const candidates = [...verified, ...landed.map((item) => ({ ...item, commit: item.tip }))];
   for (const candidate of candidates) {
-    let contains = true;
-    for (const commit of [config.base, ...required.map((item) => item.commit)])
-      if (!(await ancestor(config.project, commit, candidate.commit, signal))) contains = false;
-    if (contains)
+    if (await containsAll(config, [{ commit: config.base }, ...required], candidate.commit, signal))
       return {
         blockersReady: true,
         prerequisite: {
@@ -138,12 +149,53 @@ async function selectBase(
         },
       };
   }
-  // A configured stack base may already contain all the prerequisites.
-  for (const item of required)
-    if (!(await ancestor(config.project, item.commit, config.base, signal)))
-      return landed.length ? { blockersReady: false } : { blockersReady: false, joinRequired: true, join: verified };
-  return configuredReadiness(config, required);
+  if (await containsAll(config, required, config.base, signal))
+    return configuredReadiness(config, required);
+  return joinReadiness(config, verified, landed, signal);
 }
+async function joinReadiness(
+  config: { project: string; base: string; prBase?: string },
+  verified: NonNullable<Readiness['join']>,
+  landed: readonly LandedPrerequisite[],
+  signal?: AbortSignal
+) {
+  const boundary: JoinBoundary = {
+    base: config.base,
+    prBase: config.prBase ?? 'main',
+    pin: config.base,
+    landed: [...landed],
+  };
+  for (const candidate of [
+    ...landed.map((item) => ({ commit: item.tip, branch: item.branch })),
+    ...verified,
+  ]) {
+    if (!(await containsRequired(config.project, candidate.commit, boundary, signal))) continue;
+    // Default/pin are fallback replay boundaries. Existing containing open
+    // anchors remain eligible without forcing unrelated default advancement.
+    if (landed.some((item) => item.tip === candidate.commit)) {
+      boundary.base = candidate.commit;
+      boundary.prBase = candidate.branch;
+    }
+    return { blockersReady: false, joinRequired: true, join: verified, joinBoundary: boundary };
+  }
+  if (await containsRequired(config.project, config.base, boundary, signal))
+    return { blockersReady: false, joinRequired: true, join: verified, joinBoundary: boundary };
+  return {
+    blockersReady: false,
+    blockedReason: 'No verified join boundary contains the operator pin and landed prerequisites',
+  };
+}
+async function containsAll(
+  config: { project: string },
+  required: readonly { commit: string }[],
+  head: string,
+  signal?: AbortSignal
+) {
+  for (const item of required)
+    if (!(await ancestor(config.project, item.commit, head, signal))) return false;
+  return true;
+}
+
 function configuredReadiness(
   config: { base: string; prBase?: string },
   required: readonly { issue: number; commit: string }[]

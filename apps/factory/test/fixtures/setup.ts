@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 export async function protocol() {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
-  execFileSync('git', ['init', repository]);
+  execFileSync('git', ['init', '--initial-branch=main', repository]);
   execFileSync('git', [
     '-C',
     repository,

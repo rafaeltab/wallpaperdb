@@ -47,7 +47,20 @@ function jobControls(
   job: Extract<Status, { kind: 'job' }>,
   observed: Extract<import('../capabilities/job/index.js').Observation, { kind: 'found' }> | null
 ) {
-  return `${job.resume ? `<p>${'runId' in job.resume ? 'Interrupted or failed stage. Retry continues this existing job and stage.' : 'Parked. Active capacity released. Answer in the owning T3 thread, then refresh and resume.'}</p><button data-action="resume" data-command="${escapeHtml(JSON.stringify({ jobId: job.intent.id, ...job.resume }))}" ${observed?.question ? 'disabled' : ''}>${'runId' in job.resume ? 'Retry existing stage' : 'Resume existing job'}</button>` : ''}${job.delivery?.activity !== 'cancelled' ? `<button data-action="cancel" data-command="${escapeHtml(JSON.stringify({ jobId: job.intent.id }))}">Cancel job</button>` : ''}`;
+  return `${resumeButton(job, observed)}${job.delivery?.activity !== 'cancelled' ? `<button data-action="cancel" data-command="${escapeHtml(JSON.stringify({ jobId: job.intent.id }))}">Cancel job</button>` : ''}`;
+}
+
+function resumeButton(
+  job: Extract<Status, { kind: 'job' }>,
+  observed: Extract<import('../capabilities/job/index.js').Observation, { kind: 'found' }> | null
+) {
+  const action = job.resume;
+  if (!action) return '';
+  const retry = 'runId' in action;
+  const explanation = retry
+    ? 'Interrupted or failed stage. Retry continues this existing job and stage.'
+    : 'Parked. Active capacity released. Answer in the owning T3 thread, then refresh and resume.';
+  return `<p>${explanation}</p><button data-action="resume" data-command="${escapeHtml(JSON.stringify({ jobId: job.intent.id, ...action }))}" ${observed?.question ? 'disabled' : ''}>${retry ? 'Retry existing stage' : 'Resume existing job'}</button>`;
 }
 
 function controls(schedule: ScheduleStatus): string {

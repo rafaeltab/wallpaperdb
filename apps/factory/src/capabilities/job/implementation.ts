@@ -56,6 +56,33 @@ export const JobLive = Layer.effect(
           elapsedMs: Math.max(0, now - intent.createdAt),
         };
       }).pipe(Effect.withSpan('factory.job.observe'));
+    const resumeQuestion = (
+      intent: Intent,
+      command: Extract<import('./contract.js').Resume, { questionId: string }>
+    ) =>
+      Effect.gen(function* () {
+        const waiting = yield* currentStage(store);
+        const control = yield* store.readControl();
+        if (!waiting) return { kind: 'rejected' as const };
+        if (!matchesResume(intent, waiting, control, command)) return { kind: 'rejected' as const };
+        const observed = yield* execution.observe(intent, waiting);
+        if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
+        if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
+        const evidence = yield* resumeEvidence(execution, intent, waiting, observed);
+        if (!evidence) return { kind: 'rejected' as const };
+        const request = {
+          ...waiting,
+          index: waiting.index + 1,
+          ordinal: evidence.ordinal + 1,
+          previousRunId: evidence.runId,
+          resume: true,
+          observedRunId: undefined,
+          question: undefined,
+          deliveryIndex: undefined,
+        };
+        yield* store.saveStage(request);
+        return yield* observe(intent);
+      });
     return {
       status: () =>
         Effect.gen(function* () {
@@ -65,31 +92,10 @@ export const JobLive = Layer.effect(
       resume: (command) =>
         Effect.gen(function* () {
           const intent = yield* store.read();
-          if (intent && 'runId' in command)
-            return yield* retryStage(store, intent, command, observe);
-          const waiting = yield* currentStage(store);
-          const control = yield* store.readControl();
-          if (!intent || !waiting || !('questionId' in command))
-            return { kind: 'rejected' as const };
-          if (!matchesResume(intent, waiting, control, command))
-            return { kind: 'rejected' as const };
-          const observed = yield* execution.observe(intent, waiting);
-          if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
-          if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
-          const evidence = yield* resumeEvidence(execution, intent, waiting, observed);
-          if (!evidence) return { kind: 'rejected' as const };
-          const request = {
-            ...waiting,
-            index: waiting.index + 1,
-            ordinal: evidence.ordinal + 1,
-            previousRunId: evidence.runId,
-            resume: true,
-            observedRunId: undefined,
-            question: undefined,
-            deliveryIndex: undefined,
-          };
-          yield* store.saveStage(request);
-          return yield* observe(intent);
+          if (!intent) return { kind: 'rejected' as const };
+          if ('runId' in command) return yield* retryStage(store, intent, command, observe);
+          return yield* resumeQuestion(intent, command);
+
         }).pipe(Effect.withSpan('factory.job.resume')),
       cancel: (jobId) =>
         Effect.gen(function* () {

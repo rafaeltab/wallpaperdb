@@ -8,6 +8,7 @@ import type {
   Resume,
   ResumeAction,
   StageRequest,
+  StageEvidence,
   Status,
   Unavailable,
 } from './contract.js';
@@ -45,13 +46,7 @@ export function retryAction(
   return Effect.gen(function* () {
     if (!retryableStage(control, stage) || !terminalRun(stage, observation)) return undefined;
     const evidence = yield* execution.inspectStage(intent, stage);
-    if (
-      !evidence ||
-      evidence.runId !== observation.run.id ||
-      evidence.ordinal !== observation.run.ordinal ||
-      evidence.ordinal !== (stage.ordinal ?? stage.index + 1)
-    )
-      return undefined;
+    if (!matchingEvidence(evidence, stage, observation.run)) return undefined;
     if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
     return { index: stage.index, runId: evidence.runId, revision: control.revision };
   });
@@ -109,5 +104,18 @@ function currentRetry(
     waiting.index === command.index &&
     control.revision === command.revision &&
     !control.cancelled
+  );
+}
+
+function matchingEvidence(
+  evidence: StageEvidence | null,
+  stage: StageRequest,
+  run: { id: string; ordinal: number }
+): evidence is StageEvidence {
+  return (
+    evidence !== null &&
+    evidence.runId === run.id &&
+    evidence.ordinal === run.ordinal &&
+    evidence.ordinal === (stage.ordinal ?? stage.index + 1)
   );
 }

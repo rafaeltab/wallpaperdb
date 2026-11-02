@@ -1262,6 +1262,38 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
   }
 );
 
+async function saveLanding(
+  f: Pick<Awaited<ReturnType<typeof fixture>>, 'host' | 'git'>,
+  patch: object
+) {
+  const next = { ...JSON.parse(await readFile(f.host.configFile, 'utf8')), ...patch };
+  if (next.landing) {
+    const merges = {
+      101: { merge: next.landing.merge, head: next.landing.head },
+      ...next.landing.merges,
+    };
+    next.landing = { ...next.landing, pr: 101 };
+    next.defaultBranch = { name: 'main', tip: f.git('rev-parse', 'main') };
+    next.issueStates = { ...next.issueStates };
+    next.landedPrerequisites = { ...next.landedPrerequisites };
+    next.mergedPrerequisites = { ...next.mergedPrerequisites };
+    for (const [key, value] of Object.entries(merges)) {
+      const fact = JSON.parse(JSON.stringify(value));
+      const number = Number(key);
+      const issue = number - 100;
+      next.issueStates[issue] = next.landing.issueState ?? 'CLOSED';
+      next.landedPrerequisites[issue] = [number];
+      next.mergedPrerequisites[key] = {
+        merged: true,
+        head: { sha: fact.head },
+        merge_commit_sha: fact.merge,
+        html_url: `https://github.com/rafaeltab/wallpaperdb/pull/${key}`,
+        base: { ref: 'main', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+      };
+    }
+  }
+  await f.host.save(next);
+}
 async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
   const f = await fixture(options);
   const { host, git } = f;
@@ -1280,7 +1312,7 @@ async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
     ...initial.join,
     prs: { ...initial.join.prs, 101: { branch: 'A', base: 'main', state: 'MERGED' } },
   };
-  await host.save({
+  await saveLanding(f, {
     join: joinState,
     landing: { merge: merged, head: a },
     restack: options.restack,
@@ -1347,7 +1379,7 @@ it.each(['closed', 'divergent'] as const)(
     try {
       if (kind === 'closed') Object.assign(f.joinState.prs[104], { state: 'CLOSED' });
       else f.git('push', '--force', 'origin', `${f.d}:refs/heads/C`);
-      await f.host.save({ join: f.joinState, landing: { merge: f.merged, head: f.a } });
+      await saveLanding(f, { join: f.joinState, landing: { merge: f.merged, head: f.a } });
       if (!f.issues.reconcile || !f.issues.recoveries) throw new Error('Missing reconciliation');
       await Effect.runPromise(f.issues.reconcile());
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0]).toBe(f.b);
@@ -1574,7 +1606,7 @@ it('removes every already-landed layer when several rebase merges precede observ
     f.git('push', 'origin', 'main');
     f.git('switch', '--detach', f.host.base);
     Object.assign(f.joinState.prs[102], { base: 'main', state: 'MERGED' });
-    await f.host.save({
+    await saveLanding(f, {
       join: f.joinState,
       landing: { merge: f.merged, head: f.a, merges: { 102: { merge: mergedB, head: f.b } } },
     });
@@ -1598,7 +1630,7 @@ it('retargets the final PR to default with its pinned boundary and dissolves its
     f.joinState.members = [101, 104].map(
       (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
     );
-    await f.host.save({ join: f.joinState, landing: { merge: f.merged, head: f.a } });
+    await saveLanding(f, { join: f.joinState, landing: { merge: f.merged, head: f.a } });
     const issues = githubIssues({
       ...f.config,
       prerequisites: f.config.prerequisites.filter((item) => [1, 4].includes(item.issue)),
@@ -1617,7 +1649,7 @@ it('retargets the final PR to default with its pinned boundary and dissolves its
 it('keeps missing closing-link automation pending after retargeting to default', async () => {
   const f = await landedFixture();
   try {
-    await f.host.save({
+    await saveLanding(f, {
       join: f.joinState,
       landing: { merge: f.merged, head: f.a },
       missingClosingLink: true,
@@ -1718,7 +1750,7 @@ it.each([false, true])(
       live.prs[103].base = 'main';
       if (pendingCI) live.newCI = 'FAILURE';
       await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
-      await f.host.save({
+      await saveLanding(f, {
         join: live,
         landing: {
           merge: f.merged,
@@ -1816,7 +1848,10 @@ it('parks an oversized affected family without blocking reconciliation of retain
     }
     f.git('push', 'origin', ...branches);
     f.git('switch', '--detach', f.host.base);
-    await f.host.save({ join: { ...f.joinState, prs }, landing: { merge: f.merged, head: f.a } });
+    await saveLanding(f, {
+      join: { ...f.joinState, prs },
+      landing: { merge: f.merged, head: f.a },
+    });
     const config = { ...f.config, prerequisites };
     for (const issues of [githubIssues(config), githubIssues(config)]) {
       if (!issues.reconcile || !issues.recoveries) throw new Error('Missing reconciliation');
@@ -1953,7 +1988,7 @@ it.each(['closed', 'head', 'base', 'base-default', 'base-default-parents'] as co
         f.git('push', 'origin', 'main');
         f.git('switch', '--detach', f.host.base);
         await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
-        await f.host.save({ join: live, landing: { merge: f.merged, head: f.a, merges } });
+        await saveLanding(f, { join: live, landing: { merge: f.merged, head: f.a, merges } });
         await Effect.runPromise(issues.reconcile());
         expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(
           d.commit
@@ -1989,7 +2024,7 @@ it.each([false, true])(
       if (retargeted) {
         f.joinState.prs[102].base = 'main';
         f.joinState.prs[104].base = 'main';
-        await f.host.save({ join: f.joinState, landing: { merge: f.merged, head: f.a } });
+        await saveLanding(f, { join: f.joinState, landing: { merge: f.merged, head: f.a } });
       }
       const issues = githubIssues({
         ...f.config,
@@ -2034,7 +2069,7 @@ it.each([false, true])(
         },
       };
       if (knownExternal) state.prs[102].base = 'main';
-      await f.host.save({ join: state });
+      await saveLanding(f, { join: state });
       const observing = githubIssues(config);
       if (!observing.reconcile) throw new Error('Missing reconciliation');
       await Effect.runPromise(observing.reconcile());
@@ -2049,7 +2084,7 @@ it.each([false, true])(
       Object.assign(state.prs[101], { base: 'main', state: 'MERGED' });
       state.prs[102].base = 'main';
       await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(state));
-      await f.host.save({ join: state, landing: { merge: merged, head: a } });
+      await saveLanding(f, { join: state, landing: { merge: merged, head: a } });
       const reopened = githubIssues(config);
       if (!reopened.reconcile || !reopened.recoveries) throw new Error('Missing reconciliation');
       await Effect.runPromise(reopened.reconcile());
@@ -2078,91 +2113,104 @@ it.each([false, true])(
   }
 );
 
-it.each([false, true])(
-  'reconciles an owned CI repair after replay completed %s',
-  async (completed) => {
-    const f = await fixture({ ciFails: !completed });
-    try {
-      await Effect.runPromise(f.issues.prepare!(5));
-      const path = join(f.host.directory, 'join-live.json');
-      let live = JSON.parse(await readFile(path, 'utf8'));
-      live.newCI = 'FAILURE';
-      await writeFile(path, JSON.stringify(live));
-      const intent = {
-        id: 'C-job',
-        issue: 4,
-        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
-        base: f.host.base,
-        branch: 'C',
-        context: '',
-        createdAt: 0,
-        expectedStage: 'implementation' as const,
-      };
-      const observed = await Effect.runPromise(f.issues.pullRequest(intent));
-      expect(observed).toMatchObject({
-        kind: 'found',
-        ci: { failed: true },
-        reviewedCommit: f.c,
-        ready: false,
-      });
-      if (observed.kind !== 'found' || !f.issues.repairReplay)
-        throw new Error('Missing owned repair');
-      expect(await Effect.runPromise(f.issues.repairReplay(intent, 'a'.repeat(40)))).toBe(false);
-      await f.host.save({
-        ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
-        joinWriter: true,
-      });
-      expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(false);
-      await f.host.save({
-        ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
-        joinWriter: 'completed',
-      });
-      expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(true);
-      f.git('switch', '--detach', observed.commit);
-      await writeFile(join(f.host.repository, 'repair.txt'), 'fixed CI');
-      f.git('add', '.');
-      f.git('commit', '-m', 'repair C');
-      const repaired = f.git('rev-parse', 'HEAD');
-      f.git(
-        'push',
-        `--force-with-lease=refs/heads/C:${observed.commit}`,
-        'origin',
-        `${repaired}:refs/heads/C`
-      );
-      expect(
-        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
-      ).toBe(false);
-      live = JSON.parse(await readFile(path, 'utf8'));
-      live.newCI = 'SUCCESS';
-      await writeFile(path, JSON.stringify(live));
-      expect(
-        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
-      ).toBe(true);
-      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
-        commit: repaired,
-        maintenancePending: true,
-        ready: false,
-        reviewedCommit: f.c,
-      });
-      await Effect.runPromise(f.reopen().reconcile!());
-      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
-        commit: repaired,
-        ready: true,
-        reviewedCommit: f.c,
-      });
-      expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
-        blockersReady: true,
-        prerequisite: { base: repaired },
-      });
-      expect(f.git('show', `${repaired}:repair.txt`)).toBe('fixed CI');
-      expect(
-        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
-      ).toBe(true);
-    } finally {
-      await f.close();
+it.each([
+  { completed: false, legacy: false },
+  { completed: true, legacy: false },
+  { completed: true, legacy: true },
+  { completed: true, legacy: true, missingBoundary: true },
+])('reconciles an owned CI repair after replay %j', async (options) => {
+  const { completed, legacy } = options;
+  const f = await fixture({ ciFails: !completed });
+  try {
+    await Effect.runPromise(f.issues.prepare!(5));
+    if (legacy) {
+      const root = join(f.host.directory, 'joins');
+      const key = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
+      if (!key) throw new Error('Missing legacy journal');
+      const name = join(root, key, 'intent.json');
+      const operation = JSON.parse(await readFile(name, 'utf8'));
+      delete operation.boundary;
+      await writeFile(name, JSON.stringify(operation));
+      if ('missingBoundary' in options) await unlink(join(root, key, 'boundary.json'));
     }
+    const path = join(f.host.directory, 'join-live.json');
+    let live = JSON.parse(await readFile(path, 'utf8'));
+    live.newCI = 'FAILURE';
+    await writeFile(path, JSON.stringify(live));
+    const intent = {
+      id: 'C-job',
+      issue: 4,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+      base: f.host.base,
+      branch: 'C',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const observed = await Effect.runPromise(f.issues.pullRequest(intent));
+    expect(observed).toMatchObject({
+      kind: 'found',
+      ci: { failed: true },
+      reviewedCommit: f.c,
+      ready: false,
+    });
+    if (observed.kind !== 'found' || !f.issues.repairReplay)
+      throw new Error('Missing owned repair');
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, 'a'.repeat(40)))).toBe(false);
+    await saveLanding(f, {
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      joinWriter: true,
+    });
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(false);
+    await saveLanding(f, {
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      joinWriter: 'completed',
+    });
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(true);
+    f.git('switch', '--detach', observed.commit);
+    await writeFile(join(f.host.repository, 'repair.txt'), 'fixed CI');
+    f.git('add', '.');
+    f.git('commit', '-m', 'repair C');
+    const repaired = f.git('rev-parse', 'HEAD');
+    f.git(
+      'push',
+      `--force-with-lease=refs/heads/C:${observed.commit}`,
+      'origin',
+      `${repaired}:refs/heads/C`
+    );
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))).toBe(
+      false
+    );
+    live = JSON.parse(await readFile(path, 'utf8'));
+    live.newCI = 'SUCCESS';
+    await writeFile(path, JSON.stringify(live));
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))).toBe(
+      true
+    );
+    expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+      commit: repaired,
+      maintenancePending: true,
+      ready: false,
+      reviewedCommit: f.c,
+    });
+    await Effect.runPromise(f.reopen().reconcile!());
+    expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+      commit: repaired,
+      ready: true,
+      reviewedCommit: f.c,
+    });
+    expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+      blockersReady: true,
+      prerequisite: { base: repaired },
+    });
+    expect(f.git('show', `${repaired}:repair.txt`)).toBe('fixed CI');
+    expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))).toBe(
+      true
+    );
+  } finally {
+    await f.close();
   }
-);
+});
 
 it('restacks descendants of an accepted middle replay repair without losing the repair or replaying landed A', async () => {
   const f = await landedFixture();
@@ -2254,6 +2302,53 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       expect(
         (await Effect.runPromise(f.issues.recoveries!())).every((value) => value.active !== true)
       ).toBe(true);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'reconciles legacy landing facts only with authenticated closed proof, verified=%s',
+  async (verified) => {
+    const f = await landedFixture();
+    try {
+      await Effect.runPromise(f.issues.reconcile!());
+      const root = join(f.host.directory, 'joins');
+      const key = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
+      if (!key) throw new Error('Missing landing journal');
+      const name = join(root, key, 'intent.json');
+      const operation = JSON.parse(await readFile(name, 'utf8'));
+      delete operation.boundary;
+      await writeFile(name, JSON.stringify(operation));
+      await unlink(join(root, key, 'boundary.json'));
+      if (!verified) {
+        const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        config.landedPrerequisites[1] = [];
+        await f.host.save(config);
+      }
+      const intent = {
+        id: 'C',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        branch: 'C',
+        base: f.host.base,
+        prBase: 'D',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const before = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C');
+      const current = githubIssues(f.config);
+      expect(await Effect.runPromise(current.pullRequest(intent))).toMatchObject({
+        ready: verified,
+        reviewedCommit: f.c,
+      });
+      await Effect.runPromise(current.reconcile!());
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C')).toBe(before);
+      expect(await Effect.runPromise(githubIssues(f.config).pullRequest(intent))).toMatchObject({
+        ready: verified,
+      });
     } finally {
       await f.close();
     }

@@ -2,6 +2,7 @@ import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { Execution, Issues, Job, JobLive, JobStore, Time } from '../src/capabilities/job/index.js';
 import { controlledStore } from './fixtures/store.js';
+
 it('requires fresh accepted stages and matching current CI before reporting readiness', async () => {
   const store = controlledStore();
   let stage = 0;
@@ -123,6 +124,7 @@ async function stagesFixture() {
   let failed = false;
   let maintenancePending = false;
   let manualRecovery = false;
+  let repairAllowed = true;
   let now = 100;
   let progress = 'run-1:failed';
   let waiting = false;
@@ -133,6 +135,7 @@ async function stagesFixture() {
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
+      repairReplay: () => Effect.succeed(repairAllowed),
       inspect: () =>
         Effect.succeed({
           open: true,
@@ -150,6 +153,8 @@ async function stagesFixture() {
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
                 reviewedCommit,
+                parent: 'e'.repeat(40),
+                base: 'D',
                 maintenancePending,
                 manualRecovery,
                 ready: !failed,
@@ -224,6 +229,7 @@ async function stagesFixture() {
       failed?: boolean;
       maintenancePending?: boolean;
       manualRecovery?: boolean;
+      repairAllowed?: boolean;
       now?: number;
       progress?: string;
       waiting?: boolean;
@@ -243,6 +249,7 @@ async function stagesFixture() {
       failed = value.failed ?? failed;
       maintenancePending = value.maintenancePending ?? maintenancePending;
       manualRecovery = value.manualRecovery ?? manualRecovery;
+      repairAllowed = value.repairAllowed ?? repairAllowed;
       now = value.now ?? now;
       progress = value.progress ?? progress;
       waiting = value.waiting ?? waiting;
@@ -765,7 +772,7 @@ it('retains original review provenance and current CI binding after a verified i
   expect(job.sends()).toBe(2);
   job.change({ failed: true });
   expect(await job.status()).toMatchObject({ delivery: { ready: false } });
-  expect(job.sends()).toBe(2);
+  expect(job.sends()).toBe(3);
 });
 
 it('rejects a replay association that does not bind the actually accepted original review', async () => {
@@ -795,4 +802,122 @@ it('counts expected replay CI as active and parks external manual recovery witho
     delivery: { ready: false, active: false, activity: 'manual-recovery' },
   });
   expect(job.sends()).toBe(2);
+});
+
+it.each([false, true])(
+  'repairs owned replay CI once with maintenance pending %s',
+  async (maintenancePending) => {
+    const job = await stagesFixture();
+    await job.start();
+    await job.status();
+    await job.status();
+    job.change({
+      prCommit: 'c'.repeat(40),
+      reviewedCommit: 'b'.repeat(40),
+      maintenancePending,
+      failed: true,
+    });
+    expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+    expect(await Effect.runPromise(job.store.readStage(4))).toMatchObject({
+      commit: 'c'.repeat(40),
+      comparison: { base: 'e'.repeat(40), prBase: 'D', previousHead: 'b'.repeat(40) },
+    });
+    job.change({ accepted: false });
+    await job.status();
+    await job.status();
+    expect(job.sends()).toBe(3);
+  }
+);
+
+it('waits for replay writer ownership without consuming a repair delivery', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({
+    prCommit: 'c'.repeat(40),
+    reviewedCommit: 'b'.repeat(40),
+    maintenancePending: true,
+    failed: true,
+    repairAllowed: false,
+  });
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(2);
+  job.change({ repairAllowed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+});
+
+it('keeps repaired replay maintenance incomplete through fresh review and publication', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({
+    prCommit: 'c'.repeat(40),
+    reviewedCommit: 'b'.repeat(40),
+    maintenancePending: true,
+    failed: true,
+  });
+  await job.status();
+  job.change({
+    commit: 'd'.repeat(40),
+    prCommit: 'd'.repeat(40),
+    failed: false,
+    repairAllowed: false,
+  });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+  job.change({ repairAllowed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+    commit: 'd'.repeat(40),
+    comparison: { base: 'e'.repeat(40), prBase: 'D' },
+  });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+  job.change({ maintenancePending: false });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'ci', ready: true, reviewedCommit: 'b'.repeat(40) },
+  });
+});
+it('repairs a retained ready replay when the old publication receipt no longer matches the owning worktree', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({ prCommit: 'c'.repeat(40), reviewedCommit: 'b'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { ready: true } });
+  job.change({ commit: 'c'.repeat(40), failed: true, runId: 'latest-owner-run', ordinal: 9 });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+});
+
+it('binds a retained replay repair to the latest idle owner run', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({ prCommit: 'c'.repeat(40), reviewedCommit: 'b'.repeat(40) });
+  await job.status();
+  job.change({ commit: 'c'.repeat(40), failed: true, runId: 'owner-9', ordinal: 9 });
+  await job.status();
+  expect(await Effect.runPromise(job.store.readStage(4))).toMatchObject({
+    ordinal: 10,
+    previousRunId: 'owner-9',
+  });
+});
+
+it('repairs a failure observed immediately after the original publication receipt', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(await Effect.runPromise(job.store.readStage(4))).toMatchObject({
+    ordinal: 4,
+    previousRunId: 'run-3',
+  });
+  expect(job.sends()).toBe(3);
 });

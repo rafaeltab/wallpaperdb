@@ -2077,3 +2077,185 @@ it.each([false, true])(
     }
   }
 );
+
+it.each([false, true])(
+  'reconciles an owned CI repair after replay completed %s',
+  async (completed) => {
+    const f = await fixture({ ciFails: !completed });
+    try {
+      await Effect.runPromise(f.issues.prepare!(5));
+      const path = join(f.host.directory, 'join-live.json');
+      let live = JSON.parse(await readFile(path, 'utf8'));
+      live.newCI = 'FAILURE';
+      await writeFile(path, JSON.stringify(live));
+      const intent = {
+        id: 'C-job',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: f.host.base,
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const observed = await Effect.runPromise(f.issues.pullRequest(intent));
+      expect(observed).toMatchObject({
+        kind: 'found',
+        ci: { failed: true },
+        reviewedCommit: f.c,
+        ready: false,
+      });
+      if (observed.kind !== 'found' || !f.issues.repairReplay)
+        throw new Error('Missing owned repair');
+      expect(await Effect.runPromise(f.issues.repairReplay(intent, 'a'.repeat(40)))).toBe(false);
+      await f.host.save({
+        ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+        joinWriter: true,
+      });
+      expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(false);
+      await f.host.save({
+        ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+        joinWriter: 'completed',
+      });
+      expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit))).toBe(true);
+      f.git('switch', '--detach', observed.commit);
+      await writeFile(join(f.host.repository, 'repair.txt'), 'fixed CI');
+      f.git('add', '.');
+      f.git('commit', '-m', 'repair C');
+      const repaired = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/C:${observed.commit}`,
+        'origin',
+        `${repaired}:refs/heads/C`
+      );
+      expect(
+        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
+      ).toBe(false);
+      live = JSON.parse(await readFile(path, 'utf8'));
+      live.newCI = 'SUCCESS';
+      await writeFile(path, JSON.stringify(live));
+      expect(
+        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
+      ).toBe(true);
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: repaired,
+        maintenancePending: true,
+        ready: false,
+        reviewedCommit: f.c,
+      });
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: repaired,
+        ready: true,
+        reviewedCommit: f.c,
+      });
+      expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+        blockersReady: true,
+        prerequisite: { base: repaired },
+      });
+      expect(f.git('show', `${repaired}:repair.txt`)).toBe('fixed CI');
+      expect(
+        await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))
+      ).toBe(true);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it('restacks descendants of an accepted middle replay repair without losing the repair or replaying landed A', async () => {
+  const f = await landedFixture();
+  try {
+    await Effect.runPromise(f.issues.reconcile!());
+    const intent = {
+      id: 'B-job',
+      issue: 2,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+      base: f.host.base,
+      branch: 'B',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const pr = await Effect.runPromise(f.issues.pullRequest(intent));
+    if (pr.kind !== 'found') throw new Error('Missing B');
+    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+    f.git('switch', '--detach', pr.commit);
+    await writeFile(join(f.host.repository, 'fix-B.txt'), 'fixed B');
+    f.git('add', '.');
+    f.git('commit', '-m', 'repair B');
+    const repaired = f.git('rev-parse', 'HEAD');
+    f.git(
+      'push',
+      `--force-with-lease=refs/heads/B:${pr.commit}`,
+      'origin',
+      `${repaired}:refs/heads/B`
+    );
+    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit, repaired))).toBe(true);
+    await Effect.runPromise(f.issues.reconcile!());
+    const child = await Effect.runPromise(
+      f.issues.pullRequest({ ...intent, issue: 4, branch: 'C' })
+    );
+    expect(child).toMatchObject({ ready: true, reviewedCommit: f.c });
+    if (child.kind !== 'found') throw new Error('Missing C');
+    expect(f.git('show', `${child.commit}:fix-B.txt`)).toBe('fixed B');
+    expect(f.git('merge-base', '--is-ancestor', repaired, child.commit)).toBe('');
+    expect(f.git('rev-list', '--merges', `${f.merged}..${child.commit}`)).toBe('');
+    expect(f.git('log', '--format=%s', `${f.merged}..${child.commit}`)).toBe('C\nD\nrepair B\nB');
+  } finally {
+    await f.close();
+  }
+});
+
+it.each(['SIMPLE', 'COMPLEX'] as const)(
+  'recovers %s conflicts in descendants of a CI repair',
+  async (outcome) => {
+    const f = await landedFixture({ conflict: true, restack: { outcome, review: true } });
+    try {
+      for (let i = 0; i < 3; i++) await Effect.runPromise(f.issues.reconcile!());
+      const intent = {
+        id: 'B-job',
+        issue: 2,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+        base: f.host.base,
+        branch: 'B',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const pr = await Effect.runPromise(f.issues.pullRequest(intent));
+      if (pr.kind !== 'found') throw new Error('Missing B');
+      expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+      f.git('switch', '--detach', pr.commit);
+      await writeFile(join(f.host.repository, 'shared.txt'), 'B repaired behavior');
+      f.git('add', '.');
+      f.git('commit', '-m', 'repair B');
+      const repaired = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/B:${pr.commit}`,
+        'origin',
+        `${repaired}:refs/heads/B`
+      );
+      const results = [];
+      for (let i = 0; i < 8; i++) {
+        results.push(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit, repaired)));
+        await Effect.runPromise(f.issues.recoveries!());
+      }
+      expect(results.at(-1)).toBe(true);
+      await Effect.runPromise(f.issues.reconcile!());
+      const child = await Effect.runPromise(
+        f.issues.pullRequest({ ...intent, issue: 4, branch: 'C' })
+      );
+      expect(child).toMatchObject({ ready: true, reviewedCommit: f.c });
+      if (child.kind !== 'found') throw new Error('Missing C');
+      expect(f.git('merge-base', '--is-ancestor', repaired, child.commit)).toBe('');
+      expect(
+        (await Effect.runPromise(f.issues.recoveries!())).every((value) => value.active !== true)
+      ).toBe(true);
+    } finally {
+      await f.close();
+    }
+  }
+);

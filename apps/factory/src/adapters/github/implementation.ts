@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
 import { contextualPromise as githubPromise, runInContext } from './context.js';
 import { command } from '../../platform/index.js';
-import { prerequisiteJoin, type JoinConfiguration } from './joins.js';
-import { publication } from './publication.js';
+import { type JoinConfiguration, prerequisiteJoin } from './joins.js';
 import { prerequisiteReadiness, type VerifiedPrerequisite } from './prerequisites.js';
+import { publication } from './publication.js';
+
 const issueSchema = z.object({
   number: z.number().int(),
   state: z.enum(['OPEN', 'CLOSED']),
@@ -223,6 +224,16 @@ export function githubIssues(config: {
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.github.joins.reconcile')
       ),
+    repairReplay: (intent, head, repaired) =>
+      contextualPromise({
+        try: (signal) =>
+          joins?.repair(intent.issue, intent.branch, head, repaired, signal) ??
+          Promise.resolve(false),
+        catch: (cause) => new Unavailable({ operation: 'repair-replay', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.github.replay-repair')
+      ),
     pullRequest: (intent) =>
       Effect.gen(function* () {
         const replay = yield* Effect.tryPromise({
@@ -279,7 +290,14 @@ function replayAssertions(
   replay: readonly (VerifiedPrerequisite & { next: string })[]
 ) {
   return assertions.map((item) => {
-    const changed = replay.find((layer) => sameBinding(item, layer));
+    const changed = replay.find(
+      (layer) =>
+        sameBinding(item, layer) ||
+        (layer.issue === item.issue &&
+          layer.pr === item.pr &&
+          'reviewedCommit' in layer &&
+          layer.reviewedCommit === item.commit)
+    );
     return changed ? { ...item, commit: changed.next } : item;
   });
 }
@@ -316,10 +334,23 @@ function replayObservation(
       manualRecovery: true,
       lifecycle: 'Publication needs manual recovery',
     };
-  if (replay.pending || replay.automatic)
-    return { ...observed, ready: false, manualRecovery: false, maintenancePending: true };
+  if (pendingReplay(replay, observed, branch))
+    return {
+      ...observed,
+      ready: false,
+      manualRecovery: false,
+      maintenancePending: true,
+      reviewedCommit: originalReview(replay),
+      previousHead: replay.commit,
+      parent: replay.onto,
+    };
   if (replayMatches(replay, observed, branch))
-    return { ...observed, reviewedCommit: originalReview(replay), parent: replay.onto };
+    return {
+      ...observed,
+      reviewedCommit: originalReview(replay),
+      previousHead: replay.commit,
+      parent: replay.onto,
+    };
   return observed;
 }
 
@@ -327,4 +358,12 @@ function invalidReplay(replay: NonNullable<Replay>, observed: { commit: string }
   return (
     replay.manual || (!replay.pending && (replay.uncertain || observed.commit !== replay.next))
   );
+}
+
+function pendingReplay(
+  replay: NonNullable<Replay>,
+  observed: import('../../capabilities/job/index.js').PullRequestObservation,
+  branch: string
+) {
+  return (replay.pending || replay.automatic) && replayMatches(replay, observed, branch);
 }

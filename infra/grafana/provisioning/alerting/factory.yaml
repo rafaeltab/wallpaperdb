@@ -1,0 +1,112 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Factory availability
+    folder: WallpaperDB
+    interval: 1m
+    rules:
+      - uid: factory-scheduler-unavailable
+        title: Factory reconciliation unavailable
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: min(factory_scheduler_healthy)
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Factory reconciliation unavailable
+          description: "The factory is live but a scheduler observation failed. Inspect GitHub, T3, durable storage and the factory journal. An intentional admission pause, idle frontier or owning human question is not a failure."
+        labels:
+          severity: critical
+          service: factory
+
+      - uid: factory-signal-missing
+        title: Factory reconciliation signal missing
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: (time() - factory_scheduler_observed_at_seconds > bool 120) or absent_over_time(factory_scheduler_observed_at_seconds[5m])
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Factory reconciliation signal missing
+          description: "A monitored telemetry-enabled factory has stopped reporting completed reconciliation observations. Check process availability, a stuck observation, the exporter and the existing collector. Disable this missing-signal rule during explicitly unmonitored operation; silence alone cannot distinguish disabled telemetry from process loss."
+        labels:
+          severity: critical
+          service: factory
+

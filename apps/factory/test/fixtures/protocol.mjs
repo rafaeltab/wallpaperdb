@@ -15,7 +15,42 @@ if (mcpSend) {
 }
 const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
-if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
+if (
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'api' &&
+  args[1] === 'graphql' &&
+  flag('-f')?.includes('closedByPullRequestsReferences')
+) {
+  const number = Number(flag('-f').match(/issue\(number:(\d+)\)/)[1]);
+  reply({
+    data: {
+      repository: {
+        nameWithOwner: 'rafaeltab/wallpaperdb',
+        defaultBranchRef: {
+          name: config.defaultBranch?.name ?? 'main',
+          target: { oid: config.defaultBranch?.tip },
+        },
+        issue: {
+          number,
+          state: config.issueStates?.[number] ?? 'OPEN',
+          closedByPullRequestsReferences: {
+            nodes: (config.landedPrerequisites?.[number] ?? []).map((pr) => ({
+              number: pr,
+              url: `https://github.com/rafaeltab/wallpaperdb/pull/${pr}`,
+            })),
+            pageInfo: { hasNextPage: config.landingTruncated ?? false },
+          },
+        },
+      },
+    },
+  });
+} else if (
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'api' &&
+  /^repos\/rafaeltab\/wallpaperdb\/pulls\/\d+$/.test(args[1])
+) {
+  reply(config.mergedPrerequisites?.[args[1].split('/').at(-1)] ?? null);
+} else if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   if (args[1] === 'list')
     reply(
       (config.planning.candidates ?? config.planning.issues.map((i) => i.number)).map((number) => ({

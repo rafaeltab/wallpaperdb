@@ -4,6 +4,10 @@ description: "Implement a spec's tickets sequentially in T3 worktrees, stack the
 disable-model-invocation: true
 ---
 
+The installed factory supersedes this skill's manual ticket dispatch for new work. Use the [factory host operations guide](../../../../apps/factory/OPERATIONS.md) to install, preview, admit and observe issues. Keep `$do-work` for a manually selected single issue and `$babysit-pr` for its repairs.
+
+Existing coordinator sessions retain their pinned policy and continue the stack recovery, independent complete-spec review, validation and manual landing obligations below. A controlled service demonstration does not accept an entire spec. Keep this compatibility workflow available until those sessions finish; do not reinterpret draft publication as readiness or landing.
+
 Apply [task scope](../../../../docs/agents/task-scope.md) throughout coordination and complete-spec review. Include its scope and decision context in ticket-thread and reviewer briefs and the existing progress record.
 
 1. Read the full spec, tickets, comments, and dependencies through the [issue tracker](../../../../docs/agents/issue-tracker.md). Order unfinished tickets by dependency. Verify already-landed requirements before excluding them.

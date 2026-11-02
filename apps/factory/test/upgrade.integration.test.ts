@@ -4,28 +4,30 @@ import { expect, it } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
 
-it('rejects incompatible durable state before consulting external services and preserves it', async () => {
-  const host = await protocol();
-  const state = join(host.directory, 'state');
-  await mkdir(state);
-  const manifest = '{"format":2}';
-  await writeFile(join(state, 'format.json'), manifest);
-  try {
-    await expect(
-      startFactory({
-        FACTORY_PROJECT: host.repository,
-        FACTORY_T3_PROJECT_ID: 'project-id',
-        FACTORY_BASE: host.base,
-        FACTORY_T3_BINARY: '/missing/t3',
-        FACTORY_STATE: state,
-        FACTORY_PORT: '0',
-      })
-    ).rejects.toThrow(/state format.*compatible installation/i);
-    expect(await readFile(join(state, 'format.json'), 'utf8')).toBe(manifest);
-  } finally {
-    await host.cleanup();
+it.each(['{"format":2}', 'null', '{broken'])(
+  'rejects incompatible durable state %s before consulting external services and preserves it',
+  async (manifest) => {
+    const host = await protocol();
+    const state = join(host.directory, 'state');
+    await mkdir(state);
+    await writeFile(join(state, 'format.json'), manifest);
+    try {
+      await expect(
+        startFactory({
+          FACTORY_PROJECT: host.repository,
+          FACTORY_T3_PROJECT_ID: 'project-id',
+          FACTORY_BASE: host.base,
+          FACTORY_T3_BINARY: '/missing/t3',
+          FACTORY_STATE: state,
+          FACTORY_PORT: '0',
+        })
+      ).rejects.toThrow(/state format.*compatible installation/i);
+      expect(await readFile(join(state, 'format.json'), 'utf8')).toBe(manifest);
+    } finally {
+      await host.cleanup();
+    }
   }
-});
+);
 
 it('adopts pre-manifest state without discarding controls or reservations', async () => {
   const host = await protocol();

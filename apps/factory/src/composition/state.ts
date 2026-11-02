@@ -6,7 +6,15 @@ import { publisher } from '../platform/index.js';
 export async function compatibleState(directory: string) {
   const publish = publisher(directory);
   await publish('format.json', { format: 1 });
-  const manifest: unknown = JSON.parse(await readFile(join(directory, 'format.json'), 'utf8'));
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(await readFile(join(directory, 'format.json'), 'utf8'));
+  } catch (cause) {
+    throw new Error(
+      'Unreadable factory state format. Select a compatible installation; preserve the state directory and investigate filesystem or JSON corruption.',
+      { cause }
+    );
+  }
   if (
     typeof manifest !== 'object' ||
     manifest === null ||

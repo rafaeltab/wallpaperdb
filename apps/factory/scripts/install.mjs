@@ -40,6 +40,10 @@ try {
       2
     )
   );
+  if (git('status', '--porcelain') || git('rev-parse', 'HEAD') !== commit)
+    throw new Error(
+      'Source changed during packaging; retain the current release and retry from a clean committed checkout'
+    );
   await rename(temporary, target);
   console.log(target);
 } finally {

@@ -60,6 +60,14 @@ it('continues admitted work through publication without an operations-page obser
       (await running.app.inject({ method: 'POST', url: '/api/job', payload: { issue: 577 } }))
         .statusCode
     ).toBe(202);
+    await host.save({
+      complete: true,
+      base: host.base,
+      blockers: [{ number: 400, state: 'closed' }],
+    });
+    expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+      relationships: [{ issue: 577, blockers: [400] }],
+    });
     await vi.waitFor(
       async () => {
         expect(

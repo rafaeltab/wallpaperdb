@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import type { Plan, Scheduler } from '../capabilities/plan/index.js';
 import { page } from './page.js';
+import type { WorkRelationship } from './contract.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
   .strict();
@@ -18,6 +19,9 @@ export function operationsServer(config: {
   job: Job;
   plan?: Plan;
   scheduler?: Scheduler;
+  relationships?: (
+    issues: readonly number[]
+  ) => Effect.Effect<readonly WorkRelationship[], Unavailable>;
 }) {
   const app = Fastify({ bodyLimit: 20000 });
   const problem = (status: number, type: string, title: string) => ({
@@ -65,6 +69,22 @@ export function operationsServer(config: {
     const observed = operation.pipe(Effect.withSpan(name));
     return config.run(parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed);
   };
+  const schedulerStatus = async (request: FastifyRequest) => {
+    if (!config.scheduler) return undefined;
+    const snapshot = await execute(
+      request,
+      'factory.http.scheduler.status',
+      config.scheduler.status()
+    );
+    const relationships = config.relationships
+      ? await execute(
+          request,
+          'factory.http.relationships',
+          config.relationships(snapshot.state.admissions.map((admission) => admission.issue))
+        )
+      : undefined;
+    return { ...snapshot, relationships };
+  };
   app.post('/api/plan', async (request, reply) => {
     const origin = request.headers.origin;
     if (origin && origin !== `${request.protocol}://${request.headers.host}`)
@@ -86,9 +106,7 @@ export function operationsServer(config: {
   });
   if (config.scheduler) {
     const scheduler = config.scheduler;
-    app.get('/api/scheduler', (request) =>
-      execute(request, 'factory.http.scheduler.status', scheduler.status())
-    );
+    app.get('/api/scheduler', schedulerStatus);
     app.post('/api/scheduler', async (request, reply) => {
       const origin = request.headers.origin;
       if (origin && origin !== `${request.protocol}://${request.headers.host}`)
@@ -135,23 +153,21 @@ export function operationsServer(config: {
           );
       return schedulerStatus(request);
     });
-    const schedulerStatus = (request: FastifyRequest) =>
-      execute(request, 'factory.http.scheduler.status', scheduler.status());
   }
   app.get('/health', () => ({ status: 'ok' }));
   app.get('/api/job', (request) => execute(request, 'factory.http.status', config.job.status()));
-  app.get('/', async (request, reply) =>
-    reply
+  app.get('/', async (request, reply) => {
+    const schedule = await schedulerStatus(request);
+    return reply
       .type('text/html')
       .send(
         page(
           await execute(request, 'factory.http.page', config.job.status()),
-          config.scheduler
-            ? await execute(request, 'factory.http.scheduler.page', config.scheduler.status())
-            : undefined
+          schedule,
+          schedule?.relationships
         )
-      )
-  );
+      );
+  });
   app.post('/api/job', async (request, reply) => {
     const origin = request.headers.origin;
     if (origin && origin !== `${request.protocol}://${request.headers.host}`)

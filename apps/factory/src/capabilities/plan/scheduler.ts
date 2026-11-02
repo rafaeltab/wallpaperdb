@@ -281,9 +281,7 @@ export const SchedulerLive = Layer.effect(
           const issue = target.intent.issue;
           const claim = {
             issue,
-            index: command.index,
-            questionId: 'questionId' in command ? command.questionId : undefined,
-            runId: 'runId' in command ? command.runId : undefined,
+            ...resumeIdentity(command),
             run: observedRun(target),
           };
           if (!(yield* claimResume(claim, target, snapshot))) return { kind: 'occupied' as const };
@@ -438,4 +436,10 @@ function continuationCapacity(snapshot: ScheduleStatus) {
     snapshot.state.concurrency === -1 ||
     slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) < snapshot.state.concurrency
   );
+}
+
+function resumeIdentity(command: import('../job/index.js').Resume) {
+  return 'questionId' in command
+    ? { index: command.index, questionId: command.questionId }
+    : { index: command.index, runId: command.runId };
 }

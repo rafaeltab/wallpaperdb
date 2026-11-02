@@ -318,7 +318,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!head || !(await containsPrerequisite(layers, head, signal))) return true;
     const path = block.split('\n')[0]?.slice('worktree '.length);
     if (path === excludedPath) return true;
-    if (!path) return false;
+    return path ? cleanOwnedWorktree(path, signal) : false;
+  };
+  const cleanOwnedWorktree = async (path: string, signal?: AbortSignal) => {
     const retained = await retainedConflict(path, signal);
     if (retained !== undefined) return retained;
     return !(await command('git', ['status', '--porcelain'], path, signal)).trim();
@@ -775,6 +777,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       comparison.split('\n').every((line) => /^\s*\d+:\s+[a-f0-9]+\s+=\s+\d+:/.test(line))
     );
   };
+  const completedReplayBoundary = async (metadata: string, original: string, onto: string) => {
+    const todo = await readFile(join(metadata, 'git-rebase-todo'), 'utf8');
+    if (todo.split('\n').some((line) => line.trim() && !line.trim().startsWith('#'))) return false;
+    if ((await readFile(join(metadata, 'onto'), 'utf8')).trim() !== onto) return false;
+    if ((await readFile(join(metadata, 'orig-head'), 'utf8')).trim() !== original) return false;
+    return true;
+  };
   const finishReplay = async (
     item: Layer,
     onto: string,
@@ -786,10 +795,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       command('git', args, path, signal).then((value) => value.trim());
     const metadata = await run(['rev-parse', '--git-path', 'rebase-merge']);
     if (!(await exists(metadata))) return false;
-    const todo = await readFile(join(metadata, 'git-rebase-todo'), 'utf8');
-    if (todo.split('\n').some((line) => line.trim() && !line.trim().startsWith('#'))) return false;
-    if ((await readFile(join(metadata, 'onto'), 'utf8')).trim() !== onto) return false;
-    if ((await readFile(join(metadata, 'orig-head'), 'utf8')).trim() !== item.commit) return false;
+    if (!(await completedReplayBoundary(metadata, item.commit, onto))) return false;
     if (!(await equivalentReplay(item, parent, onto, await run(['rev-parse', 'HEAD']), signal)))
       return false;
     await run(['-c', 'core.editor=true', 'rebase', '--continue']);

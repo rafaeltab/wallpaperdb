@@ -29,8 +29,13 @@ if (format.format !== installation.stateFormat)
   );
 // The activation arguments and service environment must identify the same durable state.
 const environment = await readFile(config, 'utf8');
-if (!environment.split('\n').includes(`FACTORY_STATE=${state}`))
-  throw new Error('Config must contain the exact unquoted FACTORY_STATE path');
+const stateAssignments = environment
+  .split('\n')
+  .filter((line) => /^\s*(?:export\s+)?FACTORY_STATE\s*=/.test(line));
+if (stateAssignments.length !== 1 || stateAssignments[0] !== `FACTORY_STATE=${state}`)
+  throw new Error(
+    'Config must contain exactly one unquoted FACTORY_STATE assignment matching the state path'
+  );
 if (!/^[/a-zA-Z0-9_.-]+$/.test(installation.node))
   throw new Error('Unsupported Node executable path');
 const unit = join(homedir(), '.config/systemd/user', `${name}.service`);

@@ -455,7 +455,7 @@ it.each(['implementation', 'publication'] as const)(
             .poll(
               async () =>
                 (await (await page.request.get(`http://127.0.0.1:${address.port}/api/job`)).json())
-                  .delivery.stage
+                  .delivery?.stage
             )
             .toBe('publication');
           publication = await readFile(join(host.directory, 'pr.json'), 'utf8');

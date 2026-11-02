@@ -34,6 +34,7 @@ import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
+import { compatibleState } from './state.js';
 
 export async function startFactory(environment: NodeJS.ProcessEnv) {
   const configuration = z
@@ -88,6 +89,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         ),
     })
     .parse(environment);
+  await compatibleState(configuration.FACTORY_STATE);
   const project = resolve(configuration.FACTORY_PROJECT);
   await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);
   const help = await command(

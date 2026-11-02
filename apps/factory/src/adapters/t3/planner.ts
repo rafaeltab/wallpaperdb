@@ -110,6 +110,7 @@ export function t3Planner(config: {
             if (recovered) return recovered;
             const requestId = randomUUID();
             const current = await journal.read();
+            if (current && !current.retired) throw new Error('Planner state changed concurrently');
             const intent = await journal.save({
               revision: (current?.revision ?? -1) + 1,
               requestId,

@@ -46,5 +46,8 @@
     "vitest": "5.0.2",
     "@playwright/test": "^1.51.1"
   },
-  "exports": {}
+  "exports": {},
+  "files": [
+    "dist"
+  ]
 }

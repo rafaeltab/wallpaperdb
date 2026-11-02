@@ -2536,6 +2536,28 @@ it.each([
   }
 });
 
+it('preserves operator edits in the interrupted automatic conflict worktree during agent handoff', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const path = f
+      .git('worktree', 'list', '--porcelain')
+      .split('\n')
+      .find((line) => line.startsWith('worktree ') && line.includes('/replay-'))
+      ?.slice(9);
+    if (!path) throw new Error('Missing automatic attempt');
+    await writeFile(join(path, 'shared.txt'), 'operator resolution must survive');
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    expect(await readFile(join(path, 'shared.txt'), 'utf8')).toBe(
+      'operator resolution must survive'
+    );
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+  } finally {
+    await f.close();
+  }
+});
+
 it('restacks descendants of an accepted middle replay repair without losing the repair or replaying landed A', async () => {
   const f = await landedFixture();
   try {

@@ -35,7 +35,7 @@ import { operationsServer } from '../http/index.js';
 import { command } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
 import { compatibleState } from './state.js';
-import { availabilityObservation } from './availability.js';
+import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
 export async function startFactory(environment: NodeJS.ProcessEnv) {
   const configuration = z
@@ -293,8 +293,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     observing = runtime
       .runPromise(
         scheduler.tick(configuration.FACTORY_BASE).pipe(
-          Effect.tap(() =>
-            configuration.FACTORY_OTEL_ENDPOINT ? availabilityObservation(true) : Effect.void
+          Effect.tap((snapshot) =>
+            configuration.FACTORY_OTEL_ENDPOINT
+              ? availabilityObservation(retainedWorkAvailable(snapshot))
+              : Effect.void
           ),
           Effect.catch((error) =>
             (configuration.FACTORY_OTEL_ENDPOINT

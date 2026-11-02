@@ -53,7 +53,7 @@ groups:
         for: 2m
         annotations:
           summary: Factory reconciliation unavailable
-          description: "The factory is live but a scheduler observation failed. Inspect GitHub, T3, durable storage and the factory journal. An intentional admission pause, idle frontier or owning human question is not a failure."
+          description: "The factory is live but a scheduler observation failed or retained work has an absent or ambiguous T3 binding. Inspect GitHub, T3, durable storage and the factory journal. Idle, admission pause, an owning human question, and an observable failed run awaiting explicit operator action are not dependency outages."
         labels:
           severity: critical
           service: factory

@@ -109,4 +109,3 @@ groups:
         labels:
           severity: critical
           service: factory
-

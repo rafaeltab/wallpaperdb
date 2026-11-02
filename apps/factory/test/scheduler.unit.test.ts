@@ -224,6 +224,35 @@ it('reserves the initial distinct allowance and does not launch twice under repe
   }
 });
 
+it.each(['unlabelled', 'omitted'] as const)(
+  'preserves admitted work when its issue is %s in the ready pool',
+  async (representation) => {
+    const f = fixture();
+    try {
+      await f.run((s) =>
+        s.configure({ revision: -1, concurrency: 1, allowance: -1, paused: false })
+      );
+      await f.run((s) => s.tick(base));
+      const first = f.statuses.get(1);
+      const admissions = f.snapshot().admissions;
+      expect(f.launches).toEqual([1]);
+      f.setIssues([
+        ...(representation === 'unlabelled' ? [{ ...issue(1), labels: [] }] : []),
+        { ...issue(2), labels: [] },
+        issue(3),
+      ]);
+      const observed = await f.run((s) => s.tick(base));
+      expect(observed.jobs).toEqual([first]);
+      expect(f.statuses.get(1)).toEqual(first);
+      expect(f.snapshot().admissions).toEqual(admissions);
+      expect(f.launches).toEqual([1]);
+      expect(f.resumed).toEqual([]);
+    } finally {
+      await f.runtime.dispose();
+    }
+  }
+);
+
 it.each(['ready', 'landed'] as const)(
   'refills a %s slot while two other jobs continue and retains CI waits',
   async (outcome) => {

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile, cp, realpath, rename, rm } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, cp, realpath, rename, rm, symlink } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
 // Produces a separate release. Activation is an explicit operator action.
@@ -22,6 +22,9 @@ execFileSync(
 );
 try {
   await cp('dist', temporary, { recursive: true });
+  const self = join(temporary, 'node_modules/.pnpm/node_modules/@wallpaperdb/factory');
+  await rm(self, { force: true });
+  await symlink('../../../..', self);
 
   await writeFile(
     join(temporary, 'installation.json'),

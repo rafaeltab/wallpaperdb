@@ -15197,6 +15197,15 @@ for (const origin of ["default", "independent"])
 				let shell, transition;
 				const receipt = () => f.json(".boat/source-writer.json");
 				const owned = () => receipt().phases.start.localOwnership.observed;
+				const shellState = (identity) => {
+					assert.deepEqual(fixtureProcess(identity.pid), identity);
+					const text = fs.readFileSync(`/proc/${identity.pid}/stat`, "utf8");
+					const fields = text.slice(text.lastIndexOf(")") + 2).split(" ");
+					assert.equal(fields[19], identity.startTicks);
+					assert.equal(Number(fields[2]), identity.group);
+					assert.equal(Number(fields[3]), identity.session);
+					return fields[0];
+				};
 				const matches = (p, id) =>
 					p.pid === id.pid &&
 					p.birth === id.startTicks &&
@@ -15219,6 +15228,10 @@ for (const origin of ["default", "independent"])
 					shell = fixtureProcess(shellPid);
 					assert.ok(shell);
 					assert.equal(shell.cwd, path.join(f.worker, "scripts"));
+					await f.readiness.wait(
+						() => shellState(shell) === "T",
+						"exact native pre-cd shell is stopped",
+					);
 					const barrier = JSON.parse(
 						fs.readFileSync(path.join(f.control, "source-detach-barrier.json")),
 					);
@@ -15241,6 +15254,7 @@ for (const origin of ["default", "independent"])
 						assert.notEqual(shell.session, detach.session);
 					}
 					const pre = {
+						nativeState: shellState(shell),
 						shell,
 						writer,
 						detach,
@@ -15251,7 +15265,11 @@ for (const origin of ["default", "independent"])
 					};
 					retain("before-cd-release.json", pre);
 					assert.deepEqual(pre.sibling, sibling);
-					assert.deepEqual(fixtureProcess(shell.pid), shell);
+					assert.equal(
+						shellState(shell),
+						"T",
+						"pre-cd continuation requires native stop",
+					);
 					process.kill(shell.pid, "SIGCONT");
 					await f.readiness.wait(
 						() => fs.existsSync(path.join(f.control, "source-cwd-after")),
@@ -15271,7 +15289,12 @@ for (const origin of ["default", "independent"])
 						),
 						shell.pid,
 					);
+					await f.readiness.wait(
+						() => shellState(transition) === "T",
+						"exact native post-cd shell is stopped",
+					);
 					retain("after-native-cd.json", {
+						nativeState: shellState(transition),
 						before: shell,
 						after: transition,
 						receipt: receipt(),
@@ -15314,7 +15337,11 @@ for (const origin of ["default", "independent"])
 						// Preserve the real defect verdict; the unchanged helper setup assertion fails.
 						return result;
 					}
-					assert.deepEqual(fixtureProcess(shell.pid), transition);
+					assert.equal(
+						shellState(transition),
+						"T",
+						"post-cd continuation requires native stop",
+					);
 					process.kill(shell.pid, "SIGCONT");
 					flag(f, "source-detach-release");
 					const result = await pending;

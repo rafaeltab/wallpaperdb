@@ -7,7 +7,7 @@ export function availabilityObservation(healthy: boolean) {
   return Effect.gen(function* () {
     yield* Metric.update(Metric.gauge('factory_scheduler_healthy'), healthy ? 1 : 0);
     yield* Metric.update(
-      Metric.gauge('factory_scheduler_observed_at_seconds'),
+      Metric.gauge('factory_scheduler_observed_at_seconds', { attributes: { unit: 's' } }),
       (yield* Clock.currentTimeMillis) / 1000
     );
   });

@@ -1477,6 +1477,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const reconcileOperation = async (key: string, signal?: AbortSignal) => {
     const dir = join(config.directory, key);
     if (await read(dir, 'complete.json')) return;
+    if (await read(dir, 'limit.json')) return;
     const saved = await read(dir, 'intent.json');
     if (saved) {
       const operation = intent.parse(saved);
@@ -1639,11 +1640,31 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       signal
     );
   };
+  const oversizedMaintenance = async (
+    landed: z.infer<typeof landing>,
+    descendants: readonly CurrentLayer[]
+  ) => {
+    // The resource bound applies to one affected stack, not the lifetime history
+    // of ready/landed admissions. No writer or external change is claimed here.
+    if (descendants.length < 100) return false;
+    const dir = directory([-landed.anchor.pr, ...descendants.map((item) => item.issue)]);
+    await publish(dir, 'limit.json', { layers: descendants.length + 1, maximum: 100 });
+    await publish(dir, 'seed.json', descendants.slice(0, 1));
+    for (const item of descendants.slice(0, 1))
+      await publish(dir, 'recovery-progress.json', {
+        issue: item.issue,
+        active: false,
+        progress:
+          'Affected stack exceeds the 100-layer maintenance limit; manual recovery required',
+      });
+    return true;
+  };
   const maintainDescendants = async (
     landed: z.infer<typeof landing>,
     descendants: readonly CurrentLayer[],
     signal?: AbortSignal
   ) => {
+    if (await oversizedMaintenance(landed, descendants)) return;
     const numbers = [-landed.anchor.pr, ...descendants.map((item) => item.issue)];
     const dir = directory(numbers);
     if (await read(dir, 'complete.json')) return;
@@ -1693,7 +1714,6 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return false;
   };
   const maintain = async (assertions: readonly VerifiedPrerequisite[], signal?: AbortSignal) => {
-    if (assertions.length > 100) throw new Error('Maintenance exceeds supported bound');
     const observed = [];
     for (const assertion of assertions) observed.push(await currentLayer(assertion, signal));
     const landed = await verifiedLandings(observed, signal);

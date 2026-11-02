@@ -15,11 +15,14 @@ execFileSync('make', ['build', 'PACKAGE=factory'], { cwd: repository, stdio: 'in
 await mkdir(root, { recursive: true, mode: 0o700 });
 const target = join(root, commit);
 const temporary = join(root, `${commit}.preparing-${process.pid}`);
-await mkdir(temporary, { mode: 0o700 });
+execFileSync(
+  'pnpm',
+  ['--filter', '@wallpaperdb/factory', 'deploy', '--legacy', '--prod', temporary],
+  { cwd: repository, stdio: 'inherit' }
+);
 try {
   await cp('dist', temporary, { recursive: true });
-  await cp('node_modules', join(temporary, 'node_modules'), { recursive: true, dereference: true });
-  await writeFile(join(temporary, 'package.json'), '{"type":"module"}\n');
+
   await writeFile(
     join(temporary, 'installation.json'),
     JSON.stringify(

@@ -661,6 +661,24 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     });
     return recordResolution(dir, item, value, result, reviewed, signal);
   };
+  const preservedAttempt = async (
+    dir: string,
+    issue: number,
+    value: { worktree: string; snapshot?: string },
+    threadId?: string,
+    signal?: AbortSignal
+  ) => {
+    if (!value.snapshot || (await attemptSnapshot(value.worktree, signal)) !== value.snapshot) {
+      await saveProgress(dir, {
+        issue,
+        active: false,
+        threadId,
+        progress: `Automatic conflict worktree changed or lacks a retained snapshot; preserve edits and reconcile ${value.worktree} before accepting the agent result`,
+      });
+      return false;
+    }
+    return true;
+  };
   const recordResolution = async (
     dir: string,
     item: Layer,
@@ -675,15 +693,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       (result.classification === 'COMPLEX' && !reviewed)
     )
       return false;
-    if (!value.snapshot || (await attemptSnapshot(value.worktree, signal)) !== value.snapshot) {
-      await saveProgress(dir, {
-        issue: item.issue,
-        active: false,
-        threadId: result.threadId,
-        progress: `Automatic conflict worktree changed or lacks a retained snapshot; preserve edits and reconcile ${value.worktree} before accepting the agent result`,
-      });
-      return false;
-    }
+    if (!(await preservedAttempt(dir, item.issue, value, result.threadId, signal))) return false;
     const tree = await git(['rev-parse', `${result.commit}^{tree}`], signal);
     await publish(dir, `resolved-${item.issue}.json`, {
       ...item,
@@ -785,14 +795,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     await run(['-c', 'core.editor=true', 'rebase', '--continue']);
     return true;
   };
-  const replayAttempt = async (
+  const attemptReady = async (
     item: Layer,
     onto: string,
     parent: string,
     dir: string,
+    path: string,
     signal?: AbortSignal
   ) => {
-    const path = await ensureAttempt(item, onto, parent, dir, signal);
     const run = (args: string[]) =>
       command('git', args, path, signal).then((value) => value.trim());
     if (await run(['branch', '--show-current'])) {
@@ -801,12 +811,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         active: false,
         progress: `Automatic worktree now owns a branch; preserve it and reconcile ${path} before resuming`,
       });
-      return;
+      return false;
     }
     const conflicts = await run(['diff', '--name-only', '--diff-filter=U']);
     if (conflicts) {
       await recordConflict(item, parent, onto, path, dir, conflicts, signal);
-      return;
+      return false;
     }
     const inProgress =
       (await exists(await run(['rev-parse', '--git-path', 'rebase-merge']))) ||
@@ -818,8 +828,21 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         active: false,
         progress: `Interrupted local replay requires operator reconciliation at ${path}; preserve its edits and finish or abort the Git operation before resuming`,
       });
-      return;
+      return false;
     }
+    return true;
+  };
+  const replayAttempt = async (
+    item: Layer,
+    onto: string,
+    parent: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const path = await ensureAttempt(item, onto, parent, dir, signal);
+    if (!(await attemptReady(item, onto, parent, dir, path, signal))) return;
+    const run = (args: string[]) =>
+      command('git', args, path, signal).then((value) => value.trim());
     const head = await run(['rev-parse', 'HEAD']);
     if (head === item.commit)
       return (await attemptRebase(item, onto, parent, path, dir, signal)) ? path : undefined;

@@ -1029,16 +1029,16 @@ async function sourceCommandContract() {
   if(mode==='implicit'&&!(argv.includes('--timeout')&&argv[argv.indexOf('--timeout')+1]==='0'))throw Error('unsupported source fixture mode');
   const startedAt=new Date().toISOString(),command=argv.at(-1);
   let pid;
-  if(flag('source-independent-writer.json')){
-   const owned=JSON.parse(fs.readFileSync(path.join(control,'source-independent-writer.json')));
+  const selected=process.env.FAKE_SOURCE_WRITER_PID;
+  const ownedFile=path.join(control,selected?'source-independent-writer-'+selected+'.json':'source-independent-writer.json');
+  while(!fs.existsSync(ownedFile))await new Promise(resolve=>setTimeout(resolve,5));
+  {
+   const owned=JSON.parse(fs.readFileSync(ownedFile));
    const stat=fs.readFileSync('/proc/'+owned.pid+'/stat','utf8'),fields=stat.slice(stat.lastIndexOf(')')+2).split(' ');
    if(fields[19]!==owned.birth)throw Error('independent fixture writer birth changed');
    pid=owned.pid;
-   const job=path.join(control,'source-writer-job.json');
+   const job=path.join(control,selected?'source-writer-job-'+owned.pid+'.json':'source-writer-job.json');
    fs.writeFileSync(job+'.tmp',JSON.stringify({command,startedAt}));fs.renameSync(job+'.tmp',job);
-  }else{
-   const child=cp.spawn(process.execPath,['-e','('+sourceFixtureWriter.toString()+')('+JSON.stringify(control)+','+JSON.stringify(command)+','+JSON.stringify(startedAt)+')'],{env:process.env,cwd:process.env.FAKE_WORKER,stdio:'ignore'});
-   child.unref();pid=child.pid;
   }
   start={success:true,processId:pid,pid,command,startedAt,commandId:'cmd_fixture'+pid};
   fs.writeFileSync(path.join(control,'source-process-'+start.processId+'.start'),JSON.stringify(start));
@@ -1426,10 +1426,10 @@ child.on('close',code=>{
 `,
 		0o755,
 	);
-	const start = (owned, command, args) => {
+	const start = (owned, command, args, commandEnv = env) => {
 		const child = spawn(command, args, {
 			cwd: root,
-			env,
+			env: commandEnv,
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
@@ -1536,7 +1536,78 @@ child.on('close',code=>{
 		api: "http://127.0.0.1:12345",
 	});
 
-	const run = (...targets) => start(commands, "make", targets);
+	let sourceWriterSequence = 0,
+		selectedSourceWriter;
+	const startSourceWriter = (held) => {
+		const beginning = "function sourceFixtureWriter(";
+		const end = "async function sourceCommandContract()";
+		for (const anchor of [beginning, end])
+			assert.equal(sourceCommandContractFixture.split(anchor).length, 2);
+		const declaration = sourceCommandContractFixture.slice(
+			sourceCommandContractFixture.indexOf(beginning),
+			sourceCommandContractFixture.indexOf(end),
+		);
+		const program = path.join(
+			control,
+			held
+				? "source-independent-writer.cjs"
+				: `source-independent-writer-${++sourceWriterSequence}.cjs`,
+		);
+		fs.writeFileSync(
+			program,
+			`${declaration}
+const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;
+(async()=>{
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ const owned={pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};
+ const held=${held};
+ const ready=path.join(control,held?'source-independent-writer.json':'source-independent-writer-'+process.pid+'.json');
+ fs.writeFileSync(ready+'.tmp',JSON.stringify(owned));fs.renameSync(ready+'.tmp',ready);
+ const jobFile=path.join(control,held?'source-writer-job.json':'source-writer-job-'+process.pid+'.json');
+ while(!fs.existsSync(jobFile))await new Promise(resolve=>setTimeout(resolve,5));
+ const job=JSON.parse(fs.readFileSync(jobFile));
+ fs.writeFileSync(path.join(control,held?'source-writer-job-accepted.json':'source-writer-job-accepted-'+process.pid+'.json'),JSON.stringify(job));
+ while(held&&!fs.existsSync(path.join(control,'writer-release')))await new Promise(resolve=>setTimeout(resolve,5));
+ sourceFixtureWriter(control,job.command,job.startedAt);
+})();
+`,
+			{ mode: 0o600 },
+		);
+		const writer = start(background, process.execPath, [program]);
+		writer.birth = fixtureProcess(writer.child.pid);
+		assert.ok(writer.birth, "source writer ownership precedes CLI launch");
+		fs.appendFileSync(
+			path.join(control, "source-owned-writers.jsonl"),
+			JSON.stringify({
+				identity: writer.birth,
+				program: path.basename(program),
+				sha256: createHash("sha256")
+					.update(fs.readFileSync(program))
+					.digest("hex"),
+				held,
+			}) + "\n",
+			{ mode: 0o600 },
+		);
+		return writer;
+	};
+	const run = (...targets) => {
+		const source =
+			targets[0] === "run" &&
+			((targets.includes("PACKAGE=scripts") &&
+				targets.includes("SCRIPT=dependencies:lock")) ||
+				(targets.includes("PACKAGE=asset") &&
+					targets.includes("SCRIPT=db:generate")));
+		if (!source) return start(commands, "make", targets);
+		const held = selectedSourceWriter;
+		selectedSourceWriter = undefined;
+		const writer = held ?? startSourceWriter(false);
+		return start(
+			commands,
+			"make",
+			targets,
+			held ? env : { ...env, FAKE_SOURCE_WRITER_PID: String(writer.child.pid) },
+		);
+	};
 	return {
 		directory,
 		root,
@@ -1552,35 +1623,8 @@ child.on('close',code=>{
 			start(background, "python", ["scripts/shutdown-tunnel.py"]),
 		writer: ({ sourceCommand = false } = {}) => {
 			if (sourceCommand) {
-				const beginning = "function sourceFixtureWriter(";
-				const end = "async function sourceCommandContract()";
-				for (const anchor of [beginning, end])
-					assert.equal(sourceCommandContractFixture.split(anchor).length, 2);
-				const declaration = sourceCommandContractFixture.slice(
-					sourceCommandContractFixture.indexOf(beginning),
-					sourceCommandContractFixture.indexOf(end),
-				);
-				const program = path.join(control, "source-independent-writer.cjs");
-				fs.writeFileSync(
-					program,
-					`${declaration}
-const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;
-(async()=>{
- const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
- const owned={pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};
- const ready=path.join(control,'source-independent-writer.json');
- fs.writeFileSync(ready+'.tmp',JSON.stringify(owned));fs.renameSync(ready+'.tmp',ready);
- const jobFile=path.join(control,'source-writer-job.json');
- while(!fs.existsSync(jobFile))await new Promise(resolve=>setTimeout(resolve,5));
- const job=JSON.parse(fs.readFileSync(jobFile));
- fs.writeFileSync(path.join(control,'source-writer-job-accepted.json'),JSON.stringify(job));
- while(!fs.existsSync(path.join(control,'writer-release')))await new Promise(resolve=>setTimeout(resolve,5));
- sourceFixtureWriter(control,job.command,job.startedAt);
-})();
-`,
-					{ mode: 0o600 },
-				);
-				return start(background, process.execPath, [program]);
+				selectedSourceWriter = startSourceWriter(true);
+				return selectedSourceWriter;
 			}
 			return start(background, process.execPath, [
 				"-e",
@@ -7536,7 +7580,16 @@ async function migrationGenerationCheckout(t, fixtureOptions) {
 		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
 			"node_modules/\n",
 	);
-	const prepared = await f.generate();
+	const retainInitial = subsequentAttachedEvidence(
+		t,
+		f,
+		"migration-initial",
+		true,
+	);
+	const prepared = await (
+		fixtureOptions?.generate ?? ((fixture) => fixture.generate())
+	)(f);
+	retainInitial(prepared);
 	assert.equal(prepared.status, 0, prepared.output);
 	fs.symlinkSync(
 		path.join(repository, "apps/asset/node_modules"),
@@ -8794,7 +8847,12 @@ test("generation rejects symlinked inputs without reading the outside target", a
 	assert.equal(fs.readlinkSync(schema), outside);
 });
 
-function subsequentAttachedEvidence(t, f, label = "subsequent-attached") {
+function subsequentAttachedEvidence(
+	t,
+	f,
+	label = "subsequent-attached",
+	transactions = false,
+) {
 	const destination = process.env.BOAT_SOURCE_PROTOCOL_EVIDENCE_DIRECTORY;
 	if (!destination) return () => {};
 	fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
@@ -8837,6 +8895,33 @@ function subsequentAttachedEvidence(t, f, label = "subsequent-attached") {
 		for (const entry of fs.readdirSync(f.control))
 			if (entry.startsWith("source-") || ["transport", "calls"].includes(entry))
 				retain(entry, fs.readFileSync(path.join(f.control, entry)));
+		if (transactions) {
+			const state = path.join(
+				f.directory,
+				"home/.local/state/wallpaperdb-boat/557",
+			);
+			let bytes = 0;
+			if (fs.existsSync(state))
+				for (const name of fs.readdirSync(state))
+					if (name.startsWith("lock-"))
+						fs.cpSync(path.join(state, name), path.join(archive, name), {
+							recursive: true,
+							filter: (from) => {
+								const stat = fs.lstatSync(from);
+								assert.equal(
+									stat.isSymbolicLink(),
+									false,
+									"transaction evidence stays in fixture",
+								);
+								if (stat.isFile()) bytes += stat.size;
+								assert.ok(
+									bytes <= 512 * 1024 * 1024,
+									"bounded private initial transaction archive",
+								);
+								return true;
+							},
+						});
+		}
 		retain("make-output.log", result.output);
 		retain(
 			"result.json",
@@ -15027,3 +15112,271 @@ test("fresh lifecycle successful migration reconstruction freezes captured depen
 		[],
 	);
 });
+
+// Synthetic LOCAL scheduling control, not a reconstruction of failure269.
+for (const origin of ["default", "independent"])
+	test(`native source fixture origin at migration setup ${origin}`, async (t) => {
+		const destination = process.env.BOAT_SOURCE_ORIGIN_EVIDENCE_DIRECTORY;
+		const archive = destination
+			? fs.mkdtempSync(path.join(destination, origin + "-"))
+			: null;
+		if (archive) fs.chmodSync(archive, 0o700);
+		const retain = (name, value) => {
+			if (archive)
+				fs.writeFileSync(
+					path.join(archive, name),
+					JSON.stringify(value, null, 2) + "\n",
+					{ mode: 0o600 },
+				);
+		};
+		await migrationGenerationCheckout(t, {
+			cleanupReport: archive && path.join(archive, "fixture"),
+			generate: async (f) => {
+				const pkg = f.json("scripts/package.json"),
+					original = pkg.scripts["dependencies:lock"];
+				assert.ok(original.startsWith("cd .. && "));
+				// The same native shell stops around its existing cd, then runs unchanged tail.
+				const before =
+					'printf \'%s\n\' "$$" > "$FAKE_CONTROL/source-cwd-before"; kill -STOP "$$"; ';
+				const after =
+					'{ printf \'%s\n\' "$$" > "$FAKE_CONTROL/source-cwd-after"; kill -STOP "$$"; } && ';
+				pkg.scripts["dependencies:lock"] =
+					before + "cd .. && " + after + original.slice("cd .. && ".length);
+				f.local("scripts/package.json", JSON.stringify(pkg));
+				retain("recipe-equivalence.json", {
+					original,
+					instrumented: pkg.scripts["dependencies:lock"],
+					unchangedTail: original.slice("cd .. && ".length),
+				});
+				const sibling = fixtureProcess(f.json(".boat/state.json").daemon.pid);
+				assert.ok(sibling);
+				let independent;
+				if (origin === "independent") {
+					const writer = f.writer({ sourceCommand: true });
+					await f.readiness.wait(
+						() =>
+							fs.existsSync(
+								path.join(f.control, "source-independent-writer.json"),
+							),
+						"independent writer before public Make",
+					);
+					independent = fixtureProcess(writer.child.pid);
+					assert.ok(independent);
+					flag(f, "writer-release");
+				}
+				flag(f, "source-held-detach");
+				const raw = subsequentAttachedEvidence(t, f, "migration-setup-origin");
+				const programs = {};
+				for (const file of [
+					"scripts/boat.mjs",
+					"scripts/lib/boat-source-command.mjs",
+					"scripts/lib/boat-shutdown.mjs",
+					"scripts/lib/boat-source-generation.mjs",
+					"scripts/package.json",
+				]) {
+					const bytes = fs.readFileSync(path.join(f.root, file));
+					programs[file] = {
+						sha256: createHash("sha256").update(bytes).digest("hex"),
+						bytes: bytes.length,
+					};
+					if (archive)
+						fs.writeFileSync(
+							path.join(archive, file.replaceAll("/", "_")),
+							bytes,
+							{ mode: 0o600 },
+						);
+				}
+				retain("before-launch.json", {
+					programs,
+					independent,
+					sibling,
+					argv: ["make", "run", "PACKAGE=scripts", "SCRIPT=dependencies:lock"],
+				});
+				const pending = f.generate(),
+					command = f.commands.at(-1);
+				let shell, transition;
+				const receipt = () => f.json(".boat/source-writer.json");
+				const owned = () => receipt().phases.start.localOwnership.observed;
+				const matches = (p, id) =>
+					p.pid === id.pid &&
+					p.birth === id.startTicks &&
+					p.group === id.group &&
+					p.session === id.session &&
+					p.cwd === id.cwd;
+				try {
+					await f.readiness.wait(() => {
+						assert.equal(command.terminal, null, command.output());
+						return (
+							fs.existsSync(path.join(f.control, "source-cwd-before")) &&
+							fs.existsSync(path.join(f.control, "source-detach-barrier.json"))
+						);
+					}, "native pre-cd shell and held detach");
+					const shellPid = Number(
+						fs
+							.readFileSync(path.join(f.control, "source-cwd-before"), "utf8")
+							.trim(),
+					);
+					shell = fixtureProcess(shellPid);
+					assert.ok(shell);
+					assert.equal(shell.cwd, path.join(f.worker, "scripts"));
+					const barrier = JSON.parse(
+						fs.readFileSync(path.join(f.control, "source-detach-barrier.json")),
+					);
+					const detach = fixtureProcess(barrier.pid),
+						writer = fixtureProcess(barrier.start.processId);
+					assert.ok(detach);
+					assert.ok(writer);
+					const coupled = writer.group === detach.group;
+					if (coupled)
+						await f.readiness.wait(
+							() => owned().some((p) => matches(p, shell)),
+							"production acquired exact native shell before cd release",
+						);
+					else {
+						if (independent) assert.deepEqual(writer, independent);
+						assert.equal(
+							owned().some((p) => matches(p, shell)),
+							false,
+						);
+						assert.notEqual(shell.session, detach.session);
+					}
+					const pre = {
+						shell,
+						writer,
+						detach,
+						coupled,
+						sibling: fixtureProcess(sibling.pid),
+						receipt: receipt(),
+						at: fixtureNow(),
+					};
+					retain("before-cd-release.json", pre);
+					assert.deepEqual(pre.sibling, sibling);
+					assert.deepEqual(fixtureProcess(shell.pid), shell);
+					process.kill(shell.pid, "SIGCONT");
+					await f.readiness.wait(
+						() => fs.existsSync(path.join(f.control, "source-cwd-after")),
+						"same shell after original cd",
+					);
+					transition = fixtureProcess(shell.pid);
+					assert.ok(transition);
+					assert.equal(transition.startTicks, shell.startTicks);
+					assert.equal(transition.group, shell.group);
+					assert.equal(transition.session, shell.session);
+					assert.equal(transition.cwd, f.worker);
+					assert.equal(
+						Number(
+							fs
+								.readFileSync(path.join(f.control, "source-cwd-after"), "utf8")
+								.trim(),
+						),
+						shell.pid,
+					);
+					retain("after-native-cd.json", {
+						before: shell,
+						after: transition,
+						receipt: receipt(),
+						at: fixtureNow(),
+					});
+					if (coupled) {
+						await f.readiness.wait(
+							() =>
+								receipt().phases.start.localOwnership.failure ===
+								"observed local process changed captured ownership",
+							"native ownership change recorded by production",
+						);
+						const result = await pending;
+						raw(result);
+						retain("causal-uncertainty-before-safety.json", {
+							result,
+							receipt: receipt(),
+							shellCurrent: fixtureProcess(shell.pid),
+							sibling: fixtureProcess(sibling.pid),
+							at: fixtureNow(),
+						});
+						assert.notEqual(result.status, 0);
+						assert.match(
+							result.output,
+							/Source writer completion is uncertain/,
+						);
+						assert.equal(
+							fs.existsSync(path.join(f.control, "collecting")),
+							false,
+						);
+						assert.equal(
+							fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+							"stale lock\n",
+						);
+						assert.equal(receipt().protocolError, true);
+						assert.equal(
+							receipt().phases.start.localOwnership.failure,
+							"observed local process changed captured ownership",
+						);
+						// Preserve the real defect verdict; the unchanged helper setup assertion fails.
+						return result;
+					}
+					assert.deepEqual(fixtureProcess(shell.pid), transition);
+					process.kill(shell.pid, "SIGCONT");
+					flag(f, "source-detach-release");
+					const result = await pending;
+					raw(result);
+					retain("complete-before-safety.json", {
+						result,
+						sibling: fixtureProcess(sibling.pid),
+						at: fixtureNow(),
+					});
+					assert.equal(result.status, 0, result.output);
+					assert.match(result.output, /source fixture lock stdout/);
+					assert.match(result.output, /source fixture lock stderr/);
+					assert.deepEqual(
+						fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+						fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+					);
+					assert.notEqual(
+						fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+						"stale lock\n",
+					);
+					assert.equal(
+						fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+						false,
+					);
+					assert.deepEqual(fixtureProcess(sibling.pid), sibling);
+					return result;
+				} finally {
+					// Separate safety owns the actual paused shell, even after its ordinary cd.
+					const current = shell && fixtureProcess(shell.pid);
+					if (
+						current &&
+						current.startTicks === shell.startTicks &&
+						current.group === shell.group &&
+						current.session === shell.session
+					) {
+						process.kill(current.pid, "SIGTERM");
+						process.kill(current.pid, "SIGCONT");
+						await f.readiness.wait(
+							() => fixtureProcess(shell.pid)?.startTicks !== shell.startTicks,
+							"exact paused shell safety retirement",
+						);
+					}
+					flag(f, "source-detach-release");
+					const stateRoot = path.join(
+						f.directory,
+						"home/.local/state/wallpaperdb-boat/557",
+					);
+					if (archive && fs.existsSync(stateRoot))
+						for (const name of fs.readdirSync(stateRoot))
+							if (name.startsWith("lock-"))
+								fs.cpSync(
+									path.join(stateRoot, name),
+									path.join(archive, name),
+									{ recursive: true },
+								);
+					retain("after-independent-safety.json", {
+						shell: shell ?? null,
+						current: shell ? fixtureProcess(shell.pid) : null,
+						sibling: fixtureProcess(sibling.pid),
+						at: fixtureNow(),
+					});
+				}
+			},
+		});
+	});

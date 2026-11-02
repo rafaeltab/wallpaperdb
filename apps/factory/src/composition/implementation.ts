@@ -252,10 +252,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     cancel: (id) => scheduler.cancel(id),
   };
   const requests = new AbortController();
+  const relationshipSource = await runtime.runPromise(Issues);
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
     job,
     scheduler,
+    relationships: (numbers) =>
+      Effect.gen(function* () {
+        return yield* Effect.forEach(numbers, (issue) =>
+          Effect.map(relationshipSource.inspect(issue), (context) => ({
+            issue,
+            blockers: context.blockers,
+          }))
+        );
+      }),
     plan: await runtime.runPromise(Plan),
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });

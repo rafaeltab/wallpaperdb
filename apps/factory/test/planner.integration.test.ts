@@ -16,6 +16,7 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
       issues: [
@@ -57,7 +58,12 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
       input
     );
-    for (const patch of [{ role: 'user' }, { malformed: true }, { status: 'failed' }]) {
+    for (const patch of [
+      { role: 'user' },
+      { malformed: true },
+      { status: 'failed' },
+      { responseRequestId: 'stale-request' },
+    ]) {
       await host.save({ planner: { proposal, ...patch } });
       await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
         _tag: 'Unavailable',
@@ -81,7 +87,15 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     ]);
     const starts = (await host.calls()).filter((call) => call.args[1] === 'start').length;
     await expect(
-      Effect.runPromise(adapter.propose(input), { signal: AbortSignal.timeout(5000) })
+      Effect.runPromise(
+        t3Planner({
+          binary: host.binary,
+          project: host.repository,
+          projectId: 'project-id',
+          stateDirectory: `${host.directory}/planner-state`,
+        }).propose(input),
+        { signal: AbortSignal.timeout(5000) }
+      )
     ).rejects.toMatchObject({
       _tag: 'Unavailable',
       cause: expect.objectContaining({ message: 'Previous advisory planner is still outstanding' }),
@@ -89,6 +103,12 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
     await host.save({ planner: { proposal, status: 'completed' } });
     expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
+    const changed = { ...input, capacity: { concurrency: 2, admission: 1 } };
+    expect(await Effect.runPromise(adapter.propose(changed))).toEqual(proposal);
+    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
+      changed
+    );
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
       starts + 1
     );
@@ -109,6 +129,7 @@ it('retains uncertain launch responsibility after a lost start response', async 
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
       issues: [],
@@ -122,7 +143,16 @@ it('retains uncertain launch responsibility after a lost start response', async 
       input
     );
     await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
-    await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
+    await expect(
+      Effect.runPromise(
+        t3Planner({
+          binary: host.binary,
+          project: host.repository,
+          projectId: 'project-id',
+          stateDirectory: `${host.directory}/planner-state`,
+        }).propose(input)
+      )
+    ).rejects.toMatchObject({
       _tag: 'Unavailable',
       cause: expect.objectContaining({
         message: 'Planner launch is uncertain; operator reconciliation required',
@@ -144,6 +174,7 @@ it('returns Unavailable when the planner exits before consuming large context', 
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
     });
     await expect(
       Effect.runPromise(
@@ -185,6 +216,7 @@ it('bounds one outstanding advisory request across polling iterations and concur
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
       issues: [],

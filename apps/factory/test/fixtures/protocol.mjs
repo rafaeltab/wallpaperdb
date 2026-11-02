@@ -454,7 +454,7 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   reply({
     thread: {
       threadId: 'planner-thread',
-      latestRunId: 'planner-run',
+      latestRunId: config.planner.runId ?? 'planner-run',
       status: config.planner.status ?? 'completed',
       providerInstanceId: 'codex',
       model: 'gpt-6.1-sol',
@@ -465,7 +465,10 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
         runId: 'planner-run',
         text: config.planner.malformed
           ? '{}'
-          : JSON.stringify({ requestId, ...config.planner.proposal }),
+          : JSON.stringify({
+              requestId: config.planner.responseRequestId ?? requestId,
+              ...config.planner.proposal,
+            }),
       },
     ],
   });
@@ -667,7 +670,10 @@ else if (args[1] === 'start') {
                 }),
               },
             ]
-          : ((config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
+          : (((config.holdPublication && resource?.runCount === 3) ||
+            (config.holdReview && resource?.runCount === 2)
+              ? []
+              : config.messages) ??
             (config.complete && resource
               ? [
                   {

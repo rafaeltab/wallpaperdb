@@ -226,6 +226,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     Layer.succeed(
       IPlanner,
       t3Planner({
+        stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
         project,
         binary: configuration.FACTORY_T3_BINARY,
         projectId: configuration.FACTORY_T3_PROJECT_ID,

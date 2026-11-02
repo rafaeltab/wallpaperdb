@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
@@ -285,3 +285,34 @@ it('reserves one durable launch across competing planner adapters', async () => 
     await host.cleanup();
   }
 });
+
+it.each(['{', JSON.stringify({ revision: 1, requestId: 'saved', input: '{}', deadline: 0 })])(
+  'fails closed on corrupt durable planner state %s',
+  async (record) => {
+    const host = await protocol();
+    try {
+      const directory = `${host.directory}/planner-state`;
+      await mkdir(directory);
+      await writeFile(`${host.directory}/calls.jsonl`, '');
+      await writeFile(`${directory}/planner-0.json`, record);
+      const adapter = t3Planner({
+        binary: host.binary,
+        project: host.repository,
+        projectId: 'project-id',
+        stateDirectory: directory,
+      });
+      await expect(
+        Effect.runPromise(
+          adapter.propose({
+            issues: [],
+            job: { kind: 'empty' },
+            capacity: { concurrency: 1, admission: 1 },
+          })
+        )
+      ).rejects.toMatchObject({ _tag: 'Unavailable' });
+      expect(await host.calls()).toEqual([]);
+    } finally {
+      await host.cleanup();
+    }
+  }
+);

@@ -139,3 +139,40 @@ it('selects a verified child base and blocks divergent joins using real Git ance
     await host.cleanup();
   }
 });
+it('continues observing an eligible issue with more than 100 retained ready publications', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({ prHead: host.base, base: host.base });
+    const adapter = githubIssues({
+      project: host.repository,
+      base: host.base,
+      prerequisites: [],
+      readyPrerequisites: () =>
+        Effect.succeed(
+          Array.from({ length: 101 }, (_, index) => ({
+            issue: index + 1,
+            pr: index + 101,
+            commit: host.base,
+          }))
+        ),
+      joins: { directory: `${host.directory}/joins`, binary: host.binary, projectId: 'project-id' },
+    });
+    if (!adapter.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(adapter.reconcile());
+    expect(await Effect.runPromise(adapter.inspect(585))).toMatchObject({
+      open: true,
+      blockersReady: true,
+    });
+    expect(
+      (await host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'view')
+    ).toHaveLength(101);
+  } finally {
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

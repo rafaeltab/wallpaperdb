@@ -1760,3 +1760,53 @@ done
     await f.close();
   }
 });
+it('parks an oversized affected family without blocking reconciliation of retained publications', async () => {
+  const f = await landedFixture();
+  try {
+    const prerequisites: import('../src/adapters/github/index.js').VerifiedPrerequisite[] = [
+      ...f.config.prerequisites,
+    ];
+    const prs: Record<string, { branch: string; base: string; state?: string }> = {
+      ...f.joinState.prs,
+    };
+    const branches: string[] = [];
+    let parent = f.c;
+    let previousBranch = 'C';
+    for (let index = 0; index < 97; index++) {
+      const branch = `extra-${index}`;
+      f.git('switch', '-c', branch, parent);
+      await writeFile(join(f.host.repository, 'extra.txt'), String(index));
+      f.git('add', '.');
+      f.git('commit', '-m', branch);
+      const head = f.git('rev-parse', 'HEAD');
+      prerequisites.push({ issue: 200 + index, pr: 300 + index, commit: head, parent });
+      prs[String(300 + index)] = { branch, base: previousBranch };
+      branches.push(branch);
+      previousBranch = branch;
+      parent = head;
+    }
+    f.git('push', 'origin', ...branches);
+    f.git('switch', '--detach', f.host.base);
+    await f.host.save({ join: { ...f.joinState, prs }, landing: { merge: f.merged, head: f.a } });
+    const config = { ...f.config, prerequisites };
+    for (const issues of [githubIssues(config), githubIssues(config)]) {
+      if (!issues.reconcile || !issues.recoveries) throw new Error('Missing reconciliation');
+      await Effect.runPromise(issues.reconcile());
+      expect(await Effect.runPromise(issues.recoveries())).toContainEqual(
+        expect.objectContaining({
+          active: false,
+          progress: expect.stringContaining('100-layer maintenance limit'),
+        })
+      );
+    }
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/extra-96').split(/\s/)[0]).toBe(
+      parent
+    );
+    expect(
+      (await f.host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
+    ).toHaveLength(0);
+  } finally {
+    await f.close();
+  }
+});

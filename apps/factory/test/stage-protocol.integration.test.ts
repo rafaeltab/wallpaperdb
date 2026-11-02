@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -274,4 +275,92 @@ it('delivers the durable per-job PR target instead of the configured default', (
     expect(sends[0].args[3]).toContain(
       'against PR target factory/A, pinned comparison ' + host.base
     );
+  }));
+
+it('delivers owned replay repair against the actual comparison and accepts only its current clean receipt', () =>
+  stageFixture(async ({ host, adapter, intent }) => {
+    const binding = await Effect.runPromise(adapter.observe(intent));
+    if (binding.kind !== 'found') throw new Error('Missing owner');
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim();
+    git(
+      host.repository,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'new replay parent'
+    );
+    const parent = git(host.repository, 'rev-parse', 'HEAD');
+    git(
+      host.repository,
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'replayed issue'
+    );
+    const head = git(host.repository, 'rev-parse', 'HEAD');
+    const request: StageRequest = {
+      index: 3,
+      stage: 'babysitting',
+      threadId: 'thread-live',
+      commit: head,
+      previousRunId: 'published',
+      ordinal: 4,
+      comparison: { base: parent, prBase: 'D', previousHead: host.base },
+    };
+    await host.save({ overrides: { status: 'running' } });
+    await expect(Effect.runPromise(adapter.sendStage(intent, request))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    await host.save({ overrides: { status: 'completed' } });
+    await Effect.runPromise(adapter.sendStage(intent, request));
+    const sent = (await host.calls()).filter(
+      (c) => c.args[1] === 'send' && !c.args.includes('--help')
+    );
+    expect(sent).toHaveLength(1);
+    expect(JSON.stringify(sent[0])).toContain(head);
+    expect(JSON.stringify(sent[0])).toContain(parent);
+    expect(JSON.stringify(sent[0])).toContain('actual comparison');
+    git(binding.worktree, 'reset', '--hard', head);
+    const receipt = {
+      delivery: '1:3',
+      jobId: '1',
+      stage: 'babysitting',
+      base: parent,
+      commit: head,
+      outcome: '<PR>READY</PR>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'fixed', runCount: 4 },
+      messages: [{ role: 'assistant', runId: 'fixed', text: JSON.stringify(receipt) }],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+      commit: head,
+    });
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'fixed', runCount: 4 },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'fixed',
+          text: JSON.stringify({ ...receipt, base: host.base }),
+        },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
   }));

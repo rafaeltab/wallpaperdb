@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Intent, type JobStore, Unavailable } from '../../capabilities/job/index.js';
+
 const intentSchema = z
   .object({
     id: z.string().min(1),
@@ -21,6 +22,13 @@ const intentSchema = z
 const stageSchema = z
   .object({
     ordinal: z.number().int().positive().optional(),
+    comparison: z
+      .object({
+        base: z.string().regex(/^[a-f0-9]{40}$/),
+        prBase: z.string().min(1),
+        previousHead: z.string().regex(/^[a-f0-9]{40}$/),
+      })
+      .optional(),
     continuation: z.boolean().optional(),
     resume: z.boolean().optional(),
     observedRunId: z.string().optional(),

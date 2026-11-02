@@ -93,7 +93,7 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
     const prompt = args[3];
     const operation = prompt.match(/Operation ([a-f0-9]+)\./)[1];
     const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/).slice(1);
-    const worktree = join(config.directory, 'recovery-worker');
+    const worktree = join(config.directory, `recovery-worker-${operation}`);
     git(config.repository, 'worktree', 'add', '-b', flag('--branch'), worktree, flag('--worktree'));
     try {
       git(worktree, 'rebase', '--onto', onto, parent);
@@ -101,8 +101,8 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       writeFileSync(
         join(worktree, 'shared.txt'),
         config.restack.outcome === 'COMPLEX'
-          ? `export const behavior = () => 'resolved D and C behavior';`
-          : 'resolved D and C behavior'
+          ? `export const behavior = () => 'resolved D and C behavior ${operation}';`
+          : `resolved D and C behavior ${operation}`
       );
       git(worktree, 'add', 'shared.txt');
       execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], {

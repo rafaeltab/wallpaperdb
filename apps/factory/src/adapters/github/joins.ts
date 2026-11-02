@@ -1,31 +1,31 @@
 import { createHash } from 'node:crypto';
 import {
-  mkdir,
-  open,
-  readFile,
   link,
-  unlink,
+  mkdir,
   mkdtemp,
+  open,
   readdir,
-  rmdir,
+  readFile,
   rename,
+  rmdir,
+  unlink,
 } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { z } from 'zod';
+import { dirname, join } from 'node:path';
 import { Effect, Layer as EffectLayer } from 'effect';
+import { z } from 'zod';
+import { Unavailable } from '../../capabilities/job/index.js';
 import {
+  type RecoveryOutcome,
   RecoveryPorts,
   Restack,
   RestackLive,
-  type RecoveryOutcome,
 } from '../../capabilities/restack/index.js';
-import { Unavailable } from '../../capabilities/job/index.js';
+import { command } from '../../platform/index.js';
 import { t3Restacker } from '../t3/index.js';
+import { normalizeChecks, passingChecks } from './checks.js';
+import { runInContext, admitRecovery } from './context.js';
 import { landingEvidence } from './landing.js';
 import type { VerifiedPrerequisite } from './prerequisites.js';
-import { runInContext, admitRecovery } from './context.js';
-import { command } from '../../platform/index.js';
-import { normalizeChecks, passingChecks } from './checks.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
 import {
   joinBoundary,
@@ -69,6 +69,7 @@ const intent = z.object({
   groups: z.array(group),
   members: z.array(z.number().int().positive()),
   numbers: z.array(z.number().int()).max(100),
+  generation: sha.optional(),
   layers: z.array(layer),
   replay: z.array(layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha })),
 });
@@ -147,10 +148,37 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const git = (args: string[], signal?: AbortSignal) =>
     command('git', args, project, signal).then((text) => text.trim());
   const directory = (numbers: readonly number[]) => join(config.directory, id(numbers));
-  const load = async (numbers: readonly number[]) => {
-    const value = await read(directory(numbers), 'intent.json');
-    return value === null ? null : intent.parse(value);
+  const effective = async (dir: string): Promise<Intent | null> => {
+    let saved = await read(dir, 'intent.json');
+    if (!saved) return null;
+    let operation = intent.parse(saved);
+    const seen = new Set<string>();
+    for (;;) {
+      const key = operation.generation ?? 'initial';
+      if (seen.has(key)) throw new Error('Cyclic replay repair journal');
+      seen.add(key);
+      saved = await read(dir, `repair-${key}.json`);
+      if (!saved) return operation;
+      operation = intent.parse(saved);
+    }
   };
+  const requiredOperation = async (dir: string) => {
+    const operation = await effective(dir);
+    if (!operation) throw new Error('Missing durable replay intent');
+    return operation;
+  };
+  const completionName = (operation: Intent) =>
+    operation.generation ? `complete-${operation.generation}.json` : 'complete.json';
+  const repairRequestName = (operation: Intent, head: string) =>
+    `repair-request-${operation.generation ?? 'initial'}-${head}.json`;
+  const completed = async (dir: string) => {
+    const operation = await effective(dir);
+    if (!operation) return null;
+    for (const item of operation.replay)
+      if (await read(dir, repairRequestName(operation, item.next))) return null;
+    return await read(dir, completionName(operation));
+  };
+  const load = (numbers: readonly number[]) => effective(directory(numbers));
   const remote = async (branch: string, signal?: AbortSignal) => {
     const value = await git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], signal);
     return value.split(/\s/)[0];
@@ -235,8 +263,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!path) return false;
     return !(await command('git', ['status', '--porcelain'], path, signal)).trim();
   };
-  const released = async (key: string) =>
-    !!(await read(join(config.directory, key), 'complete.json'));
+  const released = async (key: string) => !!(await completed(join(config.directory, key)));
   const ownerState = async (existing: unknown, key: string) => {
     const owner = z.object({ key: z.string() }).parse(existing).key;
     if (owner === key) return 'owned';
@@ -886,7 +913,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.layers) {
       const changed = operation.replay.find((replay) => replay.pr === item.pr);
       const head = await remote(item.branch, signal);
-      if (head !== item.commit && head !== changed?.next) {
+      if (
+        head !== item.commit &&
+        head !== changed?.next &&
+        !(operation.generation && head === changed?.commit)
+      ) {
         await publish(dir, 'blocked.json', {
           kind: 'head-conflict',
           issue: item.issue,
@@ -1003,6 +1034,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
+  const claimEvidence = async (item: Intent['replay'][number], dir: string) => {
+    const legacy = await read(dir, `evidence-claim-${item.pr}.json`);
+    if (legacy && z.object({ commit: sha }).parse(legacy).commit === item.next) return false;
+    return publish(dir, `evidence-claim-${item.pr}-${item.next}.json`, { commit: item.next });
+  };
   const recordEvidence = async (
     item: Intent['replay'][number],
     dir: string,
@@ -1041,8 +1077,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         .map((comment) => comment.body),
     ].join('\n');
     if (body.includes(item.next) && body.includes(item.url)) return true;
-    if (!(await publish(dir, `evidence-claim-${item.pr}.json`, { commit: item.next })))
-      return false;
+    if (!(await claimEvidence(item, dir))) return false;
     await command(
       'gh',
       [
@@ -1068,7 +1103,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const validateReplays = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     for (const item of operation.replay) {
       const saved = await read(dir, `resolved-${item.issue}.json`);
-      if (!saved) {
+      if (repairedResolution(operation, item, saved)) {
         if (!(await validate(item, dir, signal))) return false;
         continue;
       }
@@ -1178,7 +1213,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!(await closingLinks(operation, dir, signal))) return;
     if (!(await regroup(operation, dir, signal))) return;
     if (!(await refreshAssertions(operation, dir, signal))) return;
-    await publish(dir, 'complete.json', { commit: replayTip(operation) });
+    await publish(dir, completionName(operation), { commit: replayTip(operation) });
   };
   const nonRecoverable = (blocked: unknown) =>
     !!blocked && !z.object({ kind: z.literal('conflict') }).safeParse(blocked).success;
@@ -1354,7 +1389,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const evidence = async (numbers: readonly number[], signal?: AbortSignal) => {
     const operation = await load(numbers);
-    if (!operation || !(await read(directory(numbers), 'complete.json'))) return [];
+    if (!operation || !(await completed(directory(numbers)))) return [];
     if (!(await completedComparisonsValid(operation, signal))) return [];
     for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
@@ -1366,9 +1401,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const saved = await read(dir, 'intent.json');
       if (saved)
         records.push({
-          operation: intent.parse(saved),
+          operation: await requiredOperation(dir),
           directory: dir,
-          complete: !!(await read(dir, 'complete.json')),
+          complete: !!(await completed(dir)),
         });
     }
     return records;
@@ -1461,11 +1496,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const reconcileOperation = async (key: string, signal?: AbortSignal) => {
     const dir = join(config.directory, key);
-    if (await read(dir, 'complete.json')) return;
+    if (await completed(dir)) return;
     if (await read(dir, 'limit.json')) return;
     const saved = await read(dir, 'intent.json');
     if (saved) {
-      const operation = intent.parse(saved);
+      const operation = await requiredOperation(dir);
       await prepare(operation.numbers, null, signal);
       return;
     }
@@ -1520,11 +1555,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ...progress,
       issue: item.issue,
       pr: item.url,
-      progress: (await read(dir, 'complete.json'))
+      progress: (await completed(dir))
         ? 'Verified; downstream readiness may proceed'
         : progress.progress,
-      active: (await read(dir, 'complete.json')) ? false : progress.active,
+      active: (await completed(dir)) ? false : progress.active,
     };
+  };
+  const repairRecoveries = async () => {
+    const result = [];
+    for (const name of (await operationDirectories()).filter((value) =>
+      value.startsWith('repair-replay-')
+    )) {
+      const parent = name.slice('repair-replay-'.length, 'repair-replay-'.length + 64);
+      if (await completed(join(config.directory, parent))) continue;
+      const value = await recoveryStatus(join(config.directory, name));
+      if (value) result.push(value);
+    }
+    return result;
   };
   const recoveries = async (signal?: AbortSignal) => {
     const result = [];
@@ -1532,6 +1579,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const value = await recoveryStatus(join(config.directory, key));
       if (value) result.push(value);
     }
+    result.push(...(await repairRecoveries()));
     const observed = await publicationRecoveries(signal);
     return [...new Map([...result, ...observed].map((value) => [value.issue, value])).values()];
   };
@@ -1772,7 +1820,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (await oversizedMaintenance(landed, descendants)) return;
     const numbers = [-landed.anchor.pr, ...descendants.map((item) => item.issue)];
     const dir = directory(numbers);
-    if (await read(dir, 'complete.json')) return;
+    if (await completed(dir)) return;
     if (
       !(await acquire(
         id(numbers),
@@ -1857,7 +1905,175 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await maintainAnchor(anchor, guarded, landed, signal);
     }
   };
-  return { prepare, evidence, state, replayFor, reconcile, recoveries, maintain };
+  const repairDirectory = (record: ReplayRecord, head: string) =>
+    join(config.directory, `repair-replay-${id(record.operation.numbers)}-${head}`);
+  const repairSources = (operation: Intent) =>
+    operation.replay.map((old) => ({
+      ...old,
+      commit: old.next,
+      parent: old.onto,
+      reviewedCommit: reviewOrigin(old),
+    }));
+  const recoverRepair = async (record: ReplayRecord, head: string, signal?: AbortSignal) => {
+    const dir = repairDirectory(record, head);
+    if (!(await blockingFile(dir))) return;
+    const sources = repairSources(record.operation);
+    await recoverConflict(dir, sources, signal);
+  };
+  const repairWriters = async (operation: Intent, issue: number, signal?: AbortSignal) => {
+    const keys = [
+      ...operation.layers.map((value) => `branch:${value.branch}`),
+      ...operation.groups.map((value) => `group:${value.number}`),
+    ];
+    if (!(await acquire(id(operation.numbers), keys))) return false;
+    if (!(await writers(operation.layers, signal))) return false;
+    if (!(await landingStillPresent(operation.landing, signal))) return false;
+    return manualWritersReady(
+      operation.layers.filter((value) => value.issue !== issue),
+      signal
+    );
+  };
+  const repairHead = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    repaired: string,
+    signal?: AbortSignal
+  ) => {
+    if (!(await read(record.directory, repairRequestName(record.operation, head)))) return null;
+    if (!(await isAncestor(head, repaired, signal))) return null;
+    const fixed = {
+      ...item,
+      commit: head,
+      next: repaired,
+      tree: await git(['rev-parse', `${repaired}^{tree}`], signal),
+      reviewedCommit: reviewOrigin(item),
+    };
+    if (!(await validate(fixed, record.directory, signal))) return null;
+    return fixed;
+  };
+  const repairDescendants = async (
+    record: ReplayRecord,
+    fixed: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    const operation = record.operation;
+    const issue = fixed.issue;
+    const repaired = fixed.next;
+    const replay: Intent['replay'] = [];
+    for (const old of operation.replay) {
+      if (old.issue === issue) {
+        replay.push(fixed);
+        continue;
+      }
+      const parent = replay.find((value) => value.branch === old.target);
+      if (!needsReplay(parent, old)) {
+        replay.push(old);
+        continue;
+      }
+      const dir = repairDirectory(record, repaired);
+      await publish(dir, 'seed.json', repairSources(operation));
+      const source = {
+        ...old,
+        commit: old.next,
+        parent: old.onto,
+        reviewedCommit: reviewOrigin(old),
+      };
+      if (await blockingFile(dir)) await recoverConflict(dir, [source], signal);
+      const next = await replayLayer(source, parent.next, old.target, dir, signal);
+      if (!next) return null;
+      replay.push(next);
+    }
+    return replay;
+  };
+  const repairObservation = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    repaired: string | undefined,
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(item, signal);
+    if (current.state !== 'OPEN' || current.baseRefName !== item.target) return null;
+    if (repaired) {
+      if (current.headRefOid !== repaired) return null;
+      if (!(await read(record.directory, repairRequestName(record.operation, head)))) return null;
+    }
+    return current;
+  };
+  const repairRecord = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    repaired: string | undefined,
+    signal?: AbortSignal
+  ) => {
+    const operation = record.operation;
+    const current = await repairObservation(record, item, head, repaired, signal);
+    if (!current) return false;
+    if (repaired) await recoverRepair(record, repaired, signal);
+    if (!(await repairWriters(operation, item.issue, signal))) return false;
+    if (!repaired) return requestRepair(record, item, head, current, signal);
+    const fixed = await repairHead(record, item, head, repaired, signal);
+    if (!fixed) return false;
+    return promoteRepair(record, fixed, signal);
+  };
+  const requestRepair = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    current: Awaited<ReturnType<typeof prState>>,
+    _signal?: AbortSignal
+  ) => {
+    if (current.headRefOid !== head || (await publicationGuard(item.issue, item.commit, current)))
+      return false;
+    await publish(record.directory, repairRequestName(record.operation, head), {
+      issue: item.issue,
+      branch: item.branch,
+      head,
+    });
+    return true;
+  };
+  const promoteRepair = async (
+    record: ReplayRecord,
+    fixed: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    const replay = await repairDescendants(record, fixed, signal);
+    if (!replay) return false;
+    await publish(record.directory, `repair-${record.operation.generation ?? 'initial'}.json`, {
+      ...record.operation,
+      generation: fixed.next,
+      replay,
+    });
+    return true;
+  };
+  const sameReplay = (
+    value: Intent['replay'][number],
+    issue: number,
+    branch: string,
+    head: string
+  ) => value.issue === issue && value.branch === branch && value.next === head;
+  const repair = async (
+    issue: number,
+    branch: string,
+    head: string,
+    repaired?: string,
+    signal?: AbortSignal
+  ) => {
+    const records = await replayRecords();
+    for (const record of records) {
+      const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
+      if (item) return repairRecord(record, item, head, repaired, signal);
+    }
+    if (!repaired) return false;
+    return records.some(
+      (record) =>
+        record.operation.generation === repaired &&
+        record.operation.replay.some((value) => sameReplay(value, issue, branch, repaired))
+    );
+  };
+  return { prepare, evidence, state, replayFor, reconcile, recoveries, maintain, repair };
 }
 
 function trustedRecoveryContext(value: unknown) {
@@ -2019,4 +2235,16 @@ function layerDivergence(
     pr.headRefOid !== assertion.commit ||
     (assertion.branch !== undefined && assertion.branch !== pr.headRefName)
   );
+}
+
+function repairedResolution(operation: Intent, item: Intent['replay'][number], saved: unknown) {
+  if (!saved) return true;
+  return Boolean(operation.generation && z.object({ next: sha }).parse(saved).next !== item.next);
+}
+
+function needsReplay(
+  parent: Intent['replay'][number] | undefined,
+  item: Intent['replay'][number]
+): parent is Intent['replay'][number] {
+  return !!parent && parent.next !== item.onto;
 }

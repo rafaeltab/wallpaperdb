@@ -1,18 +1,18 @@
 import { Effect } from 'effect';
-import { watchdog } from './watchdog.js';
 import {
-  Unavailable,
   type Delivery,
-  type Time,
   type Execution,
   type Intent,
   type Issues,
   type JobStore,
   type Observation,
+  type PullRequestObservation,
   type StageEvidence,
   type StageRequest,
-  type PullRequestObservation,
+  type Time,
+  Unavailable,
 } from './contract.js';
+import { watchdog } from './watchdog.js';
 
 export function reconcileStages(
   store: JobStore,
@@ -60,6 +60,7 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
+      comparison: waiting.comparison,
       stage:
         waiting.stage === 'publication'
           ? 'ci'
@@ -110,16 +111,17 @@ function readiness(
   execution: Execution,
   issues: Issues,
   intent: Intent,
-  accepted: StageRequest
+  accepted: StageRequest,
+  observation?: Extract<Observation, { kind: 'found' }>
 ) {
   return Effect.gen(function* () {
     const publication = yield* store.readStage(accepted.index - 1);
     const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
-    const matches = publicationMatches(evidence, accepted, pr);
-    const pending = maintenanceDelivery(pr, accepted.commit);
-    if (pending) return pending;
-    if (requiresManualRecovery(pr, accepted.commit))
+    const retained = (yield* store.readControl()).prerequisite;
+    const cached = retainedAssociation(retained, pr);
+    const matches = publicationMatches(evidence, accepted, pr) || cached;
+    if (manualReplay(pr, accepted.commit, cached))
       return {
         stage: 'ci' as const,
         commit: accepted.commit,
@@ -129,17 +131,18 @@ function readiness(
         activity: 'manual-recovery' as const,
         pr,
       };
-    if (requiresRepair(matches, pr)) {
-      yield* dispatchRepair(store, execution, intent, accepted, evidence);
+    if (pr.kind === 'found' && (yield* repairAllowed(issues, intent, matches, pr))) {
+      yield* dispatchRepair(store, execution, intent, accepted, evidence, pr, observation);
       return {
         stage: 'babysitting' as const,
-        commit: accepted.commit,
+        commit: pr.commit,
         ready: false,
         landed: false,
         pr,
       };
     }
-    return observedReadiness(pr, matches, accepted.commit);
+    const pending = maintenanceDelivery(pr, accepted.commit);
+    return pending ?? observedReadiness(pr, matches, accepted.commit);
   });
 }
 
@@ -157,16 +160,18 @@ function dispatchRepair(
   execution: Execution,
   intent: Intent,
   accepted: StageRequest,
-  evidence: StageEvidence | null
+  evidence: StageEvidence | null,
+  pr: Extract<PullRequestObservation, { kind: 'found' }>,
+  observation?: Extract<Observation, { kind: 'found' }>
 ) {
   return Effect.gen(function* () {
     const request: StageRequest = {
       index: accepted.index + 1,
       stage: 'babysitting',
       threadId: accepted.threadId,
-      commit: accepted.commit,
-      previousRunId: accepted.previousRunId,
-      ordinal: (evidence?.ordinal ?? 3) + 1,
+      commit: pr.commit,
+      comparison: repairComparison(pr, accepted.commit),
+      ...repairRun(accepted, evidence, observation),
     };
     yield* store.saveStage(request);
     const saved = yield* store.readStage(request.index);
@@ -193,7 +198,8 @@ function reconcileStage(
       yield* questionInterruption(store, execution, issues, intent, waiting, observation, time);
       return suspended;
     }
-    if (waiting.stage === 'ci') return yield* readiness(store, execution, issues, intent, waiting);
+    if (waiting.stage === 'ci')
+      return yield* readiness(store, execution, issues, intent, waiting, observation);
     yield* deliver(store, execution, intent, waiting);
     const observed = yield* execution.inspectStage(intent, waiting);
     const evidence = yield* associateStage(store, observed, waiting);
@@ -216,6 +222,7 @@ function reconcileStage(
         evidence,
         delivery
       );
+    if (!(yield* acceptReplayRepair(issues, intent, waiting, verified))) return delivery;
     return yield* advance(store, execution, issues, intent, waiting, verified);
   });
 }
@@ -455,7 +462,13 @@ function reviewedAssociation(
   return pr.commit === commit || pr.reviewedCommit === commit;
 }
 function requiresRepair(matches: boolean, pr: PullRequestObservation) {
-  return matches && pr.kind === 'found' && pr.ci?.failed && !pr.reviewedCommit;
+  return (
+    matches &&
+    pr.kind === 'found' &&
+    pr.ci?.failed &&
+    !pr.manualRecovery &&
+    (!pr.reviewedCommit || Boolean(pr.parent && pr.base))
+  );
 }
 function deliveryIdentity(pr: PullRequestObservation, commit: string) {
   return pr.kind === 'found'
@@ -467,7 +480,10 @@ function isLanded(pr: PullRequestObservation) {
   return pr.kind === 'found' && pr.landed;
 }
 function requiresManualRecovery(pr: PullRequestObservation, commit: string) {
-  return pr.kind === 'found' && (pr.manualRecovery === true || !reviewedAssociation(pr, commit));
+  return (
+    pr.kind === 'found' &&
+    (pr.manualRecovery === true || (!pr.maintenancePending && !reviewedAssociation(pr, commit)))
+  );
 }
 
 function maintenanceDelivery(pr: PullRequestObservation, commit: string): Delivery | null {
@@ -491,4 +507,64 @@ function observedReadiness(pr: PullRequestObservation, matches: boolean, commit:
     landed,
     active: landed ? false : undefined,
   };
+}
+
+function retainedAssociation(
+  retained: import('./contract.js').AcceptedPublication | undefined,
+  pr: PullRequestObservation
+) {
+  return (
+    pr.kind === 'found' &&
+    retained?.url === pr.url &&
+    pr.reviewedCommit === (retained.reviewedCommit ?? retained.commit)
+  );
+}
+function repairComparison(
+  pr: Extract<PullRequestObservation, { kind: 'found' }>,
+  previous: string
+): StageRequest['comparison'] {
+  if (!pr.reviewedCommit || !pr.parent || !pr.base) return undefined;
+  return { base: pr.parent, prBase: pr.base, previousHead: pr.previousHead ?? previous };
+}
+function repairAllowed(
+  issues: Issues,
+  intent: Intent,
+  matches: boolean,
+  pr: Extract<PullRequestObservation, { kind: 'found' }>
+) {
+  if (!requiresRepair(matches, pr)) return Effect.succeed(false);
+  if (!pr.reviewedCommit) return Effect.succeed(true);
+  return issues.repairReplay?.(intent, pr.commit) ?? Effect.succeed(false);
+}
+function acceptReplayRepair(
+  issues: Issues,
+  intent: Intent,
+  waiting: StageRequest,
+  evidence: StageEvidence
+) {
+  if (waiting.stage !== 'babysitting' || !waiting.comparison) return Effect.succeed(true);
+  return issues.repairReplay?.(intent, waiting.commit, evidence.commit) ?? Effect.succeed(false);
+}
+
+function manualReplay(pr: PullRequestObservation, commit: string, cached: boolean) {
+  if (pr.kind === 'found' && pr.manualRecovery) return true;
+  return requiresManualRecovery(pr, commit) && !cached;
+}
+
+function repairRun(
+  accepted: StageRequest,
+  evidence: StageEvidence | null,
+  observation?: Extract<Observation, { kind: 'found' }>
+) {
+  const run = observation?.run;
+  if (run) return { previousRunId: run.id, ordinal: run.ordinal + 1 };
+  return {
+    previousRunId: accepted.previousRunId,
+    ordinal: predecessorOrdinal(accepted, evidence) + 1,
+  };
+}
+
+function predecessorOrdinal(accepted: StageRequest, evidence: StageEvidence | null) {
+  const ordinal = evidence ? evidence.ordinal : accepted.ordinal;
+  return ordinal ?? 3;
 }

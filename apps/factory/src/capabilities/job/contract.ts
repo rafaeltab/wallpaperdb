@@ -94,6 +94,12 @@ export interface RecoveryStatus {
 /** Scheduler authorization to resume recovery work without a new issue admission. */
 export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
+  /** Coordinate a known replay repair with the existing publication journal. */
+  repairReplay?(
+    intent: Intent,
+    head: string,
+    repaired?: string
+  ): Effect.Effect<boolean, Unavailable>;
   /** Observe recovery state and durably retain known adverse publication changes
    * before later maintenance. Restoration or verified landing is observed before clearing them. */
   recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
@@ -189,6 +195,11 @@ export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' 
 /** Immutable stage association, written before any delivery. Ordinal pins single-turn stages. Babysitting watcher turns also require the
  * exact stage delivery identity in their current-run receipt. */
 export interface StageRequest {
+  readonly comparison?: {
+    readonly base: string;
+    readonly prBase: string;
+    readonly previousHead: string;
+  };
   readonly index: number;
   readonly ordinal?: number;
   readonly continuation?: boolean;
@@ -218,8 +229,9 @@ export type PullRequestObservation =
       readonly kind: 'found';
       readonly url: string;
       readonly commit: string;
-      /** Original accepted/reviewed commit of a durable, CI-verified issue-only replay. */
+      /** Original accepted/reviewed commit of a durable issue-only replay. Current CI and maintenance still gate readiness. */
       readonly reviewedCommit?: string;
+      readonly previousHead?: string;
       readonly parent?: string;
       readonly base?: string;
       readonly ci?: { readonly failed: boolean; readonly progress: string };

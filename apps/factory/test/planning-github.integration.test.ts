@@ -22,6 +22,8 @@ it('collects full trusted scope, fallback blockers, parent context and job state
   };
   try {
     await host.save({
+      defaultBranch: { name: 'main', tip: host.base },
+      issueStates: { 577: 'CLOSED' },
       planning: {
         candidates: [580],
         issues: [
@@ -56,7 +58,7 @@ it('collects full trusted scope, fallback blockers, parent context and job state
     expect(result.issues.find((i) => i.number === 580)).toMatchObject({
       blockers: [577],
       parents: [571],
-      blockersReady: true,
+      blockersReady: false,
       comments: [{ author: 'zero-two-rafaeltab', body: 'Only preview' }],
     });
     expect(result.issues.find((i) => i.number === 571)?.body).toBe('Full spec');

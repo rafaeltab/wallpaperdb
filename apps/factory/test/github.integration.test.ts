@@ -50,8 +50,9 @@ it('translates external issue observations and rejects unverified or malformed d
     await host.save({
       blockers: [{ number: 573, state: 'closed' }],
       issueStates: { 573: 'CLOSED' },
+      defaultBranch: { name: 'main', tip: host.base },
     });
-    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: true });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
     await host.save({
       blockers: Array.from({ length: 101 }, (_, index) => ({ number: index + 1, state: 'open' })),
     });

@@ -815,7 +815,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     const conflicts = await run(['diff', '--name-only', '--diff-filter=U']);
     if (conflicts) {
-      await recordConflict(item, parent, onto, path, dir, conflicts, signal);
+      await saveProgress(dir, {
+        issue: item.issue,
+        active: false,
+        progress: `Interrupted local conflict lacks a retained conflict snapshot; preserve edits and reconcile ${path} before resuming`,
+      });
       return false;
     }
     const inProgress =

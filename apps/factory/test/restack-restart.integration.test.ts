@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -14,6 +14,7 @@ const scenarios = [
   { boundary: 'group', edit: '' },
   { boundary: 'restack', edit: '' },
   { boundary: 'local', edit: 'dirty' },
+  { boundary: 'conflict', edit: 'dirty' },
   { boundary: 'local', edit: 'commit' },
   { boundary: 'remote', edit: 'remote' },
   { boundary: 'base', edit: 'base' },
@@ -23,7 +24,7 @@ const scenarios = [
 for (const { boundary, edit } of scenarios) {
   it(`recovers the actual factory after SIGKILL at ${boundary} ${edit} while preserving external changes`, async () => {
     const f = await joinFixture({
-      conflict: boundary === 'restack',
+      conflict: ['restack', 'conflict'].includes(boundary),
       restack: boundary === 'restack' ? { outcome: 'SIMPLE' } : undefined,
     });
     const { host, git } = f;
@@ -41,6 +42,17 @@ for (const { boundary, edit } of scenarios) {
         `#!/bin/sh\n${JSON.stringify(process.execPath)} -e 'const fs=require("fs"); fs.writeFileSync(${JSON.stringify(marker)}, "${boundary}"); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){ if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20); } fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},"done");'\n`
       );
       await chmod(hook, 0o700);
+    }
+    if (boundary === 'conflict') {
+      const originalGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+      const wrapper = join(host.directory, 'git');
+      await writeFile(
+        wrapper,
+        `#!/usr/bin/env node
+const fs=require('fs'); const args=process.argv.slice(2); const result=require('child_process').spawnSync(${JSON.stringify(originalGit)},args,{encoding:'utf8'}); if(args.includes('rebase')&&result.status!==0){fs.writeFileSync(${JSON.stringify(marker)},'conflict'); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);} fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},'done');} process.stdout.write(result.stdout??''); process.stderr.write(result.stderr??''); process.exit(result.status??1);
+`
+      );
+      await chmod(wrapper, 0o700);
     }
     const socket = createServer().listen(0, '127.0.0.1');
     await once(socket, 'listening');
@@ -102,7 +114,10 @@ for (const { boundary, edit } of scenarios) {
         ?.slice(9);
       if (edit === 'dirty' || edit === 'commit') {
         if (!attempt) throw new Error('Missing automatic worktree');
-        await writeFile(join(attempt, 'operator.txt'), 'preserve operator change');
+        await writeFile(
+          join(attempt, boundary === 'conflict' ? 'shared.txt' : 'operator.txt'),
+          'preserve operator change'
+        );
         if (edit === 'commit') {
           git('-C', attempt, 'add', 'operator.txt');
           git('-C', attempt, 'commit', '-m', 'Operator change');
@@ -127,9 +142,12 @@ for (const { boundary, edit } of scenarios) {
         await Effect.runPromise(ports.reconcile());
         expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
         if (edit === 'dirty' || edit === 'commit') {
-          expect(await readFile(join(attempt ?? '', 'operator.txt'), 'utf8')).toBe(
-            'preserve operator change'
-          );
+          expect(
+            await readFile(
+              join(attempt ?? '', boundary === 'conflict' ? 'shared.txt' : 'operator.txt'),
+              'utf8'
+            )
+          ).toBe('preserve operator change');
           expect(git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
         }
         if (edit === 'dirty')
@@ -137,7 +155,11 @@ for (const { boundary, edit } of scenarios) {
             expect.arrayContaining([
               expect.objectContaining({
                 active: false,
-                progress: expect.stringContaining('operator reconciliation'),
+                progress: expect.stringContaining(
+                  boundary === 'conflict'
+                    ? 'lacks a retained conflict snapshot'
+                    : 'operator reconciliation'
+                ),
               }),
             ])
           );

@@ -586,3 +586,65 @@ it.each([
     }
   );
 });
+
+it('renders current dependency direction from the admitted issue read model and fails rather than retaining stale edges', async () => {
+  const requested: (readonly number[])[] = [];
+  let unavailable = false;
+  let blockers = [1];
+  const state = {
+    revision: 4,
+    concurrency: 1,
+    allowance: 2,
+    paused: true,
+    admissions: [
+      { issue: 2, base: intent.base, context: '' },
+      { issue: 3, base: intent.base, context: '' },
+    ],
+  };
+  const app = operationsServer({
+    base: intent.base,
+    job: idle,
+    run: Effect.runPromise,
+    relationships: (issues) => {
+      requested.push(issues);
+      return unavailable
+        ? Effect.fail(
+            new Unavailable({ operation: 'relationships', cause: new Error('private-cause') })
+          )
+        : Effect.succeed([
+            { issue: 2, blockers },
+            { issue: 3, blockers: [2] },
+          ]);
+    },
+    scheduler: {
+      status: () => Effect.succeed({ state, jobs: [] }),
+      tick: () => Effect.succeed({ state, jobs: [] }),
+      configure: () => Effect.succeed('saved'),
+      start: idle.start,
+      resume: idle.resume,
+      cancel: idle.cancel,
+    },
+  });
+  try {
+    const first = (await app.inject('/')).body;
+    expect(first).toContain(
+      'Issue #2 prerequisites: <a href="https://github.com/rafaeltab/wallpaperdb/issues/1">#1</a>; admitted dependents: <a href="https://github.com/rafaeltab/wallpaperdb/issues/3">#3</a>'
+    );
+    expect(first).toContain(
+      'Issue #3 prerequisites: <a href="https://github.com/rafaeltab/wallpaperdb/issues/2">#2</a>; admitted dependents: None'
+    );
+    expect(first).not.toContain('Upgrades remain unavailable');
+    expect(requested).toEqual([[2, 3]]);
+    blockers = [];
+    const refreshed = (await app.inject('/')).body;
+    expect(refreshed).toContain('Issue #2 prerequisites: None; admitted dependents:');
+    expect(refreshed).not.toContain('issues/1">#1</a>');
+    unavailable = true;
+    const failed = await app.inject('/api/scheduler');
+    expect(failed.statusCode).toBe(503);
+    expect(failed.body).not.toContain('private-cause');
+    expect(failed.body).not.toContain('blockers');
+  } finally {
+    await app.close();
+  }
+});

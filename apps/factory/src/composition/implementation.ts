@@ -308,9 +308,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
 }
 
 function readyAssertion(status: Status): VerifiedPrerequisite | null {
-  if (status.kind !== 'job' || !(status.delivery?.ready || status.delivery?.landed)) return null;
-  const pr = status.delivery.pr;
-  if (pr?.kind !== 'found') return null;
+  if (status.kind !== 'job') return null;
+  const pr = status.prerequisite;
+  if (!pr) return null;
   return {
     issue: status.intent.issue,
     pr: Number(pr.url.split('/').at(-1)),

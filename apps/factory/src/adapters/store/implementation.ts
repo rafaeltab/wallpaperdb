@@ -79,6 +79,21 @@ export function fileStore(directory: string): JobStore {
       revision: z.number().int().nonnegative(),
       cancelled: z.boolean(),
       claimed: z.array(z.number().int().nonnegative()),
+      prerequisite: z
+        .object({
+          url: z.string().url(),
+          commit: z.string().regex(/^[a-f0-9]{40}$/),
+          reviewedCommit: z
+            .string()
+            .regex(/^[a-f0-9]{40}$/)
+            .optional(),
+          parent: z
+            .string()
+            .regex(/^[a-f0-9]{40}$/)
+            .optional(),
+          base: z.string().optional(),
+        })
+        .optional(),
       parked: z
         .object({
           index: z.number().int().nonnegative(),

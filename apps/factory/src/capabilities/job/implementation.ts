@@ -30,6 +30,7 @@ export const JobLive = Layer.effect(
           observation,
           time
         );
+        yield* retainPrerequisite(store, delivery);
         const control = yield* store.readControl();
         const stage = yield* currentStage(store);
         const resume = resumeCommand(control, stage, observation);
@@ -37,6 +38,7 @@ export const JobLive = Layer.effect(
         return {
           kind: 'job' as const,
           intent,
+          prerequisite: control.cancelled ? undefined : control.prerequisite,
           resume,
           execution: observation,
           delivery: delivery
@@ -200,4 +202,27 @@ function prerequisiteBinding(command: Start, prerequisite?: { prBase: string; ev
   return prerequisite
     ? { prBase: prerequisite.prBase, prerequisiteEvidence: prerequisite.evidence }
     : { prBase: command.prBase, prerequisiteEvidence: command.prerequisiteEvidence };
+}
+
+function retainPrerequisite(
+  store: import('./contract.js').JobStore,
+  delivery: Delivery | undefined
+) {
+  return Effect.gen(function* () {
+    const pr = delivery?.pr;
+    if (!(delivery?.ready || delivery?.landed) || pr?.kind !== 'found') return;
+    const prerequisite = {
+      url: pr.url,
+      commit: pr.commit,
+      reviewedCommit: pr.reviewedCommit,
+      parent: pr.parent,
+      base: pr.base,
+    };
+    for (;;) {
+      const current = yield* store.readControl();
+      if (JSON.stringify(current.prerequisite) === JSON.stringify(prerequisite)) return;
+      if (yield* store.saveControl({ ...current, revision: current.revision + 1, prerequisite }))
+        return;
+    }
+  }).pipe(Effect.withSpan('factory.job.retain-prerequisite'));
 }

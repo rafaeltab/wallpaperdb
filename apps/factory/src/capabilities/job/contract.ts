@@ -61,7 +61,17 @@ export interface JobStore {
   claimStage(index: number): Effect.Effect<boolean, Unavailable>;
   claimLaunch(): Effect.Effect<boolean, Unavailable>;
 }
+export interface AcceptedPublication {
+  readonly url: string;
+  readonly commit: string;
+  readonly reviewedCommit?: string;
+  readonly parent?: string;
+  readonly base?: string;
+}
 export interface Control {
+  /** Last verified ready or landed association survives external retargeting and restart.
+   * Revalidation still gates all prerequisite use and external maintenance. */
+  readonly prerequisite?: AcceptedPublication;
   readonly revision: number;
   readonly cancelled: boolean;
   readonly claimed: readonly number[];
@@ -149,6 +159,7 @@ export type Status =
   | {
       kind: 'job';
       intent: Intent;
+      prerequisite?: AcceptedPublication;
       execution: Observation;
       elapsedMs: number;
       resume?: { index: number; questionId: string };

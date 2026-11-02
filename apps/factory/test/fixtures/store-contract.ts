@@ -5,6 +5,37 @@ export function storeContract(
   name: string,
   setup: () => Promise<{ store: JobStore; reopen: () => JobStore; close: () => Promise<void> }>
 ) {
+  it(`${name}: retains verified prerequisite identity across reopen and competing control updates`, async () => {
+    const fixture = await setup();
+    try {
+      const current = await Effect.runPromise(fixture.store.readControl());
+      const prerequisite = {
+        url: 'https://github.com/rafaeltab/wallpaperdb/pull/102',
+        commit: 'a'.repeat(40),
+        parent: 'b'.repeat(40),
+        base: 'A',
+        reviewedCommit: 'c'.repeat(40),
+      };
+      expect(
+        await Effect.runPromise(
+          fixture.store.saveControl({ ...current, revision: current.revision + 1, prerequisite })
+        )
+      ).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().readControl())).toMatchObject({
+        prerequisite,
+      });
+      expect(
+        await Effect.runPromise(
+          fixture.store.saveControl({ ...current, revision: current.revision + 1 })
+        )
+      ).toBe(false);
+      expect(await Effect.runPromise(fixture.reopen().readControl())).toMatchObject({
+        prerequisite,
+      });
+    } finally {
+      await fixture.close();
+    }
+  });
   it(`${name}: keeps the winning intent and one launch claim across concurrent callers and reopen`, async () => {
     const fixture = await setup();
     try {

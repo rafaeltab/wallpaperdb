@@ -4,6 +4,15 @@ import { join, dirname } from 'node:path';
 import { z } from 'zod';
 import { command } from '../../platform/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
+import {
+  joinBoundary,
+  type JoinBoundary,
+  containsRequired,
+  boundaryStillValid,
+  landedParentCovered,
+  openReplayParent,
+  closedParentsKnown,
+} from './join-boundary.js';
 
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
 const layer = z.object({
@@ -22,6 +31,7 @@ const group = z.object({
   pull_requests: z.array(z.object({ number: z.number().int().positive() })),
 });
 const intent = z.object({
+  boundary: joinBoundary.optional(),
   groups: z.array(group),
   members: z.array(z.number().int().positive()),
   numbers: z.array(z.number().int().positive()).max(100),
@@ -276,20 +286,29 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const nextLayer = async (
     remaining: readonly Layer[],
     covered: readonly string[],
+    boundary: JoinBoundary,
     signal?: AbortSignal
   ) => {
     for (const item of remaining) {
       if (await coveredBy(item.commit, covered, signal)) return { item, alreadyIncluded: true };
-      if (await coveredBy(item.parent, covered, signal)) return { item, alreadyIncluded: false };
+      if (
+        (await coveredBy(item.parent, covered, signal)) ||
+        (await landedParentCovered(project, item.parent, covered, boundary, signal))
+      )
+        return { item, alreadyIncluded: false };
     }
     return null;
   };
-  const orderFrom = async (anchor: Layer, layers: readonly Layer[], signal?: AbortSignal) => {
-    const order = [anchor];
-    const covered = [anchor.commit];
-    let remaining = layers.filter((item) => item.issue !== anchor.issue);
+  const orderFrom = async (
+    layers: readonly Layer[],
+    covered: string[],
+    boundary: JoinBoundary,
+    signal?: AbortSignal
+  ) => {
+    const order: Layer[] = [];
+    let remaining = [...layers];
     while (remaining.length) {
-      const next = await nextLayer(remaining, covered, signal);
+      const next = await nextLayer(remaining, covered, boundary, signal);
       if (!next) return null;
       remaining = remaining.filter((item) => item.issue !== next.item.issue);
       if (next.alreadyIncluded) continue;
@@ -298,26 +317,37 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return order;
   };
-  const replayOrder = async (layers: readonly Layer[], signal?: AbortSignal) => {
+  const replayOrder = async (
+    layers: readonly Layer[],
+    boundary: JoinBoundary,
+    signal?: AbortSignal
+  ) => {
     const sources = await Promise.all(
       layers.map(async (item) => ({
         ...item,
-        parent: await git(['merge-base', item.parent, item.commit], signal),
+        parent: await openReplayParent(project, item.parent, item.commit, boundary, signal),
       }))
     );
     for (const anchor of sources) {
-      const order = await orderFrom(anchor, sources, signal);
-      if (order) return order;
+      if (!(await containsRequired(project, anchor.commit, boundary, signal))) continue;
+      const order = await orderFrom(sources, [anchor.commit], boundary, signal);
+      if (order)
+        return { order, boundary: { ...boundary, base: anchor.commit, prBase: anchor.branch } };
     }
-    return null;
+    if (!(await containsRequired(project, boundary.base, boundary, signal))) return null;
+    const order = await orderFrom(sources, [boundary.base], boundary, signal);
+    return order ? { order, boundary } : null;
   };
-  const combine = async (order: readonly Layer[], dir: string, signal?: AbortSignal) => {
-    const first = order[0];
-    if (!first) return;
-    let onto = first.commit;
-    let target = first.branch;
+  const combine = async (
+    order: readonly Layer[],
+    boundary: JoinBoundary,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    let onto = boundary.base;
+    let target = boundary.prBase;
     const replay: Intent['replay'] = [];
-    for (const item of order.slice(1)) {
+    for (const item of order) {
       const result = await replayLayer(item, onto, target, dir, signal);
       if (!result) return;
       replay.push(result);
@@ -326,17 +356,38 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return replay;
   };
-  const invalidLayers = async (layers: readonly Layer[], signal?: AbortSignal) => {
+  const invalidLayers = async (
+    layers: readonly Layer[],
+    boundary: JoinBoundary,
+    signal?: AbortSignal
+  ) => {
     for (const item of layers) {
-      if (!(await isAncestor(base, item.commit, signal))) return 'baseline-not-contained';
-      if (await git(['rev-list', '--merges', `${base}..${item.commit}`], signal))
+      const common = boundary.landed.length
+        ? await openReplayParent(project, item.parent, item.commit, boundary, signal)
+        : await git(['merge-base', base, item.commit], signal);
+      if (await git(['rev-list', '--merges', `${common}..${item.commit}`], signal))
         return 'nonlinear-prerequisite';
     }
     return undefined;
   };
+  const memberFollows = async (
+    previous: { head: string; branch: string; closed: boolean },
+    node: { head: string; parent: string; closed: boolean },
+    boundary: JoinBoundary,
+    signal?: AbortSignal
+  ) => {
+    if (node.closed) return previous.closed && (await isAncestor(previous.head, node.head, signal));
+    if (node.parent === previous.branch) return isAncestor(previous.head, node.head, signal);
+    return (
+      node.parent === boundary.prBase &&
+      (await isAncestor(previous.head, boundary.base, signal)) &&
+      (await isAncestor(boundary.base, node.head, signal))
+    );
+  };
   const orderedMembers = async (
     members: readonly number[],
     replay: Intent['replay'],
+    boundary: JoinBoundary,
     dir: string,
     signal?: AbortSignal
   ) => {
@@ -359,13 +410,15 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
             )
           );
         const changed = replay.find((item) => item.pr === number);
-        const head = changed?.next ?? current.headRefOid;
+        const closed = boundary.landed.find((item) => item.pr === number);
+        const head = changed?.next ?? closed?.commit ?? current.headRefOid;
         return {
           number,
+          closed: !!closed,
           branch: current.headRefName,
           head,
           parent: changed?.target ?? current.baseRefName,
-          depth: Number(await git(['rev-list', '--count', `${base}..${head}`], signal)),
+          depth: Number(await git(['rev-list', '--count', head], signal)),
         };
       })
     );
@@ -374,37 +427,67 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const previous = nodes[index - 1];
       const node = nodes[index];
       if (!previous || !node) throw new Error('Missing native join member');
-      if (
-        node.parent !== previous.branch ||
-        !(await isAncestor(previous.head, node.head, signal))
-      ) {
+      if (!(await memberFollows(previous, node, boundary, signal))) {
         await publish(dir, 'blocked.json', { kind: 'grouping-needs-dependent-replay', members });
         return null;
       }
     }
     return nodes.map((node) => node.number);
   };
-  const build = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
-    const dir = directory(numbers);
-    await publish(dir, 'seed.json', candidates);
-    const layers = z
-      .array(layer)
-      .min(2)
-      .max(100)
-      .parse(await read(dir, 'seed.json'));
-    const invalid = await invalidLayers(layers, signal);
+  const prepareReplay = async (
+    layers: readonly Layer[],
+    boundary: JoinBoundary,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    if (
+      !(await closedParentsKnown(
+        project,
+        layers.map((item) => item.commit),
+        boundary,
+        signal
+      ))
+    ) {
+      await publish(dir, 'blocked.json', { kind: 'unverifiable-closed-parent' });
+      return;
+    }
+    const invalid = await invalidLayers(layers, boundary, signal);
     if (invalid) {
       await publish(dir, 'blocked.json', { kind: invalid });
       return;
     }
     if (!(await writers(layers, signal))) return;
-    const order = await replayOrder(layers, signal);
-    if (!order) {
+    const plan = await replayOrder(layers, boundary, signal);
+    if (!plan) {
       await publish(dir, 'blocked.json', { kind: 'missing-parent-boundary' });
       return;
     }
-    const replay = await combine(order, dir, signal);
+    const replay = await combine(plan.order, plan.boundary, dir, signal);
     if (!replay?.length) return;
+    return { replay, boundary: plan.boundary };
+  };
+  const build = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
+  ) => {
+    const dir = directory(numbers);
+    await publish(
+      dir,
+      'boundary.json',
+      requirements ?? { base, prBase: 'main', pin: base, landed: [] }
+    );
+    const boundary = joinBoundary.parse(await read(dir, 'boundary.json'));
+    await publish(dir, 'seed.json', candidates);
+    const layers = z
+      .array(layer)
+      .min(1)
+      .max(100)
+      .parse(await read(dir, 'seed.json'));
+    const prepared = await prepareReplay(layers, boundary, dir, signal);
+    if (!prepared) return;
+    const { replay, boundary: selectedBoundary } = prepared;
     const groups = await groupsFor(
       layers.map((item) => item.pr),
       signal
@@ -417,9 +500,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ]),
     ].filter((number) => !replayed.has(number));
     members.push(...replay.map((item) => item.pr));
-    const ordered = await orderedMembers(members, replay, dir, signal);
+    const ordered = await orderedMembers(members, replay, selectedBoundary, dir, signal);
     if (!ordered) return;
-    await publish(dir, 'intent.json', { numbers, layers, replay, groups, members: ordered });
+    await publish(dir, 'intent.json', {
+      numbers,
+      layers,
+      replay,
+      groups,
+      members: ordered,
+      boundary: selectedBoundary,
+    });
     return await load(numbers);
   };
   const validate = async (item: Intent['replay'][number], dir: string, signal?: AbortSignal) => {
@@ -618,11 +708,48 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     );
     return true;
   };
-  const validateOperation = async (operation: Intent, dir: string, signal?: AbortSignal) => {
-    for (const item of operation.replay) if (!(await validate(item, dir, signal))) return false;
-    if (!(await writers(operation.layers, signal))) return false;
-    if (!(await verifyHeads(operation, dir, signal))) return false;
+  const factsValid = async (operation: Intent, signal?: AbortSignal) => {
+    if (operation.boundary)
+      return boundaryStillValid(project, base, operation.boundary, gh, signal);
+    // Legacy intents cannot acquire new closure assumptions during recovery.
+    for (const number of operation.numbers) {
+      const state = z
+        .object({ state: z.string() })
+        .parse(
+          await gh(
+            ['issue', 'view', String(number), '--repo', 'rafaeltab/wallpaperdb', '--json', 'state'],
+            signal
+          )
+        );
+      if (state.state !== 'OPEN') return false;
+    }
     return true;
+  };
+  const containsLayers = async (operation: Intent, tip: string, signal?: AbortSignal) => {
+    for (const item of operation.layers) {
+      const changed = operation.replay.find((value) => value.issue === item.issue);
+      if (!(await isAncestor(changed?.next ?? item.commit, tip, signal))) return false;
+    }
+    return true;
+  };
+  const finalContainsFacts = async (operation: Intent, signal?: AbortSignal) => {
+    const tip = replayTip(operation);
+    if (!tip) return false;
+    const boundary = operation.boundary ?? { base, prBase: 'main', pin: base, landed: [] };
+    if (!(await containsRequired(project, tip, boundary, signal))) return false;
+    return containsLayers(operation, tip, signal);
+  };
+  const operationFactsValid = async (operation: Intent, signal?: AbortSignal) =>
+    (await factsValid(operation, signal)) && (await finalContainsFacts(operation, signal));
+  const publicationSafe = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    if (!(await operationFactsValid(operation, signal))) return false;
+    if (!(await writers(operation.layers, signal))) return false;
+    return verifyHeads(operation, dir, signal);
+  };
+  const validateOperation = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    if (!(await operationFactsValid(operation, signal))) return false;
+    for (const item of operation.replay) if (!(await validate(item, dir, signal))) return false;
+    return publicationSafe(operation, dir, signal);
   };
   const publishComparisons = async (operation: Intent, signal?: AbortSignal) => {
     for (const item of operation.replay) if (!(await publishLayer(item, signal))) return false;
@@ -641,7 +768,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const operationFor = async (
     numbers: readonly number[],
     candidates: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
   ) => {
     const dir = directory(numbers);
     if (await read(dir, 'blocked.json')) return null;
@@ -654,13 +782,18 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ))
     )
       return null;
-    if (!operation) operation = (await build(numbers, candidates, signal)) ?? null;
+    if (!operation) operation = (await build(numbers, candidates, signal, requirements)) ?? null;
     return operation;
   };
-  const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal) => {
+  const prepare = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
+  ) => {
     const dir = directory(numbers);
-    const operation = await operationFor(numbers, candidates, signal);
-    if (!operation || !(await writers(operation.layers, signal))) return;
+    const operation = await operationFor(numbers, candidates, signal, requirements);
+    if (!operation || !(await publicationSafe(operation, dir, signal))) return;
     if (
       !(await acquire(
         id(numbers),
@@ -696,28 +829,33 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       )
     );
   };
+  const verifyReplayTree = async (
+    item: Intent['replay'][number],
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
+      await read(dir, `ci-${item.next}.json`)
+    );
+    if ((await git(['rev-parse', `${item.next}^{tree}`], signal)) !== item.tree)
+      throw new Error('Mismatched replay tree');
+  };
   const evidence = async (numbers: readonly number[], signal?: AbortSignal) => {
     const operation = await load(numbers);
     if (!operation || !(await read(directory(numbers), 'complete.json'))) return [];
+    if (!(await operationFactsValid(operation, signal))) return [];
     if (!(await metadataMatches(operation, signal))) return [];
-    for (const item of operation.replay) {
-      z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
-        await read(directory(numbers), `ci-${item.next}.json`)
-      );
-      if ((await git(['rev-parse', `${item.next}^{tree}`], signal)) !== item.tree)
-        throw new Error('Mismatched replay tree');
-    }
+    for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
   };
   const completedReplay = async (key: string, issue: number, signal?: AbortSignal) => {
     const saved = await read(join(config.directory, key), 'intent.json');
     if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
     const operation = intent.parse(saved);
+    if (!(await operationFactsValid(operation, signal))) return null;
     const item = operation.replay.find((value) => value.issue === issue);
     if (!item || !(await metadataMatches(operation, signal))) return null;
-    z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
-      await read(join(config.directory, key), `ci-${item.next}.json`)
-    );
+    await verifyReplayTree(item, join(config.directory, key), signal);
     return item;
   };
   const operationDirectories = async () => {

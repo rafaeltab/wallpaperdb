@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmod, readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -572,6 +572,52 @@ it.each([false, true])(
           (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
         )
       );
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'recovers an older open-only join journal without inventing closed facts, closed=%s',
+  async (closed) => {
+    const f = await fixture({ ciFails: true });
+    try {
+      if (!f.issues.prepare) throw new Error('Missing prepare');
+      await Effect.runPromise(f.issues.prepare(5));
+      const root = join(f.host.directory, 'joins');
+      const key = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
+      if (!key) throw new Error('Missing join journal');
+      const path = join(root, key, 'intent.json');
+      const saved = JSON.parse(await readFile(path, 'utf8'));
+      // Controlled persisted state from the older journal format, not a production migration.
+      delete saved.boundary;
+      await writeFile(path, JSON.stringify(saved));
+      const statePath = join(f.host.directory, 'join-live.json');
+      const before = JSON.parse(await readFile(statePath, 'utf8'));
+      await writeFile(statePath, JSON.stringify({ ...before, newCI: 'SUCCESS' }));
+      if (closed) {
+        const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        await f.host.save({
+          ...config,
+          issueStates: { 4: 'CLOSED' },
+          defaultBranch: { name: 'main', tip: f.host.base },
+          landedPrerequisites: { 4: [] },
+        });
+      }
+      const reopened = f.reopen();
+      if (!reopened.reconcile) throw new Error('Missing reconcile');
+      await Effect.runPromise(reopened.reconcile());
+      const readiness = await Effect.runPromise(reopened.inspect(5));
+      expect(readiness.blockersReady).toBe(!closed);
+      const after = JSON.parse(await readFile(statePath, 'utf8'));
+      if (closed) expect(after.members).toEqual(before.members);
+      else {
+        const head = readiness.prerequisite?.base;
+        if (!head) throw new Error('Missing joined head');
+        expect(f.git('ls-tree', '--name-only', head)).toBe('A.txt\nB.txt\nC.txt\nD.txt');
+        expect(after.prs['104'].base).toBe('D');
+      }
     } finally {
       await f.close();
     }

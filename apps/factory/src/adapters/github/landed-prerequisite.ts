@@ -25,6 +25,7 @@ const snapshot = z.object({
 });
 const merged = z.object({
   merged: z.boolean(),
+  head: z.object({ sha }).optional(),
   merge_commit_sha: sha.nullable(),
   html_url: z.string(),
   base: z.object({ ref: z.string(), repo: z.object({ full_name: z.string() }) }),
@@ -36,6 +37,7 @@ export interface LandedPrerequisite {
   readonly url: string;
   readonly branch: string;
   readonly tip: string;
+  readonly originalHead?: string;
 }
 /** Closure alone is not delivery. Bind a unique closing PR's merge result to
  * the authenticated current default tip, then acquire only its Git objects. */
@@ -81,6 +83,7 @@ export async function landedPrerequisite(
     issue: number,
     pr: landing.pr,
     commit: landing.commit,
+    originalHead: landing.originalHead,
     url: `https://github.com/rafaeltab/wallpaperdb/pull/${landing.pr}`,
     branch: target.name,
     tip: target.target.oid,
@@ -101,7 +104,7 @@ async function closingPullRequest(
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
   signal?: AbortSignal
 ) {
-  const delivered: { pr: number; commit: string }[] = [];
+  const delivered: { pr: number; commit: string; originalHead?: string }[] = [];
   for (const reference of references) {
     const url = `https://github.com/rafaeltab/wallpaperdb/pull/${reference.number}`;
     if (reference.url !== url) throw new Error('Mismatched closing PR');
@@ -109,7 +112,11 @@ async function closingPullRequest(
       await gh(['api', `repos/rafaeltab/wallpaperdb/pulls/${reference.number}`], signal)
     );
     if (pr.merge_commit_sha && landedAssociation(pr, url, branch))
-      delivered.push({ pr: reference.number, commit: pr.merge_commit_sha });
+      delivered.push({
+        pr: reference.number,
+        commit: pr.merge_commit_sha,
+        originalHead: pr.head?.sha,
+      });
   }
   return delivered.length === 1 ? delivered[0] : null;
 }

@@ -3,7 +3,8 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { TelemetryExportTransport, telemetryBatchOptions } from '@wallpaperdb/core/telemetry';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Metric } from 'effect';
+import { metricsLayer } from './metrics.js';
 /** A local provider keeps factory telemetry independent of product processes and
  * of other runtimes in the same process. Export transport owns bounded sockets. */
 export function telemetry(endpoint: string | undefined) {
@@ -38,10 +39,14 @@ export function telemetry(endpoint: string | undefined) {
             Effect.catch(() => Effect.logWarning('Factory telemetry shutdown unavailable'))
           )
       );
-      return OtelTracer.layerWithoutOtelTracer.pipe(
+      const tracing = OtelTracer.layerWithoutOtelTracer.pipe(
         Layer.provide(
           Layer.succeed(OtelTracer.OtelTracer, provider.getTracer('wallpaperdb.factory'))
         )
+      );
+      const metrics = metricsLayer(endpoint, transport);
+      return Layer.mergeAll(tracing, metrics).pipe(
+        Layer.provideMerge(Layer.succeed(Metric.MetricRegistry, new Map()))
       );
     })
   );

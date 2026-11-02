@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   Scheduler,
   SchedulerLive,
@@ -8,7 +9,7 @@ import {
 } from '../src/capabilities/plan/index.js';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
 import type { Status } from '../src/capabilities/job/index.js';
-import { readFile, writeFile, readdir, rename, unlink, chmod } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename, unlink, chmod, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -2349,6 +2350,151 @@ it.each([false, true])(
       expect(await Effect.runPromise(githubIssues(f.config).pullRequest(intent))).toMatchObject({
         ready: verified,
       });
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each(['branch:C', 'group:9'])(
+  'respects the current successor writer before repair of %s',
+  async (resource) => {
+    const f = await fixture({ groups: true });
+    try {
+      await Effect.runPromise(f.issues.prepare!(5));
+      const root = join(f.host.directory, 'joins');
+      const original = (await readdir(root)).find((n) => /^[a-f0-9]{64}$/.test(n));
+      if (!original) throw new Error('Missing completed operation');
+      const successor = createHash('sha256')
+        .update(JSON.stringify([4, 6]))
+        .digest('hex');
+      await mkdir(join(root, successor));
+      await writeFile(join(root, successor, 'request.json'), JSON.stringify({ numbers: [4, 6] }));
+      const claims = join(root, 'writers', createHash('sha256').update(resource).digest('hex'));
+      await writeFile(join(claims, 'writer-1.json'), JSON.stringify({ key: successor }));
+      const state = join(f.host.directory, 'join-live.json');
+      const live = JSON.parse(await readFile(state, 'utf8'));
+      live.newCI = 'FAILURE';
+      await writeFile(state, JSON.stringify(live));
+      const intent = {
+        id: 'C-job',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: f.host.base,
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const observed = await Effect.runPromise(f.issues.pullRequest(intent));
+      if (observed.kind !== 'found') throw new Error('Missing replay');
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit))).toBe(
+        false
+      );
+      expect(
+        (await readdir(join(root, original))).filter((n) => n.startsWith('repair-request-'))
+      ).toEqual([]);
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(
+        observed.commit
+      );
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'holds repair ownership through restart and generation completion, pending=%s',
+  async (pending) => {
+    const f = await fixture({ ciFails: pending, groups: true });
+    try {
+      await Effect.runPromise(f.issues.prepare!(5));
+      const root = join(f.host.directory, 'joins');
+      const original = (await readdir(root)).find((n) => /^[a-f0-9]{64}$/.test(n));
+      if (!original) throw new Error('Missing operation');
+      const saved = JSON.parse(await readFile(join(root, original, 'intent.json'), 'utf8'));
+      const state = join(f.host.directory, 'join-live.json');
+      const fail = JSON.parse(await readFile(state, 'utf8'));
+      fail.newCI = 'FAILURE';
+      await writeFile(state, JSON.stringify(fail));
+      const intent = {
+        id: 'C-job',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: f.host.base,
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const observed = await Effect.runPromise(f.issues.pullRequest(intent));
+      if (observed.kind !== 'found') throw new Error('Missing replay');
+      expect(await Effect.runPromise(f.issues.repairReplay!(intent, observed.commit))).toBe(true);
+      const claims = join(root, 'writers', createHash('sha256').update('branch:C').digest('hex'));
+      const owner = async () => {
+        const names = (await readdir(claims))
+          .filter((n) => /^writer-\d+.json$/.test(n))
+          .sort((a, b) => Number(a.match(/\d+/)?.[0]) - Number(b.match(/\d+/)?.[0]));
+        return JSON.parse(await readFile(join(claims, names.at(-1)!), 'utf8')).key;
+      };
+      const active = await owner();
+      expect(active).not.toBe(original);
+      for (const group of saved.groups) {
+        const dir = join(
+          root,
+          'writers',
+          createHash('sha256').update(`group:${group.number}`).digest('hex')
+        );
+        const records = await readdir(dir);
+        const owners = await Promise.all(
+          records.map(async (name) => JSON.parse(await readFile(join(dir, name), 'utf8')).key)
+        );
+        expect(owners.at(-1)).toBe(active);
+      }
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit))).toBe(true);
+      expect(await owner()).toBe(active);
+      expect(
+        (await readdir(join(root, original))).filter((n) => n.startsWith('repair-request-'))
+      ).toHaveLength(1);
+      const numbers = [6, 7];
+      const competitor = createHash('sha256').update(JSON.stringify(numbers)).digest('hex');
+      await mkdir(join(root, competitor));
+      await writeFile(join(root, competitor, 'request.json'), JSON.stringify({ numbers }));
+      await writeFile(join(root, competitor, 'seed.json'), JSON.stringify(saved.layers));
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await owner()).toBe(active);
+      f.git('switch', '--detach', observed.commit);
+      await writeFile(join(f.host.repository, 'repair.txt'), 'fixed');
+      f.git('add', '.');
+      f.git('commit', '-m', 'repair');
+      const fixed = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/C:${observed.commit}`,
+        'origin',
+        `${fixed}:refs/heads/C`
+      );
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit, fixed))
+      ).toBe(false);
+      expect(await owner()).toBe(active);
+      const pass = JSON.parse(await readFile(state, 'utf8'));
+      pass.newCI = 'SUCCESS';
+      await writeFile(state, JSON.stringify(pass));
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit, fixed))
+      ).toBe(true);
+      expect(await owner()).toBe(active);
+      await Effect.runPromise(f.reopen().reconcile!());
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await owner()).toBe(competitor);
+      const failedAgain = JSON.parse(await readFile(state, 'utf8'));
+      failedAgain.newCI = 'FAILURE';
+      await writeFile(state, JSON.stringify(failedAgain));
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, fixed))).toBe(false);
+      expect(await owner()).toBe(competitor);
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(fixed);
+      expect(await readFile(join(f.host.repository, 'repair.txt'), 'utf8')).toBe('fixed');
     } finally {
       await f.close();
     }

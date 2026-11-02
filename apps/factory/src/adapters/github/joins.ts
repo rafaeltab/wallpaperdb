@@ -65,6 +65,7 @@ const landing = z.object({
   removed: z.array(z.number()).default([]),
 });
 const intent = z.object({
+  writerKey: z.string().optional(),
   boundary: joinBoundary.optional(),
   landing: landing.optional(),
   groups: z.array(group),
@@ -279,34 +280,63 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!path) return false;
     return !(await command('git', ['status', '--porcelain'], path, signal)).trim();
   };
-  const released = async (key: string) => !!(await completed(join(config.directory, key)));
+  const operationOwner = async (operation: Intent) => {
+    const saved = await read(
+      directory(operation.numbers),
+      `writer-${operation.generation ?? 'initial'}.json`
+    );
+    return saved
+      ? z.object({ key: z.string() }).parse(saved).key
+      : (operation.writerKey ?? id(operation.numbers));
+  };
+  const released = async (key: string) => {
+    const dir = join(config.directory, key);
+    const owner = await read(dir, 'owner.json');
+    if (!owner) return !!(await completed(dir));
+    const { parent, generation: previous } = z
+      .object({ parent: z.string(), generation: z.string() })
+      .parse(owner);
+    // Only the authoritative append chooses the successor. A lost append
+    // response or an old completion must not release an active repair.
+    const saved = await read(join(config.directory, parent), `repair-${previous}.json`);
+    if (!saved) return false;
+    const generation = z.object({ generation: sha }).parse(saved).generation;
+    return !!(await read(join(config.directory, parent), `complete-${generation}.json`));
+  };
   const ownerState = async (existing: unknown, key: string) => {
     const owner = z.object({ key: z.string() }).parse(existing).key;
-    if (owner === key) return 'owned';
-    return (await released(owner)) ? 'released' : 'busy';
+    if (await released(owner)) return 'released';
+    return owner === key ? 'owned' : 'busy';
   };
-  const claimResource = async (key: string, resource: string) => {
+  const latestClaim = async (claims: string) => {
+    let previous: unknown = null;
+    for (let index = 0; ; index++) {
+      const name = `writer-${index}.json`;
+      const existing = await read(claims, name);
+      if (!existing) return { name, previous };
+      previous = existing;
+    }
+  };
+  const claimResource = async (key: string, resource: string, predecessor?: string) => {
     const claims = join(
       config.directory,
       'writers',
       createHash('sha256').update(resource).digest('hex')
     );
-    for (let index = 0; ; index++) {
-      const name = `writer-${index}.json`;
-      const existing = await read(claims, name);
-      if (existing) {
-        const ownership = await ownerState(existing, key);
-        if (ownership === 'released') continue;
-        return ownership === 'owned';
-      }
-      await publish(claims, name, { key });
-      const winner = z.object({ key: z.string() }).parse(await read(claims, name));
-      return winner.key === key;
+    const { name, previous } = await latestClaim(claims);
+    if (previous) {
+      const ownership = await ownerState(previous, key);
+      if (ownership === 'owned') return true;
+      if (ownership === 'busy' && z.object({ key: z.string() }).parse(previous).key !== predecessor)
+        return false;
     }
+    await publish(claims, name, { key });
+    const winner = z.object({ key: z.string() }).parse(await read(claims, name));
+    return winner.key === key;
   };
-  const acquire = async (key: string, resources: readonly string[]) => {
+  const acquire = async (key: string, resources: readonly string[], predecessor?: string) => {
     for (const resource of [...resources].sort())
-      if (!(await claimResource(key, resource))) return false;
+      if (!(await claimResource(key, resource, predecessor))) return false;
     return true;
   };
   const legacyBlock = async (dir: string) => {
@@ -1286,7 +1316,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const layers = operation?.layers ?? z.array(layer).parse(candidates);
     if (
       !(await acquire(
-        id(numbers),
+        operation ? await operationOwner(operation) : id(numbers),
         layers.map((item) => `branch:${item.branch}`)
       ))
     )
@@ -1342,7 +1372,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!operation) return;
     if (
       !(await acquire(
-        id(numbers),
+        await operationOwner(operation),
         operation.groups.map((group) => `group:${group.number}`)
       ))
     )
@@ -2125,17 +2155,39 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const boundary = await repairBoundary(record, dir, signal);
     if (boundary) await recoverConflict(dir, sources, boundary, signal);
   };
-  const claimRepair = async (operation: Intent, signal?: AbortSignal) => {
+  const repairOwner = async (operation: Intent, head: string) => {
+    const parent = id(operation.numbers);
+    const key = `repair-owner-${parent}-${operation.generation ?? 'initial'}-${head}`;
+    await publish(join(config.directory, key), 'owner.json', {
+      parent,
+      generation: operation.generation ?? 'initial',
+    });
+    const dir = directory(operation.numbers);
+    const name = `writer-${operation.generation ?? 'initial'}.json`;
+    await publish(dir, name, { key, head });
+    const selected = z.object({ key: z.string(), head: sha }).parse(await read(dir, name));
+    return selected.head === head ? selected.key : null;
+  };
+  const claimRepair = async (operation: Intent, head: string, signal?: AbortSignal) => {
+    const currentGroups = await groupsFor(operation.members, signal);
     const keys = [
       ...operation.layers.map((value) => `branch:${value.branch}`),
       ...operation.groups.map((value) => `group:${value.number}`),
+      ...currentGroups.map((value) => `group:${value.number}`),
     ];
     if (!(await operationFactsValid(operation, signal))) return false;
     if (!(await requestFactsValid(operation, signal))) return false;
-    return acquire(id(operation.numbers), keys);
+    const key = await repairOwner(operation, head);
+    if (!key) return false;
+    return acquire(key, keys, operation.writerKey ?? id(operation.numbers));
   };
-  const repairWriters = async (operation: Intent, issue: number, signal?: AbortSignal) => {
-    if (!(await claimRepair(operation, signal))) return false;
+  const repairWriters = async (
+    operation: Intent,
+    issue: number,
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    if (!(await claimRepair(operation, head, signal))) return false;
     if (!(await writers(operation.layers, signal))) return false;
     if (!(await landingStillPresent(operation.landing, signal))) return false;
     return manualWritersReady(
@@ -2223,8 +2275,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const operation = record.operation;
     const current = await repairObservation(record, item, head, repaired, signal);
     if (!current) return false;
+    if (!(await repairWriters(operation, item.issue, head, signal))) return false;
     if (repaired) await recoverRepair(record, repaired, signal);
-    if (!(await repairWriters(operation, item.issue, signal))) return false;
     if (!repaired) return requestRepair(record, item, head, current, signal);
     const fixed = await repairHead(record, item, head, repaired, signal);
     if (!fixed) return false;
@@ -2257,7 +2309,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const boundary = joinBoundary.parse(
       await read(repairDirectory(record, fixed.next), 'boundary.json')
     );
-    const candidate = { ...record.operation, boundary, generation: fixed.next, replay };
+    const writerKey = await operationOwner(record.operation);
+    const candidate = { ...record.operation, boundary, writerKey, generation: fixed.next, replay };
     if (!(await operationFactsValid(candidate, signal))) return false;
     await publish(
       record.directory,

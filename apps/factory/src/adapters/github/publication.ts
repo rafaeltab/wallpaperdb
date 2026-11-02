@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
+import { observeLanding } from './landing.js';
 import { requiredChecks, passingChecks, normalizeChecks } from './checks.js';
 const schema = z.array(
   z.object({
@@ -64,6 +65,7 @@ export function publication(
           kind: 'found' as const,
           url: pr.url,
           commit: pr.headRefOid,
+          base: pr.baseRefName,
           ci: {
             failed:
               pr.state === 'OPEN' &&
@@ -84,7 +86,7 @@ export function publication(
             progress,
           },
           ready: ready(pr, passed),
-          landed: false,
+          ...(await observeLanding(gh, pr, intent.issue, signal)),
         };
       },
       catch: (cause) => new Unavailable({ operation: 'observe-publication', cause }),

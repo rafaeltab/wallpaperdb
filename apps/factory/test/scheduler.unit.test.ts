@@ -224,24 +224,34 @@ it('reserves the initial distinct allowance and does not launch twice under repe
   }
 });
 
-it('refills a completed slot while two other jobs continue and retains CI waits', async () => {
-  const f = fixture();
-  try {
-    await f.run((s) => s.configure({ revision: -1, concurrency: 3, allowance: -1, paused: false }));
-    await f.run((s) => s.tick(base));
-    expect(f.launches).toEqual([1, 2, 3]);
-    const first = f.statuses.get(1);
-    if (first?.kind !== 'job') throw new Error('Missing first job');
-    f.statuses.set(1, {
-      ...first,
-      delivery: { stage: 'ci', commit: base, ready: true, landed: false },
-    });
-    await f.run((s) => s.tick(base));
-    expect(f.launches).toEqual([1, 2, 3, 4]);
-  } finally {
-    await f.runtime.dispose();
+it.each(['ready', 'landed'] as const)(
+  'refills a %s slot while two other jobs continue and retains CI waits',
+  async (outcome) => {
+    const f = fixture();
+    try {
+      await f.run((s) =>
+        s.configure({ revision: -1, concurrency: 3, allowance: -1, paused: false })
+      );
+      await f.run((s) => s.tick(base));
+      expect(f.launches).toEqual([1, 2, 3]);
+      const first = f.statuses.get(1);
+      if (first?.kind !== 'job') throw new Error('Missing first job');
+      f.statuses.set(1, {
+        ...first,
+        delivery: {
+          stage: 'ci',
+          commit: base,
+          ready: outcome === 'ready',
+          landed: outcome === 'landed',
+        },
+      });
+      await f.run((s) => s.tick(base));
+      expect(f.launches).toEqual([1, 2, 3, 4]);
+    } finally {
+      await f.runtime.dispose();
+    }
   }
-});
+);
 it('releases a parked slot without satisfying its dependent and admits unrelated work', async () => {
   const f = fixture();
   try {

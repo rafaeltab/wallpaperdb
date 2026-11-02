@@ -308,13 +308,16 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
 }
 
 function readyAssertion(status: Status): VerifiedPrerequisite | null {
-  if (status.kind !== 'job' || !status.delivery?.ready) return null;
+  if (status.kind !== 'job' || !(status.delivery?.ready || status.delivery?.landed)) return null;
   const pr = status.delivery.pr;
   if (pr?.kind !== 'found') return null;
   return {
     issue: status.intent.issue,
     pr: Number(pr.url.split('/').at(-1)),
     commit: pr.commit,
+    parent: pr.parent ?? status.intent.base,
+    branch: status.intent.branch,
+    prBase: pr.base ?? status.intent.prBase,
     reviewedCommit: pr.reviewedCommit,
     context: status.intent.context,
     owningThreadId: status.execution.kind === 'found' ? status.execution.threadId : undefined,

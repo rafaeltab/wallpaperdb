@@ -12,7 +12,7 @@ export function page(status: Status, schedule?: ScheduleStatus): string {
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Factory operations</title>
  <style>body{font:18px system-ui;max-width:760px;margin:4rem auto;padding:1rem;background:#101820;color:#e8eef1}a{color:#8bd8ff}input,textarea,button{font:inherit;padding:.6rem;margin:.5rem 0;display:block}textarea{width:95%;min-height:8rem}small{color:#b9c8d0}article{padding:1rem;border:1px solid #506773;border-radius:8px}</style>
  <h1>Factory operations</h1><p>Continuous admission of valid plans. Review, publication and CI observation follow accepted stage outcomes. Plan preview automatically discovers issue context and asks an agent for an advisory proposal.</p>
- <section><h2>Automatic plan preview</h2><p>Preview only. Verified forks and automatic joins run through the scheduler. Post-merge stack maintenance and upgrades remain unavailable.</p><button id="preview">Generate plan preview</button><pre id="plan" role="status" style="white-space:pre-wrap"></pre></section>
+ <section><h2>Automatic plan preview</h2><p>Preview only. Verified forks and automatic joins run through the scheduler. Verified default-branch landing triggers downstream maintenance. Upgrades remain unavailable.</p><button id="preview">Generate plan preview</button><pre id="plan" role="status" style="white-space:pre-wrap"></pre></section>
  ${schedule ? controls(schedule) : ''}
  ${schedule?.recoveries?.map((recovery) => `<article><h2>Conflict recovery #${recovery.issue}</h2><p>Classification: ${escapeHtml(recovery.classification ?? 'Unclassified')}</p><p>${escapeHtml(recovery.progress)}</p>${recovery.question ? `<p>Question: ${escapeHtml(recovery.question)}</p>` : ''}<a href="${escapeHtml(recovery.pr)}">Affected PR</a>${recovery.threadId ? `<p><a href="t3-thread://v1/${escapeHtml(recovery.threadId)}">Open recovery thread</a></p>` : ''}</article>`).join('') ?? ''}
  ${job ? jobPage(job) : `<form data-start><label>Selected issue number<input name="issue" type="number" min="1" required></label><label>Maintainer execution context<textarea name="context" maxlength="16000" placeholder="Optional scope constraints for this execution"></textarea></label><button>Start selected issue</button></form>`}
@@ -23,7 +23,7 @@ export function page(status: Status, schedule?: ScheduleStatus): string {
 function deliveryPage(delivery: Delivery | undefined): string {
   if (!delivery) return '';
   const pr = delivery.pr?.kind === 'found' ? delivery.pr : null;
-  return `${waitingPage(delivery)}<p>${delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending'}</p><p>Not landed. Default-branch landing is not verified by this slice.</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
+  return `${waitingPage(delivery)}<p>${delivery.landed ? 'Landed on the default branch' : delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending'}</p><p>${delivery.landed ? 'Default-branch landing verified.' : 'Not landed.'} ${escapeHtml(pr?.lifecycle ?? '')}</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
 }
 
 function stageHeading(delivery: Delivery | undefined) {

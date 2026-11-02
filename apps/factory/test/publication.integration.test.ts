@@ -295,3 +295,48 @@ it('observes a child PR against its stored target instead of the configured defa
     await host.cleanup();
   }
 });
+
+it('verifies authenticated default landing and exposes missing lifecycle automation without regressing release states', async () => {
+  const f = await publicationScenario();
+  try {
+    const merged = { ...f.pr, state: 'MERGED' };
+    const landing = { merge: 'd'.repeat(40), head: f.pr.headRefOid };
+    await f.host.save({ prs: [merged], landing });
+    expect(await Effect.runPromise(f.adapter.pullRequest(f.intent))).toMatchObject({
+      ready: false,
+      landed: true,
+      lifecycle: 'Linked issue closed; project Done',
+    });
+    await f.host.save({ prs: [merged], landing: { ...landing, status: 'Released' } });
+    expect(await Effect.runPromise(f.adapter.pullRequest(f.intent))).toMatchObject({
+      landed: true,
+      lifecycle: 'Linked issue closed; project Released',
+    });
+    await f.host.save({
+      prs: [merged],
+      landing: { ...landing, issueState: 'OPEN', status: 'In Review' },
+    });
+    expect(await Effect.runPromise(f.adapter.pullRequest(f.intent))).toMatchObject({
+      landed: true,
+      lifecycle: expect.stringContaining('automation pending'),
+    });
+    for (const patch of [{ reachable: false }, { head: 'e'.repeat(40) }, { base: 'feature' }]) {
+      await f.host.save({ prs: [merged], landing: { ...landing, ...patch } });
+      expect(await Effect.runPromise(f.adapter.pullRequest(f.intent))).toMatchObject({
+        landed: false,
+      });
+    }
+    await f.host.save({ prs: [{ ...merged, state: 'CLOSED' }], landing });
+    expect(await Effect.runPromise(f.adapter.pullRequest(f.intent))).toMatchObject({
+      ready: false,
+      landed: false,
+    });
+    expect(
+      (await f.host.calls()).some(
+        (call) => call.args.includes('item-edit') || call.args.includes('close')
+      )
+    ).toBe(false);
+  } finally {
+    await f.close();
+  }
+});

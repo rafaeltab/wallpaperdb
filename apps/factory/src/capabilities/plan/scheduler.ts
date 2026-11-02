@@ -308,7 +308,7 @@ function hasFrontier(input: PlanningInput, state: ScheduleState) {
 }
 
 function finished(job: Extract<Status, { kind: 'job' }>) {
-  return job.delivery?.ready || job.delivery?.activity === 'cancelled';
+  return job.delivery?.ready || job.delivery?.landed || job.delivery?.activity === 'cancelled';
 }
 function resumeCapacity(target: Status, snapshot: ScheduleStatus) {
   return (

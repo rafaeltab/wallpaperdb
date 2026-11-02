@@ -58,6 +58,22 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       );
       await browserExpect(page.getByText(host.base, { exact: true })).toBeVisible();
       const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
+      await host.save({
+        complete: true,
+        base: host.base,
+        overrides: { status: 'completed' },
+        prs: [{ ...pr, state: 'MERGED' }],
+        landing: { merge: host.base, head: host.base },
+      });
+      await browserExpect
+        .poll(async () => {
+          await page.reload();
+          return page.getByText('Landed on the default branch', { exact: true }).count();
+        })
+        .toBe(1);
+      await browserExpect(
+        page.getByText('Linked issue closed; project Done', { exact: false })
+      ).toBeVisible();
       pr.statusCheckRollup[0].conclusion = 'FAILURE';
       await host.save({
         complete: true,

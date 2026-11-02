@@ -149,6 +149,12 @@ function knownJobs(input: PlanningInput) {
 
 export function locallyBlocked(blockers: readonly number[], jobs: readonly Status[]) {
   return blockers.some((number) =>
-    jobs.some((job) => job.kind === 'job' && job.intent.issue === number && !job.delivery?.ready)
+    jobs.some(
+      (job) =>
+        job.kind === 'job' &&
+        job.intent.issue === number &&
+        !job.delivery?.ready &&
+        !job.delivery?.landed
+    )
   );
 }

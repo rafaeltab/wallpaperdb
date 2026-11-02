@@ -202,9 +202,12 @@ export type PullRequestObservation =
       readonly commit: string;
       /** Original accepted/reviewed commit of a durable, CI-verified issue-only replay. */
       readonly reviewedCommit?: string;
+      readonly parent?: string;
+      readonly base?: string;
       readonly ci?: { readonly failed: boolean; readonly progress: string };
       readonly ready: boolean;
       readonly landed: boolean;
+      readonly lifecycle?: string;
     };
 export interface Delivery {
   readonly stage: Stage | 'ci';
@@ -214,7 +217,8 @@ export interface Delivery {
     | 'continuation-pending'
     | 'awaiting-answer'
     | 'cancelled'
-    | 'resume-pending';
+    | 'resume-pending'
+    | 'manual-recovery';
   readonly active?: boolean;
   readonly question?: { readonly id: string; readonly text: string };
   readonly deadline?: number;

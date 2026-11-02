@@ -265,7 +265,10 @@ export function t3Restacker(
     Effect.tryPromise({
       try: run,
       catch: (cause) => new Unavailable({ operation: operationName, cause }),
-    }).pipe(Effect.tapError((error) => Effect.logError(error)));
+    }).pipe(
+      Effect.tapError((error) => Effect.logError(error)),
+      Effect.withSpan(`factory.t3.${operationName}`)
+    );
   return {
     resolve: () => effect('restack-resolve', (signal) => execution.resolve(signal)),
     review: (commit: string) =>

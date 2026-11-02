@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
+import { contextualPromise, runInContext } from './context.js';
 import { command } from '../../platform/index.js';
 import { prerequisiteJoin, type JoinConfiguration } from './joins.js';
 import { publication } from './publication.js';
@@ -34,7 +35,7 @@ export function githubIssues(config: {
     ? prerequisiteJoin(config.project, config.base, config.joins, gh)
     : undefined;
   const inspect = (number: number, prepare = false, candidate?: Parameters<Issues['inspect']>[1]) =>
-    Effect.tryPromise({
+    contextualPromise({
       try: async (signal) => {
         return await inspectIssue(number, prepare, signal, candidate);
       },
@@ -45,7 +46,7 @@ export function githubIssues(config: {
     );
   async function joinContext(numbers: readonly number[], signal: AbortSignal) {
     const dynamic = config.readyPrerequisites
-      ? await Effect.runPromise(config.readyPrerequisites(), { signal })
+      ? await runInContext(config.readyPrerequisites(), signal)
       : [];
     const pending = await joins?.state(numbers);
     const currentAssertions = [...dynamic, ...config.prerequisites];
@@ -186,9 +187,12 @@ export function githubIssues(config: {
       Effect.tryPromise({
         try: () => joins?.recoveries() ?? Promise.resolve([]),
         catch: (cause) => new Unavailable({ operation: 'read-recoveries', cause }),
-      }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.github.recoveries')
+      ),
     reconcile: () =>
-      Effect.tryPromise({
+      contextualPromise({
         try: (signal) => joins?.reconcile(signal) ?? Promise.resolve(),
         catch: (cause) => new Unavailable({ operation: 'reconcile-prerequisite-joins', cause }),
       }).pipe(

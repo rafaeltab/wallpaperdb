@@ -21,6 +21,7 @@ import {
 } from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { t3Restacker } from '../t3/index.js';
+import { runInContext } from './context.js';
 import { command } from '../../platform/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
@@ -1387,9 +1388,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
 
 function runRecovery(ports: RecoveryPorts, signal?: AbortSignal) {
   const layer = RestackLive.pipe(EffectLayer.provide(EffectLayer.succeed(RecoveryPorts, ports)));
-  return Effect.runPromise(
+  return runInContext(
     Effect.flatMap(Restack, (restack) => restack.advance()).pipe(Effect.provide(layer)),
-    { signal }
+    signal
   );
 }
 

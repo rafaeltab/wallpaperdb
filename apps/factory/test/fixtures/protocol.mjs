@@ -189,6 +189,73 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
   else console.log(JSON.stringify(state));
   process.exit(0);
 }
+if (
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'api' &&
+  args[1] === 'repos/rafaeltab/wallpaperdb' &&
+  !config.landing
+) {
+  console.log(JSON.stringify({ default_branch: 'main' }));
+  process.exit(0);
+}
+if (
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'api' &&
+  args[1].includes('/pulls/') &&
+  !config.landing
+) {
+  console.log(
+    JSON.stringify({
+      merged: false,
+      merge_commit_sha: null,
+      head: { sha: 'a'.repeat(40) },
+      base: { ref: 'main' },
+    })
+  );
+  process.exit(0);
+}
+if (
+  config.landing &&
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'api' &&
+  (args[1] === 'repos/rafaeltab/wallpaperdb' ||
+    args[1].includes('/compare/') ||
+    args[1].includes('/pulls/'))
+) {
+  const value = config.landing.merges?.[args[1].split('/').at(-1)] ?? config.landing;
+  if (args[1].includes('/compare/'))
+    console.log(
+      JSON.stringify({
+        status: value.reachable === false ? 'diverged' : 'ahead',
+        merge_base_commit: { sha: args[1].split('/compare/')[1].split('...')[0] },
+      })
+    );
+  else if (args[1].includes('/pulls/'))
+    console.log(
+      JSON.stringify({
+        merged: true,
+        merge_commit_sha: value.merge,
+        head: { sha: value.head },
+        base: { ref: value.base ?? 'main' },
+      })
+    );
+  else console.log(JSON.stringify({ default_branch: 'main' }));
+  process.exit(0);
+}
+if (
+  config.landing &&
+  basename(process.argv[1]) === 'gh' &&
+  args[0] === 'issue' &&
+  args.includes('state,projectItems')
+) {
+  console.log(
+    JSON.stringify({
+      state: config.landing.issueState ?? 'CLOSED',
+      projectItems: [{ title: 'WallpaperDB', status: { name: config.landing.status ?? 'Done' } }],
+    })
+  );
+  process.exit(0);
+}
 if (config.joinWriter && basename(process.argv[1]) === 't3') {
   console.log(
     JSON.stringify(
@@ -252,6 +319,9 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       git('ls-remote', '--heads', 'origin', `refs/heads/${item.branch}`).split(/\s/)[0];
     result = {
       url: `https://github.com/rafaeltab/wallpaperdb/pull/${number}`,
+      closingIssuesReferences: config.missingClosingLink
+        ? []
+        : [{ url: `https://github.com/rafaeltab/wallpaperdb/issues/${number - 100}` }],
       headRefOid: head,
       headRefName: item.branch,
       baseRefName: item.base,
@@ -406,8 +476,17 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           ? [JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))]
           : [])
     );
+  else if (
+    args[0] === 'pr' &&
+    args[1] === 'view' &&
+    args.includes('url,headRefOid,headRefName,baseRefName,baseRefOid,state') &&
+    (config.prs?.length || existsSync(join(config.directory, 'pr.json')))
+  )
+    reply(config.prs?.[0] ?? JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8')));
   else if (args[0] === 'pr')
     reply({
+      baseRefName: 'main',
+      baseRefOid: config.base ?? 'a'.repeat(40),
       headRefOid: config.prerequisiteHeads?.[args[2]] ?? config.prHead ?? 'a'.repeat(40),
       state: 'OPEN',
       url: `https://github.com/rafaeltab/wallpaperdb/pull/${args[2]}`,

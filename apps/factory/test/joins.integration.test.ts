@@ -1262,6 +1262,166 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
   }
 );
 
+async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
+  const f = await fixture(options);
+  const { host, git } = f;
+  const initial = JSON.parse(await readFile(host.configFile, 'utf8'));
+  const a = git('rev-parse', 'A');
+  const b = git('rev-parse', 'B');
+  git('switch', 'main');
+  await writeFile(join(host.repository, 'unrelated.txt'), 'default advance');
+  git('add', '.');
+  git('commit', '-m', 'unrelated');
+  git('cherry-pick', a);
+  const merged = git('rev-parse', 'HEAD');
+  git('push', 'origin', 'main');
+  git('switch', '--detach', host.base);
+  const joinState = {
+    ...initial.join,
+    prs: { ...initial.join.prs, 101: { branch: 'A', base: 'main', state: 'MERGED' } },
+  };
+  await host.save({
+    join: joinState,
+    landing: { merge: merged, head: a },
+    restack: options.restack,
+    joinWriter: options.writer,
+  });
+  const config = {
+    project: host.repository,
+    base: host.base,
+    prerequisites: [
+      { issue: 1, pr: 101, commit: a, parent: host.base },
+      { issue: 2, pr: 102, commit: b, parent: a },
+      { issue: 3, pr: 103, commit: f.d, parent: b },
+      { issue: 4, pr: 104, commit: f.c, parent: a },
+    ],
+    joins: {
+      directory: join(host.directory, 'joins'),
+      binary: host.binary,
+      projectId: 'project-id',
+    },
+  };
+  return { ...f, a, b, merged, config, issues: githubIssues(config), joinState, initial };
+}
+it('maintains issue-only descendants after a rebase merge without replaying landed A', async () => {
+  const f = await landedFixture();
+  const { host, git, merged } = f;
+  try {
+    if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(f.issues.reconcile());
+    const head = git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(git('log', '--format=%s', `${merged}..${head}`)).toBe('C\nD\nB');
+    expect(git('ls-tree', '--name-only', head)).toBe('A.txt\nB.txt\nC.txt\nD.txt\nunrelated.txt');
+    expect(git('rev-list', '--merges', `${host.base}..${head}`)).toBe('');
+    expect(git('rev-parse', 'A')).toBe(f.a);
+    const live = JSON.parse(await readFile(join(host.directory, 'join-live.json'), 'utf8'));
+    expect(live.prs['102'].base).toBe('main');
+    expect(live.prs['103'].base).toBe('B');
+    expect(live.prs['104'].base).toBe('D');
+    expect(live.members).toEqual(
+      [102, 103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
+    );
+    const reopened = githubIssues(f.config);
+    if (!reopened.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(reopened.reconcile());
+    expect(git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(head);
+    console.log(
+      JSON.stringify({
+        provenance:
+          'Production Issues reconciliation, real isolated Git/worktrees/bare remote and durable operation files. Controlled authenticated GitHub/T3/CI protocols; acceptance and original reviews are operator assertions. No live model or real repository writes.',
+        landed: merged,
+        downstream: head,
+        history: git('log', '--format=%s', `${merged}..${head}`),
+        prBases: ['main', 'B', 'D'],
+        nativeMembers: [102, 103, 104],
+      })
+    );
+  } finally {
+    await f.close();
+  }
+});
+it.each(['closed', 'divergent'] as const)(
+  'preserves a %s descendant and reports manual recovery after landing',
+  async (kind) => {
+    const f = await landedFixture();
+    try {
+      if (kind === 'closed') Object.assign(f.joinState.prs[104], { state: 'CLOSED' });
+      else f.git('push', '--force', 'origin', `${f.d}:refs/heads/C`);
+      await f.host.save({ join: f.joinState, landing: { merge: f.merged, head: f.a } });
+      if (!f.issues.reconcile || !f.issues.recoveries) throw new Error('Missing reconciliation');
+      await Effect.runPromise(f.issues.reconcile());
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0]).toBe(f.b);
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(
+        kind === 'closed' ? f.c : f.d
+      );
+      expect(await Effect.runPromise(f.issues.recoveries())).toContainEqual(
+        expect.objectContaining({
+          issue: 4,
+          active: false,
+          progress: expect.stringContaining('manual recovery'),
+        })
+      );
+      expect(
+        (await f.host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
+      ).toHaveLength(0);
+    } finally {
+      await f.close();
+    }
+  }
+);
+it.each(['CI', 'writer'] as const)(
+  'keeps landing maintenance incomplete while %s is pending',
+  async (kind) => {
+    const f = await landedFixture(kind === 'CI' ? { ciFails: true } : { writer: true });
+    try {
+      if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+      await Effect.runPromise(f.issues.reconcile());
+      const intent = {
+        id: 'B',
+        issue: 2,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+        branch: 'B',
+        base: f.a,
+        prBase: 'A',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      expect(await Effect.runPromise(f.issues.pullRequest(intent))).not.toMatchObject({
+        reviewedCommit: f.b,
+        ready: true,
+      });
+      if (kind === 'writer')
+        expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0]).toBe(f.b);
+    } finally {
+      await f.close();
+    }
+  }
+);
+it.each(['SIMPLE', 'COMPLEX'] as const)(
+  'maintains landed stacks through %s conflict recovery and current CI',
+  async (outcome) => {
+    const f = await landedFixture({ conflict: true, restack: { outcome, review: true } });
+    try {
+      if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+      await Effect.runPromise(f.issues.reconcile());
+      await Effect.runPromise(f.issues.reconcile());
+      expect(await Effect.runPromise(f.issues.recoveries?.() ?? Effect.succeed([]))).toContainEqual(
+        expect.objectContaining({
+          classification: outcome,
+          active: false,
+          progress: 'Verified; downstream readiness may proceed',
+        })
+      );
+      const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+      expect(f.git('rev-list', '--merges', `${f.merged}..${head}`)).toBe('');
+      expect(f.git('log', '--format=%s', `${f.merged}..${head}`)).toBe('C\nD\nB');
+    } finally {
+      await f.close();
+    }
+  }
+);
+
 it('reserves the released recovery slot before a COMPLEX review send alongside unrelated work', async () => {
   const f = await fixture({
     conflict: true,
@@ -1401,6 +1561,172 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
     );
   } finally {
     await runtime.dispose();
+    await f.close();
+  }
+});
+
+it('removes every already-landed layer when several rebase merges precede observation', async () => {
+  const f = await landedFixture();
+  try {
+    f.git('switch', 'main');
+    f.git('cherry-pick', f.b);
+    const mergedB = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', 'main');
+    f.git('switch', '--detach', f.host.base);
+    Object.assign(f.joinState.prs[102], { base: 'main', state: 'MERGED' });
+    await f.host.save({
+      join: f.joinState,
+      landing: { merge: f.merged, head: f.a, merges: { 102: { merge: mergedB, head: f.b } } },
+    });
+    if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(f.issues.reconcile());
+    const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(f.git('log', '--format=%s', `${mergedB}..${head}`)).toBe('C\nD');
+    const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    expect(live.members).toEqual(
+      [103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
+    );
+    expect(live.prs[103].base).toBe('main');
+  } finally {
+    await f.close();
+  }
+});
+it('retargets the final PR to default with its pinned boundary and dissolves its native stack', async () => {
+  const f = await landedFixture({ cCommits: 2 });
+  try {
+    f.joinState.prs[104].base = 'main';
+    f.joinState.members = [101, 104].map(
+      (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
+    );
+    await f.host.save({ join: f.joinState, landing: { merge: f.merged, head: f.a } });
+    const issues = githubIssues({
+      ...f.config,
+      prerequisites: f.config.prerequisites.filter((item) => [1, 4].includes(item.issue)),
+    });
+    if (!issues.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(issues.reconcile());
+    const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(f.git('log', '--format=%s', `${f.merged}..${head}`)).toBe('C2\nC');
+    const state = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    expect(state.prs[104].base).toBe('main');
+    expect(state.members).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});
+it('keeps missing closing-link automation pending after retargeting to default', async () => {
+  const f = await landedFixture();
+  try {
+    await f.host.save({
+      join: f.joinState,
+      landing: { merge: f.merged, head: f.a },
+      missingClosingLink: true,
+    });
+    if (!f.issues.reconcile || !f.issues.recoveries) throw new Error('Missing reconciliation');
+    await Effect.runPromise(f.issues.reconcile());
+    expect(await Effect.runPromise(f.issues.recoveries())).toContainEqual(
+      expect.objectContaining({
+        issue: 2,
+        active: false,
+        progress: expect.stringContaining('linked closing issue'),
+      })
+    );
+    expect(
+      await readdir(join(f.host.directory, 'joins')).then(async (keys) =>
+        Promise.all(
+          keys
+            .filter((key) => /^[a-f0-9]{64}$/.test(key))
+            .map((key) => readdir(join(f.host.directory, 'joins', key)))
+        )
+      )
+    ).not.toContainEqual(expect.arrayContaining(['complete.json']));
+  } finally {
+    await f.close();
+  }
+});
+it('reconciles a lost retarget response from durable landing intent after reopening', async () => {
+  const f = await landedFixture({ lose: 'base' });
+  try {
+    if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+    await expect(Effect.runPromise(f.issues.reconcile())).rejects.toMatchObject({
+      operation: 'reconcile-prerequisite-joins',
+    });
+    const reopened = githubIssues(f.config);
+    if (!reopened.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(reopened.reconcile());
+    const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(f.git('log', '--format=%s', `${f.merged}..${head}`)).toBe('C\nD\nB');
+    const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    expect(live.prs[102].base).toBe('main');
+    expect(live.members).toEqual(
+      [102, 103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
+    );
+  } finally {
+    await f.close();
+  }
+});
+it('retains issue boundaries and original review through successive default landings', async () => {
+  const f = await landedFixture();
+  const intent = (issue: number, branch: string, base: string, prBase: string) => ({
+    id: branch,
+    issue,
+    issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${issue}`,
+    branch,
+    base,
+    prBase,
+    context: '',
+    createdAt: 0,
+    expectedStage: 'implementation' as const,
+  });
+  try {
+    if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(f.issues.reconcile());
+    const assertions: import('../src/adapters/github/index.js').VerifiedPrerequisite[] =
+      f.config.prerequisites.slice(0, 1);
+    for (const command of [
+      intent(2, 'B', f.a, 'A'),
+      intent(3, 'D', f.b, 'B'),
+      intent(4, 'C', f.a, 'A'),
+    ]) {
+      const observed = await Effect.runPromise(f.issues.pullRequest(command));
+      if (observed.kind !== 'found' || !observed.parent)
+        throw new Error('Missing replay association');
+      assertions.push({
+        issue: command.issue,
+        pr: command.issue + 100,
+        commit: observed.commit,
+        parent: observed.parent,
+        reviewedCommit: observed.reviewedCommit,
+      });
+    }
+    const b = assertions.find((item) => item.issue === 2);
+    if (!b) throw new Error('Missing B');
+    f.git('switch', 'main');
+    await writeFile(join(f.host.repository, 'next.txt'), 'next default advance');
+    f.git('add', '.');
+    f.git('commit', '-m', 'next');
+    f.git('cherry-pick', b.commit);
+    const mergedB = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', 'main');
+    f.git('switch', '--detach', f.host.base);
+    const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    Object.assign(live.prs[102], { base: 'main', state: 'MERGED' });
+    await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
+    await f.host.save({
+      join: live,
+      landing: { merge: f.merged, head: f.a, merges: { 102: { merge: mergedB, head: b.commit } } },
+    });
+    const current = githubIssues({ ...f.config, prerequisites: assertions });
+    if (!current.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(current.reconcile());
+    const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(f.git('log', '--format=%s', `${mergedB}..${head}`)).toBe('C\nD');
+    expect(await Effect.runPromise(current.pullRequest(intent(2, 'B', f.a, 'A')))).toMatchObject({
+      landed: true,
+      reviewedCommit: f.b,
+      commit: b.commit,
+    });
+  } finally {
     await f.close();
   }
 });

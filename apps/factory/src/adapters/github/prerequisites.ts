@@ -7,6 +7,9 @@ export interface VerifiedPrerequisite {
   readonly issue: number;
   readonly pr: number;
   readonly commit: string;
+  readonly parent?: string;
+  readonly branch?: string;
+  readonly prBase?: string;
   readonly reviewedCommit?: string;
   readonly context?: string;
   readonly owningThreadId?: string;

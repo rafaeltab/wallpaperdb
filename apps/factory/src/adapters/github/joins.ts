@@ -21,6 +21,8 @@ import {
 } from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { t3Restacker } from '../t3/index.js';
+import { landingEvidence } from './landing.js';
+import type { VerifiedPrerequisite } from './prerequisites.js';
 import { runInContext, admitRecovery } from './context.js';
 import { command } from '../../platform/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
@@ -54,11 +56,19 @@ const group = z.object({
   number: z.number().int().positive(),
   pull_requests: z.array(z.object({ number: z.number().int().positive() })),
 });
+const landing = z.object({
+  anchor: layer,
+  commit: sha,
+  branch: z.string(),
+  covered: z.array(sha).default([]),
+  removed: z.array(z.number()).default([]),
+});
 const intent = z.object({
   boundary: joinBoundary.optional(),
+  landing: landing.optional(),
   groups: z.array(group),
   members: z.array(z.number().int().positive()),
-  numbers: z.array(z.number().int().positive()).max(100),
+  numbers: z.array(z.number().int()).max(100),
   layers: z.array(layer),
   replay: z.array(layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha })),
 });
@@ -816,6 +826,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const prepared = await prepareReplay(layers, boundary, dir, signal);
     if (!prepared) return;
     const { replay, boundary: selectedBoundary } = prepared;
+    const landed = landing.nullable().parse(await read(dir, 'landing.json'));
     const groups = await groupsFor(
       layers.map((item) => item.pr),
       signal
@@ -826,7 +837,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         ...groups.flatMap((value) => value.pull_requests.map((item) => item.number)),
         ...layers.map((item) => item.pr),
       ]),
-    ].filter((number) => !replayed.has(number));
+    ].filter((number) => !replayed.has(number) && !landed?.removed.includes(number));
     members.push(...replay.map((item) => item.pr));
     const ordered = await orderedMembers(members, replay, selectedBoundary, dir, signal);
     if (!ordered) return;
@@ -837,6 +848,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       groups,
       members: ordered,
       boundary: selectedBoundary,
+      landing: landed ?? undefined,
     });
     return await load(numbers);
   };
@@ -965,6 +977,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       JSON.stringify(value.pull_requests.map((item) => item.number)) ===
       JSON.stringify(operation.members);
     let groups = await groupsFor(operation.members, signal);
+    if (operation.members.length === 1) {
+      if (!(await dissolve(groups, operation, signal))) return false;
+      return (await groupsFor(operation.members, signal)).length === 0;
+    }
     if (!groups.some(matches)) {
       // Reconcile existing grouping before a possibly non-idempotent creation.
       // Do not dissolve a group changed externally since the recorded intent.
@@ -992,7 +1008,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     const current = await prState(item, signal);
-    if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
+    if (
+      current.state !== 'OPEN' ||
+      current.headRefOid !== item.next ||
+      current.baseRefName !== item.target
+    )
+      return false;
     const recorded = z
       .object({
         body: z.string(),
@@ -1121,7 +1142,44 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       if (!(await recordEvidence(item, dir, signal))) return false;
     return true;
   };
+  const closingLinks = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    if (!operation.landing) return true;
+    for (const item of operation.replay.filter(
+      (item) => item.target === operation.landing?.branch
+    )) {
+      const observed = z
+        .object({ closingIssuesReferences: z.array(z.object({ url: z.string() })) })
+        .parse(
+          await gh(
+            [
+              'pr',
+              'view',
+              String(item.pr),
+              '--repo',
+              'rafaeltab/wallpaperdb',
+              '--json',
+              'closingIssuesReferences',
+            ],
+            signal
+          )
+        );
+      if (
+        observed.closingIssuesReferences.some(
+          (issue) => issue.url === `https://github.com/rafaeltab/wallpaperdb/issues/${item.issue}`
+        )
+      )
+        continue;
+      await publish(dir, 'recovery-progress.json', {
+        issue: item.issue,
+        active: false,
+        progress: 'Default target lacks the linked closing issue; manual recovery required',
+      });
+      return false;
+    }
+    return true;
+  };
   const deliver = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+    if (!(await closingLinks(operation, dir, signal))) return;
     if (!(await regroup(operation, dir, signal))) return;
     if (!(await refreshAssertions(operation, dir, signal))) return;
     await publish(dir, 'complete.json', { commit: replayTip(operation) });
@@ -1159,6 +1217,18 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const dir = directory(numbers);
     const operation = await operationFor(numbers, candidates, signal, requirements);
     if (!operation || !(await publicationSafe(operation, dir, signal))) return;
+    if (operation.landing) {
+      const current = await landingEvidence(
+        gh,
+        {
+          url: operation.landing.anchor.url,
+          baseRefName: operation.landing.branch,
+          headRefOid: operation.landing.anchor.commit,
+        },
+        signal
+      );
+      if (!current || !(await isAncestor(current.commit, operation.landing.commit, signal))) return;
+    }
     if (
       !(await acquire(
         id(numbers),
@@ -1195,6 +1265,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const groupingMatches = async (operation: Intent, signal?: AbortSignal) => {
     const groups = await groupsFor(operation.members, signal);
+    if (operation.members.length === 1) return groups.length === 0;
     return groups.some((value) =>
       containsMembers(
         value.pull_requests.map((item) => item.number),
@@ -1243,7 +1314,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const tip = replayTip(operation);
     return !!tip && (await isAncestor(landed.commit, tip, signal));
   };
-  const currentComparison = async (
+  const completedComparisonValid = async (
     operation: Intent,
     item: Intent['replay'][number],
     signal?: AbortSignal
@@ -1273,7 +1344,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       return true;
     if (!(await completedFactsValid(operation, signal))) return false;
     for (const item of operation.replay)
-      if (!(await currentComparison(operation, item, signal))) return false;
+      if (!(await completedComparisonValid(operation, item, signal))) return false;
     return groupingMatches(operation, signal);
   };
   const verifyReplayTree = async (
@@ -1389,7 +1460,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
     const saved = await read(join(config.directory, key), 'request.json');
     const numbers = saved
-      ? z.object({ numbers: z.array(z.number().int().positive()).max(100) }).parse(saved).numbers
+      ? z.object({ numbers: z.array(z.number().int()).max(100) }).parse(saved).numbers
       : layers.map((item) => item.issue);
     // Older records are usable only when their original identity is reconstructable.
     return id(numbers) === key ? numbers : null;
@@ -1414,12 +1485,24 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     ))
       await reconcileOperation(key, signal);
   };
+  const landingFailure = async (dir: string, blocked: unknown) => {
+    if (!blocked || !(await read(dir, 'landing.json'))) return null;
+    const seed = z.array(layer).parse(await read(dir, 'seed.json'));
+    return {
+      issue: seed[0]?.issue,
+      active: false,
+      progress: `Landing maintenance blocked; manual recovery required: ${JSON.stringify(blocked)}`,
+    };
+  };
   const recoveryStatus = async (dir: string) => {
     const blocked = await blockingFile(dir);
     const fallback = z.object({ kind: z.literal('conflict') }).safeParse(blocked).success
       ? blocked
       : null;
-    const saved = (await read(dir, 'recovery-progress.json')) ?? fallback;
+    const saved =
+      (await read(dir, 'recovery-progress.json')) ??
+      fallback ??
+      (await landingFailure(dir, blocked));
     if (!saved) return null;
     const progress = z
       .object({
@@ -1452,7 +1535,161 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return result;
   };
-  return { prepare, evidence, state, replayFor, reconcile, recoveries };
+  const currentLayer = async (assertion: VerifiedPrerequisite, signal?: AbortSignal) => {
+    const pr = z
+      .object({
+        url: z.string(),
+        headRefOid: sha,
+        headRefName: z.string(),
+        baseRefName: z.string(),
+        baseRefOid: sha,
+        state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+      })
+      .parse(
+        await gh(
+          [
+            'pr',
+            'view',
+            String(assertion.pr),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'url,headRefOid,headRefName,baseRefName,baseRefOid,state',
+          ],
+          signal
+        )
+      );
+    if (pr.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${assertion.pr}`)
+      throw new Error('Mismatched maintenance PR');
+    return {
+      ...assertion,
+      url: pr.url,
+      commit: assertion.commit,
+      branch: pr.headRefName,
+      prBase: pr.baseRefName,
+      parent: assertion.parent ?? pr.baseRefOid,
+      state: pr.state,
+      divergent:
+        pr.headRefOid !== assertion.commit ||
+        (assertion.branch !== undefined && assertion.branch !== pr.headRefName),
+    };
+  };
+  type CurrentLayer = Awaited<ReturnType<typeof currentLayer>>;
+  const descendantsOf = async (
+    anchor: Layer,
+    observed: readonly CurrentLayer[],
+    defaultBranch: string,
+    signal?: AbortSignal
+  ) => {
+    const descendants = [];
+    for (const item of observed.filter((item) => item.state !== 'MERGED')) {
+      if (!(await isAncestor(anchor.commit, item.commit, signal))) continue;
+      const previous = observed.find((parent) => parent.branch === item.prBase);
+      // GitHub may retarget children automatically. Keep the original accepted
+      // parent boundary even though the rebased prerequisite has new object IDs.
+      const parent =
+        previous?.commit ??
+        (item.prBase === defaultBranch && !(await isAncestor(anchor.commit, item.parent, signal))
+          ? anchor.commit
+          : item.parent);
+      descendants.push({ ...item, parent });
+    }
+    return descendants;
+  };
+  const maintainAnchor = async (
+    anchor: CurrentLayer,
+    observed: readonly CurrentLayer[],
+    signal?: AbortSignal
+  ) => {
+    if (anchor.divergent) return;
+    const found = await landingEvidence(
+      gh,
+      { url: anchor.url, baseRefName: anchor.prBase, headRefOid: anchor.commit },
+      signal
+    );
+    if (!found) return;
+    const descendants = await descendantsOf(anchor, observed, found.branch, signal);
+    if (!descendants.length) return;
+    await git(['fetch', 'origin', found.branch], signal);
+    const tip = await git(['rev-parse', 'FETCH_HEAD'], signal);
+    if (!(await isAncestor(found.commit, tip, signal))) return;
+    const landed = await verifiedLandings(observed, signal);
+    await maintainDescendants(
+      {
+        anchor,
+        commit: tip,
+        branch: found.branch,
+        covered: landed.map((item) => item.commit),
+        removed: landed.map((item) => item.pr),
+      },
+      descendants,
+      signal
+    );
+  };
+  const maintainDescendants = async (
+    landed: z.infer<typeof landing>,
+    descendants: readonly CurrentLayer[],
+    signal?: AbortSignal
+  ) => {
+    const numbers = [-landed.anchor.pr, ...descendants.map((item) => item.issue)];
+    const dir = directory(numbers);
+    if (await read(dir, 'complete.json')) return;
+    if (
+      !(await acquire(
+        id(numbers),
+        descendants.map((item) => `branch:${item.branch}`)
+      ))
+    )
+      return;
+    await publish(dir, 'landing.json', landed);
+    await publish(dir, 'seed.json', descendants);
+    await publish(dir, 'request.json', { numbers });
+    const adverse = descendants.find((item) => item.divergent || item.state === 'CLOSED');
+    if (adverse) {
+      await publish(dir, 'blocked.json', { kind: 'manual-recovery', issue: adverse.issue });
+      await publish(dir, 'recovery-progress.json', {
+        issue: adverse.issue,
+        active: false,
+        progress: 'Closed-unmerged or externally divergent work requires manual recovery',
+      });
+      return;
+    }
+    await prepare(numbers, descendants, signal);
+  };
+  const verifiedLandings = async (observed: readonly CurrentLayer[], signal?: AbortSignal) => {
+    const result = [];
+    for (const item of observed.filter((item) => item.state === 'MERGED' && !item.divergent))
+      if (
+        await landingEvidence(
+          gh,
+          { url: item.url, baseRefName: item.prBase, headRefOid: item.commit },
+          signal
+        )
+      )
+        result.push(item);
+    return result;
+  };
+  const hasLandedAncestor = async (
+    anchor: Layer,
+    landed: readonly Layer[],
+    signal?: AbortSignal
+  ) => {
+    for (const other of landed)
+      if (other.pr !== anchor.pr && (await isAncestor(other.commit, anchor.commit, signal)))
+        return true;
+    return false;
+  };
+  const maintain = async (assertions: readonly VerifiedPrerequisite[], signal?: AbortSignal) => {
+    if (assertions.length > 100) throw new Error('Maintenance exceeds supported bound');
+    const observed = [];
+    for (const assertion of assertions) observed.push(await currentLayer(assertion, signal));
+    const landed = await verifiedLandings(observed, signal);
+    for (const anchor of landed) {
+      if (await hasLandedAncestor(anchor, landed, signal)) continue;
+      await maintainAnchor(anchor, observed, signal);
+    }
+  };
+  return { prepare, evidence, state, replayFor, reconcile, recoveries, maintain };
 }
 
 function trustedRecoveryContext(value: unknown) {

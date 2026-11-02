@@ -7,6 +7,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   let stage = 0;
   let accepted = false;
   let ci = false;
+  let landed = false;
   const sent: number[] = [];
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
@@ -18,7 +19,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
           url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
           commit: 'b'.repeat(40),
           ready: ci,
-          landed: false,
+          landed,
         }),
       inspect: () =>
         Effect.succeed({
@@ -81,6 +82,11 @@ it('requires fresh accepted stages and matching current CI before reporting read
   ci = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { stage: 'ci', ready: true, landed: false },
+  });
+  landed = true;
+  ci = false;
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    delivery: { ready: false, landed: true, active: false },
   });
   expect(sent).toEqual([1, 2]);
 });

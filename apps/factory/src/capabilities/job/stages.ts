@@ -117,6 +117,16 @@ function readiness(
     const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
+    if (pr.kind === 'found' && !reviewedAssociation(pr, accepted.commit))
+      return {
+        stage: 'ci' as const,
+        commit: accepted.commit,
+        ready: false,
+        landed: false,
+        active: false,
+        activity: 'manual-recovery' as const,
+        pr,
+      };
     if (requiresRepair(matches, pr)) {
       yield* dispatchRepair(store, execution, intent, accepted, evidence);
       return {
@@ -132,7 +142,8 @@ function readiness(
       ...deliveryIdentity(pr, accepted.commit),
       pr,
       ready: matches && isReady(pr),
-      landed: false,
+      landed: matches && pr.kind === 'found' && pr.landed,
+      active: matches && pr.kind === 'found' && pr.landed ? false : undefined,
     };
   });
 }

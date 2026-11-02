@@ -203,7 +203,21 @@ export function githubIssues(config: {
     reconcile: (admitRecovery) =>
       contextualPromise({
         admitRecovery,
-        try: (signal) => joins?.reconcile(signal) ?? Promise.resolve(),
+        try: async (signal) => {
+          await joins?.reconcile(signal);
+          const dynamic = config.readyPrerequisites
+            ? await runInContext(config.readyPrerequisites(), signal)
+            : [];
+          await joins?.maintain(
+            [
+              ...dynamic,
+              ...config.prerequisites.filter(
+                (item) => !dynamic.some((current) => current.issue === item.issue)
+              ),
+            ],
+            signal
+          );
+        },
         catch: (cause) => new Unavailable({ operation: 'reconcile-prerequisite-joins', cause }),
       }).pipe(
         Effect.tapError((error) => Effect.logError(error)),
@@ -227,7 +241,7 @@ export function githubIssues(config: {
         return {
           ...observed,
           ready: observed.ready && replay.comparisonReady && !!matches,
-          ...(matches ? { reviewedCommit: originalReview(replay) } : {}),
+          ...(matches ? { reviewedCommit: originalReview(replay), parent: replay.onto } : {}),
         };
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),

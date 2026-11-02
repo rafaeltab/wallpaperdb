@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  access,
   link,
   mkdir,
   mkdtemp,
@@ -656,6 +657,140 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     });
     return true;
   };
+  const exists = (path: string) =>
+    access(path)
+      .then(() => true)
+      .catch((cause) => {
+        if (errno(cause, 'ENOENT')) return false;
+        throw cause;
+      });
+  const attemptPath = async (dir: string, issue: number) => {
+    const saved = await read(dir, `attempt-${issue}.json`);
+    return saved ? z.object({ path: z.string() }).parse(saved).path : undefined;
+  };
+  const pendingAttempt = async (dir: string, layers: readonly Layer[]) => {
+    for (const item of layers) {
+      if (await read(dir, `replay-${item.issue}.json`)) continue;
+      if (await read(dir, `resolved-${item.issue}.json`)) continue;
+      const path = await attemptPath(dir, item.issue);
+      if (path) return path;
+    }
+    return undefined;
+  };
+  const ensureAttempt = async (
+    item: Layer,
+    onto: string,
+    parent: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    let path = await attemptPath(dir, item.issue);
+    if (!path) {
+      const proposed = await mkdtemp(join(dir, 'replay-'));
+      await publish(dir, `attempt-${item.issue}.json`, {
+        path: proposed,
+        oldHead: item.commit,
+        parent,
+        onto,
+      });
+      path = await attemptPath(dir, item.issue);
+    }
+    if (!path) throw new Error('Missing durable replay attempt');
+    z.object({
+      oldHead: z.literal(item.commit),
+      parent: z.literal(parent),
+      onto: z.literal(onto),
+    }).parse(await read(dir, `attempt-${item.issue}.json`));
+    if (!(await exists(join(path, '.git'))))
+      await git(['worktree', 'add', '--detach', path, item.commit], signal);
+    return path;
+  };
+  const equivalentReplay = async (
+    item: Layer,
+    parent: string,
+    onto: string,
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    if (!(await isAncestor(onto, head, signal))) return false;
+    if (await git(['rev-list', '--merges', `${onto}..${head}`], signal)) return false;
+    const comparison = await git(
+      ['range-diff', '--no-color', '--no-patch', `${parent}..${item.commit}`, `${onto}..${head}`],
+      signal
+    );
+    return (
+      !!comparison &&
+      comparison.split('\n').every((line) => /^\s*\d+:\s+[a-f0-9]+\s+=\s+\d+:/.test(line))
+    );
+  };
+  const finishReplay = async (
+    item: Layer,
+    onto: string,
+    parent: string,
+    path: string,
+    signal?: AbortSignal
+  ) => {
+    const run = (args: string[]) =>
+      command('git', args, path, signal).then((value) => value.trim());
+    const metadata = await run(['rev-parse', '--git-path', 'rebase-merge']);
+    if (!(await exists(metadata))) return false;
+    const todo = await readFile(join(metadata, 'git-rebase-todo'), 'utf8');
+    if (todo.split('\n').some((line) => line.trim() && !line.trim().startsWith('#'))) return false;
+    if ((await readFile(join(metadata, 'onto'), 'utf8')).trim() !== onto) return false;
+    if ((await readFile(join(metadata, 'orig-head'), 'utf8')).trim() !== item.commit) return false;
+    if (!(await equivalentReplay(item, parent, onto, await run(['rev-parse', 'HEAD']), signal)))
+      return false;
+    await run(['-c', 'core.editor=true', 'rebase', '--continue']);
+    return true;
+  };
+  const replayAttempt = async (
+    item: Layer,
+    onto: string,
+    parent: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const path = await ensureAttempt(item, onto, parent, dir, signal);
+    const run = (args: string[]) =>
+      command('git', args, path, signal).then((value) => value.trim());
+    const conflicts = await run(['diff', '--name-only', '--diff-filter=U']);
+    if (conflicts) {
+      await publish(dir, `conflict-${item.issue}.json`, {
+        kind: 'conflict',
+        files: conflicts,
+        issue: item.issue,
+        oldHead: item.commit,
+        oldParent: parent,
+        onto,
+        worktree: path,
+      });
+      return;
+    }
+    const inProgress =
+      (await exists(await run(['rev-parse', '--git-path', 'rebase-merge']))) ||
+      (await exists(await run(['rev-parse', '--git-path', 'rebase-apply'])));
+    const dirty = !!(await run(['status', '--porcelain']));
+    if (dirty || (inProgress && !(await finishReplay(item, onto, parent, path, signal)))) {
+      await publish(dir, 'recovery-progress.json', {
+        issue: item.issue,
+        active: false,
+        progress: `Interrupted local replay requires operator reconciliation at ${path}; preserve its edits and finish or abort the Git operation before resuming`,
+      });
+      return;
+    }
+    const head = await run(['rev-parse', 'HEAD']);
+    if (head === item.commit)
+      return (await attemptRebase(item, onto, parent, path, dir, signal)) ? path : undefined;
+    if (await equivalentReplay(item, parent, onto, head, signal)) return path;
+    await publish(dir, 'blocked.json', {
+      kind: 'local-head-conflict',
+      issue: item.issue,
+      expected: item.commit,
+      actual: head,
+      worktree: path,
+    });
+    return;
+  };
   const replayLayer = async (
     item: Layer,
     onto: string,
@@ -674,10 +809,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         target,
       };
     if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
-    await mkdir(dir, { recursive: true });
-    const path = await mkdtemp(join(dir, 'replay-'));
-    await git(['worktree', 'add', '--detach', path, item.commit], signal);
-    if (!(await attemptRebase(item, onto, parent, path, dir, signal))) return;
+    const path = await replayAttempt(item, onto, parent, dir, signal);
+    if (!path) return;
     const next = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
     if (!(await git(['diff', '--name-only', onto, next], signal))) {
       await publish(dir, 'blocked.json', {
@@ -891,7 +1024,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!plan) return;
     const conflict = await blockingFile(dir);
     if (conflict && !(await recoverConflict(dir, layers, plan.boundary, signal))) return;
-    if (!(await writers(layers, signal))) return;
+    if (!(await writers(layers, signal, await pendingAttempt(dir, layers)))) return;
     const replay = await combine(plan.order, plan.boundary, dir, signal);
     if (!replay?.length) return;
     return { replay, boundary: plan.boundary };

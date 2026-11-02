@@ -101,9 +101,12 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       cause: expect.objectContaining({ message: 'Previous advisory planner is still outstanding' }),
     });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
-    await host.save({ planner: { proposal, status: 'completed' } });
-    expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
+    await host.save({ planner: { proposal, status: 'completed', runId: 'unrelated-run' } });
+    await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
+    await host.save({ planner: { proposal, status: 'completed' } });
     const changed = { ...input, capacity: { concurrency: 2, admission: 1 } };
     expect(await Effect.runPromise(adapter.propose(changed))).toEqual(proposal);
     expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(

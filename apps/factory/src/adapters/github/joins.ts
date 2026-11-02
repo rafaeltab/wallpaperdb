@@ -898,7 +898,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
-  const prState = async (item: Intent['replay'][number], signal?: AbortSignal) => {
+  const prState = async (item: Pick<Layer, 'pr'>, signal?: AbortSignal) => {
     return z
       .object({
         headRefOid: sha,
@@ -1221,6 +1221,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const maintenanceWritersReady = async (operation: Intent, signal?: AbortSignal) => {
     if (!(await writers(operation.layers, signal))) return false;
+    if (!(await manualWritersReady(operation.layers, signal))) return false;
     return landingStillPresent(operation.landing, signal);
   };
   const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal, requirements?:JoinBoundary) => {
@@ -1408,9 +1409,35 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         current.headRefOid === item.next &&
         allowedPublication(current, item)
       )
-        return { ...item, pending: true, uncertain: false };
+        return {
+          ...item,
+          pending: true,
+          automatic: false,
+          uncertain: false,
+          manual: await publicationGuard(issue, item.commit, current),
+        };
     }
-    return latest ? { ...latest.item, pending: false, uncertain: latest.uncertain } : null;
+    if (!latest) return null;
+    return observedReplay(records, issue, latest, signal);
+  };
+  const observedReplay = async (
+    records: readonly ReplayRecord[],
+    issue: number,
+    latest: { item: Intent['replay'][number]; uncertain: boolean },
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(latest.item, signal);
+    const automatic = await automaticReplayRetarget(latest.item, current, records, signal);
+    const retired = await verifiedRetiredReplay(current, latest.item, signal);
+    const record = changedPublication(current, latest.item) && !automatic && !retired;
+    const manual = await publicationGuard(
+      issue,
+      latest.item.next,
+      current,
+      record ? latest.item.target : undefined,
+      retired
+    );
+    return { ...latest.item, pending: false, uncertain: latest.uncertain, manual, automatic };
   };
   const operationDirectories = async () => {
     let entries: string[];
@@ -1538,6 +1565,63 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return result;
   };
+  const publicationGuard = async (
+    issue: number,
+    commit: string,
+    current: { state: string; headRefOid: string; baseRefName: string },
+    recordTarget?: string,
+    landed = false
+  ) => {
+    const dir = join(config.directory, 'manual', String(issue), commit);
+    for (let index = 0; ; index++) {
+      if (await read(dir, `restored-${index}.json`)) continue;
+      const saved = await read(dir, `observed-${index}.json`);
+      if (saved) {
+        const original = z.object({ target: z.string() }).parse(saved);
+        if (landed || restoredPublication(current, commit, original.target)) {
+          await publish(dir, `restored-${index}.json`, { commit });
+          continue;
+        }
+        return true;
+      }
+      if (recordTarget === undefined) return false;
+      await publish(dir, `observed-${index}.json`, { commit, target: recordTarget });
+      return true;
+    }
+  };
+  const manualWritersReady = async (layers: readonly Layer[], signal?: AbortSignal) => {
+    for (const item of layers)
+      if (await publicationGuard(item.issue, item.commit, await prState(item, signal)))
+        return false;
+    return true;
+  };
+  const automaticReplayRetarget = async (
+    item: Intent['replay'][number],
+    current: { state: string; headRefOid: string; baseRefName: string },
+    records: readonly ReplayRecord[],
+    signal?: AbortSignal
+  ) => {
+    if (!changedTargetOnly(current, item)) return false;
+    const parents = records.flatMap((record) => [
+      ...record.operation.layers,
+      ...record.operation.replay.map((replay) => ({ ...replay, commit: replay.next })),
+    ]);
+    const parent = parents.find(
+      (parent) => parent.branch === item.target && parent.commit === item.onto
+    );
+    if (!parent) return false;
+    return (await defaultLandingOf(parent, signal)) === current.baseRefName;
+  };
+  const defaultLandingOf = async (item: Layer, signal?: AbortSignal) => {
+    const current = await prState(item, signal);
+    if (current.state !== 'MERGED' || current.headRefOid !== item.commit) return undefined;
+    const found = await landingEvidence(
+      gh,
+      { url: item.url, baseRefName: current.baseRefName, headRefOid: item.commit },
+      signal
+    );
+    return found?.branch;
+  };
   const currentLayer = async (assertion: VerifiedPrerequisite, signal?: AbortSignal) => {
     const pr = z
       .object({
@@ -1568,15 +1652,19 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ...assertion,
       url: pr.url,
       commit: assertion.commit,
+      liveHead: pr.headRefOid,
       branch: pr.headRefName,
       prBase: pr.baseRefName,
       parent: assertion.parent ?? pr.baseRefOid,
       state: pr.state,
       targetChanged: assertion.prBase !== undefined && assertion.prBase !== pr.baseRefName,
+      acceptedTarget: assertion.prBase,
       parentPinned: assertion.parent !== undefined,
-      divergent:
-        pr.headRefOid !== assertion.commit ||
-        (assertion.branch !== undefined && assertion.branch !== pr.headRefName),
+      divergent: layerDivergence(
+        pr,
+        assertion,
+        pr.state !== 'MERGED' && (await publicationGuard(assertion.issue, assertion.commit, pr))
+      ),
     };
   };
   type CurrentLayer = Awaited<ReturnType<typeof currentLayer>>;
@@ -1584,16 +1672,20 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     anchor: Layer,
     observed: readonly CurrentLayer[],
     defaultBranch: string,
+    landed: readonly CurrentLayer[],
     signal?: AbortSignal
   ) => {
     const descendants = [];
     for (const item of observed.filter((item) => item.state !== 'MERGED')) {
       if (!(await isAncestor(anchor.commit, item.commit, signal))) continue;
-      const previous = observed.find((parent) => parent.branch === item.prBase);
+      const previous =
+        observed.find((parent) => parent.branch === item.acceptedTarget) ??
+        observed.find((parent) => parent.branch === item.prBase);
       // GitHub may retarget children automatically. Keep the original accepted
       // parent boundary even though the rebased prerequisite has new object IDs.
       const parent = await acceptedParent(item, previous, anchor, defaultBranch, signal);
-      descendants.push({ ...item, parent, divergent: maintenanceDivergent(item, defaultBranch) });
+      const automatic = await automaticTarget(item, landed, defaultBranch, signal);
+      descendants.push({ ...item, parent, divergent: maintenanceDivergent(item, automatic) });
     }
     return descendants;
   };
@@ -1610,9 +1702,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       return anchor.commit;
     return item.parent;
   };
+  const automaticTarget = async (
+    item: CurrentLayer,
+    landed: readonly CurrentLayer[],
+    defaultBranch: string,
+    signal?: AbortSignal
+  ) => {
+    if (!item.targetChanged || item.prBase !== defaultBranch) return false;
+    const parent = landed.find((parent) => parent.branch === item.acceptedTarget);
+    if (!parent) return false;
+    return item.parentPinned
+      ? item.parent === parent.commit
+      : await isAncestor(parent.commit, item.commit, signal);
+  };
   const maintainAnchor = async (
     anchor: CurrentLayer,
     observed: readonly CurrentLayer[],
+    landed: readonly CurrentLayer[],
     signal?: AbortSignal
   ) => {
     if (anchor.divergent) return;
@@ -1622,12 +1728,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       signal
     );
     if (!found) return;
-    const descendants = await descendantsOf(anchor, observed, found.branch, signal);
+    const descendants = await descendantsOf(anchor, observed, found.branch, landed, signal);
     if (!descendants.length) return;
     await git(['fetch', 'origin', found.branch], signal);
     const tip = await git(['rev-parse', 'FETCH_HEAD'], signal);
     if (!(await isAncestor(found.commit, tip, signal))) return;
-    const landed = await verifiedLandings(observed, signal);
     await maintainDescendants(
       {
         anchor,
@@ -1713,13 +1818,43 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         return true;
     return false;
   };
+  const rememberTargetChange = async (
+    item: CurrentLayer,
+    landed: readonly CurrentLayer[],
+    defaultBranch: string | undefined,
+    signal?: AbortSignal
+  ) => {
+    if (item.state !== 'OPEN' || !item.targetChanged) return false;
+    if (defaultBranch !== undefined && (await automaticTarget(item, landed, defaultBranch, signal)))
+      return false;
+    return publicationGuard(
+      item.issue,
+      item.commit,
+      { state: item.state, headRefOid: item.liveHead, baseRefName: item.prBase },
+      item.acceptedTarget
+    );
+  };
+  const rememberTargetChanges = async (
+    observed: readonly CurrentLayer[],
+    landed: readonly CurrentLayer[],
+    signal?: AbortSignal
+  ) => {
+    const result = [];
+    const defaultBranch = landed[0]?.prBase;
+    for (const item of observed) {
+      const manual = await rememberTargetChange(item, landed, defaultBranch, signal);
+      result.push({ ...item, divergent: item.divergent || manual });
+    }
+    return result;
+  };
   const maintain = async (assertions: readonly VerifiedPrerequisite[], signal?: AbortSignal) => {
     const observed = [];
     for (const assertion of assertions) observed.push(await currentLayer(assertion, signal));
     const landed = await verifiedLandings(observed, signal);
+    const guarded = await rememberTargetChanges(observed, landed, signal);
     for (const anchor of landed) {
       if (await hasLandedAncestor(anchor, landed, signal)) continue;
-      await maintainAnchor(anchor, observed, signal);
+      await maintainAnchor(anchor, guarded, landed, signal);
     }
   };
   return { prepare, evidence, state, replayFor, reconcile, recoveries, maintain };
@@ -1822,19 +1957,66 @@ function latestReplay(candidates: readonly Intent['replay'][number][]) {
 }
 function publicationProblem(
   current: { state: string; headRefOid: string; baseRefName: string },
-  item: Intent['replay'][number] & { pending: boolean; uncertain: boolean }
+  item: Intent['replay'][number] & {
+    pending: boolean;
+    uncertain: boolean;
+    manual?: boolean;
+    automatic?: boolean;
+  }
 ) {
   if (current.state === 'CLOSED') return 'PR closed without merge; manual recovery required';
-  if (item.pending) return undefined;
+  if (item.manual) return 'Known external publication change; manual recovery required';
+  if (item.pending || item.automatic) return undefined;
   if (item.uncertain) return 'Replay association is uncertain; manual recovery required';
-  if (current.headRefOid !== item.next || current.baseRefName !== item.target)
-    return 'PR changed externally; manual recovery required';
+  if (changedPublication(current, item)) return 'PR changed externally; manual recovery required';
   return undefined;
 }
 
 function maintenanceDivergent(
   item: { divergent: boolean; targetChanged: boolean; prBase: string },
-  defaultBranch: string
+  automatic: boolean
 ) {
-  return item.divergent || (item.targetChanged && item.prBase !== defaultBranch);
+  return item.divergent || (item.targetChanged && !automatic);
+}
+
+function restoredPublication(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  commit: string,
+  target: string
+) {
+  return (
+    current.state === 'OPEN' && current.headRefOid === commit && current.baseRefName === target
+  );
+}
+function changedTargetOnly(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  item: Intent['replay'][number]
+) {
+  return (
+    current.state === 'OPEN' &&
+    current.headRefOid === item.next &&
+    current.baseRefName !== item.target
+  );
+}
+function changedPublication(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  item: Intent['replay'][number]
+) {
+  return (
+    current.state === 'CLOSED' ||
+    current.headRefOid !== item.next ||
+    current.baseRefName !== item.target
+  );
+}
+
+function layerDivergence(
+  pr: { headRefOid: string; headRefName: string },
+  assertion: VerifiedPrerequisite,
+  manual: boolean
+) {
+  return (
+    manual ||
+    pr.headRefOid !== assertion.commit ||
+    (assertion.branch !== undefined && assertion.branch !== pr.headRefName)
+  );
 }

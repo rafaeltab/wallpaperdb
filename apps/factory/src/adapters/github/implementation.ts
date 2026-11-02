@@ -309,16 +309,22 @@ function replayObservation(
   branch: string
 ): import('../../capabilities/job/index.js').PullRequestObservation {
   if (!replay || observed.kind !== 'found') return observed;
-  if (replay.pending)
-    return { ...observed, ready: false, manualRecovery: false, maintenancePending: true };
-  if (replay.uncertain || observed.commit !== replay.next)
+  if (invalidReplay(replay, observed))
     return {
       ...observed,
       ready: false,
       manualRecovery: true,
-      lifecycle: 'PR changed externally; manual recovery required',
+      lifecycle: 'Publication needs manual recovery',
     };
+  if (replay.pending || replay.automatic)
+    return { ...observed, ready: false, manualRecovery: false, maintenancePending: true };
   if (replayMatches(replay, observed, branch))
     return { ...observed, reviewedCommit: originalReview(replay), parent: replay.onto };
   return observed;
+}
+
+function invalidReplay(replay: NonNullable<Replay>, observed: { commit: string }) {
+  return (
+    replay.manual || (!replay.pending && (replay.uncertain || observed.commit !== replay.next))
+  );
 }

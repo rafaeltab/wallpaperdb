@@ -42,7 +42,16 @@ export const JobLive = Layer.effect(
         const stage = yield* currentStage(store);
         const resume =
           resumeCommand(control, stage, observation) ??
-          (yield* retryAction(store, execution, intent, control, stage, observation));
+          (yield* retryAction(
+            store,
+            execution,
+            issues,
+            intent,
+            control,
+            stage,
+            observation,
+            delivery
+          ));
         const now = yield* time.now();
         return {
           kind: 'job' as const,

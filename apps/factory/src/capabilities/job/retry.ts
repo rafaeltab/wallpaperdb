@@ -1,8 +1,11 @@
 import { Effect } from 'effect';
 import type {
   Control,
+  Delivery,
   Execution,
   Intent,
+  Issues,
+  PullRequestObservation,
   JobStore,
   Observation,
   Resume,
@@ -17,7 +20,7 @@ function retryableStage(control: Control, stage: StageRequest | null): stage is 
   return (
     !control.cancelled &&
     stage !== null &&
-    ['implementation', 'review'].includes(stage.stage) &&
+    stage.stage !== 'ci' &&
     control.parked?.index !== stage.index
   );
 }
@@ -38,16 +41,19 @@ function terminalRun(
 export function retryAction(
   store: JobStore,
   execution: Execution,
+  issues: Issues,
   intent: Intent,
   control: Control,
   stage: StageRequest | null,
-  observation: Observation
+  observation: Observation,
+  delivery?: Delivery
 ) {
   return Effect.gen(function* () {
-    if (!retryableStage(control, stage) || !terminalRun(stage, observation)) return undefined;
+    if (!stage || !eligibleRetry(stage, control, observation, delivery)) return undefined;
     const evidence = yield* execution.inspectStage(intent, stage);
     if (!matchingEvidence(evidence, stage, observation.run)) return undefined;
     if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
+    if (!(yield* reconcilePublication(issues, intent, stage))) return undefined;
     return { index: stage.index, runId: evidence.runId, revision: control.revision };
   });
 }
@@ -118,4 +124,28 @@ function matchingEvidence(
     evidence.ordinal === run.ordinal &&
     evidence.ordinal === (stage.ordinal ?? stage.index + 1)
   );
+}
+
+function reconcilePublication(issues: Issues, intent: Intent, stage: StageRequest) {
+  if (!['publication', 'babysitting'].includes(stage.stage)) return Effect.succeed(true);
+  return issues.pullRequest(intent).pipe(Effect.map((pr) => publicationMatches(pr, stage)));
+}
+function publicationMatches(pr: PullRequestObservation, stage: StageRequest) {
+  if (pr.kind === 'absent') return stage.stage === 'publication';
+  if (pr.kind !== 'found') return false;
+  return pr.commit === stage.commit && !pr.manualRecovery && !pr.maintenancePending;
+}
+
+function eligibleRetry(
+  stage: StageRequest,
+  control: Control,
+  observation: Observation,
+  delivery?: Delivery
+): observation is Extract<Observation, { kind: 'found' }> & {
+  run: { id: string; ordinal: number };
+} {
+  return retryableStage(control, stage) && terminalRun(stage, observation) && !settled(delivery);
+}
+function settled(delivery?: Delivery) {
+  return delivery?.ready === true || delivery?.landed === true;
 }

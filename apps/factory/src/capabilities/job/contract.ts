@@ -242,6 +242,8 @@ export interface StageEvidence {
   readonly ordinal: number;
   readonly commit: string;
   readonly accepted: boolean;
+  /** Actual owning worktree cleanliness when observed by the execution adapter. Absence is no proof. */
+  readonly worktreeClean?: boolean;
   readonly waitingForGitHub?: boolean;
   /** Exact delivery association validated from the latest assistant receipt. */
   readonly stageIndex?: number;

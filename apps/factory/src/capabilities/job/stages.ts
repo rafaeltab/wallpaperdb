@@ -344,9 +344,20 @@ function pendingDelivery(
   delivery: Delivery
 ) {
   if (waiting.stage === 'babysitting')
-    return watchdog(store, issues, intent, waiting, observation, time, evidence, (request) =>
-      deliver(store, execution, intent, request)
-    );
+    return Effect.gen(function* () {
+      const reconciled = yield* terminalCI(store, issues, intent, waiting, observation, evidence);
+      if (reconciled) return reconciled;
+      return yield* watchdog(
+        store,
+        issues,
+        intent,
+        waiting,
+        observation,
+        time,
+        evidence,
+        (request) => deliver(store, execution, intent, request)
+      );
+    });
   return Effect.succeed(delivery);
 }
 
@@ -628,4 +639,74 @@ function continuationAllowed(
       run: { id: evidence.runId, ordinal: evidence.ordinal },
     });
   });
+}
+
+function terminalCI(
+  store: JobStore,
+  issues: Issues,
+  intent: Intent,
+  waiting: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>,
+  evidence: StageEvidence | null
+) {
+  return Effect.gen(function* () {
+    if (!terminalEvidence(observation, evidence, waiting.commit)) return null;
+    if (!(yield* acceptedPublication(store, waiting))) return null;
+    const pr = yield* issues.pullRequest(intent);
+    if (!successfulPublication(pr, waiting.commit)) return null;
+    return {
+      stage: 'ci' as const,
+      commit: waiting.commit,
+      ready: pr.ready,
+      landed: pr.landed,
+      active: false,
+      pr,
+    };
+  });
+}
+function acceptedPublication(store: JobStore, waiting: StageRequest) {
+  return Effect.gen(function* () {
+    // Entering CI is durable evidence that the publication receipt was accepted.
+    // A failed babysitter cannot substitute a different commit for that acceptance.
+    for (let index = 0; index < waiting.index; index++) {
+      const stage = yield* store.readStage(index);
+      if (sameAcceptedCode(stage, waiting)) return true;
+    }
+    return false;
+  });
+}
+function successfulPublication(
+  pr: PullRequestObservation,
+  commit: string
+): pr is Extract<PullRequestObservation, { kind: 'found' }> {
+  return (
+    pr.kind === 'found' &&
+    pr.commit === commit &&
+    !pr.manualRecovery &&
+    !pr.maintenancePending &&
+    (pr.ready || pr.landed)
+  );
+}
+
+function terminalEvidence(
+  observation: Extract<Observation, { kind: 'found' }>,
+  evidence: StageEvidence | null,
+  commit: string
+) {
+  return (
+    ['failed', 'interrupted'].includes(observation.status) &&
+    evidence !== null &&
+    observation.run?.id === evidence.runId &&
+    evidence.commit === commit &&
+    evidence.worktreeClean === true
+  );
+}
+
+function sameAcceptedCode(stage: StageRequest | null, waiting: StageRequest) {
+  return (
+    stage?.stage === 'ci' &&
+    stage.commit === waiting.commit &&
+    stage.previousRunId !== null &&
+    JSON.stringify(stage.comparison) === JSON.stringify(waiting.comparison)
+  );
 }

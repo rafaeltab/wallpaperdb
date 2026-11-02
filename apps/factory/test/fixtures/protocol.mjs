@@ -601,7 +601,7 @@ else if (args[1] === 'start') {
       : args[3].includes('$implement')
         ? 'implementation'
         : 'publication';
-  resource.latestRunId = `run-${index + 1}`;
+  resource.latestRunId = `run-${resource.runCount}`;
   if (index === 2 && resource.stage === 'publication') {
     const pr = {
       url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',

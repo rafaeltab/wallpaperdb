@@ -145,6 +145,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let loseSend = false;
   let ambiguous = false;
   let missingEvidence = false;
+  let worktreeClean = true;
   let stageIndex: number | undefined;
   let question: { id: string; text: string } | undefined;
   const baseDeps = Layer.mergeAll(
@@ -214,6 +215,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
                 accepted,
                 linked: links,
                 waitingForGitHub: waiting,
+                worktreeClean,
                 stageIndex,
               }
         ),
@@ -254,6 +256,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       loseSend?: boolean;
       ambiguous?: boolean;
       missingEvidence?: boolean;
+      worktreeClean?: boolean;
       ordinal?: number;
       runId?: string;
       commit?: string;
@@ -279,6 +282,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       loseSend = value.loseSend ?? loseSend;
       ambiguous = value.ambiguous ?? ambiguous;
       missingEvidence = value.missingEvidence ?? missingEvidence;
+      worktreeClean = value.worktreeClean ?? worktreeClean;
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
       commit = value.commit ?? commit;
@@ -1215,4 +1219,189 @@ it('keeps a questioned replay receipt inactive without requesting continuation c
   });
   expect(requests).toBe(0);
   expect(job.sends()).toBe(3);
+});
+
+async function terminalDeliveryFixture(stage: 'publication' | 'babysitting', status = 'failed') {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  if (stage === 'babysitting') {
+    job.change({ failed: true });
+    await job.status();
+  }
+  job.change({ accepted: false, status });
+  return job;
+}
+it.each([
+  ['publication', 'failed'],
+  ['publication', 'interrupted'],
+  ['babysitting', 'failed'],
+  ['babysitting', 'interrupted'],
+] as const)(
+  'retries the verified terminal %s run when %s without another job',
+  async (stage, status) => {
+    const job = await terminalDeliveryFixture(stage, status);
+    const before = await job.status();
+    if (before.kind !== 'job') throw new Error('Expected job');
+    expect(before.resume).toMatchObject({
+      index: stage === 'publication' ? 2 : 4,
+      runId: stage === 'publication' ? 'run-3' : 'run-4',
+    });
+    if (!before.resume) throw new Error('Expected retry');
+    const command = { jobId: before.intent.id, ...before.resume };
+    const sends = job.sends();
+    await job.resume(command);
+    expect(await job.status()).toMatchObject({
+      intent: before.intent,
+      delivery: { stage, ready: false },
+      execution: { run: { ordinal: stage === 'publication' ? 4 : 5 } },
+    });
+    expect(job.sends()).toBe(sends + 1);
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(sends + 1);
+  }
+);
+
+it('reconciles externally successful CI after terminal babysitting before considering retry', async () => {
+  const job = await terminalDeliveryFixture('babysitting');
+  const before = await job.status();
+  if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+  const sends = job.sends();
+  job.change({ failed: false });
+  expect(await job.status()).toMatchObject({
+    resume: undefined,
+    delivery: { stage: 'ci', ready: true },
+  });
+  expect(await job.resume({ jobId: before.intent.id, ...before.resume })).toEqual({
+    kind: 'rejected',
+  });
+  expect(job.sends()).toBe(sends);
+});
+
+it.each(['publication', 'babysitting'] as const)(
+  'blocks unsafe %s retry states and retains uncertain delivery claims',
+  async (stage) => {
+    const job = await terminalDeliveryFixture(stage);
+    const initial = await job.status();
+    if (initial.kind !== 'job' || !initial.resume || !('runId' in initial.resume))
+      throw new Error('Expected retry');
+    const command = { jobId: initial.intent.id, ...initial.resume };
+    const sends = job.sends();
+    for (const patch of [{ jobId: 'other' }, { index: 99 }, { runId: 'stale' }, { revision: 99 }])
+      expect(await job.resume({ ...command, ...patch })).toEqual({ kind: 'rejected' });
+    job.change({ runId: 'unknown-owner-run' });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ runId: command.runId, ordinal: 99 });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ ordinal: stage === 'publication' ? 3 : 4 });
+    for (const status of ['running', 'cancelled', 'completed', 'waiting-for-input']) {
+      job.change({ status });
+      expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    }
+    job.change({ status: 'failed', prKind: 'ambiguous' });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ prKind: 'found', prCommit: 'f'.repeat(40) });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ prCommit: 'b'.repeat(40), missingEvidence: true });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ missingEvidence: false, ambiguous: true });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ ambiguous: false, manualRecovery: true });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ manualRecovery: false, maintenancePending: true });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ maintenancePending: false, loseSend: true });
+    await expect(job.resume(command)).rejects.toMatchObject({ _tag: 'Unavailable' });
+    job.change({ loseSend: false });
+    expect(await job.status()).toMatchObject({ resume: undefined, delivery: { ready: false } });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(sends + 1);
+    await job.cancel(initial.intent.id);
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  }
+);
+it('allows a publication proven absent but keeps babysitting pending when its PR is missing', async () => {
+  for (const stage of ['publication', 'babysitting'] as const) {
+    const job = await terminalDeliveryFixture(stage);
+    job.change({ prKind: 'absent' });
+    const result = await job.status();
+    if (result.kind !== 'job') throw new Error('Expected job');
+    expect(Boolean(result.resume)).toBe(stage === 'publication');
+  }
+});
+it('does not accept externally successful publication without a receipt, and reconciles its eventual receipt without resending', async () => {
+  const job = await terminalDeliveryFixture('publication');
+  const before = await job.status();
+  if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+  expect(before.delivery?.ready).toBe(false);
+  const sends = job.sends();
+  job.change({ status: 'completed', accepted: true });
+  expect(await job.resume({ jobId: before.intent.id, ...before.resume })).toEqual({
+    kind: 'rejected',
+  });
+  expect(await job.status()).toMatchObject({
+    resume: undefined,
+    delivery: { stage: 'ci', ready: true },
+  });
+  expect(job.sends()).toBe(sends);
+});
+it('never treats missing or conflicting terminal run proof as successful CI reconciliation', async () => {
+  const job = await terminalDeliveryFixture('babysitting');
+  await job.status();
+  job.change({ failed: false, missingEvidence: true });
+  expect(await job.status()).toMatchObject({ resume: undefined, delivery: { ready: false } });
+  job.change({ missingEvidence: false, runId: 'unknown-run' });
+  expect(await job.status()).toMatchObject({ resume: undefined, delivery: { ready: false } });
+});
+
+it('preserves existing watchdog deadlines and nudge claims during explicit terminal babysitter retry', async () => {
+  const job = await terminalDeliveryFixture('babysitting');
+  const before = await job.status();
+  if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+  const wait = { revision: 0, progress: 'same checks', deadline: 3600100, nudged: true };
+  expect(await Effect.runPromise(job.store.saveWait(wait))).toBe(true);
+  const sends = job.sends();
+  await job.resume({ jobId: before.intent.id, ...before.resume });
+  await job.status();
+  expect(await Effect.runPromise(job.store.readWait())).toEqual(wait);
+  expect(job.sends()).toBe(sends + 1);
+});
+it.each(['publication', 'babysitting'] as const)(
+  'does not retry %s through an unanswered question or factory cancellation',
+  async (stage) => {
+    const job = await terminalDeliveryFixture(stage);
+    const before = await job.status();
+    if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+    const sends = job.sends();
+    const command = { jobId: before.intent.id, ...before.resume };
+    job.change({ question: { id: 'pending', text: 'Decide?' } });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    await job.cancel(before.intent.id);
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(sends);
+  }
+);
+
+it('does not reconcile successful CI over unfinished or unreviewed babysitter work', async () => {
+  const job = await terminalDeliveryFixture('babysitting');
+  await job.status();
+  job.change({ failed: false, worktreeClean: false });
+  expect(await job.status()).toMatchObject({ delivery: { ready: false } });
+  job.change({ worktreeClean: true, commit: 'c'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { ready: false } });
+  job.change({ commit: 'b'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { ready: true } });
+});
+
+it('does not use an older publication acceptance to declare replayed babysitter code ready', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true, reviewedCommit: 'b'.repeat(40), prCommit: 'd'.repeat(40) });
+  await job.status();
+  job.change({ accepted: false, status: 'failed', failed: false, commit: 'd'.repeat(40) });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'babysitting', ready: false },
+    resume: { runId: 'run-4' },
+  });
 });

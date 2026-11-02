@@ -11,7 +11,12 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
-  const observations: { healthy: number; observed: number }[] = [];
+  const observations: {
+    healthy: number;
+    observed: number;
+    healthyUnit: string;
+    observedUnit: string;
+  }[] = [];
   const schema = z.object({
     resourceMetrics: z.array(
       z.object({
@@ -20,6 +25,7 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
             metrics: z.array(
               z.object({
                 name: z.string(),
+                unit: z.string(),
                 gauge: z
                   .object({ dataPoints: z.array(z.object({ asDouble: z.number() })) })
                   .optional(),
@@ -41,13 +47,19 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
         const metrics = parsed.resourceMetrics.flatMap((resource) =>
           resource.scopeMetrics.flatMap((scope) => scope.metrics)
         );
-        const healthy = metrics.find((metric) => metric.name === 'factory_scheduler_healthy')?.gauge
-          ?.dataPoints[0]?.asDouble;
-        const observed = metrics.find(
+        const healthyMetric = metrics.find((metric) => metric.name === 'factory_scheduler_healthy');
+        const observedMetric = metrics.find(
           (metric) => metric.name === 'factory_scheduler_observed_at_seconds'
-        )?.gauge?.dataPoints[0]?.asDouble;
+        );
+        const healthy = healthyMetric?.gauge?.dataPoints[0]?.asDouble;
+        const observed = observedMetric?.gauge?.dataPoints[0]?.asDouble;
         if (healthy !== undefined && observed !== undefined)
-          observations.push({ healthy, observed });
+          observations.push({
+            healthy,
+            observed,
+            healthyUnit: healthyMetric?.unit ?? '',
+            observedUnit: observedMetric?.unit ?? '',
+          });
       }
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end('{}');
@@ -83,6 +95,7 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
         { timeout: 15000, interval: 50 }
       );
       expect((await running.app.inject('/health')).json()).toEqual({ status: 'ok' });
+      expect(observations.at(-1)).toMatchObject({ healthyUnit: '1', observedUnit: 's' });
       const failed = observations.at(-1)?.observed ?? 0;
       await host.save({
         activity: [

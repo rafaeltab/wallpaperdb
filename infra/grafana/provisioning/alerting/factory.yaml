@@ -16,7 +16,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: min(factory_scheduler_healthy)
+              expr: min(factory_scheduler_healthy_ratio)
               instant: true
               range: false
               intervalMs: 1000

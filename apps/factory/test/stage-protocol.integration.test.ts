@@ -364,3 +364,55 @@ it('delivers owned replay repair against the actual comparison and accepts only 
       accepted: true,
     });
   }));
+
+it('retries a failed implementation with its existing thread, ordinal, scope and receipt association', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({ idempotency: true, overrides: { status: 'failed' } });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      runId: 'run-1',
+      ordinal: 1,
+      accepted: false,
+    });
+    const retry = { ...request, index: 1, ordinal: 2, previousRunId: 'run-1', resume: true };
+    await Effect.runPromise(adapter.sendStage(intent, retry));
+    const sends = (await host.calls()).filter(
+      (call) => call.args[1] === 'send' && !call.args.includes('--help')
+    );
+    expect(sends).toHaveLength(1);
+    expect(sends[0].args).toContain('thread-live');
+    expect(sends[0].args).toContain(`${intent.id}:stage:1`);
+    expect(sends[0].args[3]).toContain('Use $implement');
+    expect(sends[0].args[3]).toContain('expected run ordinal 2');
+    expect(sends[0].args[3]).toContain(intent.issueUrl);
+    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      operation: 'stage-binding-changed',
+    });
+    const receipt = {
+      jobId: intent.id,
+      stage: 'implementation',
+      base: intent.base,
+      commit: host.base,
+      outcome: '<TASK>COMPLETE</TASK>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: false,
+    };
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [{ role: 'assistant', runId: 'run-2', text: JSON.stringify(receipt) }],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
+      runId: 'run-2',
+      ordinal: 2,
+      accepted: true,
+    });
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [{ role: 'assistant', runId: 'run-1', text: JSON.stringify(receipt) }],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
+      accepted: false,
+    });
+  }));

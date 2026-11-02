@@ -1,6 +1,6 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
-import { Execution, Issues, Job, JobLive, JobStore, Time } from '../src/capabilities/job/index.js';
+import { Execution, Issues, Job, JobLive, JobStore, Time, Unavailable } from '../src/capabilities/job/index.js';
 import { ContinuationAdmission } from '../src/capabilities/job/index.js';
 import {
   Scheduler,
@@ -142,6 +142,9 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let waiting = false;
   let status = 'completed';
   let runningAfterSend = false;
+  let loseSend = false;
+  let ambiguous = false;
+  let missingEvidence = false;
   let stageIndex: number | undefined;
   let question: { id: string; text: string } | undefined;
   const baseDeps = Layer.mergeAll(
@@ -190,7 +193,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       launch: () => Effect.succeed({ kind: 'submitted' as const }),
       observe: (intent) =>
         Effect.succeed({
-          kind: 'found' as const,
+          kind: ambiguous ? ('ambiguous' as const) : ('found' as const),
           threadId: 'thread',
           status,
           question,
@@ -201,20 +204,26 @@ async function stagesFixture(admission?: ContinuationAdmission) {
           model: 'gpt-6.1-sol',
         }),
       inspectStage: () =>
-        Effect.succeed({
-          runId,
-          ordinal,
-          commit,
-          accepted,
-          linked: links,
-          waitingForGitHub: waiting,
-          stageIndex,
-        }),
+        Effect.succeed(
+          missingEvidence
+            ? null
+            : {
+                runId,
+                ordinal,
+                commit,
+                accepted,
+                linked: links,
+                waitingForGitHub: waiting,
+                stageIndex,
+              }
+        ),
       sendStage: (_intent, request) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          sends++;
+          if (loseSend)
+            return yield* Effect.fail(new Unavailable({ operation: 'lost-send', cause: null }));
           ordinal = request.ordinal ?? request.index + 1;
           runId = `run-${ordinal}`;
-          sends++;
           if (runningAfterSend) status = 'running';
         }),
     })
@@ -238,10 +247,13 @@ async function stagesFixture(admission?: ContinuationAdmission) {
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
     status: () => run((job) => job.status()),
     cancel: (id: string) => run((job) => job.cancel(id)),
-    resume: (command: { jobId: string; index: number; questionId: string }) =>
+    resume: (command: import('../src/capabilities/job/index.js').Resume) =>
       run((job) => job.resume(command)),
     change: (value: {
       runningAfterSend?: boolean;
+      loseSend?: boolean;
+      ambiguous?: boolean;
+      missingEvidence?: boolean;
       ordinal?: number;
       runId?: string;
       commit?: string;
@@ -264,6 +276,9 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       answeredQuestions?: readonly string[];
     }) => {
       runningAfterSend = value.runningAfterSend ?? runningAfterSend;
+      loseSend = value.loseSend ?? loseSend;
+      ambiguous = value.ambiguous ?? ambiguous;
+      missingEvidence = value.missingEvidence ?? missingEvidence;
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
       commit = value.commit ?? commit;

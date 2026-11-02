@@ -340,3 +340,27 @@ it('verifies authenticated default landing and exposes missing lifecycle automat
     await f.close();
   }
 });
+
+it('observes actual default landing after external retarget while keeping feature merges unlanded', async () => {
+  const f = await publicationScenario();
+  try {
+    const intent = { ...f.intent, prBase: 'feature' };
+    const landing = { merge: 'd'.repeat(40), head: f.pr.headRefOid };
+    await f.host.save({ respectPRFilters: true, prs: [{ ...f.pr, state: 'MERGED' }], landing });
+    expect(await Effect.runPromise(f.adapter.pullRequest(intent))).toMatchObject({
+      ready: false,
+      landed: true,
+    });
+    await f.host.save({
+      respectPRFilters: true,
+      prs: [{ ...f.pr, baseRefName: 'feature', state: 'MERGED' }],
+      landing: { ...landing, base: 'feature' },
+    });
+    expect(await Effect.runPromise(f.adapter.pullRequest(intent))).toMatchObject({
+      ready: false,
+      landed: false,
+    });
+  } finally {
+    await f.close();
+  }
+});

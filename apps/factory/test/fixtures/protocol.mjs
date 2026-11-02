@@ -469,14 +469,22 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   if (config.githubMalformed) console.log('{}');
   else if (args[0] === 'api')
     reply(args[1]?.includes('/actions/runs/') ? config.jobs : [config.blockers ?? []]);
-  else if (args[0] === 'pr' && args[1] === 'list')
-    reply(
+  else if (args[0] === 'pr' && args[1] === 'list') {
+    const prs =
       config.prs ??
-        (existsSync(join(config.directory, 'pr.json'))
-          ? [JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))]
-          : [])
+      (existsSync(join(config.directory, 'pr.json'))
+        ? [JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))]
+        : []);
+    reply(
+      config.respectPRFilters
+        ? prs.filter(
+            (pr) =>
+              pr.headRefName === args[args.indexOf('--head') + 1] &&
+              (!args.includes('--base') || pr.baseRefName === args[args.indexOf('--base') + 1])
+          )
+        : prs
     );
-  else if (
+  } else if (
     args[0] === 'pr' &&
     args[1] === 'view' &&
     args.includes('url,headRefOid,headRefName,baseRefName,baseRefOid,state') &&

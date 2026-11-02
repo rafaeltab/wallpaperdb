@@ -117,7 +117,9 @@ function readiness(
     const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
-    if (divergentPublication(pr, accepted.commit))
+    const pending = maintenanceDelivery(pr, accepted.commit);
+    if (pending) return pending;
+    if (requiresManualRecovery(pr, accepted.commit))
       return {
         stage: 'ci' as const,
         commit: accepted.commit,
@@ -137,15 +139,7 @@ function readiness(
         pr,
       };
     }
-    const landed = matches && isLanded(pr);
-    return {
-      stage: 'ci' as const,
-      ...deliveryIdentity(pr, accepted.commit),
-      pr,
-      ready: matches && isReady(pr),
-      landed,
-      active: landed ? false : undefined,
-    };
+    return observedReadiness(pr, matches, accepted.commit);
   });
 }
 
@@ -472,6 +466,29 @@ function deliveryIdentity(pr: PullRequestObservation, commit: string) {
 function isLanded(pr: PullRequestObservation) {
   return pr.kind === 'found' && pr.landed;
 }
-function divergentPublication(pr: PullRequestObservation, commit: string) {
-  return pr.kind === 'found' && !reviewedAssociation(pr, commit);
+function requiresManualRecovery(pr: PullRequestObservation, commit: string) {
+  return pr.kind === 'found' && (pr.manualRecovery === true || !reviewedAssociation(pr, commit));
+}
+
+function maintenanceDelivery(pr: PullRequestObservation, commit: string): Delivery | null {
+  if (pr.kind !== 'found' || !pr.maintenancePending) return null;
+  return {
+    stage: 'ci',
+    ...deliveryIdentity(pr, commit),
+    pr,
+    ready: false,
+    landed: false,
+    active: true,
+  };
+}
+function observedReadiness(pr: PullRequestObservation, matches: boolean, commit: string): Delivery {
+  const landed = matches && isLanded(pr);
+  return {
+    stage: 'ci',
+    ...deliveryIdentity(pr, commit),
+    pr,
+    ready: matches && isReady(pr),
+    landed,
+    active: landed ? false : undefined,
+  };
 }

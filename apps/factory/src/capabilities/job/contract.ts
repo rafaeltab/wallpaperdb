@@ -95,8 +95,11 @@ export interface RecoveryStatus {
 export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
   recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
-  /** Advance only already durable prerequisite joins, even while their CI waits
-   * occupy capacity. Never reserves a new join or admits a child. */
+  /** Reconcile durable joins and observe verified default-branch landings. May
+   * reserve downstream maintenance from retained accepted publications, even
+   * while admissions are paused or capacity is occupied. Record operation intent
+   * before external changes; coordinate affected writers and expected-head leases.
+   * New issue admissions are never performed by this operation. */
   reconcile?(admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
@@ -219,6 +222,11 @@ export type PullRequestObservation =
       readonly ready: boolean;
       readonly landed: boolean;
       readonly lifecycle?: string;
+      /** Explicit closure or external divergence. Never grants readiness. */
+      readonly manualRecovery?: boolean;
+      /** Durable expected replay, awaiting its own CI/metadata verification.
+       * Mutually exclusive with manualRecovery; retains active capacity. */
+      readonly maintenancePending?: boolean;
     };
 export interface Delivery {
   readonly stage: Stage | 'ci';

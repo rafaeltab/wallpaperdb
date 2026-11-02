@@ -23,7 +23,7 @@ export function page(status: Status, schedule?: ScheduleStatus): string {
 function deliveryPage(delivery: Delivery | undefined): string {
   if (!delivery) return '';
   const pr = delivery.pr?.kind === 'found' ? delivery.pr : null;
-  return `${waitingPage(delivery)}<p>${delivery.landed ? 'Landed on the default branch' : delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending'}</p><p>${delivery.landed ? 'Default-branch landing verified.' : 'Not landed.'} ${escapeHtml(pr?.lifecycle ?? '')}</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
+  return `${waitingPage(delivery)}<p>${deliveryOutcome(delivery)}</p><p>${landingMessage(delivery, pr)}</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
 }
 
 function stageHeading(delivery: Delivery | undefined) {
@@ -58,4 +58,13 @@ function controls(schedule: ScheduleStatus): string {
       job.kind === 'job' ? jobPage(job) : '<p>Reserved admission awaiting reconciliation.</p>'
     )
     .join('')}`;
+}
+
+function deliveryOutcome(delivery: Delivery) {
+  if (delivery.landed) return 'Landed on the default branch';
+  return delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending';
+}
+
+function landingMessage(delivery: Delivery, pr: { lifecycle?: string } | null) {
+  return `${delivery.landed ? 'Default-branch landing verified.' : 'Not landed.'} ${escapeHtml(pr?.lifecycle ?? '')}`;
 }

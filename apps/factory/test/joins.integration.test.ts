@@ -8,7 +8,7 @@ import {
 } from '../src/capabilities/plan/index.js';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
 import type { Status } from '../src/capabilities/job/index.js';
-import { readFile, writeFile, readdir, rename, unlink } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename, unlink, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -1726,6 +1726,36 @@ it('retains issue boundaries and original review through successive default land
       reviewedCommit: f.b,
       commit: b.commit,
     });
+  } finally {
+    await f.close();
+  }
+});
+it('surfaces a concurrent expected-head lease conflict during landing maintenance without overwriting the external tip', async () => {
+  const f = await landedFixture();
+  try {
+    const hook = join(f.host.repository, '.git', 'hooks', 'pre-push');
+    await writeFile(
+      hook,
+      `#!/bin/sh
+while read local_ref local_sha remote_ref remote_sha; do
+ if [ "$remote_ref" = "refs/heads/C" ]; then
+  git --git-dir='${join(f.host.directory, 'remote.git')}' update-ref refs/heads/C ${f.d}
+ fi
+done
+`
+    );
+    await chmod(hook, 0o700);
+    if (!f.issues.reconcile || !f.issues.recoveries) throw new Error('Missing reconciliation');
+    await expect(Effect.runPromise(f.issues.reconcile())).rejects.toMatchObject({
+      operation: 'reconcile-prerequisite-joins',
+    });
+    const reopened = githubIssues({ ...f.config, prerequisites: [] });
+    if (!reopened.reconcile || !reopened.recoveries) throw new Error('Missing reconciliation');
+    await Effect.runPromise(reopened.reconcile());
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.d);
+    expect(await Effect.runPromise(reopened.recoveries())).toContainEqual(
+      expect.objectContaining({ active: false, progress: expect.stringContaining('head-conflict') })
+    );
   } finally {
     await f.close();
   }

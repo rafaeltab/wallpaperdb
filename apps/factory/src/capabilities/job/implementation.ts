@@ -209,8 +209,8 @@ function retainPrerequisite(
   delivery: Delivery | undefined
 ) {
   return Effect.gen(function* () {
-    const pr = delivery?.pr;
-    if (!(delivery?.ready || delivery?.landed) || pr?.kind !== 'found') return;
+    const pr = verifiedPublication(delivery);
+    if (!pr) return;
     const prerequisite = {
       url: pr.url,
       commit: pr.commit,
@@ -225,4 +225,9 @@ function retainPrerequisite(
         return;
     }
   }).pipe(Effect.withSpan('factory.job.retain-prerequisite'));
+}
+
+function verifiedPublication(delivery: Delivery | undefined) {
+  if (!(delivery?.ready || delivery?.landed)) return null;
+  return delivery.pr?.kind === 'found' ? delivery.pr : null;
 }

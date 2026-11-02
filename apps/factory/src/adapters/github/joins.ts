@@ -972,15 +972,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
+  const ungroup = async (groups: Intent['groups'], operation: Intent, signal?: AbortSignal) => {
+    if (!(await dissolve(groups, operation, signal))) return false;
+    return (await groupsFor(operation.members, signal)).length === 0;
+  };
   const regroup = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     const matches = (value: z.infer<typeof group>) =>
       JSON.stringify(value.pull_requests.map((item) => item.number)) ===
       JSON.stringify(operation.members);
     let groups = await groupsFor(operation.members, signal);
-    if (operation.members.length === 1) {
-      if (!(await dissolve(groups, operation, signal))) return false;
-      return (await groupsFor(operation.members, signal)).length === 0;
-    }
+    if (operation.members.length === 1) return ungroup(groups, operation, signal);
     if (!groups.some(matches)) {
       // Reconcile existing grouping before a possibly non-idempotent creation.
       // Do not dissolve a group changed externally since the recorded intent.
@@ -1008,12 +1009,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     const current = await prState(item, signal);
-    if (
-      current.state !== 'OPEN' ||
-      current.headRefOid !== item.next ||
-      current.baseRefName !== item.target
-    )
-      return false;
+    if (!currentComparison(current, item)) return false;
     const recorded = z
       .object({
         body: z.string(),
@@ -1208,27 +1204,29 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!operation) operation = (await build(numbers, candidates, signal, requirements)) ?? null;
     return operation;
   };
-  const prepare = async (
-    numbers: readonly number[],
-    candidates: unknown,
-    signal?: AbortSignal,
-    requirements?: JoinBoundary
-  ) => {
-    const dir = directory(numbers);
-    const operation = await operationFor(numbers, candidates, signal, requirements);
-    if (!operation || !(await publicationSafe(operation, dir, signal))) return;
-    if (operation.landing) {
+  const landingStillPresent = async (landed: Intent['landing'], signal?: AbortSignal) => {
+    if (landed) {
       const current = await landingEvidence(
         gh,
         {
-          url: operation.landing.anchor.url,
-          baseRefName: operation.landing.branch,
-          headRefOid: operation.landing.anchor.commit,
+          url: landed.anchor.url,
+          baseRefName: landed.branch,
+          headRefOid: landed.anchor.commit,
         },
         signal
       );
-      if (!current || !(await isAncestor(current.commit, operation.landing.commit, signal))) return;
+      if (!current || !(await isAncestor(current.commit, landed.commit, signal))) return false;
     }
+    return true;
+  };
+  const maintenanceWritersReady = async (operation: Intent, signal?: AbortSignal) => {
+    if (!(await writers(operation.layers, signal))) return false;
+    return landingStillPresent(operation.landing, signal);
+  };
+  const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal, requirements?:JoinBoundary) => {
+    const dir = directory(numbers);
+    const operation = await operationFor(numbers, candidates, signal,requirements);
+    if (!operation || !(await publicationSafe(operation,dir,signal)) || !(await maintenanceWritersReady(operation, signal))) return;
     if (
       !(await acquire(
         id(numbers),
@@ -1254,12 +1252,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const metadataMatches = async (operation: Intent, signal?: AbortSignal) => {
     for (const item of operation.replay) {
       const current = await prState(item, signal);
-      if (
-        current.state !== 'OPEN' ||
-        current.headRefOid !== item.next ||
-        current.baseRefName !== item.target
-      )
-        return false;
+      if (!currentComparison(current, item)) return false;
     }
     return groupingMatches(operation, signal);
   };
@@ -1365,6 +1358,18 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
   };
+  const retiredReplay = async (
+    item: Intent['replay'][number],
+    current: { state: string; headRefOid: string; baseRefName: string },
+    signal?: AbortSignal
+  ) => {
+    if (current.state !== 'MERGED' || current.headRefOid !== item.next) return false;
+    return !!(await landingEvidence(
+      gh,
+      { url: item.url, baseRefName: current.baseRefName, headRefOid: item.next },
+      signal
+    ));
+  };
   const completedReplay = async (key: string, issue: number) => {
     const saved = await read(join(config.directory, key), 'intent.json');
     if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
@@ -1403,7 +1408,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     let valid = false;
     for (const record of records) {
       await verifyReplayTree(record.item, record.directory, signal);
-      if (await completedComparisonsValid(record.operation, signal)) valid = true;
+      if (
+        (await retiredReplay(record.item, await prState(record.item, signal), signal)) ||
+        (await completedComparisonsValid(record.operation, signal))
+      )
+        valid = true;
     }
     return valid;
   };
@@ -1494,15 +1503,19 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       progress: `Landing maintenance blocked; manual recovery required: ${JSON.stringify(blocked)}`,
     };
   };
-  const recoveryStatus = async (dir: string) => {
-    const blocked = await blockingFile(dir);
+  const savedRecoveryProgress = async (dir: string, blocked: unknown) => {
     const fallback = z.object({ kind: z.literal('conflict') }).safeParse(blocked).success
       ? blocked
       : null;
-    const saved =
+    return (
       (await read(dir, 'recovery-progress.json')) ??
       fallback ??
-      (await landingFailure(dir, blocked));
+      (await landingFailure(dir, blocked))
+    );
+  };
+  const recoveryStatus = async (dir: string) => {
+    const blocked = await blockingFile(dir);
+    const saved = await savedRecoveryProgress(dir, blocked);
     if (!saved) return null;
     const progress = z
       .object({
@@ -1767,4 +1780,15 @@ function replayProvenance(item: Intent['replay'][number]) {
     item.prBase,
     reviewOrigin(item),
   ]);
+}
+
+function currentComparison(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  item: { next: string; target: string }
+) {
+  return (
+    current.state === 'OPEN' &&
+    current.headRefOid === item.next &&
+    current.baseRefName === item.target
+  );
 }

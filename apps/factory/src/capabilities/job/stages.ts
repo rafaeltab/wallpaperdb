@@ -117,7 +117,7 @@ function readiness(
     const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
-    if (pr.kind === 'found' && !reviewedAssociation(pr, accepted.commit))
+    if (divergentPublication(pr, accepted.commit))
       return {
         stage: 'ci' as const,
         commit: accepted.commit,
@@ -137,13 +137,14 @@ function readiness(
         pr,
       };
     }
+    const landed = matches && isLanded(pr);
     return {
       stage: 'ci' as const,
       ...deliveryIdentity(pr, accepted.commit),
       pr,
       ready: matches && isReady(pr),
-      landed: matches && pr.kind === 'found' && pr.landed,
-      active: matches && pr.kind === 'found' && pr.landed ? false : undefined,
+      landed,
+      active: landed ? false : undefined,
     };
   });
 }
@@ -466,4 +467,11 @@ function deliveryIdentity(pr: PullRequestObservation, commit: string) {
   return pr.kind === 'found'
     ? { commit: pr.commit, reviewedCommit: pr.reviewedCommit }
     : { commit };
+}
+
+function isLanded(pr: PullRequestObservation) {
+  return pr.kind === 'found' && pr.landed;
+}
+function divergentPublication(pr: PullRequestObservation, commit: string) {
+  return pr.kind === 'found' && !reviewedAssociation(pr, commit);
 }

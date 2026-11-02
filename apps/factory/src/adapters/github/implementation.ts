@@ -193,8 +193,8 @@ export function githubIssues(config: {
   }
   return {
     recoveries: () =>
-      Effect.tryPromise({
-        try: () => joins?.recoveries() ?? Promise.resolve([]),
+      contextualPromise({
+        try: (signal) => joins?.recoveries(signal) ?? Promise.resolve([]),
         catch: (cause) => new Unavailable({ operation: 'read-recoveries', cause }),
       }).pipe(
         Effect.tapError((error) => Effect.logError(error)),
@@ -234,15 +234,10 @@ export function githubIssues(config: {
         );
         const observed = yield* publication(
           gh,
-          replay?.comparison ?? targetBase(intent.prBase, config.prBase)
+          replay?.target ?? targetBase(intent.prBase, config.prBase),
+          replay ?? undefined
         )(intent);
-        if (!replay || observed.kind !== 'found') return observed;
-        const matches = replayMatches(replay, observed, intent.branch);
-        return {
-          ...observed,
-          ready: observed.ready && replay.comparisonReady && !!matches,
-          ...(matches ? { reviewedCommit: originalReview(replay), parent: replay.onto } : {}),
-        };
+        return replayObservation(replay, observed, intent.branch);
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),
     prepare: (number, admitRecovery) =>
@@ -306,4 +301,24 @@ function replayMatches(
 }
 function originalReview(replay: Replay) {
   return replay?.reviewedCommit ?? replay?.commit;
+}
+
+function replayObservation(
+  replay: Replay,
+  observed: import('../../capabilities/job/index.js').PullRequestObservation,
+  branch: string
+): import('../../capabilities/job/index.js').PullRequestObservation {
+  if (!replay || observed.kind !== 'found') return observed;
+  if (replay.pending)
+    return { ...observed, ready: false, manualRecovery: false, maintenancePending: true };
+  if (replay.uncertain || observed.commit !== replay.next)
+    return {
+      ...observed,
+      ready: false,
+      manualRecovery: true,
+      lifecycle: 'PR changed externally; manual recovery required',
+    };
+  if (replayMatches(replay, observed, branch))
+    return { ...observed, reviewedCommit: originalReview(replay), parent: replay.onto };
+  return observed;
 }

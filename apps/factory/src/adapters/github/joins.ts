@@ -1358,93 +1358,59 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
   };
-  const retiredReplay = async (
-    item: Intent['replay'][number],
-    current: { state: string; headRefOid: string; baseRefName: string },
+  const replayRecords = async () => {
+    const records = [];
+    for (const key of (await operationDirectories()).filter((key) => /^[a-f0-9]{64}$/.test(key))) {
+      const dir = join(config.directory, key);
+      const saved = await read(dir, 'intent.json');
+      if (saved)
+        records.push({
+          operation: intent.parse(saved),
+          directory: dir,
+          complete: !!(await read(dir, 'complete.json')),
+        });
+    }
+    return records;
+  };
+  type ReplayRecord = Awaited<ReturnType<typeof replayRecords>>[number];
+  // Preserve each completed issue-only review association independently. Current
+  // publication checks still gate readiness; evidence() separately verifies the
+  // complete group before it can supply a joined prerequisite comparison.
+  const completedCandidates = async (records: readonly ReplayRecord[], issue: number) => {
+    const result: Intent['replay'] = [];
+    for (const record of records.filter((record) => record.complete)) {
+      if (!(await operationFactsValid(record.operation))) continue;
+      for (const item of record.operation.replay.filter((item) => item.issue === issue)) {
+        z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
+          await read(record.directory, `ci-${item.next}.json`)
+        );
+        await verifyReplayTree(item,record.directory);
+        result.push(item);
+      }
+    }
+    return result;
+  };
+  const lookupReplay = async (
+    records: readonly ReplayRecord[],
+    issue: number,
     signal?: AbortSignal
   ) => {
-    if (current.state !== 'MERGED' || current.headRefOid !== item.next) return false;
-    return !!(await landingEvidence(
-      gh,
-      { url: item.url, baseRefName: current.baseRefName, headRefOid: item.next },
-      signal
-    ));
-  };
-  const completedReplay = async (key: string, issue: number) => {
-    const saved = await read(join(config.directory, key), 'intent.json');
-    if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
-    const operation = intent.parse(saved);
-    const item = operation.replay.find((value) => value.issue === issue);
-    if (!item) return null;
-    return { item, operation, directory: join(config.directory, key) };
-  };
-  type CompletedReplay = NonNullable<Awaited<ReturnType<typeof completedReplay>>>;
-  const currentCompleted = async (records: readonly CompletedReplay[], signal?: AbortSignal) => {
-    const terminal = records.filter(
-      (record) =>
-        !records.some(
-          (other) =>
-            replayOwner(record.item) === replayOwner(other.item) &&
-            other.item.commit === record.item.next &&
-            other.item.next !== record.item.next
-        )
-    );
-    const matches = [];
-    for (const record of terminal) {
-      const current = await prState(record.item, signal);
+    const candidates = await completedCandidates(records, issue);
+    const latest = latestReplay(candidates);
+    const pending = records
+      .filter((record) => !record.complete)
+      .flatMap((record) => record.operation.replay)
+      .filter((item) => item.issue === issue);
+    for (const item of pending) {
+      const current = await prState(item, signal);
       if (
-        current.headRefOid === record.item.next &&
-        current.headRefName === record.item.branch &&
-        current.url === record.item.url
+        current.state === 'OPEN' &&
+        current.headRefOid === item.next &&
+        allowedPublication(current, item)
       )
-        matches.push({ record, current });
+        return { ...item, pending: true, uncertain: false };
     }
-    return matches;
-  };
-  const matchingComparisonsValid = async (
-    records: readonly CompletedReplay[],
-    signal?: AbortSignal
-  ) => {
-    let valid = false;
-    for (const record of records) {
-      await verifyReplayTree(record.item, record.directory, signal);
-      if (
-        (await retiredReplay(record.item, await prState(record.item, signal), signal)) ||
-        (await completedComparisonsValid(record.operation, signal))
-      )
-        valid = true;
-    }
-    return valid;
-  };
-  const observeCompleted = async (records: readonly CompletedReplay[], signal?: AbortSignal) => {
-    const matches = await currentCompleted(records, signal);
-    const selected = matches[0];
-    if (!selected) {
-      const record = records[0];
-      if (!record) return null;
-      const current = await prState(record.item, signal);
-      return {
-        ...record.item,
-        comparison: current.baseRefName,
-        comparisonReady: false,
-        ambiguous: true,
-      };
-    }
-    const ambiguous = matches.some(
-      (value) => replayProvenance(value.record.item) !== replayProvenance(selected.record.item)
-    );
-    const comparisonReady =
-      !ambiguous &&
-      (await matchingComparisonsValid(
-        matches.map((value) => value.record),
-        signal
-      ));
-    return {
-      ...selected.record.item,
-      comparison: selected.current.baseRefName,
-      comparisonReady,
-      ambiguous,
-    };
+    return latest ? { ...latest.item, pending: false, uncertain: latest.uncertain } : null;
   };
   const operationDirectories = async () => {
     let entries: string[];
@@ -1456,16 +1422,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return entries;
   };
-  const replayFor = async (issue: number, signal?: AbortSignal) => {
-    const records = [];
-    for (const key of (await operationDirectories()).filter((value) =>
-      /^[a-f0-9]{64}$/.test(value)
-    )) {
-      const record = await completedReplay(key, issue);
-      if (record) records.push(record);
-    }
-    return observeCompleted(records, signal);
-  };
+  const replayFor = async (issue: number, signal?: AbortSignal) =>
+    lookupReplay(await replayRecords(), issue, signal);
   const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
     const saved = await read(join(config.directory, key), 'request.json');
     const numbers = saved
@@ -1541,11 +1499,42 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       active: (await read(dir, 'complete.json')) ? false : progress.active,
     };
   };
-  const recoveries = async () => {
+  const recoveries = async (signal?: AbortSignal) => {
     const result = [];
     for (const key of (await operationDirectories()).filter((key) => /^[a-f0-9]{64}$/.test(key))) {
       const value = await recoveryStatus(join(config.directory, key));
       if (value) result.push(value);
+    }
+    const observed = await publicationRecoveries(signal);
+    return [...new Map([...result, ...observed].map((value) => [value.issue, value])).values()];
+  };
+  const verifiedRetiredReplay = async (
+    current: { state: string; headRefOid: string; baseRefName: string },
+    item: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    if (current.state !== 'MERGED' || current.headRefOid !== item.next) return false;
+    return !!(await landingEvidence(
+      gh,
+      { url: item.url, baseRefName: current.baseRefName, headRefOid: item.next },
+      signal
+    ));
+  };
+  const publicationRecoveries = async (signal?: AbortSignal) => {
+    const records = await replayRecords();
+    const issues = new Set(
+      records
+        .filter((record) => record.complete)
+        .flatMap((record) => record.operation.replay.map((item) => item.issue))
+    );
+    const result = [];
+    for (const issue of issues) {
+      const replay = await lookupReplay(records, issue, signal);
+      if (!replay) continue;
+      const current = await prState(replay, signal);
+      if (await verifiedRetiredReplay(current, replay, signal)) continue;
+      const progress = publicationProblem(current, replay);
+      if (progress) result.push({ issue, pr: replay.url, progress, active: false });
     }
     return result;
   };
@@ -1583,6 +1572,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       prBase: pr.baseRefName,
       parent: assertion.parent ?? pr.baseRefOid,
       state: pr.state,
+      targetChanged: assertion.prBase !== undefined && assertion.prBase !== pr.baseRefName,
+      parentPinned: assertion.parent !== undefined,
       divergent:
         pr.headRefOid !== assertion.commit ||
         (assertion.branch !== undefined && assertion.branch !== pr.headRefName),
@@ -1601,14 +1592,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const previous = observed.find((parent) => parent.branch === item.prBase);
       // GitHub may retarget children automatically. Keep the original accepted
       // parent boundary even though the rebased prerequisite has new object IDs.
-      const parent =
-        previous?.commit ??
-        (item.prBase === defaultBranch && !(await isAncestor(anchor.commit, item.parent, signal))
-          ? anchor.commit
-          : item.parent);
-      descendants.push({ ...item, parent });
+      const parent = await acceptedParent(item, previous, anchor, defaultBranch, signal);
+      descendants.push({ ...item, parent, divergent: maintenanceDivergent(item, defaultBranch) });
     }
     return descendants;
+  };
+  const acceptedParent = async (
+    item: CurrentLayer,
+    previous: CurrentLayer | undefined,
+    anchor: Layer,
+    defaultBranch: string,
+    signal?: AbortSignal
+  ) => {
+    if (item.parentPinned) return item.parent;
+    if (previous) return previous.commit;
+    if (item.prBase === defaultBranch && !(await isAncestor(anchor.commit, item.parent, signal)))
+      return anchor.commit;
+    return item.parent;
   };
   const maintainAnchor = async (
     anchor: CurrentLayer,
@@ -1811,4 +1811,30 @@ function currentComparison(
     current.headRefOid === item.next &&
     current.baseRefName === item.target
   );
+}
+
+function latestReplay(candidates: readonly Intent['replay'][number][]) {
+  const terminal = candidates.filter(
+    (item) => !candidates.some((other) => other.commit === item.next && other.next !== item.next)
+  );
+  const item = terminal[0] ?? candidates[0];
+  return item ? { item, uncertain: terminal.length !== 1 } : null;
+}
+function publicationProblem(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  item: Intent['replay'][number] & { pending: boolean; uncertain: boolean }
+) {
+  if (current.state === 'CLOSED') return 'PR closed without merge; manual recovery required';
+  if (item.pending) return undefined;
+  if (item.uncertain) return 'Replay association is uncertain; manual recovery required';
+  if (current.headRefOid !== item.next || current.baseRefName !== item.target)
+    return 'PR changed externally; manual recovery required';
+  return undefined;
+}
+
+function maintenanceDivergent(
+  item: { divergent: boolean; targetChanged: boolean; prBase: string },
+  defaultBranch: string
+) {
+  return item.divergent || (item.targetChanged && item.prBase !== defaultBranch);
 }

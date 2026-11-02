@@ -30,63 +30,35 @@ const schema = z.array(
 );
 export function publication(
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
-  base: string
+  base: string,
+  known?: { readonly url: string }
 ): Issues['pullRequest'] {
   return (intent) =>
     Effect.tryPromise({
       try: async (signal) => {
-        const prs = schema.parse(
-          await gh(
-            [
-              'pr',
-              'list',
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--state',
-              'all',
-              '--head',
-              intent.branch,
-              '--base',
-              base,
-              '--json',
-              'url,headRefName,baseRefName,headRefOid,baseRefOid,state,mergeable,isDraft,statusCheckRollup',
-            ],
-            signal
-          )
-        );
+        const prs = await findPublications(gh, intent.branch, base, known, signal);
         if (prs.length === 0) return { kind: 'absent' as const };
         const pr = prs[0];
-        if (prs.length !== 1 || !pr || !matches(pr, intent.branch, base))
+        if (prs.length !== 1 || !pr || !matches(pr, intent.branch))
           return { kind: 'ambiguous' as const };
+        if (unexpectedTarget(pr, base, known)) return { kind: 'ambiguous' as const };
         const checks = normalizeChecks(pr.statusCheckRollup);
         const passed = passingChecks(checks);
         const progress = await workflowProgress(pr, gh, signal);
+        const landing = await observeLanding(gh, pr, intent.issue, signal);
+        const manual = publicationManual(pr, base, landing.landed);
         return {
           kind: 'found' as const,
           url: pr.url,
           commit: pr.headRefOid,
           base: pr.baseRefName,
           ci: {
-            failed:
-              pr.state === 'OPEN' &&
-              pr.statusCheckRollup.some(
-                (check) =>
-                  applicable('name' in check ? check.name : check.context) &&
-                  ('name' in check
-                    ? check.status === 'COMPLETED' &&
-                      [
-                        'FAILURE',
-                        'CANCELLED',
-                        'TIMED_OUT',
-                        'ACTION_REQUIRED',
-                        'STARTUP_FAILURE',
-                      ].includes(check.conclusion ?? '')
-                    : ['FAILURE', 'ERROR'].includes(check.state))
-              ),
+            failed: ciFailed(pr),
             progress,
           },
-          ready: ready(pr, passed),
-          ...(await observeLanding(gh, pr, intent.issue, signal)),
+          ready: ready(pr, passed) && !manual,
+          ...landing,
+          ...manualPublication(manual, landing.lifecycle),
         };
       },
       catch: (cause) => new Unavailable({ operation: 'observe-publication', cause }),
@@ -98,10 +70,9 @@ export function publication(
 
 // The pinned stage comparison stays in the intent; an independent target-head
 // advance preserves validation when head/target and conflict freedom still match.
-function matches(pr: z.infer<typeof schema>[number], branch: string, base: string) {
+function matches(pr: z.infer<typeof schema>[number], branch: string) {
   return (
     pr.headRefName === branch &&
-    pr.baseRefName === base &&
     /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/pull\/\d+$/.test(pr.url)
   );
 }
@@ -171,4 +142,81 @@ function workflowRuns(checks: z.infer<typeof schema>[number]['statusCheckRollup'
     if (match?.[1]) runs.add(match[1]);
   }
   return runs;
+}
+
+function publicationManual(
+  pr: { state: string; baseRefName: string },
+  base: string,
+  landed: boolean
+) {
+  return pr.state === 'CLOSED' || (pr.baseRefName !== base && !landed);
+}
+
+async function findPublications(
+  gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
+  branch: string,
+  base: string,
+  known: { readonly url: string } | undefined,
+  signal: AbortSignal
+) {
+  const matching = await publicationCandidates(gh, branch, known ? undefined : base, signal);
+  if (!known && matching.length === 0) return publicationCandidates(gh, branch, undefined, signal);
+  return matching;
+}
+async function publicationCandidates(
+  gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
+  branch: string,
+  base: string | undefined,
+  signal: AbortSignal
+) {
+  return schema.parse(
+    await gh(
+      [
+        'pr',
+        'list',
+        '--repo',
+        'rafaeltab/wallpaperdb',
+        '--state',
+        'all',
+        '--head',
+        branch,
+        ...(base ? ['--base', base] : []),
+        '--json',
+        'url,headRefName,baseRefName,headRefOid,baseRefOid,state,mergeable,isDraft,statusCheckRollup',
+      ],
+      signal
+    )
+  );
+}
+function unexpectedTarget(
+  pr: { state: string; baseRefName: string; url: string },
+  base: string,
+  known?: { readonly url: string }
+) {
+  return pr.state === 'OPEN' && pr.baseRefName !== base && known?.url !== pr.url;
+}
+
+function ciFailed(pr: z.infer<typeof schema>[number]) {
+  return (
+    pr.state === 'OPEN' &&
+    pr.statusCheckRollup.some(
+      (check) =>
+        applicable('name' in check ? check.name : check.context) &&
+        ('name' in check
+          ? check.status === 'COMPLETED' &&
+            ['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(
+              check.conclusion ?? ''
+            )
+          : ['FAILURE', 'ERROR'].includes(check.state))
+    )
+  );
+}
+
+function manualPublication(manual: boolean, lifecycle: string | undefined) {
+  return manual
+    ? {
+        manualRecovery: true,
+        lifecycle: lifecycle ?? 'PR target changed; manual recovery required',
+      }
+    : {};
 }

@@ -121,6 +121,8 @@ async function stagesFixture() {
   let interrupts = 0;
   let answeredQuestions: readonly string[] = [];
   let failed = false;
+  let maintenancePending = false;
+  let manualRecovery = false;
   let now = 100;
   let progress = 'run-1:failed';
   let waiting = false;
@@ -148,6 +150,8 @@ async function stagesFixture() {
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
                 reviewedCommit,
+                maintenancePending,
+                manualRecovery,
                 ready: !failed,
                 ci: { failed, progress },
                 landed: false,
@@ -218,6 +222,8 @@ async function stagesFixture() {
       reviewedCommit?: string;
       prKind?: typeof prKind;
       failed?: boolean;
+      maintenancePending?: boolean;
+      manualRecovery?: boolean;
       now?: number;
       progress?: string;
       waiting?: boolean;
@@ -235,6 +241,8 @@ async function stagesFixture() {
       reviewedCommit = value.reviewedCommit ?? reviewedCommit;
       prKind = value.prKind ?? prKind;
       failed = value.failed ?? failed;
+      maintenancePending = value.maintenancePending ?? maintenancePending;
+      manualRecovery = value.manualRecovery ?? manualRecovery;
       now = value.now ?? now;
       progress = value.progress ?? progress;
       waiting = value.waiting ?? waiting;
@@ -767,4 +775,24 @@ it('rejects a replay association that does not bind the actually accepted origin
   await job.status();
   job.change({ prCommit: 'c'.repeat(40), reviewedCommit: 'd'.repeat(40) });
   expect(await job.status()).toMatchObject({ delivery: { ready: false } });
+});
+
+it('counts expected replay CI as active and parks external manual recovery without accepting either as ready', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  expect(await job.status()).toMatchObject({ delivery: { ready: true } });
+  job.change({ prCommit: 'c'.repeat(40), maintenancePending: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { ready: false, active: true, pr: { maintenancePending: true } },
+  });
+  job.change({ maintenancePending: false, reviewedCommit: 'b'.repeat(40) });
+  expect(await job.status()).toMatchObject({
+    delivery: { ready: true, reviewedCommit: 'b'.repeat(40) },
+  });
+  job.change({ manualRecovery: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { ready: false, active: false, activity: 'manual-recovery' },
+  });
+  expect(job.sends()).toBe(2);
 });

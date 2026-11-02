@@ -215,7 +215,8 @@ if (config.join && basename(process.argv[1]) === 'gh') {
   if (args[0] === 'issue' && args[1] === 'view')
     result = {
       number,
-      state: config.issueStates?.[number] ?? (state.closedIssues?.includes(number) ? 'CLOSED' : 'OPEN'),
+      state:
+        config.issueStates?.[number] ?? (state.closedIssues?.includes(number) ? 'CLOSED' : 'OPEN'),
       author: { login: 'rafaeltab' },
       url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
       labels: [{ name: 'ready-for-agent' }],

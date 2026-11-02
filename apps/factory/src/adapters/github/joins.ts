@@ -389,7 +389,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       /* A removed automatic attempt needs no cleanup. */
     }
   };
-  const recoverConflict = async (dir: string, layers: readonly Layer[], signal?: AbortSignal) => {
+  const recoverConflict = async (
+    dir: string,
+    layers: readonly Layer[],
+    boundary: JoinBoundary,
+    signal?: AbortSignal
+  ) => {
     const conflict = z
       .object({
         kind: z.literal('conflict'),
@@ -425,7 +430,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         oldHead: item.commit,
         parent: value.oldParent,
         onto: value.onto,
-        context: JSON.stringify(context),
+        context: JSON.stringify({ ...context, boundary }),
       },
       {
         read: (name) => read(recoveryDir, name),
@@ -680,7 +685,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return nodes.map((node) => node.number);
   };
-  const prepareReplay = async (
+  const verifiedReplayPlan = async (
     layers: readonly Layer[],
     boundary: JoinBoundary,
     dir: string,
@@ -702,17 +707,42 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await publish(dir, 'blocked.json', { kind: invalid });
       return;
     }
-    const conflict = await blockingFile(dir);
-    if (conflict && !(await recoverConflict(dir, layers, signal))) return;
-    if (!(await writers(layers, signal))) return;
     const plan = await replayOrder(layers, boundary, signal);
     if (!plan) {
       await publish(dir, 'blocked.json', { kind: 'missing-parent-boundary' });
       return;
     }
+    if (!(await boundaryStillValid(project, base, plan.boundary, gh, signal))) return;
+    return plan;
+  };
+  const prepareReplay = async (
+    layers: readonly Layer[],
+    boundary: JoinBoundary,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const plan = await verifiedReplayPlan(layers, boundary, dir, signal);
+    if (!plan) return;
+    const conflict = await blockingFile(dir);
+    if (conflict && !(await recoverConflict(dir, layers, plan.boundary, signal))) return;
+    if (!(await writers(layers, signal))) return;
     const replay = await combine(plan.order, plan.boundary, dir, signal);
     if (!replay?.length) return;
     return { replay, boundary: plan.boundary };
+  };
+  const openRequest = async (numbers: readonly number[], signal?: AbortSignal) => {
+    for (const number of numbers) {
+      const state = z
+        .object({ state: z.string() })
+        .parse(
+          await gh(
+            ['issue', 'view', String(number), '--repo', 'rafaeltab/wallpaperdb', '--json', 'state'],
+            signal
+          )
+        );
+      if (state.state !== 'OPEN') return false;
+    }
+    return true;
   };
   const build = async (
     numbers: readonly number[],
@@ -721,6 +751,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     requirements?: JoinBoundary
   ) => {
     const dir = directory(numbers);
+    // A legacy partial journal can resume only without new closure assumptions.
+    if (
+      !(await read(dir, 'boundary.json')) &&
+      !requirements &&
+      !(await openRequest(numbers, signal))
+    )
+      return;
     await publish(
       dir,
       'boundary.json',
@@ -966,18 +1003,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (operation.boundary)
       return boundaryStillValid(project, base, operation.boundary, gh, signal);
     // Legacy intents cannot acquire new closure assumptions during recovery.
-    for (const number of operation.numbers) {
-      const state = z
-        .object({ state: z.string() })
-        .parse(
-          await gh(
-            ['issue', 'view', String(number), '--repo', 'rafaeltab/wallpaperdb', '--json', 'state'],
-            signal
-          )
-        );
-      if (state.state !== 'OPEN') return false;
-    }
-    return true;
+    return openRequest(operation.numbers, signal);
   };
   const validateReplays = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     for (const item of operation.replay) {

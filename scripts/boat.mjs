@@ -1440,6 +1440,28 @@ async function command() {
 			id,
 			migration ? (source) => captureAssetMigration(root, source) : undefined,
 		);
+		if (targets[0] === "boat-prepare-toolchain") {
+			let completed = false;
+			try {
+				await lock(async () => {
+					startupWorker(id);
+					await ssh(
+						id,
+						`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && mise install --locked && mise exec -- node scripts/toolchain.mjs`,
+					);
+					completed = true;
+				});
+			} finally {
+				event("toolchain-preparation", {
+					workerId: id,
+					ms: Date.now() - entered,
+					completed,
+				});
+			}
+			// Like source generation, this leaves still-wanted reconciliation for
+			// the next ordinary command, after its frozen dependency preparation.
+			return;
+		}
 		const dependencies = await prepare(id);
 		await cache(id);
 		await reconcileDevelopment(id, dependencies, {

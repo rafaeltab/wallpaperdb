@@ -13688,10 +13688,11 @@ for (const kind of ["progress", "replacement", "uncertainty"])
 	});
 
 // Public Make exercises the opt-in lifecycle; only the external CLI is controlled.
-async function freshCheckout(t) {
+async function freshCheckout(t, options = {}) {
 	const f = await developmentCheckout(t, {
 		prepare: false,
 		...reconstructionEvidence(t),
+		...options,
 	});
 	const baseline = path.join(f.directory, "fresh-empty-worker");
 	fs.cpSync(f.worker, baseline, { recursive: true });
@@ -13732,6 +13733,300 @@ const freshCalls = (f) =>
 				.filter(Boolean)
 				.map((line) => JSON.parse(line))
 		: [];
+
+async function toolchainCheckout(t, fresh = false) {
+	const options = { ...reconstructionEvidence(t), captureStreams: true };
+	const f = fresh
+		? await freshCheckout(t, options)
+		: await developmentCheckout(t, { ...options, prepare: false });
+	const bin = path.join(f.directory, "home/.local/bin");
+	const mise = path.join(bin, "mise");
+	fs.writeFileSync(
+		mise,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process'),crypto=require('crypto');
+const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL,root=process.cwd();
+const inputs=()=>crypto.createHash('sha256').update(fs.readFileSync('mise.toml')).update(fs.readFileSync('mise.lock')).digest('hex');
+const record=stage=>{const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage,argv,cwd:root,pid:process.pid,startTicks:fields[19]})+'\\n');};
+if(argv[0]==='trust')process.exit(0);
+if(argv[0]==='install'){
+ if(JSON.stringify(argv)!==JSON.stringify(['install','--locked']))throw Error('toolchain must stay locked');
+ record('install-entered');fs.writeFileSync(path.join(control,'toolchain-entered'),'yes');
+ while(fs.existsSync(path.join(control,'hold-toolchain'))&&!fs.existsSync(path.join(control,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ if(fs.existsSync(path.join(control,'fail-toolchain')))process.exit(23);
+ const file=path.join(root,'.mise/installed-tools');fs.mkdirSync(path.dirname(file),{recursive:true});
+ if(!fs.existsSync(file)||fs.readFileSync(file,'utf8')!==inputs())record('cold-acquisition');
+ fs.writeFileSync(file,inputs());record('installed');console.log('locked tools installed');process.exit(0);
+}
+if(argv[0]!=='exec')throw Error('unexpected mise invocation');
+const command=argv.slice(argv[1]==='--'?2:1);
+if(command.join(' ')==='node scripts/toolchain.mjs'){
+ if(!fs.existsSync('.mise/installed-tools')||fs.readFileSync('.mise/installed-tools','utf8')!==inputs())throw Error('tools not installed for these pins');
+ record('verified');console.log('selected tools verified');console.error('tool verification stderr drained');
+ process.exit(fs.existsSync(path.join(control,'fail-verification'))?24:0);
+}
+process.exit(cp.spawnSync(command[0],command.slice(1),{stdio:'inherit',env:process.env}).status??1);
+`,
+	);
+	const pnpm = path.join(bin, "pnpm");
+	fs.renameSync(pnpm, `${pnpm}-original`);
+	fs.writeFileSync(
+		pnpm,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process'),argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
+if(argv[0]==='install'){
+ if(JSON.stringify(argv)!==JSON.stringify(['install','--frozen-lockfile']))throw Error('frozen flags changed');
+ fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'frozen',argv})+'\\n');
+ if(fs.readFileSync('pnpm-lock.yaml','utf8')!=='fixture valid lock\\n'){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}
+ process.exit(0);
+}
+if(argv[2]==='exec'){
+ fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'native',argv})+'\\n');
+ console.log('selected User stdout');console.error('selected User stderr');process.exit(7);
+}
+process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-original`)},argv,{stdio:'inherit',env:process.env}).status??1);
+`,
+		{ mode: 0o755 },
+	);
+	f.local("pnpm-lock.yaml", "fixture valid lock\n");
+	f.local(
+		"node_modules/.bin/turbo",
+		"#!/bin/sh\necho 'dependency build completed'\n",
+	);
+	fs.chmodSync(path.join(f.root, "node_modules/.bin/turbo"), 0o755);
+	const docker = path.join(bin, "docker");
+	fs.writeFileSync(
+		docker,
+		fs
+			.readFileSync(docker, "utf8")
+			.replace(
+				"const apps=argv.includes",
+				"if(argv.includes('up'))fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'restore',argv})+'\\n');\nconst apps=argv.includes",
+			),
+	);
+	return {
+		...f,
+		log: () =>
+			fs.existsSync(path.join(f.control, "toolchain-log"))
+				? fs
+						.readFileSync(path.join(f.control, "toolchain-log"), "utf8")
+						.trim()
+						.split("\n")
+						.map(JSON.parse)
+				: [],
+		observe: async (command) => {
+			const result = await command.done;
+			t.diagnostic(
+				JSON.stringify({
+					birth: command.birth,
+					closedBeforeSafety: command.closed,
+					groupLiveBeforeSafety: processGroupRunning(command.child.pid),
+					...result,
+				}),
+			);
+			assert.equal(processGroupRunning(command.child.pid), false);
+			return result;
+		},
+	};
+}
+
+test("explicit toolchain preparation waits for locked qualification without preparing dependencies or restoring development", async (t) => {
+	const f = await toolchainCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			cost: 1.0288,
+			developmentWanted: true,
+		}),
+	);
+	flag(f, "hold-toolchain");
+	const command = f.run("boat-prepare-toolchain");
+	t.diagnostic(JSON.stringify({ argv: ["make", "boat-prepare-toolchain"] }));
+	await f.readiness.wait(() => {
+		assert.equal(
+			command.closed,
+			false,
+			`Toolchain phase exited before installation barrier: ${command.output()}`,
+		);
+		return fs.existsSync(path.join(f.control, "toolchain-entered"));
+	}, "toolchain installation barrier");
+	assert.deepEqual(
+		f.log().map((r) => r.stage),
+		["install-entered"],
+	);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	flag(f, "release");
+	const result = await f.observe(command);
+	assert.equal(result.status, 0, result.output);
+	assert.deepEqual(
+		f.log().map((r) => r.stage),
+		["install-entered", "cold-acquisition", "installed", "verified"],
+	);
+	assert.match(result.stderr, /tool verification stderr drained/);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assert.equal(fs.existsSync(path.join(f.control, "calls")), false);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+	assert.equal(fs.existsSync(path.join(f.control, "validation")), false);
+	assert.equal(
+		freshCalls(f).some((a) =>
+			a.at(-1)?.includes("cat > /home/user/wallpaperdb/.boat/cache.json"),
+		),
+		false,
+	);
+	const state = f.json(".boat/state.json");
+	assert.equal(state.id, "fake-new-worker");
+	assert.equal(state.developmentWanted, true);
+	assert.equal(state.reconciliationPending, true);
+	assert.equal(state.developmentDependencies, undefined);
+	assert.ok(state.cost >= 1.0288);
+	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
+	assert.equal(
+		freshCalls(f).some((a) => a.includes("--from") || a.includes("resume")),
+		false,
+	);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.find((e) => e.kind === "toolchain-preparation");
+	assert.equal(event.workerId, state.id);
+	assert.equal(event.completed, true);
+	assert.ok(event.ms >= 0);
+});
+
+const toolchainUserArgs = [
+	"test-focused",
+	"PACKAGE=user",
+	"ARGS=--config vitest.integration.config.ts test/broker-acquisition",
+];
+const toolchainNativeArgs = [
+	"--filter",
+	"@wallpaperdb/user",
+	"exec",
+	"vitest",
+	"run",
+	"--maxWorkers=1",
+	"--no-file-parallelism",
+	"--config",
+	"vitest.integration.config.ts",
+	"test/broker-acquisition",
+];
+
+async function toolchainUser(t, f) {
+	const result = await f.observe(f.run(...toolchainUserArgs));
+	assert.equal(result.status, 2, result.output);
+	assert.match(result.stdout, /selected User stdout/);
+	assert.match(result.stderr, /selected User stderr/);
+	assert.match(result.output, /Error 7/);
+	assert.deepEqual(
+		f.log().findLast((r) => r.stage === "native").argv,
+		toolchainNativeArgs,
+	);
+	const stages = f.log().map((r) => r.stage);
+	assert.ok(stages.indexOf("frozen") < stages.indexOf("native"));
+	assert.ok(f.json(".boat/prepared.json").dependencies);
+	t.diagnostic(JSON.stringify({ selectedStages: f.log() }));
+}
+
+for (const explicit of [false, true])
+	test(`explicit toolchain phase is optional for ordinary User, explicit=${explicit}`, async (t) => {
+		const f = await toolchainCheckout(t);
+		if (explicit) {
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					developmentWanted: true,
+					reconciliationPending: true,
+				}),
+			);
+			const result = await f.observe(f.run("boat-prepare-toolchain"));
+			assert.equal(result.status, 0, result.output);
+			assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+			assert.equal(
+				fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+				false,
+			);
+		}
+		await toolchainUser(t, f);
+		assert.equal(
+			f.log().filter((r) => r.stage === "cold-acquisition").length,
+			1,
+		);
+		if (explicit) {
+			const stages = f.log().map((r) => r.stage);
+			assert.ok(stages.indexOf("frozen") < stages.indexOf("restore"));
+			assert.ok(stages.indexOf("restore") < stages.indexOf("native"));
+			assert.equal(f.json(".boat/state.json").developmentWanted, true);
+			assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+			assert.equal(
+				f.json(".boat/state.json").developmentDependencies.id,
+				"fake-worker",
+			);
+		}
+	});
+
+for (const failure of ["toolchain", "verification"])
+	test(`explicit toolchain failed ${failure} preserves wanted restoration for ordinary User`, async (t) => {
+		const f = await toolchainCheckout(t);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				developmentWanted: true,
+				reconciliationPending: true,
+			}),
+		);
+		flag(f, `fail-${failure}`);
+		const result = await f.observe(f.run("boat-prepare-toolchain"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.equal(
+			f.log().some((r) => ["frozen", "native", "restore"].includes(r.stage)),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		assert.equal(f.json(".boat/state.json").developmentWanted, true);
+		const events = fs
+			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(
+			events.findLast((e) => e.kind === "toolchain-preparation").completed,
+			false,
+		);
+		fs.rmSync(path.join(f.control, `fail-${failure}`));
+		await toolchainUser(t, f);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+		assert.equal(
+			f.json(".boat/state.json").developmentDependencies.id,
+			"fake-worker",
+		);
+	});
+
+test("explicit toolchain changed pins qualify again while a stale dependency lock still blocks native work", async (t) => {
+	const f = await toolchainCheckout(t);
+	assert.equal((await f.observe(f.run("boat-prepare-toolchain"))).status, 0);
+	f.local("mise.toml", "# changed fixture tool pins\n");
+	assert.equal((await f.observe(f.run("boat-prepare-toolchain"))).status, 0);
+	assert.equal(f.log().filter((r) => r.stage === "cold-acquisition").length, 2);
+	f.local("pnpm-lock.yaml", "stale dependency lock\n");
+	const result = await f.observe(f.run(...toolchainUserArgs));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.stderr, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.equal(
+		f.log().some((r) => r.stage === "native"),
+		false,
+	);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assert.equal(f.log().filter((r) => r.stage === "cold-acquisition").length, 2);
+});
 
 test("fresh lifecycle completed stop reconstructs before toolchain-only stale lock generation", async (t) => {
 	const f = await freshCheckout(t);

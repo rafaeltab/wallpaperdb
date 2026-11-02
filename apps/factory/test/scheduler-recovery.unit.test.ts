@@ -77,7 +77,16 @@ function setup(lostSend = true, immediate = false) {
                         run: { id: 'run-1', ordinal: 1 },
                         ...observations.get(number),
                       })),
-                    inspectStage: () => Effect.succeed(null),
+                    inspectStage: () =>
+                      Effect.sync(() => {
+                        const run = observations.get(number)?.run ?? { id: 'run-1', ordinal: 1 };
+                        return {
+                          runId: run.id,
+                          ordinal: run.ordinal,
+                          commit: base,
+                          accepted: false,
+                        };
+                      }),
                     sendStage: () =>
                       Effect.gen(function* () {
                         sends++;
@@ -288,6 +297,39 @@ it('rejects a stale resume command without retaining capacity or charging a new 
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([1, 2]);
     expect(f.sends()).toBe(0);
+  } finally {
+    await f.close();
+  }
+});
+
+it('retries a failed admitted job while admissions are paused without consuming another allowance', async () => {
+  const f = setup(false, true);
+  try {
+    await f.run((s) => s.start({ issue: 1, base, context: 'Retain this scope' }));
+    f.observations.set(1, { status: 'failed' });
+    const before = await f.run((s) => s.status());
+    const job = before.jobs[0];
+    if (job?.kind !== 'job' || !job.resume) throw new Error('Expected retry');
+    await f.run((s) =>
+      s.configure({ revision: before.state.revision, concurrency: 1, allowance: 1, paused: true })
+    );
+    const command = { jobId: job.intent.id, ...job.resume };
+    await f.run((s) => s.resume(command));
+    await f.restart();
+    const after = await f.run((s) => s.status());
+    expect(after.state).toMatchObject({
+      paused: true,
+      allowance: 1,
+      admissions: before.state.admissions,
+      resuming: [],
+    });
+    expect(after.jobs[0]).toMatchObject({
+      intent: job.intent,
+      execution: { run: { id: 'run-2', ordinal: 2 } },
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(f.sends()).toBe(1);
+    expect(f.launches).toEqual([1]);
   } finally {
     await f.close();
   }

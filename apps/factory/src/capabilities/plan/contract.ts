@@ -70,7 +70,8 @@ export const Plan = Context.Service<Plan>('wallpaperdb.factory.Plan');
 export interface ResumeClaim {
   readonly issue: number;
   readonly index: number;
-  readonly questionId: string;
+  readonly questionId?: string;
+  readonly runId?: string;
   readonly run?: { readonly id: string; readonly ordinal: number };
 }
 export interface ScheduleState {
@@ -120,11 +121,9 @@ export interface Scheduler {
   start(
     command: import('../job/index.js').Start
   ): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
-  resume(command: {
-    jobId: string;
-    index: number;
-    questionId: string;
-  }): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
+  resume(
+    command: import('../job/index.js').Resume
+  ): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
   cancel(jobId: string): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
 }
 export const Scheduler = Context.Service<Scheduler>('wallpaperdb.factory.Scheduler');

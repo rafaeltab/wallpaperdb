@@ -190,6 +190,10 @@ export interface Start {
   readonly base: string;
   readonly context: string;
 }
+export type ResumeAction =
+  | { index: number; questionId: string }
+  | { index: number; runId: string; revision: number };
+export type Resume = ResumeAction & { jobId: string };
 export type Status =
   | { kind: 'empty' }
   | {
@@ -198,18 +202,14 @@ export type Status =
       prerequisite?: AcceptedPublication;
       execution: Observation;
       elapsedMs: number;
-      resume?: { index: number; questionId: string };
+      resume?: ResumeAction;
       delivery?: Delivery;
     };
 export type StartResult = Status | { kind: 'occupied' } | { kind: 'rejected' };
 export interface Job {
   start(command: Start): Effect.Effect<StartResult, Unavailable>;
   status(): Effect.Effect<Status, Unavailable>;
-  resume(command: {
-    jobId: string;
-    index: number;
-    questionId: string;
-  }): Effect.Effect<StartResult, Unavailable>;
+  resume(command: Resume): Effect.Effect<StartResult, Unavailable>;
   cancel(jobId: string): Effect.Effect<StartResult, Unavailable>;
 }
 export const Job = Context.Service<Job>('wallpaperdb.factory.Job');

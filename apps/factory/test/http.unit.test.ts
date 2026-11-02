@@ -210,9 +210,11 @@ it('shows current commit PR readiness separately from default branch landing', (
         }),
     }
   ));
-it('translates explicit resume with its job and parked-stage identity', async () => {
+it.each([
+  { jobId: '1', index: 0, questionId: 'q' },
+  { jobId: '1', index: 0, runId: 'run-1', revision: -1 },
+])('translates explicit resume identity %j', async (command) => {
   const commands: unknown[] = [];
-  const command = { jobId: '1', index: 0, questionId: 'q' };
   await contract(
     async (app) => {
       const response = await app.inject({
@@ -561,3 +563,26 @@ it.each([false, true])(
     }
   }
 );
+
+it.each([
+  { jobId: '1', index: 0, runId: 'run' },
+  { jobId: '1', index: 0, runId: 'run', revision: -2 },
+  { jobId: '1', index: 0, runId: 'run', revision: 0, questionId: 'q' },
+])('rejects malformed retry identity %j at HTTP boundary', async (command) => {
+  let calls = 0;
+  await contract(
+    async (app) => {
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/job/resume', payload: command })).statusCode
+      ).toBe(400);
+      expect(calls).toBe(0);
+    },
+    {
+      ...idle,
+      resume: () => {
+        calls++;
+        return Effect.succeed({ kind: 'rejected' });
+      },
+    }
+  );
+});

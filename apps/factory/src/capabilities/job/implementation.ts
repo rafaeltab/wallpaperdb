@@ -1,3 +1,4 @@
+import { retryAction, retryStage } from './retry.js';
 import { Effect, Layer, Random, Option } from 'effect';
 import { reconcileStages, currentStage, hasAnsweredQuestion } from './stages.js';
 import {
@@ -39,7 +40,9 @@ export const JobLive = Layer.effect(
         yield* retainPrerequisite(store, delivery);
         const control = yield* store.readControl();
         const stage = yield* currentStage(store);
-        const resume = resumeCommand(control, stage, observation);
+        const resume =
+          resumeCommand(control, stage, observation) ??
+          (yield* retryAction(store, execution, intent, control, stage, observation));
         const now = yield* time.now();
         return {
           kind: 'job' as const,
@@ -62,9 +65,12 @@ export const JobLive = Layer.effect(
       resume: (command) =>
         Effect.gen(function* () {
           const intent = yield* store.read();
+          if (intent && 'runId' in command)
+            return yield* retryStage(store, intent, command, observe);
           const waiting = yield* currentStage(store);
           const control = yield* store.readControl();
-          if (!intent || !waiting) return { kind: 'rejected' as const };
+          if (!intent || !waiting || !('questionId' in command))
+            return { kind: 'rejected' as const };
           if (!matchesResume(intent, waiting, control, command))
             return { kind: 'rejected' as const };
           const observed = yield* execution.observe(intent, waiting);

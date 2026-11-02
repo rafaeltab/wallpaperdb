@@ -199,13 +199,23 @@ export function operationsServer(config: {
         .send(problem(422, 'factory-admission', 'Issue is not eligible'));
     return reply.code(202).send(result);
   });
-  const resumeSchema = z
-    .object({
-      jobId: z.string().min(1),
-      index: z.number().int().nonnegative(),
-      questionId: z.string().min(1),
-    })
-    .strict();
+  const resumeSchema = z.union([
+    z
+      .object({
+        jobId: z.string().min(1),
+        index: z.number().int().nonnegative(),
+        questionId: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        jobId: z.string().min(1),
+        index: z.number().int().nonnegative(),
+        runId: z.string().min(1),
+        revision: z.number().int().min(-1),
+      })
+      .strict(),
+  ]);
   const cancelSchema = z.object({ jobId: z.string().min(1) }).strict();
   for (const action of ['resume', 'cancel'] as const) {
     app.post(`/api/job/${action}`, async (request, reply) => {

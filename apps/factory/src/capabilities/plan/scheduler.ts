@@ -282,7 +282,8 @@ export const SchedulerLive = Layer.effect(
           const claim = {
             issue,
             index: command.index,
-            questionId: command.questionId,
+            questionId: 'questionId' in command ? command.questionId : undefined,
+            runId: 'runId' in command ? command.runId : undefined,
             run: observedRun(target),
           };
           if (!(yield* claimResume(claim, target, snapshot))) return { kind: 'occupied' as const };
@@ -368,7 +369,8 @@ function sameResume(first: ResumeClaim, second: ResumeClaim) {
   return (
     first.issue === second.issue &&
     first.index === second.index &&
-    first.questionId === second.questionId
+    first.questionId === second.questionId &&
+    first.runId === second.runId
   );
 }
 function recoveredResume(claim: ResumeClaim, jobs: readonly Status[]) {

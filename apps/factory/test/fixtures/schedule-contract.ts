@@ -33,4 +33,13 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
   expect(await Effect.runPromise(store.save({ ...read, revision: 0 }))).toBe(false);
   expect(await Effect.runPromise(store.save({ ...read, revision: 1, paused: false }))).toBe(true);
   expect(await Effect.runPromise(reopen().read())).toEqual({ ...read, revision: 1, paused: false });
+  const retry = {
+    ...read,
+    revision: 2,
+    resuming: [
+      { issue: 1, index: 1, runId: 'failed-review', run: { id: 'failed-review', ordinal: 2 } },
+    ],
+  };
+  expect(await Effect.runPromise(store.save(retry))).toBe(true);
+  expect(await Effect.runPromise(reopen().read())).toEqual(retry);
 }

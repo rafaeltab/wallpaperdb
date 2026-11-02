@@ -221,7 +221,8 @@ const scheduleSchema = z
           .object({
             issue: z.number().int().positive(),
             index: z.number().int().nonnegative(),
-            questionId: z.string().min(1),
+            questionId: z.string().min(1).optional(),
+            runId: z.string().min(1).optional(),
             run: z
               .object({ id: z.string().min(1), ordinal: z.number().int().positive() })
               .optional(),

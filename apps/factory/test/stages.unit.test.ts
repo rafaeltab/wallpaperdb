@@ -8,19 +8,22 @@ it('requires fresh accepted stages and matching current CI before reporting read
   let accepted = false;
   let ci = false;
   let landed = false;
+  let publicationAvailable = true;
   const sent: number[] = [];
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(100) }),
     Layer.succeed(Issues, {
       pullRequest: () =>
-        Effect.succeed({
-          kind: 'found' as const,
-          url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
-          commit: 'b'.repeat(40),
-          ready: ci,
-          landed,
-        }),
+        !publicationAvailable
+          ? Effect.succeed({ kind: 'ambiguous' as const })
+          : Effect.succeed({
+              kind: 'found' as const,
+              url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+              commit: 'b'.repeat(40),
+              ready: ci,
+              landed,
+            }),
       inspect: () =>
         Effect.succeed({
           open: true,
@@ -83,8 +86,21 @@ it('requires fresh accepted stages and matching current CI before reporting read
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { stage: 'ci', ready: true, landed: false },
   });
-  landed = true;
+  publicationAvailable = false;
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    prerequisite: { commit: 'b'.repeat(40) },
+    delivery: { ready: false, pr: { kind: 'ambiguous' } },
+  });
+  publicationAvailable = true;
   ci = false;
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    prerequisite: {
+      url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+      commit: 'b'.repeat(40),
+    },
+    delivery: { ready: false },
+  });
+  landed = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { ready: false, landed: true, active: false },
   });

@@ -11,6 +11,17 @@ import { basename, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
 const args = process.argv.slice(2);
+const hold = async (boundary) => {
+  if (config.hold !== boundary) return;
+  writeFileSync(join(config.directory, 'held'), boundary);
+  const { setTimeout } = await import('node:timers/promises');
+  const deadline = Date.now() + 20000;
+  while (!existsSync(join(config.directory, 'release'))) {
+    if (Date.now() > deadline) throw new Error('Controlled protocol hold expired');
+    await setTimeout(20);
+  }
+  writeFileSync(join(config.directory, 'released'), boundary);
+};
 appendFileSync(
   join(config.directory, 'calls.jsonl'),
   JSON.stringify({ binary: basename(process.argv[1]), args }) + '\n'
@@ -144,6 +155,7 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       ],
     };
     writeFileSync(path, JSON.stringify(state));
+    await hold('restack');
     if (config.restack.loseLaunch) process.exit(1);
     console.log(
       JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
@@ -408,6 +420,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
   // Queries can overlap each other and metadata edits. They must not publish
   // their old snapshots over a completed edit or expose a truncated JSON file.
   if (boundary || (args[0] === 'api' && args.includes('POST'))) save();
+  await hold(boundary);
   console.log(JSON.stringify(result));
   process.exit(0);
 }

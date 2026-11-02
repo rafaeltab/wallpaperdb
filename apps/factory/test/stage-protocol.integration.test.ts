@@ -416,3 +416,172 @@ it('retries a failed implementation with its existing thread, ordinal, scope and
       accepted: false,
     });
   }));
+
+it.each(['publication', 'babysitting'] as const)(
+  'continues terminal %s with reconciliatory instructions and the exact new receipt identity',
+  (stage) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const ordinal = stage === 'publication' ? 3 : 4;
+      const index = stage === 'publication' ? 2 : 4;
+      await host.save({
+        idempotency: true,
+        overrides: { status: 'failed', runCount: ordinal, latestRunId: `run-${ordinal}` },
+      });
+      const pending = { ...request, stage, index, ordinal, previousRunId: `run-${ordinal - 1}` };
+      expect(await Effect.runPromise(adapter.inspectStage(intent, pending))).toMatchObject({
+        accepted: false,
+        runId: `run-${ordinal}`,
+        ordinal,
+      });
+      const retry = {
+        ...pending,
+        index: index + 1,
+        ordinal: ordinal + 1,
+        previousRunId: `run-${ordinal}`,
+        resume: true,
+      };
+      await host.save({
+        idempotency: true,
+        overrides: { status: 'failed', runCount: 99, latestRunId: `run-${ordinal}` },
+      });
+      await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
+        _tag: 'Unavailable',
+      });
+      await host.save({
+        idempotency: true,
+        overrides: { status: 'failed', runCount: ordinal, latestRunId: `run-${ordinal}` },
+      });
+      await Effect.runPromise(adapter.sendStage(intent, retry));
+      const sends = (await host.calls()).filter(
+        (c) => c.args[1] === 'send' && !c.args.includes('--help')
+      );
+      expect(sends).toHaveLength(1);
+      expect(sends[0].args).toContain(`${intent.id}:stage:${index + 1}`);
+      expect(sends[0].args[3]).toContain(
+        stage === 'publication'
+          ? 'inspect and reuse the existing PR'
+          : 'without starting another watcher'
+      );
+      const receipt = {
+        ...(stage === 'babysitting' ? { delivery: `${intent.id}:${index + 1}` } : {}),
+        jobId: intent.id,
+        stage,
+        base: intent.base,
+        commit: host.base,
+        outcome: stage === 'publication' ? '<PR>CREATED</PR>' : '<PR>READY</PR>',
+        tests: true,
+        coverage: true,
+        crap: true,
+        reviews: true,
+      };
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          { role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(receipt) },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
+        accepted: true,
+        ordinal: ordinal + 1,
+        runId: `run-${ordinal + 1}`,
+      });
+      const stale =
+        stage === 'babysitting'
+          ? { ...receipt, delivery: `${intent.id}:${index}` }
+          : { ...receipt, stage: 'review' };
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [{ role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(stale) }],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).not.toMatchObject({
+        accepted: true,
+      });
+    })
+);
+
+it('refuses publication retry for a dirty or changed reviewed head while preserving the clean valid case', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({ idempotency: true, overrides: { status: 'failed' } });
+    const binding = await Effect.runPromise(adapter.observe(intent));
+    if (binding.kind !== 'found') throw new Error('Expected worker');
+    const retry = {
+      ...request,
+      stage: 'publication' as const,
+      index: 1,
+      ordinal: 2,
+      previousRunId: 'run-1',
+      resume: true,
+    };
+    const path = join(binding.worktree, 'unreviewed.txt');
+    await writeFile(path, 'unfinished publication edits');
+    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' });
+    git('add', '.');
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '-m',
+      'Unreviewed commit'
+    );
+    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    expect(
+      (await host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
+    ).toHaveLength(0);
+    git('reset', '--hard', host.base);
+    await Effect.runPromise(adapter.sendStage(intent, retry));
+    expect(
+      (await host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
+    ).toHaveLength(1);
+  }));
+
+it('reports actual clean/head proof for conclusively terminal babysitting without inventing acceptance', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({ overrides: { status: 'failed', latestRunId: 'run-4', runCount: 4 } });
+    const stage = {
+      ...request,
+      stage: 'babysitting' as const,
+      index: 4,
+      ordinal: 4,
+      previousRunId: 'run-3',
+    };
+    const binding = await Effect.runPromise(adapter.observe(intent));
+    if (binding.kind !== 'found') throw new Error('Expected worker');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
+      accepted: false,
+      worktreeClean: true,
+      commit: host.base,
+    });
+    await writeFile(join(binding.worktree, 'unfinished.txt'), 'unfinished');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
+      accepted: false,
+      worktreeClean: false,
+      commit: host.base,
+    });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' });
+    git('add', '.');
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '-m',
+      'Unreviewed work'
+    );
+    const head = git('rev-parse', 'HEAD').trim();
+    expect(head).not.toBe(host.base);
+    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
+      accepted: false,
+      worktreeClean: true,
+      commit: head,
+    });
+  }));

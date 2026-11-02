@@ -410,83 +410,109 @@ it('shows conflict classification and pending questions with a recovery-thread l
   }
 });
 
-it('retries an interrupted stage in its existing worker without another admission', async () => {
-  const host = await protocol();
-  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
-  process.env.PATH = `${host.directory}:${previous.path}`;
-  process.env.FACTORY_FIXTURE = host.configFile;
-  const { writeFile } = await import('node:fs/promises');
-  const authorization = `${host.directory}/authorization`;
-  await writeFile(authorization, 'Bearer controlled-protocol');
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const running = await startFactory({
-      FACTORY_PROJECT: host.repository,
-      FACTORY_T3_PROJECT_ID: 'project-id',
-      FACTORY_BASE: host.base,
-      FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: `${host.directory}/state`,
-      FACTORY_PORT: '0',
-      FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
-      FACTORY_T3_MCP_AUTHORIZATION_FILE: authorization,
-    });
+it.each(['implementation', 'publication'] as const)(
+  'retries an interrupted %s stage in its existing worker without another admission',
+  async (stage) => {
+    const host = await protocol();
+    const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+    process.env.PATH = `${host.directory}:${previous.path}`;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const { writeFile } = await import('node:fs/promises');
+    const authorization = `${host.directory}/authorization`;
+    await writeFile(authorization, 'Bearer controlled-protocol');
+    const browser = await chromium.launch({ headless: true });
     try {
-      const page = await browser.newPage();
-      const address = running.app.server.address();
-      if (!address || typeof address === 'string') throw new Error('Missing listener');
-      await page.goto(`http://127.0.0.1:${address.port}`);
-      await page.getByLabel('Selected issue number').fill('579');
-      await page.getByRole('button', { name: 'Start selected issue' }).click();
-      await browserExpect(page.getByText('Status: running')).toBeVisible();
-      const before = await (
-        await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
-      ).json();
-      await host.save({ overrides: { status: 'interrupted' } });
-      await page.reload();
-      await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toBeVisible();
-      const navigated = page.waitForEvent('load');
-      const delivered = page.waitForResponse(
-        (response) =>
-          response.url().endsWith('/api/job/resume') && response.request().method() === 'POST'
-      );
-      await page.getByRole('button', { name: 'Retry existing stage' }).click();
-      expect((await delivered).status()).toBe(202);
-      await navigated;
-      await host.save({});
-      await page.reload();
-      await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(
-        0
-      );
-      const resumed = await (
-        await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
-      ).json();
-      expect(resumed.intent).toEqual(before.intent);
-      expect(resumed.execution.run).toEqual({ id: 'run-2', ordinal: 2 });
-      expect(resumed.delivery).toMatchObject({ stage: 'implementation', ready: false });
-      const schedule = await (
-        await page.request.get(`http://127.0.0.1:${address.port}/api/scheduler`)
-      ).json();
-      expect(schedule.state.admissions).toHaveLength(1);
-      await page.getByRole('button', { name: 'Cancel job' }).click();
-      await browserExpect(page.getByText('cancelled', { exact: true })).toBeVisible();
-      expect(
-        (await host.calls()).filter(
-          (call) => call.args[1] === 'start' && !call.args.includes('--help')
-        )
-      ).toHaveLength(1);
-      expect(
-        (await host.calls()).filter(
-          (call) => call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send'
-        )
-      ).toHaveLength(1);
+      const running = await startFactory({
+        FACTORY_PROJECT: host.repository,
+        FACTORY_T3_PROJECT_ID: 'project-id',
+        FACTORY_BASE: host.base,
+        FACTORY_T3_BINARY: host.binary,
+        FACTORY_STATE: `${host.directory}/state`,
+        FACTORY_PORT: '0',
+        FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
+        FACTORY_T3_MCP_AUTHORIZATION_FILE: authorization,
+      });
+      try {
+        const page = await browser.newPage();
+        const address = running.app.server.address();
+        if (!address || typeof address === 'string') throw new Error('Missing listener');
+        await page.goto(`http://127.0.0.1:${address.port}`);
+        await page.getByLabel('Selected issue number').fill('579');
+        await page.getByRole('button', { name: 'Start selected issue' }).click();
+        await browserExpect(page.getByText('Status: running')).toBeVisible();
+        const before = await (
+          await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+        ).json();
+        let publication: string | undefined;
+        if (stage === 'publication') {
+          await host.save({
+            complete: true,
+            base: host.base,
+            holdPublication: true,
+            overrides: { status: 'completed' },
+          });
+          await browserExpect
+            .poll(
+              async () =>
+                (await (await page.request.get(`http://127.0.0.1:${address.port}/api/job`)).json())
+                  .delivery.stage
+            )
+            .toBe('publication');
+          publication = await readFile(join(host.directory, 'pr.json'), 'utf8');
+        }
+        await host.save({ overrides: { status: 'interrupted' } });
+        await page.reload();
+        await browserExpect(
+          page.getByRole('button', { name: 'Retry existing stage' })
+        ).toBeVisible();
+        const navigated = page.waitForEvent('load');
+        const delivered = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/api/job/resume') && response.request().method() === 'POST'
+        );
+        await page.getByRole('button', { name: 'Retry existing stage' }).click();
+        expect((await delivered).status()).toBe(202);
+        await navigated;
+        await host.save({});
+        await page.reload();
+        await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(
+          0
+        );
+        const resumed = await (
+          await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+        ).json();
+        expect(resumed.intent).toEqual(before.intent);
+        expect(resumed.execution.run).toEqual(
+          stage === 'publication' ? { id: 'run-4', ordinal: 4 } : { id: 'run-2', ordinal: 2 }
+        );
+        if (publication)
+          expect(await readFile(join(host.directory, 'pr.json'), 'utf8')).toBe(publication);
+        expect(resumed.delivery).toMatchObject({ stage, ready: false });
+        const schedule = await (
+          await page.request.get(`http://127.0.0.1:${address.port}/api/scheduler`)
+        ).json();
+        expect(schedule.state.admissions).toHaveLength(1);
+        await page.getByRole('button', { name: 'Cancel job' }).click();
+        await browserExpect(page.getByText('cancelled', { exact: true })).toBeVisible();
+        expect(
+          (await host.calls()).filter(
+            (call) => call.args[1] === 'start' && !call.args.includes('--help')
+          )
+        ).toHaveLength(1);
+        expect(
+          (await host.calls()).filter(
+            (call) => call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send'
+          )
+        ).toHaveLength(stage === 'publication' ? 3 : 1);
+      } finally {
+        await running.close();
+      }
     } finally {
-      await running.close();
+      await browser.close();
+      process.env.PATH = previous.path;
+      if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous.fixture;
+      await host.cleanup();
     }
-  } finally {
-    await browser.close();
-    process.env.PATH = previous.path;
-    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = previous.fixture;
-    await host.cleanup();
   }
-});
+);

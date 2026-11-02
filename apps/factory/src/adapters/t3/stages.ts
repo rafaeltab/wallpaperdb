@@ -70,7 +70,7 @@ export function stageExecution(
               await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
             ).trim();
             if (
-              !request.resume &&
+              (!request.resume || request.stage === 'publication') &&
               (!deliveryHead(head, request) ||
                 (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim())
             )
@@ -115,14 +115,7 @@ export function stageExecution(
             const observed = outcome(raw, intent, request);
             if (!observed) {
               const pending = pendingRun(raw, request, intent);
-              if (!pending?.waitingForGitHub) return pending;
-              const commit = (
-                await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
-              ).trim();
-              const dirty = (
-                await command('git', ['status', '--porcelain'], binding.worktree, signal)
-              ).trim();
-              return { ...pending, commit, waitingForGitHub: !dirty };
+              return pendingWorktree(pending, request, binding, signal);
             }
             const { thread, result } = observed;
             const commit = (
@@ -158,7 +151,7 @@ function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   if (request.resume && request.stage !== 'babysitting')
     return resumePrompt(intent, request, scope);
   if (request.stage === 'babysitting')
-    return `${request.continuation || request.resume ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. ${scope}. ${replayInstructions(request)} Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${intent.id}:${request.index}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)} For babysitting only, include delivery="${intent.id}:${request.index}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
+    return `${request.continuation || request.resume ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. ${scope}. ${replayInstructions(request)} Reconcile current GitHub CI and any existing watcher before acting. If CI is already successful, verify and return the required receipt without starting another watcher, retrying CI or editing code. Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${intent.id}:${request.index}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)} For babysitting only, include delivery="${intent.id}:${request.index}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
   const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';
   return `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal ?? request.index + 1}; predecessor run ${request.previousRunId}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage)}`;
 }
@@ -284,7 +277,7 @@ function resumePrompt(intent: Intent, request: StageRequest, scope: string) {
     babysitting: '$babysit-pr',
     ci: '$babysit-pr',
   };
-  return `Resume the existing ${request.stage} stage of this issue job in this owning thread/worktree. Do not admit another job, launch a worker, create another worktree or expand scope. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal}; predecessor run ${request.previousRunId}. ${scope}. Keep the existing stage handoffs and watchdog association. Use ${skills[request.stage]}. ${receiptInstructions(intent, request.stage)}`;
+  return `Resume the existing ${request.stage} stage of this issue job in this owning thread/worktree. Do not admit another job, launch a worker, create another worktree or expand scope. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal}; predecessor run ${request.previousRunId}. ${scope}. Keep the existing stage handoffs and watchdog association. Reconcile actual external outcomes before any side effect. For publication, inspect and reuse the existing PR and publication journal before considering creation; never create a duplicate or republish an already matching head. For already successful CI, verify the existing outcome and return the required receipt without starting another watcher or retrying CI. Use ${skills[request.stage]}. ${receiptInstructions(intent, request.stage)}`;
 }
 
 function currentResume(
@@ -293,6 +286,7 @@ function currentResume(
 ) {
   return (
     binding.run?.id === request.previousRunId &&
+    binding.run?.ordinal === (request.ordinal ?? request.index + 1) - 1 &&
     ['completed', 'interrupted', 'failed', 'cancelled'].includes(binding.status)
   );
 }
@@ -318,4 +312,31 @@ function replayInstructions(request: StageRequest) {
 
 function knownOwningHead(head: string, comparison: StageRequest['comparison']) {
   return head === comparison?.previousHead || Boolean(comparison?.owningHeads?.includes(head));
+}
+
+async function pendingWorktree(
+  pending: ReturnType<typeof pendingRun>,
+  request: StageRequest,
+  binding: Extract<import('../../capabilities/job/index.js').Observation, { kind: 'found' }>,
+  signal: AbortSignal
+) {
+  if (!pending || !needsWorktree(pending, request, binding.status)) return pending;
+  const commit = (await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)).trim();
+  const dirty = (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim();
+  return {
+    ...pending,
+    commit,
+    worktreeClean: !dirty,
+    waitingForGitHub: pending.waitingForGitHub && !dirty,
+  };
+}
+function needsWorktree(
+  pending: NonNullable<ReturnType<typeof pendingRun>>,
+  request: StageRequest,
+  status: string
+) {
+  return (
+    pending.waitingForGitHub ||
+    (request.stage === 'babysitting' && ['failed', 'interrupted'].includes(status))
+  );
 }

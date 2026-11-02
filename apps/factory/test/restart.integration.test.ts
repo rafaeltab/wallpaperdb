@@ -72,6 +72,12 @@ it('a fresh process reconciles publication after a lost response without repeati
       kind: 'job',
       execution: { kind: 'found', threadId: 'thread-live' },
     });
+    await stop(child);
+    child = launch();
+    await ready();
+    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+      execution: { threadId: 'thread-live', run: { id: 'run-1' } },
+    });
     const scheduler = z
       .object({ state: z.object({ revision: z.number() }) })
       .parse(await (await fetch(origin + '/api/scheduler')).json());
@@ -89,6 +95,29 @@ it('a fresh process reconciles publication after a lost response without repeati
         })
       ).ok
     ).toBe(true);
+    await host.save({
+      complete: true,
+      base: host.base,
+      holdReview: true,
+      overrides: { status: 'completed' },
+    });
+    await vi.waitFor(
+      async () => {
+        await fetch(origin + '/api/job');
+        expect(
+          (await host.calls()).filter(
+            (call) => call.args[1] === 'send' && !call.args.includes('--help')
+          )
+        ).toHaveLength(1);
+      },
+      { timeout: 10000, interval: 30 }
+    );
+    await stop(child);
+    child = launch();
+    await ready();
+    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+      delivery: { stage: 'review', ready: false },
+    });
     await host.save({
       complete: true,
       base: host.base,

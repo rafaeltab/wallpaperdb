@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import { link, mkdir, open, readFile, unlink } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { publisher } from '../../platform/index.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Intent, type JobStore, Unavailable } from '../../capabilities/job/index.js';
@@ -45,14 +45,6 @@ const stageSchema = z
   .strict();
 const code = (cause: unknown, expected: string) =>
   cause instanceof Error && 'code' in cause && cause.code === expected;
-async function syncDirectory(directory: string) {
-  const handle = await open(directory, 'r');
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
 /** Linux local filesystem only. Atomic hard-link publication prevents partial reads
  * and competing reservations; fsync precedes any subsequent external side effect. */
 export function fileStore(directory: string): JobStore {
@@ -209,36 +201,6 @@ export function fileStore(directory: string): JobStore {
       effect('reserve', () => publish('intent.json', intentSchema.parse(intent))),
     claimLaunch: () => effect('claimLaunch', () => publish('launch-claimed.json', { version: 1 })),
   };
-}
-
-function publisher(directory: string) {
-  const publish = async (name: string, value: unknown) => {
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    await syncDirectory(dirname(directory));
-    const temporary = join(directory, `.${randomUUID()}`);
-    const target = join(directory, name);
-    const handle = await open(temporary, 'wx', 0o600);
-    try {
-      await handle.writeFile(JSON.stringify(value));
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    try {
-      await link(temporary, target);
-      await syncDirectory(directory);
-      return true;
-    } catch (cause) {
-      if (code(cause, 'EEXIST')) {
-        await syncDirectory(directory);
-        return false;
-      }
-      throw cause;
-    } finally {
-      await unlink(temporary);
-    }
-  };
-  return publish;
 }
 
 const scheduleSchema = z

@@ -255,3 +255,33 @@ it('bounds one outstanding advisory request across polling iterations and concur
     await host.cleanup();
   }
 });
+
+it('reserves one durable launch across competing planner adapters', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({ planner: { lostStart: true } });
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    const outcomes = await Promise.allSettled([
+      Effect.runPromise(t3Planner(config).propose(input)),
+      Effect.runPromise(t3Planner(config).propose(input)),
+    ]);
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(['rejected', 'rejected']);
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

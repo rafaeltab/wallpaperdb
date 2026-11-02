@@ -1699,6 +1699,8 @@ it.each([false, true])(
           commit: observed.commit,
           parent: observed.parent,
           reviewedCommit: observed.reviewedCommit,
+          prBase: observed.base,
+          branch: command.branch,
         });
       }
       const b = assertions.find((item) => item.issue === 2);
@@ -1713,6 +1715,7 @@ it.each([false, true])(
       f.git('switch', '--detach', f.host.base);
       const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
       Object.assign(live.prs[102], { base: 'main', state: 'MERGED' });
+      live.prs[103].base = 'main';
       if (pendingCI) live.newCI = 'FAILURE';
       await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
       await f.host.save({
@@ -1725,6 +1728,12 @@ it.each([false, true])(
       });
       const current = githubIssues({ ...f.config, prerequisites: assertions });
       if (!current.reconcile) throw new Error('Missing reconciliation');
+      expect(await Effect.runPromise(current.recoveries?.() ?? Effect.succeed([]))).toEqual([]);
+      expect(await Effect.runPromise(current.pullRequest(intent(3, 'D', f.b, 'B')))).toMatchObject({
+        ready: false,
+        maintenancePending: true,
+        manualRecovery: false,
+      });
       await Effect.runPromise(current.reconcile());
       if (pendingCI) {
         expect(
@@ -1830,7 +1839,7 @@ it('parks an oversized affected family without blocking reconciliation of retain
     await f.close();
   }
 });
-it.each(['closed', 'head', 'base'] as const)(
+it.each(['closed', 'head', 'base', 'base-default', 'base-default-parents'] as const)(
   'surfaces post-maintenance %s changes while retaining healthy issue review associations',
   async (kind) => {
     const f = await landedFixture();
@@ -1873,6 +1882,7 @@ it.each(['closed', 'head', 'base'] as const)(
       const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
       if (kind === 'closed') live.prs[104].state = 'CLOSED';
       if (kind === 'base') live.prs[104].base = 'A';
+      if (kind.startsWith('base-default')) live.prs[104].base = 'main';
       if (kind === 'head') f.git('push', '--force', 'origin', `${f.d}:refs/heads/C`);
       await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
       const issues = githubIssues({ ...f.config, prerequisites: assertions });
@@ -1912,6 +1922,60 @@ it.each(['closed', 'head', 'base'] as const)(
       expect(
         (await f.host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
       ).toHaveLength(before);
+      if (kind.startsWith('base-default')) {
+        live.prs[104].base = 'D';
+        await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
+        expect(await Effect.runPromise(issues.pullRequest(cIntent))).toMatchObject({ ready: true });
+        live.prs[104].base = 'main';
+        await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
+        expect(await Effect.runPromise(issues.pullRequest(cIntent))).toMatchObject({
+          ready: false,
+          manualRecovery: true,
+        });
+        await Effect.runPromise(issues.recoveries());
+      }
+      if (kind === 'base' || kind.startsWith('base-default')) {
+        const b = observed[0];
+        const d = observed[1];
+        if (!b || !d) throw new Error('Missing maintained parents');
+        f.git('switch', 'main');
+        f.git('cherry-pick', b.commit);
+        const mergedB = f.git('rev-parse', 'HEAD');
+        const merges: Record<string, { merge: string; head: string }> = {
+          102: { merge: mergedB, head: b.commit },
+        };
+        Object.assign(live.prs[102], { state: 'MERGED', base: 'main' });
+        if (kind === 'base-default-parents') {
+          f.git('cherry-pick', d.commit);
+          merges['103'] = { merge: f.git('rev-parse', 'HEAD'), head: d.commit };
+          Object.assign(live.prs[103], { state: 'MERGED', base: 'main' });
+        }
+        f.git('push', 'origin', 'main');
+        f.git('switch', '--detach', f.host.base);
+        await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
+        await f.host.save({ join: live, landing: { merge: f.merged, head: f.a, merges } });
+        await Effect.runPromise(issues.reconcile());
+        expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(
+          d.commit
+        );
+        expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(
+          observed[2]?.commit
+        );
+        expect(
+          (await f.host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
+        ).toHaveLength(before);
+        expect(await Effect.runPromise(issues.pullRequest(cIntent))).toMatchObject({
+          ready: false,
+          manualRecovery: true,
+        });
+        expect(await Effect.runPromise(issues.recoveries())).toContainEqual(
+          expect.objectContaining({
+            issue: 4,
+            active: false,
+            progress: expect.stringContaining('manual recovery'),
+          })
+        );
+      }
     } finally {
       await f.close();
     }
@@ -1940,6 +2004,74 @@ it.each([false, true])(
       const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
       expect(f.git('log', '--format=%s', `${f.merged}..${head}`)).toBe('C\nD\nB');
       expect(f.git('rev-list', '--merges', `${f.merged}..${head}`)).toBe('');
+    } finally {
+      await f.close();
+    }
+  }
+);
+it.each([false, true])(
+  'distinguishes automatic retarget from a known pre-landing external edit across reopen %s',
+  async (knownExternal) => {
+    const f = await fixture();
+    try {
+      const initial = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      const state = initial.join;
+      const a = f.git('rev-parse', 'A');
+      const b = f.git('rev-parse', 'B');
+      const config = {
+        project: f.host.repository,
+        base: f.host.base,
+        prerequisites: [
+          { issue: 1, pr: 101, commit: a, parent: f.host.base, prBase: 'main', branch: 'A' },
+          { issue: 2, pr: 102, commit: b, parent: a, prBase: 'A', branch: 'B' },
+          { issue: 3, pr: 103, commit: f.d, parent: b, prBase: 'B', branch: 'D' },
+          { issue: 4, pr: 104, commit: f.c, parent: a, prBase: 'A', branch: 'C' },
+        ],
+        joins: {
+          directory: join(f.host.directory, 'joins'),
+          binary: f.host.binary,
+          projectId: 'project-id',
+        },
+      };
+      if (knownExternal) state.prs[102].base = 'main';
+      await f.host.save({ join: state });
+      const observing = githubIssues(config);
+      if (!observing.reconcile) throw new Error('Missing reconciliation');
+      await Effect.runPromise(observing.reconcile());
+      f.git('switch', 'main');
+      await writeFile(join(f.host.repository, 'advance.txt'), 'default advance');
+      f.git('add', '.');
+      f.git('commit', '-m', 'advance');
+      f.git('cherry-pick', a);
+      const merged = f.git('rev-parse', 'HEAD');
+      f.git('push', 'origin', 'main');
+      f.git('switch', '--detach', f.host.base);
+      Object.assign(state.prs[101], { base: 'main', state: 'MERGED' });
+      state.prs[102].base = 'main';
+      await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(state));
+      await f.host.save({ join: state, landing: { merge: merged, head: a } });
+      const reopened = githubIssues(config);
+      if (!reopened.reconcile || !reopened.recoveries) throw new Error('Missing reconciliation');
+      await Effect.runPromise(reopened.reconcile());
+      const bHead = f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0];
+      if (knownExternal) {
+        expect(bHead).toBe(b);
+        expect(await Effect.runPromise(reopened.recoveries())).toContainEqual(
+          expect.objectContaining({
+            issue: 2,
+            active: false,
+            progress: expect.stringContaining('manual recovery'),
+          })
+        );
+        expect(
+          (await f.host.calls()).filter((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
+        ).toHaveLength(0);
+      } else {
+        expect(bHead).not.toBe(b);
+        const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+        expect(f.git('log', '--format=%s', `${merged}..${head}`)).toBe('C\nD\nB');
+        expect(await Effect.runPromise(reopened.recoveries())).toEqual([]);
+      }
     } finally {
       await f.close();
     }

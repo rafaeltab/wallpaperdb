@@ -94,6 +94,8 @@ export interface RecoveryStatus {
 /** Scheduler authorization to resume recovery work without a new issue admission. */
 export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
+  /** Observe recovery state and durably retain known adverse publication changes
+   * before later maintenance. Restoration or verified landing is observed before clearing them. */
   recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
   /** Reconcile durable joins and observe verified default-branch landings. May
    * reserve downstream maintenance from retained accepted publications, even
@@ -104,6 +106,8 @@ export interface Issues {
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
   prepare?(issue: number, admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
+  /** Observe the bound publication and retain known adverse observations locally.
+   * External refs and PR metadata are read-only at this boundary. */
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
   /** A candidate is a previously selected launch comparison, not a replacement
    * operator pin. For prerequisites, return that exact base only after current
@@ -224,7 +228,8 @@ export type PullRequestObservation =
       readonly lifecycle?: string;
       /** Explicit closure or external divergence. Never grants readiness. */
       readonly manualRecovery?: boolean;
-      /** Durable expected replay, awaiting its own CI/metadata verification.
+      /** Expected maintenance from durable publication/operation evidence,
+       * awaiting its own CI/metadata verification.
        * Mutually exclusive with manualRecovery; retains active capacity. */
       readonly maintenancePending?: boolean;
     };

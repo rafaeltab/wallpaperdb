@@ -248,6 +248,24 @@ export function githubIssues(config: {
           replay?.target ?? targetBase(intent.prBase, config.prBase),
           replay ?? undefined
         )(intent);
+        const blocked = yield* contextualPromise({
+          try: (signal) =>
+            observed.kind === 'found'
+              ? (joins?.boundaryProblem(intent.issue, intent.branch, observed.commit, signal) ??
+                Promise.resolve(false))
+              : Promise.resolve(false),
+          catch: (cause) => new Unavailable({ operation: 'observe-maintenance-boundary', cause }),
+        }).pipe(
+          Effect.tapError((error) => Effect.logError(error)),
+          Effect.withSpan('factory.github.maintenance-boundary')
+        );
+        if (blocked && observed.kind === 'found')
+          return {
+            ...observed,
+            ready: false,
+            manualRecovery: true,
+            lifecycle: 'Verified containing boundary unavailable',
+          };
         return replayObservation(replay, observed, intent.branch);
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),
@@ -333,6 +351,8 @@ function replayObservation(
       ready: false,
       manualRecovery: true,
       lifecycle: 'Publication needs manual recovery',
+      reviewedCommit: originalReview(replay),
+      parent: replay.onto,
     };
   if (pendingReplay(replay, observed, branch))
     return {

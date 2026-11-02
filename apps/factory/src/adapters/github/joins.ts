@@ -25,6 +25,7 @@ import { t3Restacker } from '../t3/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
 import { runInContext, admitRecovery } from './context.js';
 import { landingEvidence } from './landing.js';
+import { refreshBoundary, retainedBoundary } from './maintenance-boundary.js';
 import type { VerifiedPrerequisite } from './prerequisites.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
 import {
@@ -148,10 +149,25 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const git = (args: string[], signal?: AbortSignal) =>
     command('git', args, project, signal).then((text) => text.trim());
   const directory = (numbers: readonly number[]) => join(config.directory, id(numbers));
+  const hydrateOperation = async (dir: string, saved: unknown) => {
+    const operation = intent.parse(saved);
+    if (operation.boundary) return operation;
+    const savedBoundary = await read(dir, 'boundary.json');
+    const first = operation.replay[0];
+    if (!savedBoundary || !first) return operation;
+    // The initial boundary precedes planning. A legacy intent still records the
+    // selected comparison in its replay, while the saved facts retain the pin.
+    const boundary = {
+      ...joinBoundary.parse(savedBoundary),
+      base: first.onto,
+      prBase: first.target,
+    };
+    return { ...operation, boundary };
+  };
   const effective = async (dir: string): Promise<Intent | null> => {
     let saved = await read(dir, 'intent.json');
     if (!saved) return null;
-    let operation = intent.parse(saved);
+    let operation = await hydrateOperation(dir, saved);
     const seen = new Set<string>();
     for (;;) {
       const key = operation.generation ?? 'initial';
@@ -159,7 +175,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       seen.add(key);
       saved = await read(dir, `repair-${key}.json`);
       if (!saved) return operation;
-      operation = intent.parse(saved);
+      operation = await hydrateOperation(dir, saved);
     }
   };
   const requiredOperation = async (dir: string) => {
@@ -812,6 +828,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const openRequest = async (numbers: readonly number[], signal?: AbortSignal) => {
     for (const number of numbers) {
+      if (number < 1) return false;
       const state = z
         .object({ state: z.string() })
         .parse(
@@ -824,9 +841,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
-  const build = async (
+  const buildBoundary = async (
     numbers: readonly number[],
-    candidates: unknown,
     signal?: AbortSignal,
     requirements?: JoinBoundary
   ) => {
@@ -843,7 +859,17 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       'boundary.json',
       requirements ?? { base, prBase: 'main', pin: base, landed: [] }
     );
-    const boundary = joinBoundary.parse(await read(dir, 'boundary.json'));
+    return joinBoundary.parse(await read(dir, 'boundary.json'));
+  };
+  const build = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
+  ) => {
+    const dir = directory(numbers);
+    const boundary = await buildBoundary(numbers, signal, requirements);
+    if (!boundary) return;
     await publish(dir, 'seed.json', candidates);
     const layers = z
       .array(layer)
@@ -1094,10 +1120,32 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     );
     return true;
   };
+  const restoreLandingBoundary = async (operation: Intent, signal?: AbortSignal) => {
+    const landed = operation.landing;
+    if (!landed) return false;
+    const boundary = await refreshBoundary(
+      project,
+      base,
+      undefined,
+      [landed.anchor.issue, ...operation.numbers],
+      [{ base: landed.commit, prBase: landed.branch }],
+      gh,
+      signal
+    );
+    if (!boundary || !legacyLandingMatches(landed, boundary)) return false;
+    if (!(await containsRequired(project, replayTip(operation) ?? base, boundary, signal)))
+      return false;
+    const dir = directory(operation.numbers);
+    await publish(dir, 'boundary.json', boundary);
+    operation.boundary = joinBoundary.parse(await read(dir, 'boundary.json'));
+    return boundaryStillValid(project, base, operation.boundary, gh, signal);
+  };
   const factsValid = async (operation: Intent, signal?: AbortSignal) => {
     if (operation.boundary)
       return boundaryStillValid(project, base, operation.boundary, gh, signal);
-    // Legacy intents cannot acquire new closure assumptions during recovery.
+    // A legacy landing journal may acquire current authenticated facts, never
+    // inferred closure or a replacement operator pin. Other closed legacy work waits.
+    if (operation.landing) return restoreLandingBoundary(operation, signal);
     return openRequest(operation.numbers, signal);
   };
   const validateReplays = async (operation: Intent, dir: string, signal?: AbortSignal) => {
@@ -1154,8 +1202,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const operationFactsValid = async (operation: Intent, signal?: AbortSignal) =>
     (await factsValid(operation, signal)) && (await finalContainsFacts(operation, signal));
+  const requestFactsValid = (operation: Intent, signal?: AbortSignal) =>
+    openRequest(
+      operation.numbers.filter(
+        (number) => number > 0 && !operation.boundary?.landed.some((fact) => fact.issue === number)
+      ),
+      signal
+    );
   const publicationSafe = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     if (!(await operationFactsValid(operation, signal))) return false;
+    if (!(await requestFactsValid(operation, signal))) return false;
     if (!(await writers(operation.layers, signal))) return false;
     return verifyHeads(operation, dir, signal);
   };
@@ -1259,10 +1315,31 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!(await manualWritersReady(operation.layers, signal))) return false;
     return landingStillPresent(operation.landing, signal);
   };
-  const prepare = async (numbers: readonly number[], candidates: unknown, signal?: AbortSignal, requirements?:JoinBoundary) => {
+  const readyOperation = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
+  ) => {
     const dir = directory(numbers);
-    const operation = await operationFor(numbers, candidates, signal,requirements);
-    if (!operation || !(await publicationSafe(operation,dir,signal)) || !(await maintenanceWritersReady(operation, signal))) return;
+    const operation = await operationFor(numbers, candidates, signal, requirements);
+    if (
+      !operation ||
+      !(await publicationSafe(operation, dir, signal)) ||
+      !(await maintenanceWritersReady(operation, signal))
+    )
+      return null;
+    return operation;
+  };
+  const prepare = async (
+    numbers: readonly number[],
+    candidates: unknown,
+    signal?: AbortSignal,
+    requirements?: JoinBoundary
+  ) => {
+    const dir = directory(numbers);
+    const operation = await readyOperation(numbers, candidates, signal, requirements);
+    if (!operation) return;
     if (
       !(await acquire(
         id(numbers),
@@ -1415,12 +1492,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const completedCandidates = async (records: readonly ReplayRecord[], issue: number) => {
     const result: Intent['replay'] = [];
     for (const record of records.filter((record) => record.complete)) {
-      if (!(await operationFactsValid(record.operation))) continue;
       for (const item of record.operation.replay.filter((item) => item.issue === issue)) {
         z.object({ commit: z.literal(item.next), tree: z.literal(item.tree) }).parse(
           await read(record.directory, `ci-${item.next}.json`)
         );
-        await verifyReplayTree(item,record.directory);
+        await verifyReplayTree(item, record.directory);
         result.push(item);
       }
     }
@@ -1484,8 +1560,28 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return entries;
   };
-  const replayFor = async (issue: number, signal?: AbortSignal) =>
-    lookupReplay(await replayRecords(), issue, signal);
+  const replayFactsValid = async (
+    records: readonly ReplayRecord[],
+    item: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    for (const record of records) {
+      if (
+        !record.operation.replay.some(
+          (value) => value.issue === item.issue && value.next === item.next
+        )
+      )
+        continue;
+      if (!(await operationFactsValid(record.operation, signal))) return false;
+    }
+    return true;
+  };
+  const replayFor = async (issue: number, signal?: AbortSignal) => {
+    const records = await replayRecords();
+    const item = await lookupReplay(records, issue, signal);
+    if (!item) return null;
+    return { ...item, manual: item.manual || !(await replayFactsValid(records, item, signal)) };
+  };
   const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
     const saved = await read(join(config.directory, key), 'request.json');
     const numbers = saved
@@ -1535,6 +1631,15 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     );
   };
   const recoveryStatus = async (dir: string) => {
+    const limit = z.object({ source: layer }).safeParse(await read(dir, 'limit.json'));
+    if (limit.success)
+      return {
+        issue: limit.data.source.issue,
+        pr: limit.data.source.url,
+        active: false,
+        progress:
+          'Affected stack exceeds the 100-layer maintenance limit; manual recovery required',
+      };
     const blocked = await blockingFile(dir);
     const saved = await savedRecoveryProgress(dir, blocked);
     if (!saved) return null;
@@ -1580,6 +1685,15 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       if (value) result.push(value);
     }
     result.push(...(await repairRecoveries()));
+    result.push(
+      ...(await pendingBoundaries(signal)).map((item) => ({
+        issue: item.issue,
+        pr: item.url,
+        active: false,
+        progress:
+          'No verified containing boundary retains the operator pin and current landed facts; manual recovery required',
+      }))
+    );
     const observed = await publicationRecoveries(signal);
     return [...new Map([...result, ...observed].map((value) => [value.issue, value])).values()];
   };
@@ -1595,6 +1709,31 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       signal
     ));
   };
+  const pendingBoundary = async (dir: string, signal?: AbortSignal) => {
+    const saved = await read(dir, 'boundary-problem.json');
+    if (!saved) return [];
+    const operation = await effective(dir);
+    if (operation && (await completed(dir)) && (await operationFactsValid(operation, signal)))
+      return [];
+    return z.array(layer).max(100).parse(saved);
+  };
+  const pendingBoundaries = async (signal?: AbortSignal) => {
+    const result: Layer[] = [];
+    for (const key of (await operationDirectories()).filter((value) =>
+      /^[a-f0-9]{64}$/.test(value)
+    ))
+      result.push(...(await pendingBoundary(join(config.directory, key), signal)));
+    return result;
+  };
+  const boundaryProblem = async (
+    issue: number,
+    branch: string,
+    head: string,
+    signal?: AbortSignal
+  ) =>
+    (await pendingBoundaries(signal)).some(
+      (item) => item.issue === issue && item.branch === branch && item.commit === head
+    );
   const publicationRecoveries = async (signal?: AbortSignal) => {
     const records = await replayRecords();
     const issues = new Set(
@@ -1790,7 +1929,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         removed: landed.map((item) => item.pr),
       },
       descendants,
-      signal
+      signal,
+      landed.map((item) => item.issue)
     );
   };
   const oversizedMaintenance = async (
@@ -1801,21 +1941,48 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     // of ready/landed admissions. No writer or external change is claimed here.
     if (descendants.length < 100) return false;
     const dir = directory([-landed.anchor.pr, ...descendants.map((item) => item.issue)]);
-    await publish(dir, 'limit.json', { layers: descendants.length + 1, maximum: 100 });
-    await publish(dir, 'seed.json', descendants.slice(0, 1));
-    for (const item of descendants.slice(0, 1))
-      await publish(dir, 'recovery-progress.json', {
-        issue: item.issue,
-        active: false,
-        progress:
-          'Affected stack exceeds the 100-layer maintenance limit; manual recovery required',
-      });
+    await publish(dir, 'limit.json', {
+      layers: descendants.length + 1,
+      maximum: 100,
+      source: descendants[0],
+    });
     return true;
+  };
+  const maintenanceBoundary = async (
+    landed: z.infer<typeof landing>,
+    descendants: readonly CurrentLayer[],
+    closed: readonly number[],
+    signal?: AbortSignal
+  ) => {
+    const records = await replayRecords();
+    const prior = records
+      .filter((record) =>
+        record.operation.layers.some((item) =>
+          descendants.some((child) => child.issue === item.issue)
+        )
+      )
+      .map((record) => record.operation.boundary)
+      .filter((value): value is JoinBoundary => !!value);
+    const boundary = retainedBoundary(prior);
+    if (boundary === null) return null;
+    return refreshBoundary(
+      project,
+      base,
+      boundary,
+      [landed.anchor.issue, ...closed],
+      [
+        { base: landed.commit, prBase: landed.branch },
+        ...descendants.map((item) => ({ base: item.commit, prBase: item.branch })),
+      ],
+      gh,
+      signal
+    );
   };
   const maintainDescendants = async (
     landed: z.infer<typeof landing>,
     descendants: readonly CurrentLayer[],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    closed: readonly number[] = []
   ) => {
     if (await oversizedMaintenance(landed, descendants)) return;
     const numbers = [-landed.anchor.pr, ...descendants.map((item) => item.issue)];
@@ -1828,7 +1995,20 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ))
     )
       return;
-    await publish(dir, 'landing.json', landed);
+    const requirements = await maintenanceBoundary(landed, descendants, closed, signal);
+    if (!requirements) {
+      await publish(dir, 'boundary-problem.json', descendants);
+      return;
+    }
+    const verifiedLanding = {
+      ...landed,
+      covered: requirements.landed.flatMap((fact) =>
+        fact.originalHead ? [fact.originalHead] : []
+      ),
+      removed: requirements.landed.map((fact) => fact.pr),
+    };
+    await publish(dir, 'boundary.json', requirements);
+    await publish(dir, 'landing.json', verifiedLanding);
     await publish(dir, 'seed.json', descendants);
     await publish(dir, 'request.json', { numbers });
     const adverse = descendants.find((item) => item.divergent || item.state === 'CLOSED');
@@ -1841,7 +2021,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       });
       return;
     }
-    await prepare(numbers, descendants, signal);
+    await prepare(numbers, descendants, signal, requirements);
   };
   const verifiedLandings = async (observed: readonly CurrentLayer[], signal?: AbortSignal) => {
     const result = [];
@@ -1914,18 +2094,48 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       parent: old.onto,
       reviewedCommit: reviewOrigin(old),
     }));
+  const legacyRepairBoundary = async (operation: Intent, signal?: AbortSignal) => {
+    if (
+      operation.numbers.some((number) => number < 1) ||
+      !(await openRequest(operation.numbers, signal))
+    )
+      return null;
+    return refreshBoundary(
+      project,
+      base,
+      undefined,
+      operation.numbers,
+      operation.replay.map((item) => ({ base: item.onto, prBase: item.target })),
+      gh,
+      signal
+    );
+  };
+  const repairBoundary = async (record: ReplayRecord, dir: string, signal?: AbortSignal) => {
+    if (!(await operationFactsValid(record.operation, signal))) return null;
+    const boundary =
+      record.operation.boundary ?? (await legacyRepairBoundary(record.operation, signal));
+    if (!boundary) return null;
+    await publish(dir, 'boundary.json', boundary);
+    return boundary;
+  };
   const recoverRepair = async (record: ReplayRecord, head: string, signal?: AbortSignal) => {
     const dir = repairDirectory(record, head);
     if (!(await blockingFile(dir))) return;
     const sources = repairSources(record.operation);
-    await recoverConflict(dir, sources, signal);
+    const boundary = await repairBoundary(record, dir, signal);
+    if (boundary) await recoverConflict(dir, sources, boundary, signal);
   };
-  const repairWriters = async (operation: Intent, issue: number, signal?: AbortSignal) => {
+  const claimRepair = async (operation: Intent, signal?: AbortSignal) => {
     const keys = [
       ...operation.layers.map((value) => `branch:${value.branch}`),
       ...operation.groups.map((value) => `group:${value.number}`),
     ];
-    if (!(await acquire(id(operation.numbers), keys))) return false;
+    if (!(await operationFactsValid(operation, signal))) return false;
+    if (!(await requestFactsValid(operation, signal))) return false;
+    return acquire(id(operation.numbers), keys);
+  };
+  const repairWriters = async (operation: Intent, issue: number, signal?: AbortSignal) => {
+    if (!(await claimRepair(operation, signal))) return false;
     if (!(await writers(operation.layers, signal))) return false;
     if (!(await landingStillPresent(operation.landing, signal))) return false;
     return manualWritersReady(
@@ -1960,6 +2170,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const operation = record.operation;
     const issue = fixed.issue;
     const repaired = fixed.next;
+    const dir = repairDirectory(record, repaired);
+    const boundary = await repairBoundary(record, dir, signal);
+    if (!boundary) return null;
+    await publish(dir, 'seed.json', repairSources(operation));
     const replay: Intent['replay'] = [];
     for (const old of operation.replay) {
       if (old.issue === issue) {
@@ -1971,15 +2185,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         replay.push(old);
         continue;
       }
-      const dir = repairDirectory(record, repaired);
-      await publish(dir, 'seed.json', repairSources(operation));
       const source = {
         ...old,
         commit: old.next,
         parent: old.onto,
         reviewedCommit: reviewOrigin(old),
       };
-      if (await blockingFile(dir)) await recoverConflict(dir, [source], signal);
+      if (await blockingFile(dir)) await recoverConflict(dir, [source], boundary, signal);
       const next = await replayLayer(source, parent.next, old.target, dir, signal);
       if (!next) return null;
       replay.push(next);
@@ -2023,10 +2235,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     item: Intent['replay'][number],
     head: string,
     current: Awaited<ReturnType<typeof prState>>,
-    _signal?: AbortSignal
+    signal?: AbortSignal
   ) => {
     if (current.headRefOid !== head || (await publicationGuard(item.issue, item.commit, current)))
       return false;
+    if (!(await repairBoundary(record, record.directory, signal))) return false;
     await publish(record.directory, repairRequestName(record.operation, head), {
       issue: item.issue,
       branch: item.branch,
@@ -2041,11 +2254,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   ) => {
     const replay = await repairDescendants(record, fixed, signal);
     if (!replay) return false;
-    await publish(record.directory, `repair-${record.operation.generation ?? 'initial'}.json`, {
-      ...record.operation,
-      generation: fixed.next,
-      replay,
-    });
+    const boundary = joinBoundary.parse(
+      await read(repairDirectory(record, fixed.next), 'boundary.json')
+    );
+    const candidate = { ...record.operation, boundary, generation: fixed.next, replay };
+    if (!(await operationFactsValid(candidate, signal))) return false;
+    await publish(
+      record.directory,
+      `repair-${record.operation.generation ?? 'initial'}.json`,
+      candidate
+    );
     return true;
   };
   const sameReplay = (
@@ -2073,7 +2291,17 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         record.operation.replay.some((value) => sameReplay(value, issue, branch, repaired))
     );
   };
-  return { prepare, evidence, state, replayFor, reconcile, recoveries, maintain, repair };
+  return {
+    prepare,
+    evidence,
+    state,
+    replayFor,
+    reconcile,
+    recoveries,
+    maintain,
+    repair,
+    boundaryProblem,
+  };
 }
 
 function trustedRecoveryContext(value: unknown) {
@@ -2247,4 +2475,10 @@ function needsReplay(
   item: Intent['replay'][number]
 ): parent is Intent['replay'][number] {
   return !!parent && parent.next !== item.onto;
+}
+
+function legacyLandingMatches(landed: NonNullable<Intent['landing']>, boundary: JoinBoundary) {
+  const anchor = boundary.landed.find((fact) => fact.pr === landed.anchor.pr);
+  if (anchor?.originalHead !== landed.anchor.commit) return false;
+  return landed.removed.every((pr) => boundary.landed.some((fact) => fact.pr === pr));
 }

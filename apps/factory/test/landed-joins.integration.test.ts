@@ -721,3 +721,166 @@ it.each([false, true])(
     }
   }
 );
+
+it.each(['B', 'C'])(
+  'retains the exact pin and closed proof through an owned replay CI repair generation for %s',
+  async (branch) => {
+    const f = await fixture(true, true);
+    try {
+      const issues = f.issues();
+      if (!issues.prepare || !issues.repairReplay || !issues.reconcile)
+        throw new Error('Missing repair ports');
+      await Effect.runPromise(issues.prepare(4));
+      const command = {
+        id: `${branch}-job`,
+        issue: branch === 'B' ? 2 : 3,
+        issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${branch === 'B' ? 2 : 3}`,
+        branch,
+        base: f.base,
+        prBase: 'B',
+        createdAt: 0,
+        context: '',
+        expectedStage: 'implementation' as const,
+      };
+      const before = await Effect.runPromise(issues.pullRequest(command));
+      if (before.kind !== 'found') throw new Error('Missing C');
+      await f.mutate({ newCI: 'FAILURE' });
+      expect(await Effect.runPromise(issues.repairReplay(command, before.commit))).toBe(true);
+      f.git('switch', '--detach', before.commit);
+      await f.commit('repair');
+      const fixed = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${before.commit}`,
+        'origin',
+        `${fixed}:refs/heads/${branch}`
+      );
+      await f.mutate({ newCI: 'SUCCESS' });
+      expect(await Effect.runPromise(issues.repairReplay(command, before.commit, fixed))).toBe(
+        true
+      );
+      await Effect.runPromise(f.issues().reconcile!());
+      const ready = await Effect.runPromise(f.issues().inspect(4));
+      expect(ready.blockersReady).toBe(true);
+      const head = ready.prerequisite?.base;
+      if (!head) throw new Error('Missing repaired final tree');
+      expect(f.git('merge-base', '--is-ancestor', fixed, head)).toBe('');
+      if (branch === 'C') expect(head).toBe(fixed);
+      else expect(f.git('log', '--format=%s', `${fixed}..${head}`)).toBe('C');
+      expect(f.git('show', `${head}:operator.txt`)).toBe('operator');
+      expect(f.git('show', `${head}:A.txt`)).toBe('A landed');
+      expect(f.git('show', `${head}:repair.txt`)).toBe('repair');
+      expect(f.git('merge-base', '--is-ancestor', f.base, head)).toBe('');
+      expect(f.git('rev-list', '--merges', `${f.base}..${head}`)).toBe('');
+      const facts = f.observation.mergedPrerequisites;
+      await f.set({
+        mergedPrerequisites: { ...facts, 101: { ...facts[101], head: { sha: f.host.base } } },
+      });
+      expect(await Effect.runPromise(f.issues().pullRequest(command))).toMatchObject({
+        ready: false,
+        manualRecovery: true,
+      });
+      expect(await Effect.runPromise(f.issues().inspect(4))).toMatchObject({
+        blockersReady: false,
+      });
+      expect(await Effect.runPromise(f.issues().repairReplay!(command, fixed))).toBe(false);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'maintains a mixed join after manual landing only with its exact pin, containing=%s',
+  async (containing) => {
+    const f = await fixture(true, true);
+    try {
+      const issues = f.issues();
+      await Effect.runPromise(issues.prepare!(4));
+      const command = (issue: number, branch: string) => ({
+        id: branch,
+        issue,
+        issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${issue}`,
+        branch,
+        base: f.base,
+        createdAt: 0,
+        context: '',
+        expectedStage: 'implementation' as const,
+      });
+      const b = await Effect.runPromise(issues.pullRequest(command(2, 'B')));
+      const c = await Effect.runPromise(issues.pullRequest(command(3, 'C')));
+      if (b.kind !== 'found' || c.kind !== 'found') throw new Error('Missing owned joins');
+      f.git('switch', 'primary');
+      if (containing) f.git('merge', '--ff-only', 'operator/base');
+      await f.commit('advance');
+      f.git('cherry-pick', b.commit);
+      const merged = f.git('rev-parse', 'HEAD');
+      f.git('push', 'origin', 'primary');
+      f.git('switch', '--detach', f.host.base);
+      const live = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+      live.prs[102].state = 'MERGED';
+      live.prs[102].base = 'primary';
+      await f.mutate(live);
+      const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      await f.host.save({
+        ...config,
+        defaultBranch: { name: 'primary', tip: merged },
+        issueStates: { ...config.issueStates, 2: 'CLOSED' },
+        landedPrerequisites: { ...config.landedPrerequisites, 2: [102] },
+        mergedPrerequisites: {
+          ...config.mergedPrerequisites,
+          102: {
+            merged: true,
+            head: { sha: b.commit },
+            merge_commit_sha: merged,
+            html_url: 'https://github.com/rafaeltab/wallpaperdb/pull/102',
+            base: { ref: 'primary', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+          },
+        },
+        landing: { pr: 102, merge: merged, head: b.commit, base: 'primary' },
+      });
+      const current = githubIssues({
+        project: f.host.repository,
+        base: f.base,
+        prBase: f.target,
+        prerequisites: [
+          {
+            issue: 2,
+            pr: 102,
+            commit: b.commit,
+            parent: b.parent,
+            prBase: b.base,
+            reviewedCommit: b.reviewedCommit,
+          },
+          {
+            issue: 3,
+            pr: 103,
+            commit: c.commit,
+            parent: c.parent,
+            prBase: c.base,
+            reviewedCommit: c.reviewedCommit,
+          },
+        ],
+        joins: {
+          directory: join(f.host.directory, 'joins'),
+          binary: f.host.binary,
+          projectId: 'project-id',
+        },
+      });
+      await Effect.runPromise(current.reconcile!());
+      const observed = await Effect.runPromise(
+        current.pullRequest({ ...command(3, 'C'), prBase: 'B' })
+      );
+      expect(observed).toMatchObject({ ready: containing });
+      const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+      if (containing) {
+        expect(f.git('merge-base', '--is-ancestor', f.base, head)).toBe('');
+        expect(f.git('merge-base', '--is-ancestor', merged, head)).toBe('');
+        expect(f.git('log', '--format=%s', `${merged}..${head}`)).toBe('C');
+        expect(f.git('show', `${head}:operator.txt`)).toBe('operator');
+      } else expect(head).toBe(c.commit);
+    } finally {
+      await f.close();
+    }
+  }
+);

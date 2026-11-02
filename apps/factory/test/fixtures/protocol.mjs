@@ -101,8 +101,8 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       writeFileSync(
         join(worktree, 'shared.txt'),
         config.restack.outcome === 'COMPLEX'
-          ? `export const behavior = () => 'resolved D and C behavior ${operation}';`
-          : `resolved D and C behavior ${operation}`
+          ? `export const behavior = () => 'resolved D and C behavior${state?.operation && state.operation !== operation ? ` ${operation}` : ''}';`
+          : `resolved D and C behavior${state?.operation && state.operation !== operation ? ` ${operation}` : ''}`
       );
       git(worktree, 'add', 'shared.txt');
       execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], {
@@ -195,14 +195,16 @@ if (
   args[1] === 'repos/rafaeltab/wallpaperdb' &&
   !config.landing
 ) {
-  console.log(JSON.stringify({ default_branch: 'main' }));
+  console.log(JSON.stringify({ default_branch: config.defaultBranch?.name ?? 'main' }));
   process.exit(0);
 }
 if (
   basename(process.argv[1]) === 'gh' &&
   args[0] === 'api' &&
   args[1].includes('/pulls/') &&
-  !config.landing
+  (!config.landing ||
+    (Number(args[1].split('/').at(-1)) !== config.landing.pr &&
+      !Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1))))
 ) {
   console.log(
     JSON.stringify({
@@ -220,7 +222,9 @@ if (
   args[0] === 'api' &&
   (args[1] === 'repos/rafaeltab/wallpaperdb' ||
     args[1].includes('/compare/') ||
-    args[1].includes('/pulls/'))
+    (args[1].includes('/pulls/') &&
+      (Number(args[1].split('/').at(-1)) === config.landing.pr ||
+        Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1)))))
 ) {
   const value = config.landing.merges?.[args[1].split('/').at(-1)] ?? config.landing;
   if (args[1].includes('/compare/'))
@@ -239,7 +243,7 @@ if (
         base: { ref: value.base ?? 'main' },
       })
     );
-  else console.log(JSON.stringify({ default_branch: 'main' }));
+  else console.log(JSON.stringify({ default_branch: config.defaultBranch?.name ?? 'main' }));
   process.exit(0);
 }
 if (

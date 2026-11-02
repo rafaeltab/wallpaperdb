@@ -42,14 +42,16 @@ export async function observeLanding(
   // GitHub's configured closure and Item closed workflows own the completion
   // transition. Never write Done to compensate for failed automation or regress a
   // later Canary/Released state. Missing automation remains visible and pending.
+  return { landed: true, lifecycle: lifecycleStatus(linked) };
+}
+function lifecycleStatus(linked: {
+  state: string;
+  projectItems: readonly { title: string; status: { name: string } | null }[];
+}) {
   const status = linked.projectItems.find((item) => item.title === 'WallpaperDB')?.status?.name;
-  return {
-    landed: true,
-    lifecycle:
-      linked.state === 'CLOSED' && ['Done', 'Canary', 'Released'].includes(status ?? '')
-        ? `Linked issue closed; project ${status}`
-        : `Landing verified; lifecycle automation pending: issue ${linked.state}, project ${status ?? 'missing'}`,
-  };
+  return linked.state === 'CLOSED' && ['Done', 'Canary', 'Released'].includes(status ?? '')
+    ? `Linked issue closed; project ${status}`
+    : `Landing verified; lifecycle automation pending: issue ${linked.state}, project ${status ?? 'missing'}`;
 }
 export async function landingEvidence(
   gh: Gh,
@@ -69,12 +71,7 @@ export async function landingEvidence(
       base: z.object({ ref: z.string() }),
     })
     .parse(await gh(['api', `repos/rafaeltab/wallpaperdb/pulls/${number}`], signal));
-  if (
-    !merged.merged ||
-    merged.head.sha !== pr.headRefOid ||
-    merged.base.ref !== repo.default_branch ||
-    !merged.merge_commit_sha
-  )
+  if (!mergedAssociation(merged, pr.headRefOid, repo.default_branch) || !merged.merge_commit_sha)
     return null;
   const comparison = z
     .object({ status: z.string(), merge_base_commit: z.object({ sha }) })
@@ -93,4 +90,12 @@ export async function landingEvidence(
   )
     return null;
   return { commit: merged.merge_commit_sha, branch: repo.default_branch };
+}
+
+function mergedAssociation(
+  merged: { merged: boolean; head: { sha: string }; base: { ref: string } },
+  head: string,
+  branch: string
+) {
+  return merged.merged && merged.head.sha === head && merged.base.ref === branch;
 }

@@ -14,7 +14,7 @@ export const RestackLive = Layer.effect(
             return { ...resolution, progress: 'Awaiting independent review-loop', ready: false };
           const ready = yield* ports.verify(resolution.commit);
           return { ...resolution, progress: ready ? 'Verified' : 'Awaiting CI', ready };
-        }),
+        }).pipe(Effect.withSpan('factory.restack.advance')),
     };
   })
 );

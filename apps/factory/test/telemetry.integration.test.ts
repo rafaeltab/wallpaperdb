@@ -1,3 +1,11 @@
+import { Effect, Layer, Tracer } from 'effect';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import {
+  BasicTracerProvider,
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
+import { joinFixture } from './fixtures/join.js';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { expect, it, vi } from 'vitest';
@@ -96,5 +104,41 @@ it('bounds a stalled collector during cleanup without leaving exporter sockets',
     if (prior === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = prior;
     await host.cleanup();
+  }
+});
+
+it('preserves the incoming trace through nested recovery execution', async () => {
+  const f = await joinFixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  const exporter = new InMemorySpanExporter();
+  const provider = new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+  const layer = OtelTracer.layerWithoutOtelTracer.pipe(
+    Layer.provide(Layer.succeed(OtelTracer.OtelTracer, provider.getTracer('factory-contract')))
+  );
+  const traceId = '12345678901234567890123456789012';
+  const parent = Tracer.externalSpan({ traceId, spanId: '1234567890123456', sampled: true });
+  const prepare = () =>
+    Effect.runPromise(
+      (f.issues.prepare?.(5) ?? Effect.void).pipe(
+        Effect.withParentSpan(parent),
+        Effect.provide(layer)
+      )
+    );
+  try {
+    await prepare();
+    exporter.reset();
+    await prepare();
+    await provider.forceFlush();
+    const spans = exporter.getFinishedSpans();
+    // This checks context propagation as a mechanism, not individual span names.
+    expect(spans.length).toBeGreaterThan(1);
+    expect([...new Set(spans.map((span) => span.spanContext().traceId))]).toEqual([traceId]);
+    expect(spans.every((span) => span.parentSpanContext !== undefined)).toBe(true);
+    expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(true);
+  } finally {
+    try {
+      await provider.shutdown();
+    } finally {
+      await f.close();
+    }
   }
 });

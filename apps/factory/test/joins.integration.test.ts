@@ -2749,3 +2749,95 @@ it.each([false, true])(
     }
   }
 );
+
+it.each(['review', 'publication', 'ci'] as const)(
+  'retains certified replay ancestry for the subsequent %s stage',
+  async (stage) => {
+    const f = await fixture();
+    try {
+      const a = f.git('rev-parse', 'A');
+      f.git('switch', '-c', 'replacement', f.host.base);
+      await writeFile(join(f.host.repository, 'upstream.txt'), 'upstream');
+      f.git('add', '.');
+      f.git('commit', '-m', 'upstream');
+      f.git('cherry-pick', a);
+      const parent = f.git('rev-parse', 'HEAD');
+      f.git('cherry-pick', f.c);
+      const replay = f.git('rev-parse', 'HEAD');
+      const owning = join(f.host.directory, 'owning');
+      f.git('worktree', 'add', owning, '-b', 'owned-C', replay);
+      const intent = {
+        id: 'C',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: a,
+        prBase: 'A',
+        branch: 'owned-C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const request = {
+        index: 5,
+        stage,
+        threadId: 'owner-C',
+        commit: replay,
+        previousRunId: 'repair',
+        ordinal: 5,
+        comparison: { base: parent, prBase: 'main', previousHead: f.c, owningHeads: [f.c, replay] },
+      };
+      const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      await f.host.save({ ...config, joinWriter: false });
+      await writeFile(
+        join(f.host.directory, 'resource.json'),
+        JSON.stringify({
+          threadId: 'owner-C',
+          title: 'Factory C',
+          projectId: 'project-id',
+          providerInstanceId: 'codex',
+          model: 'gpt-6.1-sol',
+          branch: 'owned-C',
+          worktreePath: owning,
+          status: 'completed',
+          latestRunId: 'repair',
+          runCount: 4,
+          pendingRequestCount: 0,
+        })
+      );
+      const execution = t3Execution({
+        project: f.host.repository,
+        projectId: 'project-id',
+        binary: f.host.binary,
+      });
+      for (const context of [
+        undefined,
+        { ...request, threadId: 'unrelated' },
+        { ...request, stage: 'implementation' as const },
+      ])
+        await expect(Effect.runPromise(execution.observe(intent, context))).rejects.toMatchObject({
+          _tag: 'Unavailable',
+        });
+      expect(
+        await Effect.runPromise(execution.observe(intent, { ...request, stage: 'babysitting' }))
+      ).toMatchObject({ kind: 'found' });
+      expect(await Effect.runPromise(execution.observe(intent, request))).toMatchObject({
+        kind: 'found',
+      });
+      if (stage !== 'ci') {
+        await writeFile(join(owning, 'dirty.txt'), 'dirty');
+        await expect(Effect.runPromise(execution.sendStage(intent, request))).rejects.toMatchObject(
+          { _tag: 'Unavailable' }
+        );
+        await unlink(join(owning, 'dirty.txt'));
+        await Effect.runPromise(execution.sendStage(intent, request));
+        expect(
+          (await f.host.calls()).filter(
+            (call) => call.args[1] === 'send' && !call.args.includes('--help')
+          )
+        ).toHaveLength(1);
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);

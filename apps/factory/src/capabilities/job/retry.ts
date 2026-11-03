@@ -144,10 +144,17 @@ function reconcilePublication(
   return issues.pullRequest(intent).pipe(
     Effect.flatMap((pr) => {
       if (publicationMatches(pr, stage)) return Effect.succeed(true);
-      if (stage.stage !== 'publication' || pr.kind !== 'found') return Effect.succeed(false);
-      if (pr.manualRecovery || !pr.maintenancePending) return Effect.succeed(false);
+      if (!pendingReviewedPublication(stage, pr)) return Effect.succeed(false);
       return issues.claimPublicationRetry?.(intent, stage, evidence) ?? Effect.succeed(false);
     })
+  );
+}
+function pendingReviewedPublication(stage: StageRequest, pr: PullRequestObservation) {
+  return (
+    stage.stage === 'publication' &&
+    pr.kind === 'found' &&
+    !pr.manualRecovery &&
+    pr.maintenancePending
   );
 }
 function publicationMatches(pr: PullRequestObservation, stage: StageRequest) {

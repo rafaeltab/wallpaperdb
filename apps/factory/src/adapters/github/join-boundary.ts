@@ -37,7 +37,7 @@ export async function containsRequired(
     if (!(await ancestor(project, commit, head, signal))) return false;
   return true;
 }
-export async function boundaryStillValid(
+export async function boundaryFactsValid(
   project: string,
   pin: string,
   boundary: JoinBoundary,
@@ -47,6 +47,16 @@ export async function boundaryStillValid(
   if (boundary.pin !== pin || !(await containsRequired(project, boundary.base, boundary, signal)))
     return false;
   if (!(await landingFactsValid(project, boundary, gh, signal))) return false;
+  return true;
+}
+export async function boundaryStillValid(
+  project: string,
+  pin: string,
+  boundary: JoinBoundary,
+  gh: Gh,
+  signal?: AbortSignal
+) {
+  if (!(await boundaryFactsValid(project, pin, boundary, gh, signal))) return false;
   const text = await command(
     'git',
     ['ls-remote', '--heads', 'origin', `refs/heads/${boundary.prBase}`],

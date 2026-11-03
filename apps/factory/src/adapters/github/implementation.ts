@@ -191,11 +191,15 @@ export function githubIssues(config: {
         );
         const observed = yield* publication(
           gh,
-          replay?.target ?? targetBase(intent.prBase, config.prBase)
+          replay?.comparison ?? targetBase(intent.prBase, config.prBase)
         )(intent);
-        if (replayMatches(replay, observed, intent.branch))
-          return { ...observed, reviewedCommit: originalReview(replay) };
-        return observed;
+        if (!replay || observed.kind !== 'found') return observed;
+        const matches = replayMatches(replay, observed, intent.branch);
+        return {
+          ...observed,
+          ready: observed.ready && replay.comparisonReady && !!matches,
+          ...(matches ? { reviewedCommit: originalReview(replay) } : {}),
+        };
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),
     prepare: (number) => Effect.asVoid(inspect(number, true)),

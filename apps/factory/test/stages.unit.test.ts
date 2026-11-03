@@ -954,7 +954,9 @@ it('retains review and publication authority after a replay repair correction', 
   job.change({ commit: 'd'.repeat(40), prCommit: 'd'.repeat(40), failed: false });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
   job.change({ commit: 'f'.repeat(40), repairAllowed: false });
-  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false, active: false } });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'review', ready: false, active: false },
+  });
   await job.status();
   expect(job.sends()).toBe(4);
   job.change({ repairAllowed: true });
@@ -970,7 +972,9 @@ it('retains review and publication authority after a replay repair correction', 
     },
   });
   job.change({ prCommit: 'f'.repeat(40), repairAllowed: false });
-  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false, active: false } });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'publication', ready: false, active: false },
+  });
   await job.status();
   expect(job.sends()).toBe(5);
   job.change({ repairAllowed: true });

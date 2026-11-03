@@ -1791,14 +1791,17 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const layers = z.array(layer).parse(await read(dir, 'seed.json'));
     const item = layers.find((value) => value.issue === association.issue);
     if (!item) return null;
+    const verified = await completed(dir);
+    const operation = await effective(dir);
+    // A later repair request withdraws readiness, not a completed resolver's
+    // historical completion. Its new recovery has its own active reservation.
+    const settled = operation && (await read(dir, completionName(operation)));
     return {
       ...progress,
       issue: item.issue,
       pr: item.url,
-      progress: (await completed(dir))
-        ? 'Verified; downstream readiness may proceed'
-        : progress.progress,
-      active: (await completed(dir)) ? false : progress.active,
+      progress: verified ? 'Verified; downstream readiness may proceed' : progress.progress,
+      active: settled ? false : progress.active,
     };
   };
   const repairRecoveries = async () => {

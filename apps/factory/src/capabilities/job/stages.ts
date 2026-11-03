@@ -222,7 +222,10 @@ function reconcileStage(
         evidence,
         delivery
       );
-    if (!(yield* acceptReplayRepair(issues, intent, waiting, verified))) return delivery;
+    // This run has conclusively finished. A pending journal or descendant
+    // recovery keeps the receipt unaccepted, without occupying another worker slot.
+    if (!(yield* acceptReplayRepair(issues, intent, waiting, verified)))
+      return { ...delivery, active: false };
     return yield* advance(store, execution, issues, intent, waiting, verified);
   });
 }

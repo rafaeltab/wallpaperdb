@@ -3480,10 +3480,13 @@ process.exit(result.status ?? 1);
       );
     await Effect.runPromise(jobStore.claimStage(4));
     let observedJob: import('../src/capabilities/job/index.js').Job;
+    let admissionPolicy: import('../src/capabilities/job/index.js').RecoveryAdmission = () =>
+      Effect.succeed(false);
     let depth = 0;
     let maximumDepth = 0;
     const issues = githubIssues({
       ...f.config,
+      admitRecovery: (issue) => admissionPolicy(issue),
       readyPrerequisites: () => observedJob.status().pipe(Effect.as([])),
     });
     jobRuntime = ManagedRuntime.make(
@@ -3515,7 +3518,12 @@ process.exit(result.status ?? 1);
           )
         ),
     };
-    let unrelated: Status = { kind: 'job', intent: { ...intent, id: 'unrelated', issue: 99, branch: 'unrelated' }, execution: { kind: 'absent' }, elapsedMs: 0 };
+    let unrelated: Status = {
+      kind: 'job',
+      intent: { ...intent, id: 'unrelated', issue: 99, branch: 'unrelated' },
+      execution: { kind: 'absent' },
+      elapsedMs: 0,
+    };
     const unrelatedJob: import('../src/capabilities/job/index.js').Job = {
       status: () => Effect.succeed(unrelated),
       start: () => Effect.die('Retained unrelated work must not launch again'),
@@ -3538,7 +3546,9 @@ process.exit(result.status ?? 1);
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(ScheduleStore, schedule),
-            Layer.succeed(JobPool, { job: (number) => Effect.succeed(number === 99 ? unrelatedJob : observedJob) }),
+            Layer.succeed(JobPool, {
+              job: (number) => Effect.succeed(number === 99 ? unrelatedJob : observedJob),
+            }),
             Layer.succeed(Issues, issues),
             Layer.succeed(Plan, { preview: () => Effect.die('Paused scheduler must not plan') }),
             Layer.succeed(PlanningSource, {
@@ -3549,6 +3559,7 @@ process.exit(result.status ?? 1);
       )
     );
     const scheduler = await schedulerRuntime.runPromise(Scheduler);
+    admissionPolicy = scheduler.authorizeRecovery;
     await schedulerRuntime.runPromise(scheduler.tick(f.host.base));
     const path = join(f.host.directory, 'restacker.json');
     const saved = JSON.parse(await readFile(path, 'utf8'));
@@ -3569,11 +3580,29 @@ process.exit(result.status ?? 1);
     await writeFile(path, JSON.stringify(saved));
     const retained = await Effect.runPromise(schedule.read());
     const unrelatedAdmission = { issue: 99, base: intent.base, context: '' };
-    await Effect.runPromise(schedule.save({ ...retained, revision: retained.revision + 1, concurrency: 1, allowance: 2, admissions: [admission, unrelatedAdmission] }));
+    await Effect.runPromise(
+      schedule.save({
+        ...retained,
+        revision: retained.revision + 1,
+        concurrency: 1,
+        allowance: 2,
+        admissions: [admission, unrelatedAdmission],
+      })
+    );
     await schedulerRuntime.runPromise(scheduler.status());
-    expect((await f.host.calls()).filter((call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation))).toHaveLength(0);
+    expect(
+      (await f.host.calls()).filter(
+        (call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation)
+      )
+    ).toHaveLength(0);
+    expect(await Effect.runPromise(issues.recoveries!())).toContainEqual(
+      expect.objectContaining({ issue: 4, active: false })
+    );
     if (unrelated.kind !== 'job') throw new Error('Missing unrelated job');
-    unrelated = { ...unrelated, delivery: { stage: 'publication', commit: intent.base, ready: true, landed: false } };
+    unrelated = {
+      ...unrelated,
+      delivery: { stage: 'publication', commit: intent.base, ready: true, landed: false },
+    };
     await schedulerRuntime.runPromise(scheduler.status());
     const sends = (await f.host.calls()).filter(
       (call) =>
@@ -3583,7 +3612,10 @@ process.exit(result.status ?? 1);
     );
     expect(sends).toHaveLength(1);
     expect(maximumDepth).toBeLessThan(3);
-    expect((await Effect.runPromise(schedule.read())).admissions).toEqual([admission, unrelatedAdmission]);
+    expect((await Effect.runPromise(schedule.read())).admissions).toEqual([
+      admission,
+      unrelatedAdmission,
+    ]);
     expect(await Effect.runPromise(jobStore.readStage(4))).toEqual(request);
     expect(await Effect.runPromise(jobStore.readStage(5))).toBeNull();
   } finally {

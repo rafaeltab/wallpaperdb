@@ -452,17 +452,15 @@ it.each(['implementation', 'publication'] as const)(
             overrides: { status: 'completed' },
           });
           await browserExpect
-            .poll(
-              async () => {
-                const observation = await (
-                  await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
-                ).json();
-                return {
-                  stage: observation.delivery?.stage,
-                  run: observation.execution?.run?.id,
-                };
-              }
-            )
+            .poll(async () => {
+              const observation = await (
+                await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+              ).json();
+              return {
+                stage: observation.delivery?.stage,
+                run: observation.execution?.run?.id,
+              };
+            })
             .toEqual({ stage: 'publication', run: 'run-3' });
           publication = await readFile(join(host.directory, 'pr.json'), 'utf8');
         }

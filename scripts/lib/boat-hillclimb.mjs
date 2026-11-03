@@ -4,6 +4,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { captureCommand } from "./boat-capture.mjs";
 import { assessAssetBaseline } from "./boat-547-baseline.mjs";
+import {
+	create547Preparation,
+	preparationInputs,
+	qualifiedCliSha256,
+} from "./boat-547-preparation.mjs";
 
 const contractPath = fileURLToPath(
 	new URL("../boat-workloads/547-asset-baseline.json", import.meta.url),
@@ -54,7 +59,7 @@ function publish(file, value) {
 		throw new Error("Result publication readback failed");
 }
 
-function owner(root) {
+function worktreeIdentity(root) {
 	const worktree = fs.readFileSync(path.join(root, ".worktree"), "utf8");
 	const value = (name) =>
 		worktree
@@ -74,6 +79,10 @@ function owner(root) {
 		identity.ingress > 65535
 	)
 		throw new Error("Missing generated worktree identity");
+	return identity;
+}
+
+function owner(root, identity = worktreeIdentity(root)) {
 	const enrollmentPath = path.join(root, ".boat/enrollment.json");
 	if (!fs.existsSync(enrollmentPath)) return { ...identity, worker: null };
 	const enrollment = read(enrollmentPath),
@@ -179,15 +188,33 @@ function manifest(directory) {
 	});
 }
 
-async function stopOwned(root, binding, evidence, make) {
+async function stopOwned(
+	root,
+	binding,
+	evidence,
+	make,
+	pending = false,
+	checkOwner = owner,
+) {
+	if (!binding.worker && !binding.admission)
+		return { status: "NOT_NEEDED_LOCAL_CONTROL" };
 	try {
-		if (JSON.stringify(binding) !== JSON.stringify(owner(root)))
+		if (pending) {
+			const state = read(path.join(root, ".boat/state.json"));
+			if (
+				state.admission?.token !== binding.admission ||
+				state.admission.owner?.root !== root ||
+				state.admission.owner?.key !== binding.key ||
+				state.runningSince != null
+			)
+				throw new Error("Pending admission changed; no stop authority");
+		} else if (JSON.stringify(binding) !== JSON.stringify(checkOwner(root)))
 			throw new Error("Owning worker changed; no stop authority");
 		const directory = path.join(evidence, "owning-stop");
 		const argv = [
 			"make",
 			"boat-stop",
-			`BOAT_EXPECTED_WORKER_ID=${binding.worker}`,
+			...(pending ? [] : [`BOAT_EXPECTED_WORKER_ID=${binding.worker}`]),
 			`BOAT_EXPECTED_ADMISSION=${binding.admission}`,
 		];
 		const receipt = await make(argv, {
@@ -197,10 +224,13 @@ async function stopOwned(root, binding, evidence, make) {
 		});
 		captured(directory, receipt, argv, 0);
 		const state = read(path.join(root, ".boat/state.json"));
-		const attempt = state.shutdownAttempt;
+		const selected = pending
+			? { ...state.admission, id: state.admission?.candidate?.id }
+			: state;
+		const attempt = selected.shutdownAttempt;
 		const accounted =
-			state.id === binding.worker &&
-			state.runningSince === null &&
+			selected.id === binding.worker &&
+			selected.runningSince === null &&
 			attempt?.workerId === binding.worker &&
 			attempt.status === "completed-observed" &&
 			attempt.completion?.workerId === binding.worker &&
@@ -220,20 +250,61 @@ async function stopOwned(root, binding, evidence, make) {
 				: accounted
 					? "STOPPED_ACCOUNTED_OPERATION_UNVERIFIED"
 					: "UNRESOLVED",
-			worker: state.id,
-			runningSince: state.runningSince,
+			worker: selected.id,
+			runningSince: selected.runningSince,
 			accountingAppliedAt: attempt?.accountingAppliedAt,
 			stop,
-			cost: state.cost,
+			cost: selected.cost,
 		};
 	} catch (error) {
 		return { status: "UNRESOLVED", error: error.message };
 	}
 }
 
-export async function execute547Asset(
+export async function execute547Asset(config, dependencies = {}) {
+	return execute547Phase(config, dependencies, {
+		id: "red-asset",
+		argv: read(contractPath).nativeMakeArgv,
+		code: 2,
+		inputs(root, binding) {
+			const paths = [
+				contractPath,
+				workloadPath,
+				...implementationPaths,
+				path.join(root, ".worktree"),
+			];
+			if (binding.worker) {
+				const workload = read(workloadPath);
+				for (const input of [
+					...workload.inputs.tests,
+					workload.inputs.initialLock,
+					workload.inputs.unchangedProtectedControl,
+					...read(contractPath).baselineSources,
+				]) {
+					const file = path.join(root, input.path);
+					if (sha(fs.readFileSync(file)) !== input.sha256)
+						throw new Error(`Frozen workload input changed: ${input.path}`);
+					paths.push(file);
+				}
+			}
+			return paths;
+		},
+		assess: (raw) =>
+			assessAssetBaseline(raw.stdout, raw.stderr, read(contractPath)),
+	});
+}
+
+async function execute547Phase(
 	config,
-	{ make = makeCommand, clock = monotonic, publication = publish } = {},
+	{
+		make = makeCommand,
+		clock = monotonic,
+		publication = publish,
+		binding: suppliedBinding,
+		checkOwner = owner,
+		cleanup = stopOwned,
+	} = {},
+	spec,
 ) {
 	const started = clock();
 	const deadline = Math.min(started + 180, config.coldDeadline);
@@ -247,13 +318,13 @@ export async function execute547Asset(
 		config.coldDeadline > started + 1200
 	)
 		throw new Error("Invalid worktree, round or original cold deadline");
-	const binding = owner(root);
+	const binding = suppliedBinding ?? checkOwner(root);
 	fs.mkdirSync(config.evidence, { recursive: true, mode: 0o700 });
-	const directory = path.join(config.evidence, "red-asset");
+	const directory = path.join(config.evidence, spec.id);
 	fs.mkdirSync(directory, { mode: 0o700 }); // Exclusive owning phase; capture owns a distinct absent child.
 	const result = {
 		version: 1,
-		phase: "red-asset",
+		phase: spec.id,
 		round: config.round,
 		scope: binding.worker ? "LIVE" : "LOCAL_CONTROL",
 		owner: binding,
@@ -267,46 +338,28 @@ export async function execute547Asset(
 			);
 	};
 	try {
-		const contract = read(contractPath);
-		const inputs = [
-			contractPath,
-			workloadPath,
-			...implementationPaths,
-			path.join(root, ".worktree"),
-		];
-		if (binding.worker) {
-			const workload = read(workloadPath);
-			for (const input of [
-				...workload.inputs.tests,
-				workload.inputs.initialLock,
-				workload.inputs.unchangedProtectedControl,
-				...contract.baselineSources,
-			]) {
-				const file = path.join(root, input.path);
-				if (sha(fs.readFileSync(file)) !== input.sha256)
-					throw new Error(`Frozen workload input changed: ${input.path}`);
-				inputs.push(file);
-			}
-		}
+		within();
+		await spec.prepare?.();
+		const inputs = spec.inputs(root, binding);
 		const before = inputs.map(fileIdentity);
 		result.inputs = before;
 		const preserved = () => {
 			if (
 				JSON.stringify(before) !== JSON.stringify(inputs.map(fileIdentity)) ||
-				JSON.stringify(binding) !== JSON.stringify(owner(root))
+				JSON.stringify(binding) !== JSON.stringify(checkOwner(root))
 			)
 				throw new Error("Phase source or owner changed");
 		};
 		within();
 		const command = path.join(directory, "command");
-		const receipt = await make(contract.nativeMakeArgv, {
+		const receipt = await make(spec.argv, {
 			directory: command,
 			deadline,
 			cwd: root,
 		});
-		const raw = captured(command, receipt, contract.nativeMakeArgv);
+		const raw = captured(command, receipt, spec.argv, spec.code ?? 0);
 		within();
-		result.outcome = assessAssetBaseline(raw.stdout, raw.stderr, contract);
+		result.outcome = await spec.assess(raw, { directory, receipt, within });
 		preserved();
 		within();
 		Object.assign(result, { status: "PASS", acceptedAt: clock() });
@@ -336,14 +389,354 @@ export async function execute547Asset(
 			}
 		};
 		record();
-		if (binding.worker)
-			result.cleanup = await stopOwned(root, binding, config.evidence, make);
+		result.cleanup = await cleanup(root, binding, config.evidence, make);
 		record();
 		try {
 			manifest(directory);
 		} catch (manifestError) {
 			result.manifestError = manifestError.message;
 		}
+		throw error;
+	}
+}
+
+export async function execute547Preparation(config, dependencies = {}) {
+	if (
+		Object.keys(config).some(
+			(key) =>
+				!["worktree", "round", "evidence", "cacheNamespace"].includes(key),
+		)
+	)
+		throw new Error(
+			"Preparation configuration accepts only worktree, round, evidence and cacheNamespace",
+		);
+	const {
+		make = makeCommand,
+		clock = monotonic,
+		publication = publish,
+		observeCli = fileIdentity,
+	} = dependencies;
+	const root = fs.realpathSync(config.worktree);
+	if (
+		root !== config.worktree ||
+		!/^[a-zA-Z0-9_-]+$/.test(config.round) ||
+		!path.isAbsolute(config.evidence)
+	)
+		throw new Error(
+			"Invalid preparation worktree, round or evidence destination",
+		);
+	const identity = worktreeIdentity(root);
+	const namespace = config.cacheNamespace ?? `547-${identity.key}`;
+	if (!/^[a-z0-9][a-z0-9-]*$/.test(namespace))
+		throw new Error("Invalid preparation cache namespace");
+	const enrollmentFile = path.join(root, ".boat/enrollment.json"),
+		stateFile = path.join(root, ".boat/state.json");
+	const previous = fs.existsSync(stateFile) ? read(stateFile) : {};
+	if (
+		previous.runningSince != null ||
+		(previous.admission &&
+			previous.admission.status !== "published" &&
+			previous.admission.runningSince != null)
+	)
+		throw new Error(
+			"Preparation requires no prior running or pending compute obligation",
+		);
+	fs.mkdirSync(path.dirname(config.evidence), { recursive: true, mode: 0o700 });
+	fs.mkdirSync(config.evidence, { mode: 0o700 });
+	let binding = { ...identity, worker: null },
+		workload,
+		coldStarted,
+		coldDeadline;
+	let creationMayHaveStarted = false,
+		cleanupResult;
+	const results = [];
+	const immutablePaths = [
+		...new Set([
+			workloadPath,
+			contractPath,
+			...implementationPaths,
+			...preparationInputs,
+			...["../boat.mjs", "../boat-hillclimb.mjs", "../boat-route.mk"].map(
+				(file) => fileURLToPath(new URL(file, import.meta.url)),
+			),
+			path.join(root, ".worktree"),
+			path.join(root, "Makefile"),
+		]),
+	];
+	const immutable = immutablePaths.map(fileIdentity);
+	const preservedImplementation = () => {
+		if (
+			JSON.stringify(immutable) !==
+			JSON.stringify(immutablePaths.map(fileIdentity))
+		)
+			throw new Error(
+				"Preparation implementation or generated worktree identity changed",
+			);
+	};
+	const summary = {
+		version: 1,
+		round: config.round,
+		phase: "preparation",
+		owner: binding,
+		phases: results,
+	};
+	const currentOwner = () => (binding.worker ? owner(root, identity) : binding);
+	const cleanup = async () => {
+		if (cleanupResult) return cleanupResult;
+		cleanupResult = { status: "UNRESOLVED", error: "Cleanup did not complete" };
+		try {
+			if (!binding.worker && creationMayHaveStarted) {
+				const state = read(stateFile),
+					a = state.admission;
+				if (
+					a?.token !== previous.admission?.token &&
+					a?.owner?.root === root &&
+					a?.owner?.key === identity.key &&
+					typeof a.token === "string" &&
+					/^[A-Za-z0-9_-]+$/.test(a.token)
+				) {
+					if (a.status === "published") binding = owner(root, identity);
+					else {
+						cleanupResult = await stopOwned(
+							root,
+							{
+								...identity,
+								worker: a.candidate?.id ?? null,
+								admission: a.token,
+							},
+							config.evidence,
+							make,
+							true,
+						);
+						return cleanupResult;
+					}
+				} else if (
+					state.runningSince != null ||
+					(a && a.status !== "published") ||
+					state.id !== previous.id
+				)
+					throw new Error(
+						"Created compute ownership is unresolved; no stop authority",
+					);
+			}
+			cleanupResult = await stopOwned(
+				root,
+				binding,
+				config.evidence,
+				make,
+				false,
+				() => owner(root, identity),
+			);
+			return cleanupResult;
+		} catch (error) {
+			cleanupResult = { status: "UNRESOLVED", error: error.message };
+			return cleanupResult;
+		}
+	};
+	const run = async (id, argv, options = {}) => {
+		const internal = { ...config, coldDeadline: coldDeadline ?? clock() + 180 };
+		const result = await execute547Phase(
+			internal,
+			{ make, clock, publication, binding, checkOwner: currentOwner, cleanup },
+			{
+				id,
+				argv,
+				code: options.code,
+				prepare: options.prepare,
+				inputs: () => {
+					preservedImplementation();
+					return [
+						...new Set([...immutablePaths, ...(workload?.inputs() ?? [])]),
+					].filter((file) => !options.mutable?.includes(file));
+				},
+				assess: options.assess ?? (() => ({ completed: true })),
+			},
+		);
+		results.push({
+			phase: id,
+			status: result.status,
+			started: result.started,
+			acceptedAt: result.acceptedAt,
+			deadline: result.deadline,
+			outcome: result.outcome,
+		});
+		return result;
+	};
+	const enrollment = () => {
+		const value = read(enrollmentFile);
+		if (
+			value.root !== root ||
+			value.key !== identity.key ||
+			value.size !== "large" ||
+			value.mode !== "development" ||
+			value.cohort !== "c" ||
+			value.lifecycle !== "fresh-after-stop" ||
+			value.cacheNamespace !== namespace
+		)
+			throw new Error("Measured enrollment does not match this preparation");
+		const cli = path.join(root, ".mise/boat/boat");
+		const observation = observeCli(cli);
+		if (observation.sha256 !== qualifiedCliSha256)
+			throw new Error("Post-enrollment CLI identity mismatch");
+		return { ...value, cli: observation };
+	};
+	const event = (kind, receipt) => {
+		const matches = fs
+			.readFileSync(path.join(root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse)
+			.filter(
+				(e) =>
+					e.kind === kind && Date.parse(e.at) >= Date.parse(receipt.began.utc),
+			);
+		if (
+			matches.length !== 1 ||
+			matches[0].workerId !==
+				(binding.worker ?? owner(root, identity).worker) ||
+			matches[0].completed !== true
+		)
+			throw new Error(`Missing current ${kind} completion event`);
+		return matches[0];
+	};
+	try {
+		workload = create547Preparation(root);
+		if (fs.existsSync(enrollmentFile)) summary.enrollment = enrollment();
+		else
+			summary.enrollment = (
+				await run(
+					"enroll",
+					[
+						"make",
+						"boat-enroll",
+						"MODE=development",
+						"SIZE=large",
+						"COHORT=c",
+						"LIFECYCLE=fresh-after-stop",
+						`BOAT_CACHE_NAMESPACE=${namespace}`,
+					],
+					{ assess: () => enrollment() },
+				)
+			).outcome;
+		// Enrollment/bootstrap is local. The original cold clock begins here once.
+		coldStarted = clock();
+		coldDeadline = coldStarted + 1200;
+		summary.coldStarted = coldStarted;
+		summary.coldDeadline = coldDeadline;
+		creationMayHaveStarted = true;
+		await run("prepare-toolchain", ["make", "boat-prepare-toolchain"], {
+			assess: (_raw, { receipt }) => ({
+				owner: owner(root, identity),
+				event: event("toolchain-preparation", receipt),
+			}),
+		});
+		binding = owner(root, identity);
+		if (previous.id && binding.worker === previous.id)
+			throw new Error("Fresh preparation retained the stopped predecessor");
+		summary.owner = binding;
+		const tests = (name) => [
+			"make",
+			"test-focused",
+			`PACKAGE=${name === "auth" ? "asset" : name}`,
+			`ARGS=--config vitest.integration.config.ts ${name === "auth" ? "test/protected-broker.integration.test.ts test/broker-acquisition-errors.integration.test.ts" : "test/broker-acquisition"}`,
+		];
+		for (const name of ["user", "wallpaper", "asset", "auth"])
+			await run(`red-${name}`, tests(name), {
+				code: 2,
+				prepare: name === "user" ? workload.stageTests : undefined,
+				assess: (raw, { directory }) => {
+					const outcome = workload.assessTests(raw, `red-${name}`);
+					if (name === "user")
+						publish(
+							path.join(directory, "initial-worker.json"),
+							read(stateFile),
+						);
+					return outcome;
+				},
+			});
+		await run("toolchain", ["make", "toolchain"], {
+			prepare: workload.stageRepair,
+		});
+		await run(
+			"generate",
+			["make", "run", "PACKAGE=scripts", "SCRIPT=dependencies:lock"],
+			{
+				mutable: [path.join(root, "pnpm-lock.yaml")],
+				assess: (_raw, { directory }) => workload.acceptGenerated(directory),
+			},
+		);
+		await run("frozen", ["make", "build", "PACKAGE=vitest-config", "FORCE=1"]);
+		await run(
+			"noop",
+			["make", "run", "PACKAGE=scripts", "SCRIPT=dependencies:lock"],
+			{ assess: () => workload.acceptNoop() },
+		);
+		for (const name of ["user", "wallpaper", "asset", "auth"])
+			await run(`green-${name}`, tests(name), {
+				assess: (raw) => workload.assessTests(raw, `green-${name}`),
+			});
+		for (const name of ["user", "wallpaper", "asset"])
+			await run(`check-${name}`, ["make", "check", `PACKAGE=${name}`]);
+		await run(
+			"metadata",
+			[
+				"make",
+				"docker-run",
+				"ARGS=node scripts/boat-workloads/547-runtime.cjs metadata",
+			],
+			{ assess: workload.acceptMetadata },
+		);
+		await run("chromium-install", [
+			"make",
+			"run",
+			"PACKAGE=web",
+			"SCRIPT=test:browser:install",
+		]);
+		await run(
+			"chromium-launch",
+			[
+				"make",
+				"docker-run",
+				"ARGS=node scripts/boat-workloads/547-runtime.cjs chromium",
+			],
+			{ assess: workload.acceptChromium },
+		);
+		await run("prepare-infra-images", ["make", "boat-prepare-infra-images"], {
+			assess: (raw, { receipt }) => ({
+				...workload.acceptImages(raw, identity.project),
+				event: event("infra-image-preparation", receipt),
+			}),
+		});
+		workload.verify(true);
+		preservedImplementation();
+		Object.assign(summary, {
+			status: "PASS_PREDEV_THROUGH_IMAGES",
+			scope: "LIVE",
+			elapsed: clock() - coldStarted,
+			compute: "OPEN",
+			next: "HOLD_BEFORE_SDK8",
+		});
+		publication(path.join(config.evidence, "preparation-result.json"), summary);
+		manifest(config.evidence);
+		workload.verify(true);
+		preservedImplementation();
+		if (clock() >= coldDeadline)
+			throw new Error(
+				"Original cold deadline exceeded before final publication",
+			);
+		return summary;
+	} catch (error) {
+		delete summary.next;
+		Object.assign(summary, {
+			status: "FAIL",
+			error: error.message,
+			owner: binding,
+			cleanup: await cleanup(),
+			failedAt: clock(),
+		});
+		summary.compute = summary.cleanup.status;
+		publish(path.join(config.evidence, "preparation-result.json"), summary);
+		manifest(config.evidence);
 		throw error;
 	}
 }

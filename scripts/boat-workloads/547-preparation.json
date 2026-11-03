@@ -1,0 +1,471 @@
+{
+	"version": 1,
+	"cliSha256": "5d7933a238dcea0446bbbee0e2506692961d16537b9960003e4ece9ecb1ec498",
+	"baselines": {
+		"red-user": {
+			"files": [
+				{
+					"project": "user-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"collected": 3,
+					"failed": 3
+				}
+			],
+			"cases": [
+				{
+					"project": "user-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after timeout",
+					"result": "failed"
+				},
+				{
+					"project": "user-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after cancellation",
+					"result": "failed"
+				},
+				{
+					"project": "user-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after disposal",
+					"result": "failed"
+				}
+			],
+			"collected": 3,
+			"failed": 3,
+			"anchor": "test/broker-acquisition.integration.test.ts:50"
+		},
+		"red-wallpaper": {
+			"files": [
+				{
+					"project": "wallpaper-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"collected": 3,
+					"failed": 3
+				}
+			],
+			"cases": [
+				{
+					"project": "wallpaper-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after timeout",
+					"result": "failed"
+				},
+				{
+					"project": "wallpaper-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after cancellation",
+					"result": "failed"
+				},
+				{
+					"project": "wallpaper-integration",
+					"file": "test/broker-acquisition.integration.test.ts",
+					"name": "closes the native silent-peer socket after disposal",
+					"result": "failed"
+				}
+			],
+			"collected": 3,
+			"failed": 3,
+			"anchor": "test/broker-acquisition.integration.test.ts:55"
+		},
+		"red-auth": {
+			"files": [
+				{
+					"project": "asset-integration",
+					"file": "test/protected-broker.integration.test.ts",
+					"collected": 3,
+					"failed": 0
+				},
+				{
+					"project": "asset-integration",
+					"file": "test/broker-acquisition-errors.integration.test.ts",
+					"collected": 3,
+					"failed": 1
+				}
+			],
+			"cases": [
+				{
+					"project": "asset-integration",
+					"file": "test/protected-broker.integration.test.ts",
+					"name": "asset-integration  test/protected-broker.integration.test.ts (3 tests)",
+					"result": "passed"
+				},
+				{
+					"project": "asset-integration",
+					"file": "test/broker-acquisition-errors.integration.test.ts",
+					"name": "preserves authorization denial across multiple resolved address candidates without an abort signal",
+					"result": "passed"
+				},
+				{
+					"project": "asset-integration",
+					"file": "test/broker-acquisition-errors.integration.test.ts",
+					"name": "closes the native silent-peer socket on explicit abort without dialing the remaining candidate",
+					"result": "failed"
+				},
+				{
+					"project": "asset-integration",
+					"file": "test/broker-acquisition-errors.integration.test.ts",
+					"name": "preserves healthy authenticated acquisition and native broker shutdown with multiple candidates",
+					"result": "passed"
+				}
+			],
+			"collected": 6,
+			"failed": 1,
+			"anchor": "test/broker-acquisition-errors.integration.test.ts:76"
+		}
+	},
+	"lock": {
+		"counts": {
+			"native-deprecation": 17,
+			"nats-consumer": 13,
+			"nats-snapshot": 1,
+			"patch-declaration": 1,
+			"peer-context": 3
+		},
+		"edits": [
+			{
+				"before": [],
+				"after": [
+					"  nats@2.29.3:\n",
+					"    hash: 6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe\n",
+					"    path: patches/nats-2.29.3.patch\n"
+				],
+				"section": "patchedDependencies:\n",
+				"owner": null,
+				"kind": "patch-declaration",
+				"anchorBefore": "    path: patches/stryker-vitest-10.0.0.patch\n",
+				"anchorAfter": "\n"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/asset:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/color-extractor:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/gateway:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/ingestor:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/tags:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/user:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/variant-generator:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  apps/wallpaper:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  packages/core:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  packages/events:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  packages/test-utils:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  packages/testcontainers:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["        version: 2.29.3\n"],
+				"after": [
+					"        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)\n"
+				],
+				"section": "importers:\n",
+				"owner": "  packages/url-ipv4-resolver:\n",
+				"kind": "nats-consumer"
+			},
+			{
+				"before": ["    deprecated: 'Merged into tsx: https://tsx.is'\n"],
+				"after": ["    deprecated: 'Merged into tsx: https://tsx.hirok.io'\n"],
+				"section": "packages:\n",
+				"owner": "  '@esbuild-kit/core-utils@3.3.2':\n",
+				"kind": "native-deprecation"
+			},
+			{
+				"before": ["    deprecated: 'Merged into tsx: https://tsx.is'\n"],
+				"after": ["    deprecated: 'Merged into tsx: https://tsx.hirok.io'\n"],
+				"section": "packages:\n",
+				"owner": "  '@esbuild-kit/esm-loader@2.6.5':\n",
+				"kind": "native-deprecation"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: The use of process spans has been removed from Messaging Semantic Conventions. It is now recommended to connect pub/sub spans via Span Links. See https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/ for details.\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/propagation-utils@0.30.16':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: Package no longer supported. See https://github.com/open-telemetry/opentelemetry-js/pull/7077\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/propagator-jaeger@1.27.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: Package no longer supported. See https://github.com/open-telemetry/opentelemetry-js/pull/7077\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/propagator-jaeger@1.29.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: Package no longer supported. See https://github.com/open-telemetry/opentelemetry-js/pull/7077\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/propagator-jaeger@1.30.1':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: Package no longer supported. See https://github.com/open-telemetry/opentelemetry-js/pull/7077\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/propagator-jaeger@2.11.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: ^18.19.0 || >=20.6.0}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-base@1.27.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-base@1.29.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-base@1.30.1':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-base@2.11.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: ^18.19.0 || >=20.6.0}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-node@1.27.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-node@1.29.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-node@1.30.1':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=14'}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-node@2.11.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: ^18.19.0 || >=20.6.0}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": ["    deprecated: Use @opentelemetry/sdk-trace package\n"],
+				"section": "packages:\n",
+				"owner": "  '@opentelemetry/sdk-trace-web@2.11.0':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: ^18.19.0 || >=20.6.0}\n",
+				"anchorAfter": "    peerDependencies:\n"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.\n"
+				],
+				"section": "packages:\n",
+				"owner": "  '@smithy/smithy-client@4.10.2':\n",
+				"kind": "native-deprecation",
+				"anchorBefore": "    engines: {node: '>=18.0.0'}\n",
+				"anchorAfter": "\n"
+			},
+			{
+				"before": [
+					"      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))\n"
+				],
+				"after": [
+					"      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))\n"
+				],
+				"section": "snapshots:\n",
+				"owner": "  '@vitest/coverage-v8@5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)':\n",
+				"kind": "peer-context"
+			},
+			{
+				"before": [
+					"      '@vitest/browser': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)\n"
+				],
+				"after": [
+					"      '@vitest/browser': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))(vitest@5.0.2)\n"
+				],
+				"section": "snapshots:\n",
+				"owner": "  '@vitest/coverage-v8@5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)':\n",
+				"kind": "peer-context"
+			},
+			{
+				"before": [
+					"      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))\n"
+				],
+				"after": [
+					"      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))\n"
+				],
+				"section": "snapshots:\n",
+				"owner": "  '@vitest/ui@5.0.2(vitest@5.0.2)':\n",
+				"kind": "peer-context"
+			},
+			{
+				"before": ["  nats@2.29.3:\n"],
+				"after": [
+					"  nats@2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe):\n"
+				],
+				"section": "snapshots:\n",
+				"owner": "  nats@2.29.3:\n",
+				"kind": "nats-snapshot"
+			}
+		]
+	},
+	"defaultImages": [
+		"node:22.22.3-alpine",
+		"grafana/otel-lgtm:latest",
+		"nats:2-alpine",
+		"natsio/nats-box:latest",
+		"opensearchproject/opensearch:2.11.0",
+		"postgres:16-alpine",
+		"redis:7-alpine",
+		"chrislusf/seaweedfs:4.47"
+	]
+}

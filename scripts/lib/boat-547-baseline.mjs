@@ -4,13 +4,7 @@ const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const refuse = (reason) => {
 	throw new Error(reason);
 };
-export function assessAssetBaseline(stdout, stderr, contract) {
-	const out = stripVTControlCharacters(
-			new TextDecoder("utf-8", { fatal: true }).decode(stdout),
-		),
-		err = stripVTControlCharacters(
-			new TextDecoder("utf-8", { fatal: true }).decode(stderr),
-		);
+export function refuseTestSetup(out, err, selection) {
 	// This wrapper is evidence of the exact Vitest command failing, never an outcome verdict.
 	const expectedVitestWrapper = (line) => {
 		const m = line
@@ -27,14 +21,10 @@ export function assessAssetBaseline(stdout, stderr, contract) {
 		words.splice(at, 2);
 		return equal(
 			words.sort(),
-			[
-				"--maxWorkers=1",
-				"--no-file-parallelism",
-				"test/broker-acquisition",
-			].sort(),
+			["--maxWorkers=1", "--no-file-parallelism", ...selection].sort(),
 		);
 	};
-	const setupView = (out + "\n" + err)
+	const setupView = `${out}\n${err}`
 		.split("\n")
 		.filter((line) => !expectedVitestWrapper(line))
 		.join("\n");
@@ -44,6 +34,16 @@ export function assessAssetBaseline(stdout, stderr, contract) {
 		)
 	)
 		refuse("SETUP_OR_COLLECTION");
+}
+
+export function assessAssetBaseline(stdout, stderr, contract) {
+	const out = stripVTControlCharacters(
+		new TextDecoder("utf-8", { fatal: true }).decode(stdout),
+	);
+	const err = stripVTControlCharacters(
+		new TextDecoder("utf-8", { fatal: true }).decode(stderr),
+	);
+	refuseTestSetup(out, err, ["test/broker-acquisition"]);
 	const expected = contract.expectedCaseSet;
 	const key = (x) => JSON.stringify([x.project, x.file, x.name]);
 	const wanted = new Map(expected.map((x) => [key(x), x]));
@@ -80,14 +80,22 @@ export function assessAssetBaseline(stdout, stderr, contract) {
 		!/Tests\s+16 failed\s*\|\s*2 passed\s*\(18\)/.test(out)
 	)
 		refuse("CASE_SET");
+	assessBaselineAssertions(err, expected);
+	return { files: 6, collected: 18, failed: 16, passed: 2 };
+}
+
+export function assessBaselineAssertions(err, expected) {
+	const wanted = new Map(
+		expected.map((x) => [JSON.stringify([x.project, x.file, x.name]), x]),
+	);
 	const failures = new Map();
 	let pending = [];
 	for (const line of err.split("\n")) {
 		const m = line.match(
-			/^\s*FAIL\s+asset-integration\s+(test\/[^\s]+\.ts)\s+>\s+(.+?)\s*$/,
+			/^\s*FAIL\s+(\S+)\s+(test\/[^\s]+\.ts)\s+>\s+(.+?)\s*$/,
 		);
 		if (m) {
-			const k = JSON.stringify(["asset-integration", m[1], m[2]]);
+			const k = JSON.stringify([m[1], m[2], m[3]]);
 			if (failures.has(k) || pending.includes(k)) refuse("ASSERTION_CASE_SET");
 			pending.push(k);
 			continue;
@@ -112,12 +120,15 @@ export function assessAssetBaseline(stdout, stderr, contract) {
 			}
 		}
 	}
-	if (pending.length || failures.size !== 16) refuse("ASSERTION_CASE_SET");
+	if (
+		pending.length ||
+		failures.size !== expected.filter((c) => c.result === "failed").length
+	)
+		refuse("ASSERTION_CASE_SET");
 	for (const [k, w] of wanted)
 		if (
 			w.result === "failed" &&
 			(!failures.get(k)?.assertion || !failures.get(k)?.anchor)
 		)
 			refuse("ASSERTION_FAMILY");
-	return { files: 6, collected: 18, failed: 16, passed: 2 };
 }

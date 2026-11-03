@@ -1134,16 +1134,22 @@ async function stop(
 			async () => {
 				// A daemon's idle/cost decision belongs to the generation it observed.
 				// Explicit stop/settle calls still clean all of their owned obligations.
-				if (expectedWorkerId) {
+				if (expectedWorkerId || expectedAdmissionToken) {
 					const current = read(stateFile),
 						admission = current.admission;
 					if (
-						current.id !== expectedWorkerId ||
-						(admission &&
-							(admission.status !== "published" ||
-								admission.candidate?.id !== expectedWorkerId)) ||
+						(expectedWorkerId &&
+							(current.id !== expectedWorkerId ||
+								(admission &&
+									(admission.status !== "published" ||
+										admission.candidate?.id !== expectedWorkerId)))) ||
 						(expectedAdmissionToken &&
-							admission?.token !== expectedAdmissionToken)
+							(admission?.token !== expectedAdmissionToken ||
+								admission.owner?.root !== root ||
+								admission.owner?.key !== config.key ||
+								(!expectedWorkerId &&
+									current.runningSince != null &&
+									current.id !== admission.candidate?.id)))
 					)
 						return false;
 				}
@@ -2158,7 +2164,7 @@ try {
 			throw new Error("Invalid expected stop worker identity");
 		if (
 			expectedAdmissionToken &&
-			(!expectedWorkerId || !/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken))
+			!/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken)
 		)
 			throw new Error("Invalid expected stop admission identity");
 		const stopped = await stop(action === "delete", undefined, {

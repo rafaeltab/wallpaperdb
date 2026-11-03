@@ -610,6 +610,13 @@ export async function execute547Preparation(config, dependencies = {}) {
 			throw new Error(`Missing current ${kind} completion event`);
 		return matches[0];
 	};
+	const prepareImages = (id) =>
+		run(id, ["make", "boat-prepare-infra-images"], {
+			assess: (raw, { receipt }) => ({
+				...workload.acceptImages(raw, identity.project),
+				event: event("infra-image-preparation", receipt),
+			}),
+		});
 	try {
 		workload = create547Preparation(root, dependencies.objects);
 		if (fs.existsSync(enrollmentFile)) summary.enrollment = enrollment();
@@ -645,6 +652,15 @@ export async function execute547Preparation(config, dependencies = {}) {
 		if (previous.id && binding.worker === previous.id)
 			throw new Error("Fresh preparation retained the stopped predecessor");
 		summary.owner = binding;
+		if (previous.developmentWanted) {
+			await run("prepare-workspace", ["make", "boat-prepare-workspace"], {
+				assess: (_raw, { receipt }) => ({
+					owner: owner(root, identity),
+					event: event("workspace-preparation", receipt),
+				}),
+			});
+			await prepareImages("prepare-images-before-restoration");
+		}
 		const tests = (name) => [
 			"make",
 			"test-focused",
@@ -712,12 +728,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			],
 			{ assess: workload.acceptChromium },
 		);
-		await run("prepare-infra-images", ["make", "boat-prepare-infra-images"], {
-			assess: (raw, { receipt }) => ({
-				...workload.acceptImages(raw, identity.project),
-				event: event("infra-image-preparation", receipt),
-			}),
-		});
+		await prepareImages("prepare-infra-images");
 		workload.verify(true);
 		preservedImplementation();
 		Object.assign(summary, {

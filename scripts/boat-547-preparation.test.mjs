@@ -135,7 +135,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -262,6 +262,71 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 		],
 		3,
 	);
+});
+
+async function stoppedWantedDevelopment(f) {
+	f.config.cacheNamespace = "reused-fixture";
+	f.env.CONTROL_REQUIRE_RECONCILIATION_PREPARATION = "1";
+	await f.make(["make", "boat-enroll", "BOAT_CACHE_NAMESPACE=reused-fixture"], {
+		cwd: f.root,
+		directory: path.join(f.root, "enrollment-setup"),
+		deadline: mono() + 10,
+	});
+	fs.writeFileSync(
+		path.join(f.root, ".boat/state.json"),
+		JSON.stringify({
+			id: "stopped-predecessor",
+			runningSince: null,
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	return f;
+}
+
+test("547 reused wanted development prepares workspace and images before its first ordinary command", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	await stoppedWantedDevelopment(f);
+	const outcome = await f.run().then(
+		(value) => ({ value }),
+		(error) => ({ error }),
+	);
+	try {
+		if (outcome.error) {
+			const file = path.join(f.config.evidence, "red-user/command/stderr.raw");
+			assert.fail(
+				outcome.error.message +
+					(fs.existsSync(file) ? "\n" + fs.readFileSync(file, "utf8") : ""),
+			);
+		}
+		assert.equal(outcome.value.status, "PASS_STARTUP_READY");
+		assert.deepEqual(json(path.join(f.root, "intent-at-first-ordinary.json")), {
+			wanted: true,
+			pending: true,
+		});
+		const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+		const firstUser = commands.findIndex(
+			(a) => a[1] === "test-focused" && a.includes("PACKAGE=user"),
+		);
+		assert.deepEqual(
+			commands.slice(1, firstUser).map((a) => a[1]),
+			[
+				"boat-prepare-toolchain",
+				"boat-prepare-workspace",
+				"boat-prepare-infra-images",
+			],
+		);
+		assert.equal(
+			commands.filter((a) => a[1] === "boat-prepare-infra-images").length,
+			2,
+		);
+		const prep = json(path.join(f.config.evidence, "preparation-result.json"));
+		assert.equal(prep.coldDeadline - prep.coldStarted, 1200);
+		assert.ok(prep.phases.every((p) => p.deadline <= prep.coldDeadline));
+	} finally {
+		if (outcome.value) await outcome.value.serving.stop();
+	}
 });
 
 test("547 ready fixtures run concurrently with independent native listeners", async (t) => {
@@ -1071,95 +1136,119 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
-	test("547 qualified public ready entry owns preparation, stdin replacement and cleanup", {
-		timeout: 30000,
-	}, async (t) => {
-		const f = preparationFixture(t, true);
-		f.config.until = "ready";
-		await (await f.servingPorts()).release();
-		fs.symlinkSync(
-			path.join(repository, "scripts"),
-			path.join(f.root, "scripts"),
-		);
-		fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
-		fs.copyFileSync(
-			process.env.BOAT_547_QUALIFIED_CLI,
-			path.join(f.root, ".mise/boat/boat"),
-		);
-		const file = path.join(f.root, "config.json");
-		fs.writeFileSync(file, JSON.stringify(f.config));
-		const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
-		const capture = captureServingCommand({
-			argv: [make, "boat-hillclimb-547"],
-			directory: path.join(f.root, "entry-capture"),
-			cwd: f.root,
-			env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
-			input: true,
-		});
-		try {
-			const deadline = mono() + 15;
-			const resultFile = path.join(f.config.evidence, "startup/result.json");
-			while (!fs.existsSync(resultFile)) {
-				capture.assertRunning();
-				assert.ok(
-					mono() < deadline,
-					"Public ready entry must publish inside control deadline",
-				);
-				await new Promise((resolve) => setTimeout(resolve, 25));
-			}
-			const result = json(resultFile);
-			assert.equal(result.status, "PASS_STARTUP_READY", JSON.stringify(result));
-			assert.equal(result.containers.length, 10);
-			assert.equal(result.routes.length, 8);
-			assert.ok(result.acceptedAt < result.deadline);
-			capture.writeInput(
-				`${JSON.stringify({ action: "replace-preview", worker: result.owner.worker, admission: result.owner.admission, generation: result.preview.generation })}\n`,
+	for (const wanted of [false, true])
+		test(`547 qualified public ready entry owns preparation, stdin replacement and cleanup, previousWanted=${wanted}`, {
+			timeout: 30000,
+		}, async (t) => {
+			const f = preparationFixture(t, true);
+			f.config.until = "ready";
+			if (wanted) await stoppedWantedDevelopment(f);
+			await (await f.servingPorts()).release();
+			fs.symlinkSync(
+				path.join(repository, "scripts"),
+				path.join(f.root, "scripts"),
 			);
-			const changedFile = path.join(
-				f.config.evidence,
-				"startup/preview-replacement.json",
+			fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+			fs.copyFileSync(
+				process.env.BOAT_547_QUALIFIED_CLI,
+				path.join(f.root, ".mise/boat/boat"),
 			);
-			while (
-				!fs.existsSync(changedFile) ||
-				json(changedFile).status === "RUNNING"
-			) {
-				capture.assertRunning();
-				assert.ok(
-					mono() < deadline,
-					"Public replacement must finish inside control deadline",
+			const file = path.join(f.root, "config.json");
+			fs.writeFileSync(file, JSON.stringify(f.config));
+			const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
+			const capture = captureServingCommand({
+				argv: [make, "boat-hillclimb-547"],
+				directory: path.join(f.root, "entry-capture"),
+				cwd: f.root,
+				env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
+				input: true,
+			});
+			try {
+				const deadline = mono() + 15;
+				const resultFile = path.join(f.config.evidence, "startup/result.json");
+				while (!fs.existsSync(resultFile)) {
+					capture.assertRunning();
+					assert.ok(
+						mono() < deadline,
+						"Public ready entry must publish inside control deadline",
+					);
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				const result = json(resultFile);
+				assert.equal(
+					result.status,
+					"PASS_STARTUP_READY",
+					JSON.stringify(result),
 				);
-				await new Promise((resolve) => setTimeout(resolve, 25));
+				assert.equal(result.containers.length, 10);
+				assert.equal(result.routes.length, 8);
+				assert.ok(result.acceptedAt < result.deadline);
+				if (wanted) {
+					assert.deepEqual(
+						json(path.join(f.root, "intent-at-first-ordinary.json")),
+						{ wanted: true, pending: true },
+					);
+					const prep = json(
+						path.join(f.config.evidence, "preparation-result.json"),
+					);
+					for (const name of [
+						"prepare-workspace",
+						"prepare-images-before-restoration",
+						"prepare-infra-images",
+					])
+						assert.equal(
+							prep.phases.find((p) => p.phase === name)?.status,
+							"PASS",
+						);
+				}
+				capture.writeInput(
+					`${JSON.stringify({ action: "replace-preview", worker: result.owner.worker, admission: result.owner.admission, generation: result.preview.generation })}\n`,
+				);
+				const changedFile = path.join(
+					f.config.evidence,
+					"startup/preview-replacement.json",
+				);
+				while (
+					!fs.existsSync(changedFile) ||
+					json(changedFile).status === "RUNNING"
+				) {
+					capture.assertRunning();
+					assert.ok(
+						mono() < deadline,
+						"Public replacement must finish inside control deadline",
+					);
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				const changed = json(changedFile);
+				assert.equal(
+					changed.status,
+					"PASS_PREVIEW_REPLACEMENT",
+					JSON.stringify(changed),
+				);
+				assert.notEqual(changed.preview.generation, result.preview.generation);
+				assert.equal(changed.next, "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST");
+			} finally {
+				await capture.stop();
 			}
-			const changed = json(changedFile);
 			assert.equal(
-				changed.status,
-				"PASS_PREVIEW_REPLACEMENT",
-				JSON.stringify(changed),
+				json(path.join(f.root, ".boat/state.json")).runningSince,
+				null,
 			);
-			assert.notEqual(changed.preview.generation, result.preview.generation);
-			assert.equal(changed.next, "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST");
-		} finally {
-			await capture.stop();
-		}
-		assert.equal(
-			json(path.join(f.root, ".boat/state.json")).runningSince,
-			null,
-		);
-		assert.equal(
-			jsonLines(path.join(f.root, "commands.jsonl")).filter(
-				(a) => a[1] === "boat-stop",
-			).length,
-			1,
-		);
-		assert.equal(
-			json(path.join(f.root, "entry-capture/disposal.json")).pipesClosed,
-			true,
-		);
-		assert.deepEqual(
-			json(path.join(f.root, "entry-capture/disposal.json")).unresolved,
-			[],
-		);
-	});
+			assert.equal(
+				jsonLines(path.join(f.root, "commands.jsonl")).filter(
+					(a) => a[1] === "boat-stop",
+				).length,
+				1,
+			);
+			assert.equal(
+				json(path.join(f.root, "entry-capture/disposal.json")).pipesClosed,
+				true,
+			);
+			assert.deepEqual(
+				json(path.join(f.root, "entry-capture/disposal.json")).unresolved,
+				[],
+			);
+		});
 
 	test("547 qualified public missing artifact refuses missing post-bootstrap artifact before compute", (t) => {
 		const f = preparationFixture(t, true);

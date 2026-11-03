@@ -13862,6 +13862,8 @@ const fs=require('fs'),path=require('path'),cp=require('child_process'),argv=pro
 if(argv[0]==='install'){
  if(JSON.stringify(argv)!==JSON.stringify(['install','--frozen-lockfile']))throw Error('frozen flags changed');
  fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'frozen',argv})+'\\n');
+ fs.writeFileSync(path.join(control,'frozen-entered'),'yes');
+ while(fs.existsSync(path.join(control,'hold-frozen'))&&!fs.existsSync(path.join(control,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  if(fs.readFileSync('pnpm-lock.yaml','utf8')!=='fixture valid lock\\n'){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}
  process.exit(0);
 }
@@ -13914,6 +13916,117 @@ process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-original`)},argv,{stdio:'inh
 		},
 	};
 }
+
+test("explicit workspace preparation awaits frozen dependencies and defers fresh development restoration", async (t) => {
+	const f = await toolchainCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
+	);
+	flag(f, "hold-frozen");
+	const command = f.run("boat-prepare-workspace");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "frozen-entered"));
+		}, "workspace frozen-install barrier");
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		assertPreparationDefersDevelopment(f);
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.equal(result.status, 0, result.output);
+	assert.ok(f.json(".boat/prepared.json").dependencies);
+	assertPreparationDefersDevelopment(f);
+	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.findLast((x) => x.kind === "workspace-preparation");
+	assert.equal(event.workerId, "fake-new-worker");
+	assert.equal(event.completed, true);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("explicit workspace preparation rejects stale frozen inputs without consuming restoration", async (t) => {
+	const f = await toolchainCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	f.local("pnpm-lock.yaml", "stale dependency lock\n");
+	const result = await f.observe(f.run("boat-prepare-workspace"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	assertPreparationDefersDevelopment(f);
+	assert.equal(
+		fs
+			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse)
+			.some((e) => e.kind === "workspace-preparation" && e.completed),
+		false,
+	);
+	f.local("pnpm-lock.yaml", "fixture valid lock\n");
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("explicit workspace preparation refuses a selected generation change before completion", async (t) => {
+	const f = await toolchainCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "hold-frozen");
+	const command = f.run("boat-prepare-workspace");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "frozen-entered"));
+		}, "workspace qualification before generation change");
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				id: "replacement-worker",
+			}),
+		);
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation changed/);
+	assertPreparationDefersDevelopment(f);
+	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
+	assert.equal(
+		fs
+			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse)
+			.some((e) => e.kind === "workspace-preparation" && e.completed),
+		false,
+	);
+});
 
 test("explicit toolchain preparation waits for locked qualification without preparing dependencies or restoring development", async (t) => {
 	const f = await toolchainCheckout(t, true);
@@ -15463,7 +15576,7 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
-function assertImagePreparationOnly(f) {
+function assertPreparationDefersDevelopment(f) {
 	const state = f.json(".boat/state.json");
 	assert.equal(state.developmentWanted, true);
 	assert.equal(state.reconciliationPending, true);
@@ -15486,7 +15599,7 @@ function assertImagePreparationOnly(f) {
 	);
 }
 
-async function imageNextOrdinaryUser(t, f) {
+async function preparedNextOrdinaryUser(t, f) {
 	const at = f.log().length;
 	f.local("package.json", '{"private":true,"nextOrdinary":true}\n');
 	await toolchainUser(t, f);
@@ -15521,7 +15634,7 @@ test("infra image phase awaits complete acquisition on the selected fresh worker
 		);
 		return fs.existsSync(path.join(f.control, "image-entered"));
 	}, "native image acquisition barrier");
-	assertImagePreparationOnly(f);
+	assertPreparationDefersDevelopment(f);
 	assert.equal(fs.existsSync(path.join(f.control, "present-images")), false);
 	assert.equal(
 		f.imageLog().some((x) => x.stage === "inspect"),
@@ -15552,7 +15665,7 @@ test("infra image phase awaits complete acquisition on the selected fresh worker
 			"infra/docker-compose.yml",
 		]);
 	}
-	assertImagePreparationOnly(f);
+	assertPreparationDefersDevelopment(f);
 	assert.equal(f.json(".boat/state.json").id, "fake-new-worker");
 	assert.ok(f.json(".boat/state.json").cost >= 1.0288);
 	assert.equal(freshCalls(f).filter((a) => a.includes("new")).length, 1);
@@ -15561,7 +15674,7 @@ test("infra image phase awaits complete acquisition on the selected fresh worker
 		false,
 	);
 	t.diagnostic(JSON.stringify({ imageProof: proof, imagePort: f.imageLog() }));
-	await imageNextOrdinaryUser(t, f);
+	await preparedNextOrdinaryUser(t, f);
 });
 
 for (const failure of ["fail-images", "missing-image", "invalid-image-id"])
@@ -15587,13 +15700,13 @@ for (const failure of ["fail-images", "missing-image", "invalid-image-id"])
 					: /Invalid selected image identity/,
 		);
 		assert.doesNotMatch(result.stdout, /BOAT_INFRA_IMAGES/);
-		assertImagePreparationOnly(f);
+		assertPreparationDefersDevelopment(f);
 		assert.ok(
 			f.json(".boat/prepared.json").dependencies,
 			"real frozen preparation may acknowledge dependencies",
 		);
 		t.diagnostic(JSON.stringify({ imagePort: f.imageLog() }));
-		if (failure === "fail-images") await imageNextOrdinaryUser(t, f);
+		if (failure === "fail-images") await preparedNextOrdinaryUser(t, f);
 	});
 
 test("infra image phase leaves standalone ordinary infra and exact no-pull ARGS supported", async (t) => {
@@ -15654,7 +15767,7 @@ test("infra image phase cannot complete after the selected worker generation cha
 	assert.notEqual(result.status, 0, result.output);
 	assert.match(result.output, /Worker generation changed/);
 	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
-	assertImagePreparationOnly(f);
+	assertPreparationDefersDevelopment(f);
 	const event = fs
 		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
 		.trim()

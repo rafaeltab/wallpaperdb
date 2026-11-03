@@ -165,9 +165,14 @@ if (target === "infra-start") {
 	});
 	console.log("boat 1.0.85\nEnrolled. No worker created.");
 } else if (target === "boat-prepare-toolchain") {
+	const previous = fs.existsSync(".boat/state.json")
+		? read(".boat/state.json")
+		: {};
 	save(".boat/state.json", {
 		id: "controlled-worker",
 		runningSince: Date.now(),
+		developmentWanted: previous.developmentWanted,
+		reconciliationPending: previous.reconciliationPending,
 		admission: {
 			status: "published",
 			token: "controlled-admission",
@@ -203,9 +208,32 @@ if (target === "infra-start") {
 		);
 		process.exitCode = 1;
 	}
+} else if (target === "boat-prepare-workspace") {
+	save("workspace-prepared.json", { completed: true });
+	event("workspace-preparation");
 } else if (target === "test-focused") {
 	const color = fs.existsSync("patches/nats-2.29.3.patch") ? "green" : "red";
 	phase = `${color}-${value("ARGS").includes("protected-broker") ? "auth" : value("PACKAGE")}`;
+	if (
+		phase === "red-user" &&
+		process.env.CONTROL_REQUIRE_RECONCILIATION_PREPARATION
+	) {
+		assert.equal(
+			fs.existsSync("workspace-prepared.json"),
+			true,
+			"Frozen workspace must be prepared before wanted restoration",
+		);
+		assert.equal(
+			fs.existsSync("infra-images-prepared.json"),
+			true,
+			"Infrastructure images must be prepared before wanted restoration",
+		);
+		const state = read(".boat/state.json");
+		save("intent-at-first-ordinary.json", {
+			wanted: state.developmentWanted,
+			pending: state.reconciliationPending,
+		});
+	}
 	if (phase === "red-asset") {
 		process.stdout.write(
 			fs.readFileSync(
@@ -268,9 +296,16 @@ if (target === "infra-start") {
 		`${phase === "metadata" ? "BOAT547_WORKER_METADATA" : "BOAT547_CHROMIUM_LAUNCH"} ${JSON.stringify(observed)}`,
 	);
 } else if (target === "boat-prepare-infra-images") {
+	if (process.env.CONTROL_REQUIRE_RECONCILIATION_PREPARATION)
+		assert.equal(
+			fs.existsSync("workspace-prepared.json"),
+			true,
+			"Workspace preparation must precede acquisition",
+		);
 	const observed = data.output["prepare-infra-images"];
 	observed.project = process.env.CONTROL_PROJECT;
 	console.log(`BOAT_INFRA_IMAGES ${JSON.stringify(observed)}`);
+	save("infra-images-prepared.json", { completed: true });
 	event("infra-image-preparation");
 } else if (target === "boat-stop") {
 	const retired = {};

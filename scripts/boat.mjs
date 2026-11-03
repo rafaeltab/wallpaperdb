@@ -1556,6 +1556,17 @@ async function command() {
 			return;
 		}
 		const dependencies = await prepare(id);
+		if (targets[0] === "boat-prepare-workspace") {
+			await lock(() => {
+				startupWorker(id);
+				event("workspace-preparation", {
+					workerId: id,
+					ms: Date.now() - entered,
+					completed: true,
+				});
+			});
+			return;
+		}
 		if (targets[0] === "boat-prepare-infra-images") {
 			let completed = false;
 			try {

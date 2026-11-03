@@ -3360,3 +3360,218 @@ it.each(['C', 'B'])(
     }
   }
 );
+
+it('finishes scheduler admission when an admitted repair waits for COMPLEX descendant review', async () => {
+  const f = await landedFixture({ conflict: true, restack: { outcome: 'COMPLEX', review: true } });
+  let jobRuntime:
+    | ManagedRuntime.ManagedRuntime<Job, import('../src/capabilities/job/index.js').Unavailable>
+    | undefined;
+  let schedulerRuntime: ManagedRuntime.ManagedRuntime<Scheduler, never> | undefined;
+  try {
+    for (let i = 0; i < 3; i++) await Effect.runPromise(f.issues.reconcile!());
+    const intent = {
+      id: 'B-capacity',
+      issue: 2,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+      base: f.host.base,
+      branch: 'B',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const pr = await Effect.runPromise(f.issues.pullRequest(intent));
+    if (pr.kind !== 'found' || !pr.parent || !pr.base) throw new Error('Missing verified B');
+    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+    f.git('switch', '--detach', pr.commit);
+    await writeFile(join(f.host.repository, 'shared.txt'), 'B repaired behavior');
+    f.git('add', '.');
+    f.git('commit', '-m', 'repair B with descendant conflict');
+    const repaired = f.git('rev-parse', 'HEAD');
+    f.git(
+      'push',
+      `--force-with-lease=refs/heads/B:${pr.commit}`,
+      'origin',
+      `${repaired}:refs/heads/B`
+    );
+    const owning = join(f.host.directory, 'B-capacity-owner');
+    f.git('worktree', 'add', owning, 'B');
+    execFileSync('git', ['-C', owning, 'reset', '--hard', repaired]);
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    await f.host.save({
+      ...config,
+      joinWriter: false,
+      restack: { outcome: 'COMPLEX', review: true, question: 'Wait' },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'repair-run',
+          text: JSON.stringify({
+            delivery: `${intent.id}:4`,
+            jobId: intent.id,
+            stage: 'babysitting',
+            base: pr.parent,
+            commit: repaired,
+            outcome: '<PR>READY</PR>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: true,
+          }),
+        },
+      ],
+    });
+    await writeFile(
+      join(f.host.directory, 'resource.json'),
+      JSON.stringify({
+        threadId: 'B-capacity-owner',
+        title: `Factory ${intent.id}`,
+        projectId: 'project-id',
+        providerInstanceId: 'codex',
+        model: 'gpt-6.1-sol',
+        branch: 'B',
+        worktreePath: owning,
+        status: 'completed',
+        latestRunId: 'repair-run',
+        runCount: 5,
+        pendingRequestCount: 0,
+        pullRequests: [{ url: pr.url }],
+      })
+    );
+    const parentConfig = join(f.host.directory, 'parent-protocol.json');
+    const parentProtocol = {
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      restack: undefined,
+    };
+    await writeFile(parentConfig, JSON.stringify(parentProtocol));
+    const parentBinary = join(f.host.directory, 'parent-t3');
+    await writeFile(
+      parentBinary,
+      `#!/usr/bin/env node
+const { spawnSync } = require('node:child_process');
+const result = spawnSync(process.execPath, [${JSON.stringify(f.host.binary)}, ...process.argv.slice(2)], { env: { ...process.env, FACTORY_FIXTURE: ${JSON.stringify(parentConfig)} }, stdio: 'inherit' });
+process.exit(result.status ?? 1);
+`
+    );
+    await chmod(parentBinary, 0o700);
+    const execution = t3Execution({
+      project: f.host.repository,
+      projectId: 'project-id',
+      binary: parentBinary,
+    });
+    const request: import('../src/capabilities/job/index.js').StageRequest = {
+      stage: 'babysitting',
+      index: 4,
+      ordinal: 5,
+      threadId: 'B-capacity-owner',
+      previousRunId: 'ci-run',
+      commit: pr.commit,
+      comparison: { base: pr.parent, prBase: pr.base, previousHead: pr.commit },
+    };
+    expect(await Effect.runPromise(execution.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+      commit: repaired,
+    });
+    const jobStore = fileStore(join(f.host.directory, 'B-capacity-state'));
+    await Effect.runPromise(jobStore.reserve(intent));
+    const names = ['implementation', 'review', 'publication', 'ci', 'babysitting'] as const;
+    for (let index = 0; index < names.length; index++)
+      await Effect.runPromise(
+        jobStore.saveStage(index === 4 ? request : { ...request, stage: names[index], index })
+      );
+    await Effect.runPromise(jobStore.claimStage(4));
+    let observedJob: import('../src/capabilities/job/index.js').Job;
+    let depth = 0;
+    let maximumDepth = 0;
+    const issues = githubIssues({
+      ...f.config,
+      readyPrerequisites: () => observedJob.status().pipe(Effect.as([])),
+    });
+    jobRuntime = ManagedRuntime.make(
+      JobLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(JobStore, jobStore),
+            Layer.succeed(Issues, issues),
+            Layer.succeed(Execution, execution),
+            Layer.succeed(Time, { now: () => Effect.succeed(100) })
+          )
+        )
+      )
+    );
+    const parent = await jobRuntime.runPromise(Job);
+    observedJob = {
+      ...parent,
+      status: () =>
+        Effect.gen(function* () {
+          depth++;
+          maximumDepth = Math.max(maximumDepth, depth);
+          expect(depth).toBeLessThan(3);
+          return yield* parent.status();
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              depth--;
+            })
+          )
+        ),
+    };
+    const schedule = controlledScheduleStore();
+    const admission = { issue: 2, base: intent.base, context: '' };
+    await Effect.runPromise(
+      schedule.save({
+        revision: 0,
+        concurrency: -1,
+        allowance: 1,
+        paused: true,
+        admissions: [admission],
+      })
+    );
+    schedulerRuntime = ManagedRuntime.make(
+      SchedulerLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(ScheduleStore, schedule),
+            Layer.succeed(JobPool, { job: () => Effect.succeed(observedJob) }),
+            Layer.succeed(Issues, issues),
+            Layer.succeed(Plan, { preview: () => Effect.die('Paused scheduler must not plan') }),
+            Layer.succeed(PlanningSource, {
+              read: () => Effect.die('Paused scheduler must not discover'),
+            })
+          )
+        )
+      )
+    );
+    const scheduler = await schedulerRuntime.runPromise(Scheduler);
+    await schedulerRuntime.runPromise(scheduler.tick(f.host.base));
+    const path = join(f.host.directory, 'restacker.json');
+    const saved = JSON.parse(await readFile(path, 'utf8'));
+    expect(saved.thread.pendingRequestCount).toBe(1);
+    saved.thread.status = 'completed';
+    saved.thread.pendingRequestCount = 0;
+    saved.messages = [
+      {
+        role: 'assistant',
+        runId: 'resolve-run',
+        text: JSON.stringify({
+          operation: saved.operation,
+          commit: saved.head,
+          outcome: '<RESTACK>COMPLEX</RESTACK>',
+        }),
+      },
+    ];
+    await writeFile(path, JSON.stringify(saved));
+    await schedulerRuntime.runPromise(scheduler.tick(f.host.base));
+    const sends = (await f.host.calls()).filter(
+      (call) => call.args[1] === 'send' && call.args[2] === saved.thread.threadId
+    );
+    expect(sends).toHaveLength(1);
+    expect(maximumDepth).toBeLessThan(3);
+    expect((await Effect.runPromise(schedule.read())).admissions).toEqual([admission]);
+    expect(await Effect.runPromise(jobStore.readStage(4))).toEqual(request);
+    expect(await Effect.runPromise(jobStore.readStage(5))).toBeNull();
+  } finally {
+    await schedulerRuntime?.dispose();
+    await jobRuntime?.dispose();
+    await f.close();
+  }
+});

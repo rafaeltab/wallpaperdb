@@ -169,20 +169,32 @@ function approvedLock(initial) {
 	return Buffer.from(lines.join(""));
 }
 
-export function create547Preparation(root) {
+const nativeObjects = {
+	baselineApps: () =>
+		git("ls-tree", "-r", workload.productBase, "--", "apps")
+			.toString("utf8")
+			.trim()
+			.split("\n")
+			.map((line) => {
+				const [mode, , blob, file] = line.split(/\s+/);
+				return { mode, blob, path: file };
+			}),
+	baselineBlob: (file) => {
+		const result = git("ls-tree", workload.productBase, "--", file)
+			.toString("utf8")
+			.trim();
+		return result ? result.split(/\s+/)[2] : null;
+	},
+	readBlob: (blob) => git("cat-file", "blob", blob),
+};
+
+export function create547Preparation(root, objects = nativeObjects) {
 	const initialLock = fs.readFileSync(
 		path.join(root, workload.inputs.initialLock.path),
 	);
 	require(sha(initialLock) ===
 		workload.inputs.initialLock.sha256, "Frozen initial lock changed");
-	const tree = git("ls-tree", "-r", workload.productBase, "--", "apps")
-		.toString("utf8")
-		.trim()
-		.split("\n")
-		.map((line) => {
-			const [mode, , blob, file] = line.split(/\s+/);
-			return { mode, blob, path: file };
-		});
+	const tree = objects.baselineApps();
 	const expected = new Map();
 	const modes = new Map();
 	for (const item of tree) {
@@ -224,15 +236,8 @@ export function create547Preparation(root) {
 	}
 	const baseline = new Map(tree.map((item) => [item.path, item.blob]));
 	for (const input of [...workload.inputs.tests, ...workload.inputs.repair]) {
-		const blob =
-			baseline.get(input.path) ??
-			(() => {
-				const result = git("ls-tree", workload.productBase, "--", input.path)
-					.toString("utf8")
-					.trim();
-				return result ? result.split(/\s+/)[2] : null;
-			})();
-		const before = blob ? git("cat-file", "blob", blob) : null;
+		const blob = baseline.get(input.path) ?? objects.baselineBlob(input.path);
+		const before = blob ? objects.readBlob(blob) : null;
 		require(before
 			? fs.existsSync(path.join(root, input.path)) &&
 					fs.readFileSync(path.join(root, input.path)).equals(before)
@@ -264,7 +269,7 @@ export function create547Preparation(root) {
 		verify();
 		// Validate the complete group before its first owned write.
 		const payloads = inputs.map((input) => {
-			const bytes = git("cat-file", "blob", input.gitBlob);
+			const bytes = objects.readBlob(input.gitBlob);
 			require(sha(bytes) ===
 				input.sha256, `Frozen blob changed: ${input.path}`);
 			return { input, bytes };

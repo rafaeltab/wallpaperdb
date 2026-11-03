@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import { execute547Asset, makeCommand } from "./lib/boat-hillclimb.mjs";
+import { objects547 } from "./test-fixtures/547-inputs.mjs";
 
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const fixtureFiles = path.join(repository, "scripts/test-fixtures");
@@ -332,25 +333,17 @@ function publishControlledOwner(f, predecessor) {
 	]) {
 		const p = path.join(f.root, input.path);
 		fs.mkdirSync(path.dirname(p), { recursive: true });
-		const b = spawnSync("git", ["cat-file", "blob", input.gitBlob], {
-			cwd: repository,
-			maxBuffer: 2 * 1024 * 1024,
-		});
-		assert.equal(b.status, 0);
-		fs.writeFileSync(p, b.stdout);
+		fs.writeFileSync(p, objects547.readBlob(input.gitBlob));
 	}
 	for (const input of workload.inputs.repair.filter((x) =>
 		x.path.startsWith("apps/asset/"),
 	)) {
 		const p = path.join(f.root, input.path);
 		fs.mkdirSync(path.dirname(p), { recursive: true });
-		const b = spawnSync(
-			"git",
-			["show", `${workload.productBase}:${input.path}`],
-			{ cwd: repository },
+		fs.writeFileSync(
+			p,
+			objects547.readBlob(objects547.baselineBlob(input.path)),
 		);
-		assert.equal(b.status, 0);
-		fs.writeFileSync(p, b.stdout);
 	}
 	// Only frozen object bytes are copied; no provider or Git checkout is created.
 	f.env.BOAT_EXEC = "local";

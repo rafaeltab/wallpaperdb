@@ -7,12 +7,13 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as runner from "./lib/boat-hillclimb.mjs";
+import { objects547 } from "./test-fixtures/547-inputs.mjs";
 
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
 
-function preparationFixture(t) {
+function preparationFixture(t, nativeObjects = false) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-preparation-"));
 	fs.writeFileSync(
 		path.join(root, "Makefile"),
@@ -22,26 +23,44 @@ function preparationFixture(t) {
 	const workload = json(
 		path.join(repository, "scripts/boat-workloads/547.json"),
 	);
-	const appArchive = execFileSync(
-		"git",
-		["archive", workload.productBase, "apps"],
-		{ cwd: repository, maxBuffer: 32 * 1024 * 1024 },
-	);
-	assert.equal(
-		spawnSync("tar", ["xf", "-"], { cwd: root, input: appArchive }).status,
-		0,
-	);
-	for (const [file, blob] of [
-		["pnpm-lock.yaml", workload.inputs.initialLock.gitBlob],
-		[
-			"pnpm-workspace.yaml",
-			workload.resolutionDiagnostic.baselineWorkspaceBlob,
-		],
-	])
-		fs.writeFileSync(
-			path.join(root, file),
-			execFileSync("git", ["cat-file", "blob", blob], { cwd: repository }),
+	if (nativeObjects) {
+		const appArchive = execFileSync(
+			"git",
+			["archive", workload.productBase, "apps"],
+			{ cwd: repository, maxBuffer: 32 * 1024 * 1024 },
 		);
+		assert.equal(
+			spawnSync("tar", ["xf", "-"], { cwd: root, input: appArchive }).status,
+			0,
+		);
+		for (const [file, blob] of [
+			["pnpm-lock.yaml", workload.inputs.initialLock.gitBlob],
+			[
+				"pnpm-workspace.yaml",
+				workload.resolutionDiagnostic.baselineWorkspaceBlob,
+			],
+		])
+			fs.writeFileSync(
+				path.join(root, file),
+				execFileSync("git", ["cat-file", "blob", blob], { cwd: repository }),
+			);
+	} else {
+		for (const item of objects547.baselineApps()) {
+			const file = path.join(root, item.path);
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, objects547.readBlob(item.blob), {
+				mode: item.mode === "100755" ? 0o755 : 0o644,
+			});
+		}
+		fs.writeFileSync(
+			path.join(root, "pnpm-lock.yaml"),
+			objects547.readBlob(workload.inputs.initialLock.gitBlob),
+		);
+		fs.writeFileSync(
+			path.join(root, "pnpm-workspace.yaml"),
+			objects547.readBlob(workload.resolutionDiagnostic.baselineWorkspaceBlob),
+		);
+	}
 	fs.writeFileSync(
 		path.join(root, ".worktree"),
 		"WORKTREE_SLOT=276\nCOMPOSE_PROJECT_NAME=wallpaperdb-control\nINGRESS_PORT=10760\n",
@@ -80,7 +99,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 			path.join(repository, "scripts/boat-workloads/547-preparation.json"),
 		).cliSha256,
 	});
-	return {
+	const f = {
 		root,
 		config,
 		env,
@@ -91,11 +110,19 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 				env: { ...env, CONTROL_MAKE_ARGV: JSON.stringify(argv) },
 			}),
 	};
+	f.run = (extra = {}) =>
+		runner.execute547Preparation(config, {
+			make: f.make,
+			observeCli,
+			objects: nativeObjects ? undefined : objects547,
+			...extra,
+		});
+	return f;
 }
 
 test("547 complete preparation reuses Make capture and publishes each phase before returning", async (t) => {
 	const f = preparationFixture(t);
-	const result = await runner.execute547Preparation(f.config, {
+	const result = await f.run({
 		make: f.make,
 		observeCli: f.observeCli,
 	});
@@ -183,28 +210,28 @@ function publicEntry(f) {
 	});
 }
 
-test("547 public Make preparation refuses missing post-bootstrap artifact before compute", (t) => {
-	const f = preparationFixture(t);
-	const r = publicEntry(f);
-	assert.equal(r.status, 2);
-	assert.match(r.stderr, /ENOENT/);
-	assert.equal(
-		json(path.join(f.config.evidence, "enroll/command/receipt.json")).terminal
-			.code,
-		0,
-	);
-	assert.equal(
-		json(path.join(f.config.evidence, "preparation-result.json")).status,
-		"FAIL",
-	);
-	assert.equal(fs.existsSync(path.join(f.root, ".boat/state.json")), false);
-});
+if (process.env.BOAT_547_QUALIFIED_CLI) {
+	test("547 qualified public missing artifact refuses missing post-bootstrap artifact before compute", (t) => {
+		const f = preparationFixture(t, true);
+		const r = publicEntry(f);
+		assert.equal(r.status, 2);
+		assert.match(r.stderr, /ENOENT/);
+		assert.equal(
+			json(path.join(f.config.evidence, "enroll/command/receipt.json")).terminal
+				.code,
+			0,
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "preparation-result.json")).status,
+			"FAIL",
+		);
+		assert.equal(fs.existsSync(path.join(f.root, ".boat/state.json")), false);
+	});
 
-// Optional explicit composition qualification after ordinary local boat-bootstrap.
-// Default tests stay offline. The installed CLI is read and hashed, never used for provider work.
-if (process.env.BOAT_547_QUALIFIED_CLI)
-	test("547 qualified CLI public entry completes the full controlled Make preparation", (t) => {
-		const f = preparationFixture(t);
+	// Optional explicit composition qualification after ordinary local boat-bootstrap.
+	// Default tests stay offline. The installed CLI is read and hashed, never used for provider work.
+	test("547 qualified public entry completes the full controlled Make preparation", (t) => {
+		const f = preparationFixture(t, true);
 		fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
 		fs.copyFileSync(
 			process.env.BOAT_547_QUALIFIED_CLI,
@@ -218,12 +245,13 @@ if (process.env.BOAT_547_QUALIFIED_CLI)
 			"PASS_PREDEV_THROUGH_IMAGES",
 		);
 	});
+}
 
 test("547 preparation publishes failure and stops once without advancing the fixed sequence", async (t) => {
 	const f = preparationFixture(t);
 	f.env.CONTROL_FAIL = "red-wallpaper";
 	await assert.rejects(() =>
-		runner.execute547Preparation(f.config, {
+		f.run({
 			make: f.make,
 			observeCli: f.observeCli,
 		}),
@@ -245,7 +273,7 @@ test("547 every native baseline failure must be the expected closure assertion",
 	f.env.CONTROL_ERROR_CASE = "user-non-assertion";
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				make: f.make,
 				observeCli: f.observeCli,
 			}),
@@ -262,7 +290,7 @@ test("547 unrelated pnpm failure cannot borrow valid native baseline output", as
 	f.env.CONTROL_ERROR_CASE = "unrelated-wrapper";
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				make: f.make,
 				observeCli: f.observeCli,
 			}),
@@ -275,7 +303,7 @@ test("547 generated lock refuses and preserves unrelated bytes before frozen bui
 	f.env.CONTROL_LOCK_DRIFT = "yes";
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				make: f.make,
 				observeCli: f.observeCli,
 			}),
@@ -302,7 +330,7 @@ test("547 a new label and generated identity use unchanged preparation code", as
 		path.join(f.root, ".worktree"),
 		"WORKTREE_SLOT=301\nCOMPOSE_PROJECT_NAME=wallpaperdb-another\nINGRESS_PORT=11010\n",
 	);
-	const result = await runner.execute547Preparation(f.config, {
+	const result = await f.run({
 		make: f.make,
 		observeCli: f.observeCli,
 	});
@@ -317,7 +345,7 @@ test("547 cold acceptance remains bounded after native completion", async (t) =>
 	let offset = 0;
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				observeCli: f.observeCli,
 				clock: () => mono() + offset,
 				make: async (argv, options) => {
@@ -353,7 +381,7 @@ test("547 final cold publication cannot leave a late passing result", async (t) 
 	let offset = 0;
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				make: f.make,
 				observeCli: f.observeCli,
 				clock: () => mono() + offset,
@@ -379,7 +407,7 @@ test("547 post-bootstrap hash refusal occurs before worker selection", async (t)
 	const f = preparationFixture(t);
 	await assert.rejects(
 		() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				make: f.make,
 				observeCli: () => ({ sha256: "0".repeat(64) }),
 			}),
@@ -406,10 +434,13 @@ test("547 unrelated product bytes and dangling later-phase paths are preserved b
 		);
 		if (kind === "product-drift")
 			fs.appendFileSync(file, "\n// unrelated edit\n");
-		else fs.symlinkSync("missing-owned-target", file);
+		else {
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.symlinkSync("missing-owned-target", file);
+		}
 		let commands = 0;
 		await assert.rejects(() =>
-			runner.execute547Preparation(f.config, {
+			f.run({
 				observeCli: f.observeCli,
 				make: async () => {
 					commands++;

@@ -35,7 +35,7 @@ else
 endif
 boat-status: ## Show this enrolled worker and experiment accounting
 	@node scripts/boat.mjs status
-boat-stop: ## Stop only this enrolled worker
+boat-stop: ## Stop only this enrolled worker (optional BOAT_EXPECTED_WORKER_ID guard)
 	@node scripts/boat.mjs stop
 boat-delete: ## Delete only this enrolled worker at worktree teardown
 	@node scripts/boat.mjs delete

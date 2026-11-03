@@ -1,15 +1,16 @@
 // Fixed Asset case/assertion evaluator extracted from the reviewed #547 assessor.
+import { stripVTControlCharacters } from "node:util";
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const refuse = (reason) => {
 	throw new Error(reason);
 };
 export function assessAssetBaseline(stdout, stderr, contract) {
-	const out = new TextDecoder("utf-8", { fatal: true })
-			.decode(stdout)
-			.replace(/\x1b\[[0-9;]*m/g, ""),
-		err = new TextDecoder("utf-8", { fatal: true })
-			.decode(stderr)
-			.replace(/\x1b\[[0-9;]*m/g, "");
+	const out = stripVTControlCharacters(
+			new TextDecoder("utf-8", { fatal: true }).decode(stdout),
+		),
+		err = stripVTControlCharacters(
+			new TextDecoder("utf-8", { fatal: true }).decode(stderr),
+		);
 	// This wrapper is evidence of the exact Vitest command failing, never an outcome verdict.
 	const expectedVitestWrapper = (line) => {
 		const m = line
@@ -101,7 +102,7 @@ export function assessAssetBaseline(stdout, stderr, contract) {
 			for (const k of pending) {
 				const x = failures.get(k),
 					w = wanted.get(k);
-				if (!w || w.result !== "failed") refuse("ASSERTION_CASE_SET");
+				if (w?.result !== "failed") refuse("ASSERTION_CASE_SET");
 				if (x && line.includes(w.assertionAnchor)) x.anchor = true;
 			}
 			if (/⎯.*\[\d+\/\d+\]/.test(line)) {

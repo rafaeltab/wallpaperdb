@@ -38,7 +38,8 @@
 		"format:files": "biome format --write",
 		"test:operator-inbox": "node --test operator-inbox.test.mjs",
 		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts",
-		"test:boat-hillclimb": "cd .. && node --test scripts/boat-hillclimb.test.mjs scripts/makefile.test.mjs"
+		"test:boat-hillclimb": "cd .. && node --test scripts/boat-hillclimb.test.mjs scripts/makefile.test.mjs",
+		"lint:files": "biome lint"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

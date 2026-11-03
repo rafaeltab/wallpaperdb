@@ -180,6 +180,26 @@ for (const [name, change] of [
 					),
 			),
 	],
+	[
+		"a different assertion cannot satisfy the case counts",
+		(f) =>
+			fs.writeFileSync(
+				f.stderr,
+				fs
+					.readFileSync(f.stderr, "utf8")
+					.replace("expected 1 to be +0", "expected 2 to be +0"),
+			),
+	],
+	[
+		"an unrelated assertion source cannot satisfy native closure",
+		(f) =>
+			fs.writeFileSync(
+				f.stderr,
+				fs
+					.readFileSync(f.stderr, "utf8")
+					.replaceAll("broker-acquisition.ts", "unrelated-source.ts"),
+			),
+	],
 ])
 	test(`547 ${name}`, async (t) => {
 		const f = fixture(t);
@@ -344,25 +364,29 @@ for (const predecessor of [undefined, null])
 		assert.equal(result.status, "PASS");
 	});
 
+function installControlledStop(f, providerCompleted = true) {
+	// External lifecycle effect is controlled; Make/capture/result handling stays real.
+	fs.appendFileSync(
+		path.join(f.root, "Makefile"),
+		"\nboat-stop:\n\t@node stop-control.cjs\n",
+	);
+	fs.writeFileSync(
+		path.join(f.root, "stop-control.cjs"),
+		`const fs = require('node:fs');
+const p = '.boat/state.json', state = JSON.parse(fs.readFileSync(p));
+fs.appendFileSync('stop-calls', 'one\\n');
+state.runningSince = null;
+state.shutdownAttempt = {workerId:state.id, status:'completed-observed', accountingAppliedAt:'2026-11-03T00:00:01Z', completion:{workerId:state.id, provider:{id:state.id, stop:{id:'controlled-stop', status:${JSON.stringify(providerCompleted ? "completed" : "pending")}, forced:false, error:null, endedAt:${JSON.stringify(providerCompleted ? "2026-11-03T00:00:00Z" : null)}}}}};
+fs.writeFileSync(p, JSON.stringify(state));`,
+	);
+}
+
 for (const providerCompleted of [true, false])
 	test(`547 failure stops once and retains provider completion ${providerCompleted}`, async (t) => {
 		const f = fixture(t);
 		publishControlledOwner(f);
 		fs.writeFileSync(f.stderr, "Cannot find package vitest\n");
-		// External lifecycle effect is controlled; Make/capture/result handling stays real.
-		fs.appendFileSync(
-			path.join(f.root, "Makefile"),
-			"\nboat-stop:\n\t@node stop-control.cjs\n",
-		);
-		fs.writeFileSync(
-			path.join(f.root, "stop-control.cjs"),
-			`const fs = require('node:fs');
-const p = '.boat/state.json', state = JSON.parse(fs.readFileSync(p));
-fs.appendFileSync('stop-calls', 'one\\n');
-state.runningSince = null;
-state.shutdownAttempt = {workerId:state.id, status:'completed-observed', accountingAppliedAt:'2026-11-03T00:00:01Z', completion:{provider:{stop:{id:'controlled-stop', status:${JSON.stringify(providerCompleted ? "completed" : "pending")}, forced:false, error:null, endedAt:${JSON.stringify(providerCompleted ? "2026-11-03T00:00:00Z" : null)}}}}};
-fs.writeFileSync(p, JSON.stringify(state));`,
-		);
+		installControlledStop(f, providerCompleted);
 		await assert.rejects(f.run(), /SETUP_OR_COLLECTION/);
 		assert.equal(
 			fs.readFileSync(path.join(f.root, "stop-calls"), "utf8"),
@@ -377,6 +401,153 @@ fs.writeFileSync(p, JSON.stringify(state));`,
 				: "STOPPED_ACCOUNTED_OPERATION_UNVERIFIED",
 		);
 	});
+
+for (const file of [
+	"pnpm-lock.yaml",
+	"apps/asset/test/broker-acquisition-events.integration.test.ts",
+	"apps/asset/src/adapters/cleanup/worker.ts",
+])
+	test(`547 frozen byte drift refuses ${file} before native work`, async (t) => {
+		const f = fixture(t);
+		publishControlledOwner(f);
+		installControlledStop(f);
+		fs.appendFileSync(path.join(f.root, file), "\n# changed\n");
+		await assert.rejects(f.run(), /Frozen workload input changed/);
+		assert.equal(fs.existsSync(f.env.CONTROL_ARGV), false);
+		assert.equal(
+			fs.readFileSync(path.join(f.root, "stop-calls"), "utf8"),
+			"one\n",
+		);
+	});
+
+test("547 frozen input mutation during final publication cannot pass", async (t) => {
+	const f = fixture(t);
+	publishControlledOwner(f);
+	installControlledStop(f);
+	await assert.rejects(
+		f.run({
+			publication: (file, value) => {
+				fs.writeFileSync(file, JSON.stringify(value));
+				fs.appendFileSync(
+					path.join(f.root, "pnpm-lock.yaml"),
+					"\n# concurrent change\n",
+				);
+			},
+		}),
+		/Phase source or owner changed/,
+	);
+	assert.equal(
+		json(path.join(f.config.evidence, "red-asset/result.json")).status,
+		"FAIL",
+	);
+	assert.match(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+		/concurrent change/,
+	);
+});
+
+for (const guarded of [false, true])
+	test(`547 controller lifecycle-lock race with bound stop ${guarded}`, async (t) => {
+		const f = fixture(t);
+		publishControlledOwner(f);
+		f.env.HOME = path.join(f.root, "home");
+		fs.mkdirSync(f.env.HOME);
+		const enrollment = path.join(f.root, ".boat/enrollment.json"),
+			e = json(enrollment);
+		// Allow a second 500ms lifecycle-lock poll within a tightened ordinary stop budget.
+		e.shutdownBudgetMs = 30000;
+		fs.writeFileSync(enrollment, JSON.stringify(e));
+		const lock = path.join(f.root, ".boat/lifecycle.lock");
+		fs.mkdirSync(lock);
+		fs.writeFileSync(path.join(lock, "pid"), String(process.pid));
+		t.after(() => {
+			if (fs.existsSync(lock)) fs.rmSync(lock, { recursive: true });
+		});
+		fs.writeFileSync(f.stderr, "Cannot find package vitest\n");
+		fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+		fs.writeFileSync(
+			path.join(f.root, ".mise/boat/boat"),
+			"#!/bin/sh\necho called >> provider-calls\nexit 1\n",
+			{ mode: 0o700 },
+		);
+		await assert.rejects(
+			f.run({
+				make: async (argv, options) => {
+					// The false neighbor reproduces the former unqualified Make call.
+					const selected = guarded
+						? argv
+						: argv.filter((arg) => !arg.startsWith("BOAT_EXPECTED_WORKER_ID="));
+					const pending = makeCommand(selected, { ...options, env: f.env });
+					if (argv[1] === "boat-stop") {
+						assert.equal(argv[2], "BOAT_EXPECTED_WORKER_ID=controlled-worker");
+						const end = mono() + 2;
+						while (
+							!fs.existsSync(
+								path.join(f.root, ".boat/shutdown-processes.jsonl"),
+							)
+						) {
+							if (mono() >= end) {
+								fs.rmSync(lock, { recursive: true });
+								await pending;
+								throw new Error("Controller did not enter shutdown");
+							}
+							await new Promise((resolve) => setTimeout(resolve, 10));
+						}
+						const statePath = path.join(f.root, ".boat/state.json"),
+							state = json(statePath);
+						state.id = "new-owner";
+						state.admission.candidate.id = state.id;
+						fs.writeFileSync(statePath, JSON.stringify(state));
+						fs.rmSync(lock, { recursive: true });
+					}
+					return pending;
+				},
+			}),
+			/SETUP_OR_COLLECTION/,
+		);
+		const state = json(path.join(f.root, ".boat/state.json"));
+		assert.equal(state.id, "new-owner");
+		assert.equal(state.runningSince, 1);
+		if (guarded) {
+			assert.equal(state.shutdownAttempt, undefined);
+			assert.equal(fs.existsSync(path.join(f.root, "provider-calls")), false);
+			assert.match(
+				fs.readFileSync(
+					path.join(f.config.evidence, "owning-stop/stderr.raw"),
+					"utf8",
+				),
+				/Expected stop worker changed/,
+			);
+		} else {
+			assert.equal(
+				state.shutdownAttempt.workerId,
+				"new-owner",
+				"unqualified stop reaches the wrong synthetic owner",
+			);
+			assert.equal(
+				fs.existsSync(path.join(f.root, "provider-calls")),
+				true,
+				"counterexample must reach the controlled provider seam",
+			);
+		}
+		assert.equal(
+			json(path.join(f.config.evidence, "red-asset/result.json")).cleanup
+				.status,
+			"UNRESOLVED",
+		);
+	});
+
+test("547 a missing mandatory worker cannot become local-control success", async (t) => {
+	const f = fixture(t);
+	publishControlledOwner(f);
+	const file = path.join(f.root, ".boat/state.json"),
+		state = json(file);
+	delete state.id;
+	delete state.admission.candidate.id;
+	fs.writeFileSync(file, JSON.stringify(state));
+	await assert.rejects(f.run(), /Owned published worker/);
+	assert.equal(fs.existsSync(f.env.CONTROL_ARGV), false);
+});
 
 test("547 changed owner forbids stopping another worker", async (t) => {
 	const f = fixture(t);
@@ -403,5 +574,70 @@ test("547 changed owner forbids stopping another worker", async (t) => {
 	assert.equal(
 		json(path.join(f.config.evidence, "red-asset/result.json")).cleanup.status,
 		"UNRESOLVED",
+	);
+});
+
+test("547 an active Make command is retired at the original execution cutoff", async (t) => {
+	let finishSafety = () => {};
+	t.after(() => finishSafety()); // Retire before the fixture directory is removed.
+	const f = fixture(t);
+	f.config.coldDeadline = mono() + 6;
+	const owned = `${f.env.CONTROL_ARGV}.owner.json`;
+	let safetyUsed = false;
+	const safety = () => {
+		if (!fs.existsSync(owned)) return;
+		const record = json(owned);
+		try {
+			const stat = fs.readFileSync(`/proc/${record.pid}/stat`, "utf8");
+			const birth = stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19];
+			if (
+				birth === record.birth &&
+				fs.readlinkSync(`/proc/${record.pid}/cwd`) === f.root
+			) {
+				safetyUsed = true;
+				process.kill(record.pid, "SIGTERM");
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT" && error.code !== "ESRCH") throw error;
+		}
+	};
+	const independent = setTimeout(safety, 3000);
+	finishSafety = () => {
+		clearTimeout(independent);
+		safety();
+	};
+	fs.writeFileSync(
+		path.join(f.root, "bin/pnpm"),
+		`#!/usr/bin/env node
+const fs = require('node:fs');
+fs.writeFileSync(process.env.CONTROL_ARGV, JSON.stringify(process.argv.slice(2)));
+const stat = fs.readFileSync('/proc/self/stat', 'utf8');
+fs.writeFileSync(process.env.CONTROL_ARGV+'.owner.json', JSON.stringify({pid:process.pid,birth:stat.slice(stat.lastIndexOf(')')+2).split(' ')[19]}));
+setInterval(() => {}, 1000);
+`,
+		{ mode: 0o700 },
+	);
+	await assert.rejects(
+		f.run(),
+		/terminal or drainage|completion or original deadline/,
+	);
+	const directory = path.join(f.config.evidence, "red-asset/command");
+	const receipt = json(path.join(directory, "receipt.json"));
+	assert.match(receipt.failure, /deadline exceeded/);
+	assert.equal(receipt.captureComplete, false);
+	assert.equal(
+		safetyUsed,
+		false,
+		"capture must retire the command before independent safety",
+	);
+	assert.ok(
+		fs.existsSync(f.env.CONTROL_ARGV),
+		"actual command reached the external seam before cancellation",
+	);
+	assert.equal(json(path.join(directory, "disposal.json")).pipesClosed, true);
+	assert.deepEqual(json(path.join(directory, "disposal.json")).unresolved, []);
+	assert.equal(
+		json(path.join(f.config.evidence, "red-asset/result.json")).status,
+		"FAIL",
 	);
 });

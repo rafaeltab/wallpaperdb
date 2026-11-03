@@ -2139,7 +2139,15 @@ try {
 		await runDaemon();
 	} else if (action === "stop" || action === "delete") {
 		owned();
-		await stop(action === "delete");
+		const expectedWorkerId =
+			action === "stop" ? process.env.BOAT_EXPECTED_WORKER_ID : undefined;
+		if (expectedWorkerId && !/^[A-Za-z0-9_-]+$/.test(expectedWorkerId))
+			throw new Error("Invalid expected stop worker identity");
+		const stopped = await stop(action === "delete", undefined, {
+			expectedWorkerId,
+		});
+		if (stopped === false)
+			throw new Error("Expected stop worker changed; no stop executed");
 	} else if (action === "preview") await preview();
 	else if (action === "cache-server") await serveCache();
 	else if (action === "cache") {

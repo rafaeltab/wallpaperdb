@@ -84,15 +84,20 @@ function owner(root) {
 		enrollment.key !== identity.key ||
 		enrollment.size !== "large" ||
 		enrollment.lifecycle !== "fresh-after-stop" ||
-		!state.runningSince ||
+		!Number.isFinite(state.runningSince) ||
+		state.runningSince <= 0 ||
+		typeof state.id !== "string" ||
 		admission?.status !== "published" ||
 		typeof admission.token !== "string" ||
 		!admission.token ||
+		typeof admission.name !== "string" ||
+		!admission.name ||
 		admission.owner?.root !== root ||
 		admission.owner?.key !== identity.key ||
 		admission.candidate?.id !== state.id ||
 		admission.candidate?.size !== "large" ||
 		admission.candidate?.name !== admission.name ||
+		!/^[-_A-Za-z0-9]+$/.test(state.id) ||
 		admission.previousWorkerId === state.id ||
 		admission.shutdownAttempt
 	)
@@ -178,7 +183,11 @@ async function stopOwned(root, binding, evidence, make) {
 		if (JSON.stringify(binding) !== JSON.stringify(owner(root)))
 			throw new Error("Owning worker changed; no stop authority");
 		const directory = path.join(evidence, "owning-stop");
-		const argv = ["make", "boat-stop"];
+		const argv = [
+			"make",
+			"boat-stop",
+			`BOAT_EXPECTED_WORKER_ID=${binding.worker}`,
+		];
 		const receipt = await make(argv, {
 			directory,
 			deadline: monotonic() + 180,
@@ -192,10 +201,13 @@ async function stopOwned(root, binding, evidence, make) {
 			state.runningSince === null &&
 			attempt?.workerId === binding.worker &&
 			attempt.status === "completed-observed" &&
-			!!attempt.accountingAppliedAt;
+			attempt.completion?.workerId === binding.worker &&
+			attempt.completion?.provider?.id === binding.worker &&
+			Number.isFinite(Date.parse(attempt.accountingAppliedAt));
 		const stop = attempt?.completion?.provider?.stop;
 		const completed =
 			accounted &&
+			typeof stop?.id === "string" &&
 			stop?.status === "completed" &&
 			stop.forced === false &&
 			stop.error === null &&

@@ -299,6 +299,7 @@ function publishControlledOwner(f, predecessor) {
 			key,
 			size: "large",
 			mode: "development",
+			cohort: "c",
 			lifecycle: "fresh-after-stop",
 		}),
 	);
@@ -446,8 +447,15 @@ test("547 frozen input mutation during final publication cannot pass", async (t)
 	);
 });
 
-for (const guarded of [false, true])
-	test(`547 controller lifecycle-lock race with bound stop ${guarded}`, async (t) => {
+for (const [transition, guarded] of [
+	["published-worker", false],
+	["published-worker", true],
+	["pending-candidate", false],
+	["pending-candidate", true],
+	["unchanged", true],
+	["admission-token", true],
+])
+	test(`547 controller lifecycle-lock ${transition} with bound stop ${guarded}`, async (t) => {
 		const f = fixture(t);
 		publishControlledOwner(f);
 		f.env.HOME = path.join(f.root, "home");
@@ -467,7 +475,20 @@ for (const guarded of [false, true])
 		fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
 		fs.writeFileSync(
 			path.join(f.root, ".mise/boat/boat"),
-			"#!/bin/sh\necho called >> provider-calls\nexit 1\n",
+			`#!/usr/bin/env node
+const fs = require('node:fs'), args = process.argv.slice(2);
+fs.appendFileSync('provider-calls', JSON.stringify(args)+'\\n');
+const state = JSON.parse(fs.readFileSync('.boat/state.json')), a = state.admission;
+if(args.includes('new-candidate') && args.includes('info')) {
+ const stopped = fs.existsSync('candidate-stopped');
+ console.log(JSON.stringify({sandbox:{id:'new-candidate',name:a.name,type:a.size,state:stopped?'stopped':'ready',stop:stopped?{id:'controlled-stop',status:'completed',forced:false,error:null,endedAt:'2026-11-03T00:00:00Z'}:undefined}}));
+} else if(args.includes('new-candidate') && args.includes('stop')) {
+ fs.writeFileSync('candidate-stopped','yes'); console.log('{}');
+} else if(args.includes('ssh')) {
+ // Controlled watcher retirement has no external effect.
+} else if(args.includes('usage')) console.log('{}');
+else process.exitCode = 1;
+`,
 			{ mode: 0o700 },
 		);
 		await assert.rejects(
@@ -476,10 +497,14 @@ for (const guarded of [false, true])
 					// The false neighbor reproduces the former unqualified Make call.
 					const selected = guarded
 						? argv
-						: argv.filter((arg) => !arg.startsWith("BOAT_EXPECTED_WORKER_ID="));
+						: argv.filter((arg) => !arg.startsWith("BOAT_EXPECTED_"));
 					const pending = makeCommand(selected, { ...options, env: f.env });
 					if (argv[1] === "boat-stop") {
 						assert.equal(argv[2], "BOAT_EXPECTED_WORKER_ID=controlled-worker");
+						assert.equal(
+							argv[3],
+							"BOAT_EXPECTED_ADMISSION=controlled-admission",
+						);
 						const end = mono() + 2;
 						while (
 							!fs.existsSync(
@@ -495,8 +520,25 @@ for (const guarded of [false, true])
 						}
 						const statePath = path.join(f.root, ".boat/state.json"),
 							state = json(statePath);
-						state.id = "new-owner";
-						state.admission.candidate.id = state.id;
+						if (transition === "published-worker") {
+							state.id = "new-owner";
+							state.admission.candidate.id = state.id;
+						} else if (transition === "pending-candidate") {
+							const token = "11111111-2222-4333-8444-555555555555";
+							const name = `wallpaperdb-557-${e.cohort}-${e.key}-${token}`;
+							state.admission = {
+								status: "candidate-owned",
+								owner: { root: f.root, key: e.key },
+								token,
+								name,
+								size: e.size,
+								previousWorkerId: state.id,
+								runningSince: Date.now(),
+								candidate: { id: "new-candidate", name, size: e.size },
+							};
+						} else if (transition === "admission-token") {
+							state.admission.token = "another-admission";
+						}
 						fs.writeFileSync(statePath, JSON.stringify(state));
 						fs.rmSync(lock, { recursive: true });
 					}
@@ -506,9 +548,12 @@ for (const guarded of [false, true])
 			/SETUP_OR_COLLECTION/,
 		);
 		const state = json(path.join(f.root, ".boat/state.json"));
-		assert.equal(state.id, "new-owner");
+		assert.equal(
+			state.id,
+			transition === "published-worker" ? "new-owner" : "controlled-worker",
+		);
 		assert.equal(state.runningSince, 1);
-		if (guarded) {
+		if (guarded && transition !== "unchanged") {
 			assert.equal(state.shutdownAttempt, undefined);
 			assert.equal(fs.existsSync(path.join(f.root, "provider-calls")), false);
 			assert.match(
@@ -516,14 +561,28 @@ for (const guarded of [false, true])
 					path.join(f.config.evidence, "owning-stop/stderr.raw"),
 					"utf8",
 				),
-				/Expected stop worker changed/,
+				/Expected stop ownership changed/,
 			);
 		} else {
-			assert.equal(
-				state.shutdownAttempt.workerId,
-				"new-owner",
-				"unqualified stop reaches the wrong synthetic owner",
-			);
+			if (transition === "published-worker" || transition === "unchanged")
+				assert.equal(
+					state.shutdownAttempt.workerId,
+					state.id,
+					"unqualified stop reaches the wrong synthetic owner",
+				);
+			else {
+				const calls = fs
+					.readFileSync(path.join(f.root, "provider-calls"), "utf8")
+					.trim()
+					.split("\n")
+					.map(JSON.parse);
+				assert.ok(
+					calls.some(
+						(args) => args.includes("stop") && args.includes("new-candidate"),
+					),
+					"unqualified cleanup must reach candidate B stop at the controlled provider seam",
+				);
+			}
 			assert.equal(
 				fs.existsSync(path.join(f.root, "provider-calls")),
 				true,

@@ -90,6 +90,7 @@ function owner(root) {
 		admission?.status !== "published" ||
 		typeof admission.token !== "string" ||
 		!admission.token ||
+		!/^[A-Za-z0-9_-]+$/.test(admission.token) ||
 		typeof admission.name !== "string" ||
 		!admission.name ||
 		admission.owner?.root !== root ||
@@ -187,6 +188,7 @@ async function stopOwned(root, binding, evidence, make) {
 			"make",
 			"boat-stop",
 			`BOAT_EXPECTED_WORKER_ID=${binding.worker}`,
+			`BOAT_EXPECTED_ADMISSION=${binding.admission}`,
 		];
 		const receipt = await make(argv, {
 			directory,

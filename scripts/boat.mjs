@@ -1113,7 +1113,7 @@ async function stopAdmission(budget) {
 async function stop(
 	remove = false,
 	targets,
-	{ preserveIntent = false, expectedWorkerId } = {},
+	{ preserveIntent = false, expectedWorkerId, expectedAdmissionToken } = {},
 ) {
 	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
 		fs.appendFileSync(
@@ -1134,8 +1134,19 @@ async function stop(
 			async () => {
 				// A daemon's idle/cost decision belongs to the generation it observed.
 				// Explicit stop/settle calls still clean all of their owned obligations.
-				if (expectedWorkerId && read(stateFile).id !== expectedWorkerId)
-					return false;
+				if (expectedWorkerId) {
+					const current = read(stateFile),
+						admission = current.admission;
+					if (
+						current.id !== expectedWorkerId ||
+						(admission &&
+							(admission.status !== "published" ||
+								admission.candidate?.id !== expectedWorkerId)) ||
+						(expectedAdmissionToken &&
+							admission?.token !== expectedAdmissionToken)
+					)
+						return false;
+				}
 				const errors = [];
 				try {
 					await stopAdmission(budget);
@@ -2141,13 +2152,21 @@ try {
 		owned();
 		const expectedWorkerId =
 			action === "stop" ? process.env.BOAT_EXPECTED_WORKER_ID : undefined;
+		const expectedAdmissionToken =
+			action === "stop" ? process.env.BOAT_EXPECTED_ADMISSION : undefined;
 		if (expectedWorkerId && !/^[A-Za-z0-9_-]+$/.test(expectedWorkerId))
 			throw new Error("Invalid expected stop worker identity");
+		if (
+			expectedAdmissionToken &&
+			(!expectedWorkerId || !/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken))
+		)
+			throw new Error("Invalid expected stop admission identity");
 		const stopped = await stop(action === "delete", undefined, {
 			expectedWorkerId,
+			expectedAdmissionToken,
 		});
 		if (stopped === false)
-			throw new Error("Expected stop worker changed; no stop executed");
+			throw new Error("Expected stop ownership changed; no stop executed");
 	} else if (action === "preview") await preview();
 	else if (action === "cache-server") await serveCache();
 	else if (action === "cache") {

@@ -188,6 +188,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             prBase: configuration.FACTORY_PR_BASE,
             prerequisites: configuration.FACTORY_PREREQUISITES,
             readyPrerequisites,
+            admitRecovery: (issue) => recoveryAdmission(issue),
             joins: {
               directory: resolve(configuration.FACTORY_STATE, 'joins'),
               binary: configuration.FACTORY_T3_BINARY,

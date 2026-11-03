@@ -5,7 +5,9 @@ import type { RecoveryAdmission, Unavailable } from '../../capabilities/job/inde
 // Promise-based Git orchestration must retain the caller's tracer, parent span
 // and logger when it re-enters an Effect service. Each async operation is isolated.
 const execution = new AsyncLocalStorage<Context.Context<never>>();
-const admission = new AsyncLocalStorage<RecoveryAdmission>();
+// An observation without a policy must not mint an inherited manual grant.
+// The legacy manual fallback applies only at the actual recovery boundary.
+const admission = new AsyncLocalStorage<RecoveryAdmission | undefined>();
 export function contextualPromise<A>(options: {
   admitRecovery?: RecoveryAdmission;
   defaultRecoveryAdmission?: RecoveryAdmission;
@@ -17,10 +19,7 @@ export function contextualPromise<A>(options: {
       try: (signal) =>
         execution.run(context, () =>
           admission.run(
-            options.admitRecovery ??
-              admission.getStore() ??
-              options.defaultRecoveryAdmission ??
-              (() => Effect.succeed(true)),
+            options.admitRecovery ?? admission.getStore() ?? options.defaultRecoveryAdmission,
             () => options.try(signal)
           )
         ),

@@ -393,6 +393,13 @@ test("547 startup awaits ordinary app image build before launching Watch", async
 			fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
 			false,
 		);
+		for (const name of ["dev", "preview"])
+			assert.equal(
+				fs.existsSync(
+					path.join(f.config.evidence, "startup", name, "invocation.json"),
+				),
+				false,
+			);
 		assert.equal(
 			fs.existsSync(
 				path.join(f.config.evidence, "startup/apps-build/result.json"),
@@ -439,6 +446,13 @@ test("547 startup app image failure never launches Watch and stops its owner onc
 			fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
 			false,
 		);
+		for (const name of ["dev", "preview"])
+			assert.equal(
+				fs.existsSync(
+					path.join(f.config.evidence, "startup", name, "invocation.json"),
+				),
+				false,
+			);
 		const result = json(path.join(f.config.evidence, "startup/result.json"));
 		assert.equal(result.status, "FAIL");
 		assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");

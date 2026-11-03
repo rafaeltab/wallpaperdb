@@ -393,7 +393,21 @@ test("547 serving receipt I/O rejection retires the other capture and stops once
 	const ended = await done;
 	try {
 		assert.equal(ended.status, "fulfilled", ended.error?.message);
+		assert.equal(ended.value.status, "CAPTURE_FINALIZATION_FAILED");
 		assert.equal(ended.value.compute.status, "STOPPED_ACCOUNTED");
+		assert.equal(
+			ended.value.transports.some((capture) => /EEXIST/.test(capture.failure)),
+			true,
+		);
+		const persisted = json(
+			path.join(f.config.evidence, "startup/cleanup.json"),
+		);
+		assert.equal(persisted.status, "CAPTURE_FINALIZATION_FAILED");
+		assert.equal(persisted.compute.status, "STOPPED_ACCOUNTED");
+		assert.equal(
+			persisted.transports.some((capture) => /EEXIST/.test(capture.failure)),
+			true,
+		);
 		assert.equal(
 			json(path.join(f.root, ".boat/state.json")).runningSince,
 			null,
@@ -471,7 +485,12 @@ test("547 serving receipt rejection before readiness is handled and stopped", as
 	);
 	const result = json(path.join(f.config.evidence, "startup/result.json"));
 	assert.equal(result.status, "FAIL");
+	assert.equal(result.cleanup.status, "CAPTURE_FINALIZATION_FAILED");
 	assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+	assert.equal(
+		result.cleanup.transports.some((capture) => /EEXIST/.test(capture.failure)),
+		true,
+	);
 	assert.equal(json(path.join(f.root, ".boat/state.json")).runningSince, null);
 	assert.equal(
 		jsonLines(path.join(f.root, "commands.jsonl")).filter(

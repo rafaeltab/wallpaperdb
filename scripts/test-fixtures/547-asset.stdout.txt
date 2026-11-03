@@ -6,10 +6,10 @@ Authenticated cache forward ready
    • Remote caching enabled
 
 @wallpaperdb/vitest-config:build: cache hit, replaying logs 37281d8475e3d6da
-@wallpaperdb/vitest-config:build: 
+@wallpaperdb/vitest-config:build:
 @wallpaperdb/vitest-config:build: > @wallpaperdb/vitest-config@0.1.0 build /home/user/wallpaperdb/packages/vitest-config
 @wallpaperdb/vitest-config:build: > tsc
-@wallpaperdb/vitest-config:build: 
+@wallpaperdb/vitest-config:build:
 
  Tasks:    1 successful, 1 total
 Cached:    1 cached, 1 total

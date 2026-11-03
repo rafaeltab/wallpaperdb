@@ -533,6 +533,7 @@ it.each([
       ...config,
       issueStates: { ...config.issueStates, 2: 'CLOSED' },
       defaultBranch: { name: 'primary', tip: merged },
+      landing: { pr: 102, merge: merged, head: b, base: 'primary' },
       landedPrerequisites: {
         ...config.landedPrerequisites,
         2: ['missing-proof', 'unchanged-target-unproved'].includes(kind) ? [] : [102],

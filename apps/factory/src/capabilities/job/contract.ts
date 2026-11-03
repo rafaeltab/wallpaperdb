@@ -110,7 +110,8 @@ export interface Issues {
    * reserve downstream maintenance from retained accepted publications, even
    * while admissions are paused or capacity is occupied. Record operation intent
    * before external changes; coordinate affected writers and expected-head leases.
-   * New issue admissions are never performed by this operation. */
+   * New issue admissions are never performed by this operation. When supplied,
+   * admitRecovery authorizes resumed review before capacity reservation and delivery. */
   reconcile?(admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */

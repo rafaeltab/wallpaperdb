@@ -541,6 +541,7 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 		const f = preparationFixture(t);
 		f.config.until = "ready";
 		let now = mono();
+		let stopBarrierArmed = false;
 		const entered = Promise.withResolvers(),
 			release = Promise.withResolvers();
 		const result = await f.run(
@@ -556,7 +557,7 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 								now += 601;
 						},
 						make: async (argv, options) => {
-							if (argv[1] === "boat-stop") {
+							if (stopBarrierArmed && argv[1] === "boat-stop") {
 								entered.resolve();
 								await release.promise;
 							}
@@ -566,6 +567,7 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 				: {},
 		);
 		try {
+			stopBarrierArmed = true;
 			if (fault === "source")
 				fs.appendFileSync(
 					path.join(f.root, "apps/user/src/boat-live-547.ts"),

@@ -149,6 +149,15 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
     );
   } else if (args[1] === 'send') {
+    const journals = join(config.directory, 'joins');
+    writeFileSync(
+      join(config.directory, 'review-capacity-observed.json'),
+      JSON.stringify(
+        readdirSync(journals, { recursive: true })
+          .filter((name) => name.endsWith('recovery-progress.json'))
+          .map((name) => JSON.parse(readFileSync(join(journals, name), 'utf8')))
+      )
+    );
     if (config.restack.repair) {
       writeFileSync(
         join(state.thread.worktreePath, 'shared.txt'),

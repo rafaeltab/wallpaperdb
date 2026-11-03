@@ -34,8 +34,14 @@ export function githubIssues(config: {
   const joins = config.joins
     ? prerequisiteJoin(config.project, config.base, config.joins, gh)
     : undefined;
-  const inspect = (number: number, prepare = false, candidate?: Parameters<Issues['inspect']>[1]) =>
+  const inspect = (
+    number: number,
+    prepare = false,
+    candidate?: Parameters<Issues['inspect']>[1],
+    admitRecovery?: Parameters<NonNullable<Issues['reconcile']>>[0]
+  ) =>
     contextualPromise({
+      admitRecovery,
       try: async (signal) => {
         return await inspectIssue(number, prepare, signal, candidate);
       },
@@ -191,8 +197,9 @@ export function githubIssues(config: {
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.github.recoveries')
       ),
-    reconcile: () =>
+    reconcile: (admitRecovery) =>
       contextualPromise({
+        admitRecovery,
         try: (signal) => joins?.reconcile(signal) ?? Promise.resolve(),
         catch: (cause) => new Unavailable({ operation: 'reconcile-prerequisite-joins', cause }),
       }).pipe(
@@ -221,7 +228,8 @@ export function githubIssues(config: {
         };
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),
-    prepare: (number) => Effect.asVoid(inspect(number, true)),
+    prepare: (number, admitRecovery) =>
+      Effect.asVoid(inspect(number, true, undefined, admitRecovery)),
   };
 }
 

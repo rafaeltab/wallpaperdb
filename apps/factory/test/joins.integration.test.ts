@@ -1,10 +1,20 @@
+import {
+  Scheduler,
+  SchedulerLive,
+  ScheduleStore,
+  JobPool,
+  Plan,
+  PlanningSource,
+} from '../src/capabilities/plan/index.js';
+import { controlledScheduleStore } from './fixtures/schedule-store.js';
+import type { Status } from '../src/capabilities/job/index.js';
 import { readFile, writeFile, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
 import { controlledStore } from './fixtures/store.js';
 import { fileStore } from '../src/adapters/store/index.js';
-import { t3Execution } from '../src/adapters/t3/index.js';
+import { t3Execution, t3Restacker } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
 import { joinFixture as fixture } from './fixtures/join.js';
@@ -1207,9 +1217,24 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
       ];
       await writeFile(path, JSON.stringify(saved));
       const check = Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
-      if (kind === 'missing-object')
+      if (kind === 'missing-object') {
         await expect(check).rejects.toMatchObject({ _tag: 'Unavailable' });
-      else {
+        const agent = t3Restacker(
+          { binary: f.host.binary, project: f.host.repository, projectId: 'project-id' },
+          {
+            id: saved.operation,
+            issue: 4,
+            pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+            oldHead: f.c,
+            parent: f.host.base,
+            onto: f.d,
+            context: '',
+          },
+          { read: async () => null, write: async () => false }
+        );
+        const failure = await Effect.runPromise(Effect.flip(agent.resolve()));
+        expect(failure).toMatchObject({ _tag: 'Unavailable', cause: { code: 128 } });
+      } else {
         await check;
         expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(
           kind === 'valid'
@@ -1220,3 +1245,146 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
     }
   }
 );
+
+it('reserves the released recovery slot before a COMPLEX review send alongside unrelated work', async () => {
+  const f = await fixture({
+    conflict: true,
+    restack: { outcome: 'COMPLEX', review: true, question: 'Wait' },
+  });
+  const store = controlledScheduleStore();
+  let unrelated: Status = { kind: 'empty' };
+  const pool: JobPool = {
+    job: () =>
+      Effect.succeed({
+        status: () => Effect.succeed(unrelated),
+        start: (command) =>
+          Effect.sync(() => {
+            unrelated = {
+              kind: 'job',
+              intent: {
+                ...command,
+                id: 'unrelated',
+                issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/99',
+                branch: 'unrelated',
+                createdAt: 0,
+                expectedStage: 'implementation',
+              },
+              elapsedMs: 0,
+              execution: { kind: 'absent' },
+            };
+            return unrelated;
+          }),
+        resume: () => Effect.succeed({ kind: 'rejected' as const }),
+        cancel: () => Effect.succeed({ kind: 'rejected' as const }),
+      }),
+  };
+  const issues: Issues = {
+    ...f.issues,
+    inspect: (number) =>
+      number === 99
+        ? Effect.succeed({
+            open: true,
+            author: 'rafaeltab',
+            labels: ['ready-for-agent'],
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/99',
+            blockers: [],
+            blockersReady: true,
+          })
+        : f.issues.inspect(number),
+  };
+  const input = () => ({
+    issues: [],
+    job: { kind: 'empty' as const },
+    scheduleRevision: Effect.runSync(store.read()).revision,
+    admissions: [],
+    paused: false,
+    capacity: { concurrency: 1, admission: -1 },
+  });
+  const runtime = ManagedRuntime.make(
+    SchedulerLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(ScheduleStore, store),
+          Layer.succeed(JobPool, pool),
+          Layer.succeed(Issues, issues),
+          Layer.succeed(Plan, {
+            preview: () =>
+              Effect.succeed({ kind: 'stale', selected: [], rejected: [], input: input() }),
+          }),
+          Layer.succeed(PlanningSource, {
+            read: () =>
+              Effect.sync(() => {
+                expect(unrelated.kind === 'job' && unrelated.delivery?.ready).toBe(true);
+                return input();
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    await Effect.runPromise(
+      store.save({ revision: 0, concurrency: 1, allowance: -1, paused: false, admissions: [] })
+    );
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.reconcile?.() ?? Effect.void);
+    expect(await Effect.runPromise(f.issues.recoveries?.() ?? Effect.succeed([]))).toEqual([
+      expect.objectContaining({ active: false }),
+    ]);
+    const scheduler = await runtime.runPromise(Scheduler);
+    expect(
+      (await runtime.runPromise(scheduler.start({ issue: 99, base: f.host.base, context: '' })))
+        .kind
+    ).toBe('job');
+    const path = join(f.host.directory, 'restacker.json');
+    const saved = JSON.parse(await readFile(path, 'utf8'));
+    saved.thread.status = 'completed';
+    saved.thread.pendingRequestCount = 0;
+    saved.messages = [
+      {
+        role: 'assistant',
+        runId: 'resolve-run',
+        text: JSON.stringify({
+          operation: saved.operation,
+          commit: saved.head,
+          outcome: '<RESTACK>COMPLEX</RESTACK>',
+        }),
+      },
+    ];
+    await writeFile(path, JSON.stringify(saved));
+    await runtime.runPromise(scheduler.tick(f.host.base));
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+    const root = join(f.host.directory, 'joins');
+    const operation = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
+    if (!operation) throw new Error('Missing operation');
+    const claims = await readdir(join(root, operation, 'recovery'));
+    const reviewClaim = join(root, operation, 'recovery', claims[0], 'review-delivery.json');
+    await expect(readFile(reviewClaim)).rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await runtime.runPromise(scheduler.status())).recoveries).toEqual([
+      expect.objectContaining({ active: false }),
+    ]);
+    const current = await Effect.runPromise(
+      pool.job(99).pipe(Effect.flatMap((job) => job.status()))
+    );
+    if (current.kind !== 'job') throw new Error('Missing admitted job');
+    unrelated = {
+      ...current,
+      delivery: { stage: 'publication', commit: f.host.base, ready: true, landed: false },
+    };
+    await runtime.runPromise(scheduler.tick(f.host.base));
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(1);
+    expect(JSON.parse(await readFile(reviewClaim, 'utf8')).commit).toBe(saved.head);
+    expect(
+      JSON.parse(await readFile(join(f.host.directory, 'review-capacity-observed.json'), 'utf8'))
+    ).toContainEqual(
+      expect.objectContaining({
+        issue: 4,
+        active: true,
+        progress: 'Independent review capacity reserved',
+      })
+    );
+  } finally {
+    await runtime.dispose();
+    await f.close();
+  }
+});

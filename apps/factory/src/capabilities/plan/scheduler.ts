@@ -83,9 +83,20 @@ export const SchedulerLive = Layer.effect(
           admissions: [...state.admissions, command],
         });
       });
+    const admitRecovery = (issue: number) =>
+      Effect.gen(function* () {
+        const snapshot = yield* status();
+        const recoveries = snapshot.recoveries ?? [];
+        if (recoveries.some((item) => item.issue === issue && item.active !== false)) return true;
+        return (
+          snapshot.state.concurrency === -1 ||
+          slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) <
+            snapshot.state.concurrency
+        );
+      });
     const reconcile = () =>
       Effect.gen(function* () {
-        yield* issues.reconcile?.() ?? Effect.void;
+        yield* issues.reconcile?.(admitRecovery) ?? Effect.void;
         const state = yield* store.read();
         for (const admission of state.admissions) {
           const job = yield* pool.job(admission.issue);
@@ -109,7 +120,7 @@ export const SchedulerLive = Layer.effect(
       Effect.gen(function* () {
         let issue = initial ?? (yield* issues.inspect(number));
         if (issue.joinRequired && !locallyBlocked(issue.blockers, jobs)) {
-          yield* issues.prepare?.(number) ?? Effect.void;
+          yield* issues.prepare?.(number, admitRecovery) ?? Effect.void;
           issue = yield* issues.inspect(number);
         }
         return issue;

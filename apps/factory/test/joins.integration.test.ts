@@ -2006,6 +2006,22 @@ it.each(['valid', 'conflicting', 'retired-target'] as const)(
       const observed = await Effect.runPromise(current.pullRequest(command(4, 'C', f.a, 'A')));
       expect(observed).toMatchObject({ ready: !conflicting, commit: c.commit });
       if (!conflicting) expect(observed).toMatchObject({ reviewedCommit: f.c });
+      const recoveries = await Effect.runPromise(current.recoveries!());
+      if (conflicting)
+        expect(recoveries).toContainEqual(
+          expect.objectContaining({
+            issue: 4,
+            active: false,
+            progress: 'Replay association is uncertain; manual recovery required',
+          })
+        );
+      else
+        expect(recoveries).not.toContainEqual(
+          expect.objectContaining({
+            issue: 4,
+            progress: expect.stringContaining('manual recovery'),
+          })
+        );
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(c.commit);
       const after = JSON.parse(await readFile(path, 'utf8'));
       expect(after.members).toEqual(
@@ -2836,6 +2852,147 @@ it.each(['review', 'publication', 'ci'] as const)(
           )
         ).toHaveLength(1);
       }
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'admits owned CI repair before and after authenticated target retirement, retired=%s',
+  async (retired) => {
+    const f = await fixture({ groups: true });
+    try {
+      await Effect.runPromise(f.issues.prepare!(5));
+      const intent = {
+        id: 'C-job',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: f.host.base,
+        prBase: 'A',
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const before = await Effect.runPromise(f.issues.pullRequest(intent));
+      if (before.kind !== 'found') throw new Error('Missing replay');
+      const path = join(f.host.directory, 'join-live.json');
+      const live = JSON.parse(await readFile(path, 'utf8'));
+      if (retired) {
+        f.git('switch', 'main');
+        f.git('merge', '--ff-only', 'D');
+        f.git('switch', '--detach', f.host.base);
+        f.git('push', 'origin', 'main');
+        f.git('push', 'origin', '--delete', 'D');
+        Object.assign(live.prs[103], { state: 'MERGED', head: f.d, base: 'main' });
+        live.prs[104].base = 'main';
+        await writeFile(path, JSON.stringify(live));
+        const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        await f.host.save({
+          ...config,
+          issueStates: { 3: 'CLOSED' },
+          landing: { pr: 103, merge: f.d, head: f.d },
+          defaultBranch: { name: 'main', tip: f.d },
+          landedPrerequisites: { 3: [103] },
+          mergedPrerequisites: {
+            103: {
+              merged: true,
+              merge_commit_sha: f.d,
+              head: { sha: f.d },
+              html_url: 'https://github.com/rafaeltab/wallpaperdb/pull/103',
+              base: { ref: 'main', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+            },
+          },
+        });
+      }
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        ready: true,
+        commit: before.commit,
+        reviewedCommit: f.c,
+      });
+      expect(await Effect.runPromise(f.reopen().recoveries!())).not.toContainEqual(
+        expect.objectContaining({ progress: expect.stringContaining('manual recovery') })
+      );
+      live.newCI = 'FAILURE';
+      await writeFile(path, JSON.stringify(live));
+      const observed = await Effect.runPromise(f.reopen().pullRequest(intent));
+      expect(observed).toMatchObject({ ready: false, ci: { failed: true } });
+      if (observed.kind !== 'found') throw new Error('Missing current publication');
+      expect(observed.manualRecovery).not.toBe(true);
+      const root = join(f.host.directory, 'joins');
+      const original = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
+      if (!original) throw new Error('Missing operation');
+      if (retired) {
+        const successor = createHash('sha256')
+          .update(JSON.stringify([4, 6]))
+          .digest('hex');
+        await mkdir(join(root, successor));
+        await writeFile(join(root, successor, 'request.json'), JSON.stringify({ numbers: [4, 6] }));
+        for (const resource of ['branch:C', 'group:9']) {
+          const claims = join(root, 'writers', createHash('sha256').update(resource).digest('hex'));
+          const name = join(claims, 'writer-1.json');
+          await writeFile(name, JSON.stringify({ key: successor }));
+          expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(
+            false
+          );
+          expect(
+            (await readdir(join(root, original))).filter((value) => value.startsWith('comparison-'))
+          ).toEqual([]);
+          await unlink(name);
+        }
+      }
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+      if (retired) {
+        const bindingPath = join(root, original, 'comparison-initial.json');
+        const bindingBytes = await readFile(bindingPath, 'utf8');
+        const binding = JSON.parse(bindingBytes);
+        binding.current.replay[0].target = 'untrusted-target';
+        await writeFile(bindingPath, JSON.stringify(binding));
+        await expect(Effect.runPromise(f.reopen().pullRequest(intent))).rejects.toMatchObject({
+          _tag: 'Unavailable',
+        });
+        await writeFile(bindingPath, bindingBytes);
+      }
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: before.commit,
+        maintenancePending: true,
+      });
+      f.git('switch', '--detach', before.commit);
+      await writeFile(join(f.host.repository, 'repair.txt'), 'repaired after target retirement');
+      f.git('add', '.');
+      f.git('commit', '-m', 'repair C');
+      const repaired = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/C:${before.commit}`,
+        'origin',
+        `${repaired}:refs/heads/C`
+      );
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+      ).toBe(false);
+      const passed = JSON.parse(await readFile(path, 'utf8'));
+      passed.newCI = 'SUCCESS';
+      await writeFile(path, JSON.stringify(passed));
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+      ).toBe(true);
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        ready: true,
+        commit: repaired,
+        reviewedCommit: f.c,
+      });
+      expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+        blockersReady: true,
+        prerequisite: { base: repaired },
+      });
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+      ).toBe(true);
+      expect(f.git('show', `${repaired}:repair.txt`)).toBe('repaired after target retirement');
     } finally {
       await f.close();
     }

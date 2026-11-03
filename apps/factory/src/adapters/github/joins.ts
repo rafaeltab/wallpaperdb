@@ -182,8 +182,29 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       operation = await hydrateOperation(dir, saved);
     }
   };
-  const effective = async (dir: string): Promise<Intent | null> =>
-    (await operationHistory(dir)).at(-1) ?? null;
+  const effective = async (dir: string): Promise<Intent | null> => {
+    const original = (await operationHistory(dir)).at(-1);
+    if (!original) return null;
+    const saved = await read(dir, comparisonName(original));
+    if (!saved) return original;
+    const binding = z.object({ original: intent, current: intent }).parse(saved);
+    if (JSON.stringify(binding.original) !== JSON.stringify(original))
+      throw new Error('Mismatched repair comparison source');
+    const restored = {
+      ...binding.current,
+      boundary: original.boundary,
+      replay: binding.current.replay.map((item, index) => ({
+        ...item,
+        target: original.replay[index]?.target,
+      })),
+    };
+    if (
+      JSON.stringify(intent.parse(restored)) !== JSON.stringify(original) ||
+      !(await comparisonTargetsValid(original, binding.current))
+    )
+      throw new Error('Mismatched repair comparison binding');
+    return binding.current;
+  };
   const requiredOperation = async (dir: string) => {
     const operation = await effective(dir);
     if (!operation) throw new Error('Missing durable replay intent');
@@ -970,15 +991,20 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     await publish(dir, `ci-${item.next}.json`, { commit: item.next, tree: item.tree });
     return true;
   };
+  const retiredLayer = async (operation: Intent, item: Layer, signal?: AbortSignal) => {
+    const fact = operation.boundary?.landed.find(
+      (value) => value.pr === item.pr && value.originalHead === item.commit
+    );
+    if (!fact) return false;
+    const current = await landedPrerequisite(project, item.issue, gh, signal);
+    if (!current || !sameLandingProof(current, fact)) return false;
+    return isAncestor(fact.commit, replayTip(operation) ?? base, signal);
+  };
   const verifyHeads = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     for (const item of operation.layers) {
-      const changed = operation.replay.find((replay) => replay.pr === item.pr);
       const head = await remote(item.branch, signal);
-      if (
-        head !== item.commit &&
-        head !== changed?.next &&
-        !(operation.generation && head === changed?.commit)
-      ) {
+      if (!head && (await retiredLayer(operation, item, signal))) continue;
+      if (!knownLayerHead(operation, item, head)) {
         await publish(dir, 'blocked.json', {
           kind: 'head-conflict',
           issue: item.issue,
@@ -2307,6 +2333,64 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return replay;
   };
+  const comparisonTargetsValid = async (original: Intent, current: Intent) => {
+    for (const item of original.replay) {
+      const changed = current.replay.find((value) => value.issue === item.issue);
+      if (!changed) return false;
+      if (changed.target === item.target) continue;
+      const parent = [
+        ...original.layers,
+        ...original.replay.map((value) => ({ ...value, commit: value.next })),
+      ].find((value) => value.branch === item.target && value.commit === item.onto);
+      const fact = current.boundary?.landed.find(
+        (value) =>
+          value.pr === parent?.pr &&
+          value.originalHead === parent?.commit &&
+          value.branch === changed.target
+      );
+      if (!fact || !(await isAncestor(fact.commit, item.next))) return false;
+    }
+    return true;
+  };
+  const currentRepairOperation = async (original: Intent, signal?: AbortSignal) => {
+    const replay: Intent['replay'] = [];
+    for (const previous of original.replay) {
+      const observed = await prState(previous, signal);
+      replay.push({ ...previous, target: observed.baseRefName });
+    }
+    const boundary = await refreshBoundary(
+      project,
+      base,
+      original.boundary,
+      original.layers.map((value) => value.issue),
+      replay.map((value) => ({ base: value.onto, prBase: value.target })),
+      gh,
+      signal
+    );
+    if (!boundary) return null;
+    const operation = { ...original, boundary, replay };
+    if (!(await comparisonTargetsValid(original, operation))) return null;
+    return operation;
+  };
+  const repairComparison = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    const original = record.operation;
+    const current = await prState(item, signal);
+    if (current.baseRefName === item.target) return record;
+    if (!record.complete || !(await completedComparisonsValid(original, signal))) return null;
+    const operation = await currentRepairOperation(original, signal);
+    if (!operation) return null;
+
+    if (!(await repairWriters(operation, item.issue, head, signal))) return null;
+    await publish(record.directory, comparisonName(original), { original, current: operation });
+    const selected = await requiredOperation(record.directory);
+    if (JSON.stringify(selected) !== JSON.stringify(intent.parse(operation))) return null;
+    return { ...record, operation: selected };
+  };
   const repairObservation = async (
     record: ReplayRecord,
     item: Intent['replay'][number],
@@ -2421,7 +2505,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const record of records) {
       if (await acceptedRepair(record, issue, branch, head, repaired)) return true;
       const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
-      if (item) return repairRecord(record, item, head, repaired, signal);
+      if (item) {
+        const selected = await repairComparison(record, item, head, signal);
+        if (!selected) return false;
+        const current = selected.operation.replay.find((value) =>
+          sameReplay(value, issue, branch, head)
+        );
+        return current ? repairRecord(selected, current, head, repaired, signal) : false;
+      }
     }
     if (!repaired) return false;
     return records.some(
@@ -2557,12 +2648,20 @@ function publicationProblem(
     uncertain: boolean;
     manual?: boolean;
     automatic?: boolean;
+    comparisonReady?: boolean;
   }
 ) {
   if (current.state === 'CLOSED') return 'PR closed without merge; manual recovery required';
   if (item.manual) return 'Known external publication change; manual recovery required';
   if (item.pending || item.automatic) return undefined;
+  return completedPublicationProblem(current, item);
+}
+function completedPublicationProblem(
+  current: { state: string; headRefOid: string; baseRefName: string },
+  item: Intent['replay'][number] & { uncertain: boolean; comparisonReady?: boolean }
+) {
   if (item.uncertain) return 'Replay association is uncertain; manual recovery required';
+  if (item.comparisonReady) return undefined;
   if (changedPublication(current, item)) return 'PR changed externally; manual recovery required';
   return undefined;
 }
@@ -2656,4 +2755,27 @@ function repairReceiptMatches(
 
 function sameReplay(value: Intent['replay'][number], issue: number, branch: string, head: string) {
   return value.issue === issue && value.branch === branch && value.next === head;
+}
+
+function comparisonName(operation: Intent) {
+  return `comparison-${operation.generation ?? 'initial'}.json`;
+}
+
+function sameLandingProof(
+  current: NonNullable<Awaited<ReturnType<typeof landedPrerequisite>>>,
+  fact: JoinBoundary['landed'][number]
+) {
+  return (
+    current.pr === fact.pr &&
+    current.originalHead === fact.originalHead &&
+    current.commit === fact.commit
+  );
+}
+function knownLayerHead(operation: Intent, item: Layer, head: string) {
+  const changed = operation.replay.find((replay) => replay.pr === item.pr);
+  return (
+    head === item.commit ||
+    head === changed?.next ||
+    Boolean(operation.generation && head === changed?.commit)
+  );
 }

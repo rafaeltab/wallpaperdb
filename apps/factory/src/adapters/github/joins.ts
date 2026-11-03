@@ -2877,20 +2877,20 @@ function currentComparison(
 
 function latestReplay(candidates: readonly Intent['replay'][number][]) {
   const terminal = candidates.filter(
-    (item) => !candidates.some((other) => other.commit === item.next && other.next !== item.next)
+    (item) =>
+      !candidates.some(
+        (other) =>
+          replayOwner(item) === replayOwner(other) &&
+          other.commit === item.next &&
+          other.next !== item.next
+      )
   );
   const item = terminal[0] ?? candidates[0];
   const equivalent =
     item &&
     terminal.length > 0 &&
     terminal.every(
-      (other) =>
-        sameOwningIssue(item, other) &&
-        item.pr === other.pr &&
-        item.next === other.next &&
-        item.tree === other.tree &&
-        item.onto === other.onto &&
-        item.target === other.target
+      (other) => sameOwningIssue(item, other) && replayProvenance(item) === replayProvenance(other)
     );
   return item ? { item, uncertain: !equivalent } : null;
 }

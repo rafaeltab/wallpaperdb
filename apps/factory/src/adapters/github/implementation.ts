@@ -328,7 +328,7 @@ function replayMatches(
 ) {
   return (
     replay &&
-    !replay.ambiguous &&
+    !replay.uncertain &&
     observed.kind === 'found' &&
     replay.branch === branch &&
     observed.commit === replay.next &&

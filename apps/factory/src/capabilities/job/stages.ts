@@ -60,7 +60,7 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
-      comparison: waiting.comparison,
+      comparison: nextComparison(waiting),
       stage:
         waiting.stage === 'publication'
           ? 'ci'
@@ -547,8 +547,26 @@ function acceptReplayRepair(
   waiting: StageRequest,
   evidence: StageEvidence
 ) {
-  if (waiting.stage !== 'babysitting' || !waiting.comparison) return Effect.succeed(true);
-  return issues.repairReplay?.(intent, waiting.commit, evidence.commit) ?? Effect.succeed(false);
+  if (!waiting.comparison) return Effect.succeed(true);
+  if (waiting.stage !== 'babysitting' && !reviewedReplayChanged(waiting, evidence))
+    return Effect.succeed(true);
+  return (
+    issues.repairReplay?.(
+      intent,
+      waiting.commit,
+      evidence.commit,
+      replayAuthority(waiting, evidence)
+    ) ?? Effect.succeed(false)
+  );
+}
+
+function replayAuthority(request: StageRequest, evidence: StageEvidence) {
+  return request.stage === 'babysitting' ? undefined : { request, evidence };
+}
+
+function reviewedReplayChanged(waiting: StageRequest, evidence: StageEvidence) {
+  if (waiting.stage === 'review') return waiting.commit !== evidence.commit;
+  return waiting.stage === 'publication' && waiting.commit !== waiting.comparison?.previousHead;
 }
 
 function manualReplay(pr: PullRequestObservation, commit: string, cached: boolean) {
@@ -572,4 +590,9 @@ function repairRun(
 function predecessorOrdinal(accepted: StageRequest, evidence: StageEvidence | null) {
   const ordinal = evidence ? evidence.ordinal : accepted.ordinal;
   return ordinal ?? 3;
+}
+
+function nextComparison(waiting: StageRequest): StageRequest['comparison'] {
+  if (waiting.stage !== 'review' || !waiting.comparison) return waiting.comparison;
+  return { ...waiting.comparison, previousHead: waiting.commit };
 }

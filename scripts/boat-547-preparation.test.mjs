@@ -565,99 +565,104 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 					}
 				: {},
 		);
-		if (fault === "source")
-			fs.appendFileSync(
-				path.join(f.root, "apps/user/src/boat-live-547.ts"),
-				"\n// unexpected input\n",
-			);
-		if (fault.startsWith("containers"))
-			f.env.CONTROL_CONTAINER_CHANGED =
-				fault === "containers-before" ? "before" : "1";
-		const rejected = assert.rejects(
-			result.serving.replacePreview({
-				action: "replace-preview",
-				worker: result.owner.worker,
-				admission: result.owner.admission,
-				generation: result.preview.generation,
-			}),
-			fault === "source"
-				? /Frozen workload changed/
-				: fault.startsWith("containers")
-					? /Application identities changed/
-					: /Original startup deadline/,
-		);
-		let timer;
 		try {
-			if (fault === "late") {
-				await Promise.race([
-					entered.promise,
-					new Promise((_, reject) => {
-						timer = setTimeout(
-							() => reject(new Error("Owning stop was not reached")),
-							10000,
-						);
-					}),
-				]);
-				const replacement = json(
-					path.join(f.config.evidence, "startup/preview-replacement.json"),
+			if (fault === "source")
+				fs.appendFileSync(
+					path.join(f.root, "apps/user/src/boat-live-547.ts"),
+					"\n// unexpected input\n",
 				);
-				assert.equal(replacement.status, "FAIL");
-				assert.equal(replacement.acceptedAt, undefined);
-				const pending = json(
-					path.join(f.config.evidence, "startup/result.json"),
+			if (fault.startsWith("containers"))
+				f.env.CONTROL_CONTAINER_CHANGED =
+					fault === "containers-before" ? "before" : "1";
+			const rejected = assert.rejects(
+				result.serving.replacePreview({
+					action: "replace-preview",
+					worker: result.owner.worker,
+					admission: result.owner.admission,
+					generation: result.preview.generation,
+				}),
+				fault === "source"
+					? /Frozen workload changed/
+					: fault.startsWith("containers")
+						? /Application identities changed/
+						: /Original startup deadline/,
+			);
+			let timer;
+			try {
+				if (fault === "late") {
+					await Promise.race([
+						entered.promise,
+						new Promise((_, reject) => {
+							timer = setTimeout(
+								() => reject(new Error("Owning stop was not reached")),
+								10000,
+							);
+						}),
+					]);
+					const replacement = json(
+						path.join(f.config.evidence, "startup/preview-replacement.json"),
+					);
+					assert.equal(replacement.status, "FAIL");
+					assert.equal(replacement.acceptedAt, undefined);
+					const pending = json(
+						path.join(f.config.evidence, "startup/result.json"),
+					);
+					assert.equal(pending.status, "FAIL");
+					assert.equal(pending.next, undefined);
+					assert.equal(pending.acceptedAt, undefined);
+					assert.equal(pending.cleanup.status, "PENDING_OWNING_STOP");
+					assert.notEqual(
+						json(path.join(f.root, ".boat/state.json")).runningSince,
+						null,
+					);
+				}
+			} finally {
+				clearTimeout(timer);
+				release.resolve();
+				await rejected;
+			}
+			await result.serving.done;
+			assert.equal(
+				json(path.join(f.config.evidence, "startup/preview-replacement.json"))
+					.status,
+				"FAIL",
+			);
+			assert.equal(
+				json(path.join(f.root, ".boat/state.json")).runningSince,
+				null,
+			);
+			assert.equal(
+				jsonLines(path.join(f.root, "commands.jsonl")).filter(
+					(a) => a[1] === "boat-stop",
+				).length,
+				1,
+			);
+			if (["source", "containers-before"].includes(fault)) {
+				assert.deepEqual(
+					jsonLines(path.join(f.root, "serving-commands.jsonl")),
+					["dev", "preview"],
 				);
-				assert.equal(pending.status, "FAIL");
-				assert.equal(pending.next, undefined);
-				assert.equal(pending.acceptedAt, undefined);
-				assert.equal(pending.cleanup.status, "PENDING_OWNING_STOP");
-				assert.notEqual(
-					json(path.join(f.root, ".boat/state.json")).runningSince,
-					null,
+				if (fault === "source")
+					assert.match(
+						fs.readFileSync(
+							path.join(f.root, "apps/user/src/boat-live-547.ts"),
+							"utf8",
+						),
+						/unexpected input/,
+					);
+			} else {
+				const disposal = json(
+					path.join(
+						f.config.evidence,
+						"startup/replacement-preview/disposal.json",
+					),
 				);
+				assert.equal(disposal.pipesClosed, true);
+				assert.deepEqual(disposal.unresolved, []);
 			}
 		} finally {
-			clearTimeout(timer);
 			release.resolve();
-			await rejected;
-		}
-		await result.serving.done;
-		assert.equal(
-			json(path.join(f.config.evidence, "startup/preview-replacement.json"))
-				.status,
-			"FAIL",
-		);
-		assert.equal(
-			json(path.join(f.root, ".boat/state.json")).runningSince,
-			null,
-		);
-		assert.equal(
-			jsonLines(path.join(f.root, "commands.jsonl")).filter(
-				(a) => a[1] === "boat-stop",
-			).length,
-			1,
-		);
-		if (["source", "containers-before"].includes(fault)) {
-			assert.deepEqual(jsonLines(path.join(f.root, "serving-commands.jsonl")), [
-				"dev",
-				"preview",
-			]);
-			if (fault === "source")
-				assert.match(
-					fs.readFileSync(
-						path.join(f.root, "apps/user/src/boat-live-547.ts"),
-						"utf8",
-					),
-					/unexpected input/,
-				);
-		} else {
-			const disposal = json(
-				path.join(
-					f.config.evidence,
-					"startup/replacement-preview/disposal.json",
-				),
-			);
-			assert.equal(disposal.pipesClosed, true);
-			assert.deepEqual(disposal.unresolved, []);
+			await result.serving.stop();
 		}
 	});
 }

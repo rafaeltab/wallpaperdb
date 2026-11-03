@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   Scheduler,
@@ -1715,6 +1716,8 @@ it.each([false, true])(
     });
     try {
       if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+      const owning = join(f.host.directory, 'owning-C-successive');
+      if (!pendingCI) f.git('worktree', 'add', owning, 'C');
       await Effect.runPromise(f.issues.reconcile());
       const assertions: import('../src/adapters/github/index.js').VerifiedPrerequisite[] =
         f.config.prerequisites.slice(0, 1);
@@ -1782,6 +1785,107 @@ it.each([false, true])(
       }
       const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
       expect(f.git('log', '--format=%s', `${mergedB}..${head}`)).toBe('C\nD');
+      if (!pendingCI) {
+        const command = intent(4, 'C', f.a, 'A');
+        const failed = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+        failed.newCI = 'FAILURE';
+        await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(failed));
+        const observed = await Effect.runPromise(current.pullRequest(command));
+        if (
+          observed.kind !== 'found' ||
+          !observed.parent ||
+          !observed.base ||
+          !observed.previousHead
+        )
+          throw new Error('Missing current comparison');
+        expect(await Effect.runPromise(current.repairReplay!(command, head))).toBe(true);
+        const execution = t3Execution({
+          project: f.host.repository,
+          projectId: 'project-id',
+          binary: f.host.binary,
+        });
+        const store = fileStore(join(f.host.directory, 'successive-stage'));
+        await Effect.runPromise(
+          store.saveStage({
+            index: 3,
+            stage: 'babysitting',
+            threadId: 'owner-C',
+            commit: head,
+            previousRunId: 'published',
+            ordinal: 4,
+            comparison: {
+              base: observed.parent,
+              prBase: observed.base,
+              previousHead: observed.previousHead,
+              owningHeads: observed.owningHeads,
+            },
+          })
+        );
+        const request = await Effect.runPromise(store.readStage(3));
+        if (!request) throw new Error('Missing durable request');
+        if (!request.comparison) throw new Error('Missing persisted comparison');
+        await expect(
+          Effect.runPromise(
+            store.saveStage({
+              ...request,
+              index: 4,
+              comparison: { ...request.comparison, owningHeads: ['not-a-sha'] },
+            })
+          )
+        ).rejects.toMatchObject({ _tag: 'Unavailable' });
+        expect(await Effect.runPromise(store.claimStage(3))).toBe(true);
+        expect(await Effect.runPromise(store.claimStage(3))).toBe(false);
+        const resource = {
+          threadId: 'owner-C',
+          title: 'Factory C',
+          projectId: 'project-id',
+          providerInstanceId: 'codex',
+          model: 'gpt-6.1-sol',
+          branch: 'C',
+          worktreePath: owning,
+          status: 'completed',
+          latestRunId: 'published',
+          runCount: 3,
+          pendingRequestCount: 0,
+        };
+        const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        await f.host.save({ ...config, joinWriter: false });
+        const git = (...args: string[]) =>
+          execFileSync('git', ['-C', owning, ...args], { encoding: 'utf8' }).trim();
+        const prior = assertions.find((a) => a.issue === 4)?.commit;
+        if (!prior) throw new Error('Missing earlier replay');
+        for (const [candidate, allowed, dirty] of [
+          [f.a, false, false],
+          [f.c, false, true],
+          [f.c, true, false],
+          [prior, true, false],
+        ] as const) {
+          git('reset', '--hard', candidate);
+          if (dirty) await writeFile(join(owning, 'dirty.txt'), 'dirty');
+          await writeFile(join(f.host.directory, 'resource.json'), JSON.stringify(resource));
+          if (allowed) {
+            expect(await Effect.runPromise(execution.observe(command, request))).toMatchObject({
+              kind: 'found',
+            });
+            if (candidate === prior)
+              await expect(Effect.runPromise(execution.observe(command))).rejects.toMatchObject({
+                _tag: 'Unavailable',
+              });
+            await Effect.runPromise(execution.sendStage(command, request));
+            expect(
+              (await Effect.runPromise(execution.inspectStage(command, request)))?.accepted
+            ).not.toBe(true);
+          } else
+            await expect(
+              Effect.runPromise(execution.sendStage(command, request))
+            ).rejects.toMatchObject({ _tag: 'Unavailable' });
+          if (dirty) await unlink(join(owning, 'dirty.txt'));
+        }
+        expect(
+          (await f.host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
+        ).toHaveLength(2);
+      }
+
       expect(await Effect.runPromise(current.pullRequest(intent(2, 'B', f.a, 'A')))).toMatchObject({
         landed: true,
         reviewedCommit: f.b,
@@ -2119,6 +2223,7 @@ it.each([
   { completed: true, legacy: false },
   { completed: true, legacy: true },
   { completed: true, legacy: true, missingBoundary: true },
+  { completed: true, legacy: false, unchanged: true },
 ])('reconciles an owned CI repair after replay %j', async (options) => {
   const { completed, legacy } = options;
   const f = await fixture({ ciFails: !completed });
@@ -2205,6 +2310,29 @@ it.each([
       prerequisite: { base: repaired },
     });
     expect(f.git('show', `${repaired}:repair.txt`)).toBe('fixed CI');
+    if ('unchanged' in options) {
+      for (let cycle = 0; cycle < 2; cycle++) {
+        const failed = JSON.parse(await readFile(path, 'utf8'));
+        failed.newCI = 'FAILURE';
+        await writeFile(path, JSON.stringify(failed));
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired))).toBe(true);
+        failed.newCI = 'SUCCESS';
+        await writeFile(path, JSON.stringify(failed));
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired, repaired))).toBe(
+          true
+        );
+        await Effect.runPromise(f.reopen().reconcile!());
+        expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+          commit: repaired,
+          ready: true,
+          reviewedCommit: f.c,
+        });
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired, repaired))).toBe(
+          true
+        );
+      }
+    }
+
     expect(await Effect.runPromise(f.issues.repairReplay(intent, observed.commit, repaired))).toBe(
       true
     );

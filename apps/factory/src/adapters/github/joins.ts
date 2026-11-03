@@ -72,6 +72,7 @@ const intent = z.object({
   members: z.array(z.number().int().positive()),
   numbers: z.array(z.number().int()).max(100),
   generation: sha.optional(),
+  repairOf: sha.optional(),
   layers: z.array(layer),
   replay: z.array(layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha })),
 });
@@ -165,20 +166,24 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     };
     return { ...operation, boundary };
   };
-  const effective = async (dir: string): Promise<Intent | null> => {
+  const operationHistory = async (dir: string): Promise<Intent[]> => {
     let saved = await read(dir, 'intent.json');
-    if (!saved) return null;
+    if (!saved) return [];
     let operation = await hydrateOperation(dir, saved);
+    const history: Intent[] = [];
     const seen = new Set<string>();
     for (;;) {
       const key = operation.generation ?? 'initial';
       if (seen.has(key)) throw new Error('Cyclic replay repair journal');
       seen.add(key);
+      history.push(operation);
       saved = await read(dir, `repair-${key}.json`);
-      if (!saved) return operation;
+      if (!saved) return history;
       operation = await hydrateOperation(dir, saved);
     }
   };
+  const effective = async (dir: string): Promise<Intent | null> =>
+    (await operationHistory(dir)).at(-1) ?? null;
   const requiredOperation = async (dir: string) => {
     const operation = await effective(dir);
     if (!operation) throw new Error('Missing durable replay intent');
@@ -1509,6 +1514,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       if (saved)
         records.push({
           operation: await requiredOperation(dir),
+          history: await operationHistory(dir),
           directory: dir,
           complete: !!(await completed(dir)),
         });
@@ -1606,11 +1612,28 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
+  const owningHeads = async (records: readonly ReplayRecord[], item: Intent['replay'][number]) => {
+    const heads = new Set<string>([reviewOrigin(item)]);
+    for (const record of records)
+      for (const operation of record.history) {
+        if (!(await read(record.directory, completionName(operation)))) continue;
+        for (const previous of operation.replay) {
+          if (!sameOwningIssue(previous, item)) continue;
+          await verifyReplayTree(previous, record.directory);
+          heads.add(previous.next);
+        }
+      }
+    return [...heads];
+  };
   const replayFor = async (issue: number, signal?: AbortSignal) => {
     const records = await replayRecords();
     const item = await lookupReplay(records, issue, signal);
     if (!item) return null;
-    return { ...item, manual: item.manual || !(await replayFactsValid(records, item, signal)) };
+    return {
+      ...item,
+      owningHeads: await owningHeads(records, item),
+      manual: item.manual || !(await replayFactsValid(records, item, signal)),
+    };
   };
   const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
     const saved = await read(join(config.directory, key), 'request.json');
@@ -2310,7 +2333,25 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await read(repairDirectory(record, fixed.next), 'boundary.json')
     );
     const writerKey = await operationOwner(record.operation);
-    const candidate = { ...record.operation, boundary, writerKey, generation: fixed.next, replay };
+    const generation = createHash('sha256')
+      .update(
+        JSON.stringify([
+          record.operation.generation ?? 'initial',
+          fixed.issue,
+          fixed.commit,
+          fixed.next,
+        ])
+      )
+      .digest('hex')
+      .slice(0, 40);
+    const candidate = {
+      ...record.operation,
+      boundary,
+      writerKey,
+      generation,
+      repairOf: fixed.commit,
+      replay,
+    };
     if (!(await operationFactsValid(candidate, signal))) return false;
     await publish(
       record.directory,
@@ -2319,12 +2360,22 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     );
     return true;
   };
-  const sameReplay = (
-    value: Intent['replay'][number],
+  const acceptedRepair = async (
+    record: ReplayRecord,
     issue: number,
     branch: string,
-    head: string
-  ) => value.issue === issue && value.branch === branch && value.next === head;
+    head: string,
+    repaired?: string
+  ) => {
+    if (!repaired) return false;
+    if (!record.operation.replay.some((value) => sameReplay(value, issue, branch, repaired)))
+      return false;
+    const accepted = record.history.some((operation) =>
+      repairReceiptMatches(operation, issue, branch, head, repaired)
+    );
+    if (!accepted) return false;
+    return !(await read(record.directory, repairRequestName(record.operation, head)));
+  };
   const repair = async (
     issue: number,
     branch: string,
@@ -2334,6 +2385,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   ) => {
     const records = await replayRecords();
     for (const record of records) {
+      if (await acceptedRepair(record, issue, branch, head, repaired)) return true;
       const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
       if (item) return repairRecord(record, item, head, repaired, signal);
     }
@@ -2534,4 +2586,28 @@ function legacyLandingMatches(landed: NonNullable<Intent['landing']>, boundary: 
   const anchor = boundary.landed.find((fact) => fact.pr === landed.anchor.pr);
   if (anchor?.originalHead !== landed.anchor.commit) return false;
   return landed.removed.every((pr) => boundary.landed.some((fact) => fact.pr === pr));
+}
+
+function sameOwningIssue(first: Intent['replay'][number], second: Intent['replay'][number]) {
+  return (
+    first.issue === second.issue &&
+    first.branch === second.branch &&
+    first.url === second.url &&
+    reviewOrigin(first) === reviewOrigin(second)
+  );
+}
+
+function repairReceiptMatches(
+  operation: Intent,
+  issue: number,
+  branch: string,
+  head: string,
+  repaired: string
+) {
+  if (operation.repairOf !== head && operation.generation !== repaired) return false;
+  return operation.replay.some((value) => sameReplay(value, issue, branch, repaired));
+}
+
+function sameReplay(value: Intent['replay'][number], issue: number, branch: string, head: string) {
+  return value.issue === issue && value.branch === branch && value.next === head;
 }

@@ -362,6 +362,7 @@ function replayObservation(
       maintenancePending: true,
       reviewedCommit: originalReview(replay),
       previousHead: replay.commit,
+      owningHeads: replay.owningHeads,
       parent: replay.onto,
     };
   if (replayMatches(replay, observed, branch))
@@ -369,6 +370,7 @@ function replayObservation(
       ...observed,
       reviewedCommit: originalReview(replay),
       previousHead: replay.commit,
+      owningHeads: replay.owningHeads,
       parent: replay.onto,
     };
   return observed;

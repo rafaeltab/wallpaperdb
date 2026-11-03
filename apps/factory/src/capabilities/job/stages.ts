@@ -524,7 +524,12 @@ function repairComparison(
   previous: string
 ): StageRequest['comparison'] {
   if (!pr.reviewedCommit || !pr.parent || !pr.base) return undefined;
-  return { base: pr.parent, prBase: pr.base, previousHead: pr.previousHead ?? previous };
+  return {
+    base: pr.parent,
+    prBase: pr.base,
+    previousHead: pr.previousHead ?? previous,
+    owningHeads: pr.owningHeads,
+  };
 }
 function repairAllowed(
   issues: Issues,

@@ -19,7 +19,10 @@ export const JobLive = Layer.effect(
     const execution = yield* Execution;
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
-        const observation = yield* execution.observe(intent);
+        const observation = yield* execution.observe(
+          intent,
+          (yield* currentStage(store)) ?? undefined
+        );
         if ((yield* store.readControl()).cancelled && observation.kind === 'found')
           yield* execution.interrupt(intent, observation.threadId);
         const delivery: Delivery | undefined = yield* reconcileStages(
@@ -61,7 +64,7 @@ export const JobLive = Layer.effect(
           if (!intent || !waiting) return { kind: 'rejected' as const };
           if (!matchesResume(intent, waiting, control, command))
             return { kind: 'rejected' as const };
-          const observed = yield* execution.observe(intent);
+          const observed = yield* execution.observe(intent, waiting);
           if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
           if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
           const evidence = yield* resumeEvidence(execution, intent, waiting, observed);

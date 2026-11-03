@@ -426,3 +426,339 @@ it('uses the default-branch merge result after rebasing changed the original PR 
     await f.close();
   }
 });
+
+async function advanceDefault(f: Awaited<ReturnType<typeof fixture>>, changedProof: object = {}) {
+  await writeFile(join(f.publisher, 'unrelated-default.txt'), 'unrelated default advance');
+  f.git('-C', f.publisher, 'add', '.');
+  f.git(
+    '-C',
+    f.publisher,
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.invalid',
+    'commit',
+    '-m',
+    'unrelated A2'
+  );
+  const tip = f.git('-C', f.publisher, 'rev-parse', 'HEAD');
+  f.git('-C', f.publisher, 'push', 'origin', 'main');
+  await f.host.save({ ...f.observation, defaultBranch: { name: 'main', tip }, ...changedProof });
+  return tip;
+}
+async function reservedRuntime(
+  f: Awaited<ReturnType<typeof fixture>>,
+  afterReservation?: () => Promise<void>
+) {
+  const issues = githubIssues({ project: f.host.repository, base: f.host.base, prerequisites: [] });
+  const persisted = fileScheduleStore(join(f.host.directory, 'reserved-schedule'));
+  let observedReservation = false;
+  const store: ScheduleStore = {
+    read: () => persisted.read(),
+    save: (state) =>
+      Effect.gen(function* () {
+        const saved = yield* persisted.save(state);
+        if (saved && state.admissions.length && !observedReservation) {
+          observedReservation = true;
+          if (afterReservation) yield* Effect.promise(afterReservation);
+        }
+        return saved;
+      }),
+  };
+  const worker = ManagedRuntime.make(
+    JobLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(JobStore, fileStore(join(f.host.directory, 'reserved-job'))),
+          Layer.succeed(Issues, issues),
+          Layer.succeed(Time, { now: () => Effect.succeed(1) }),
+          Layer.succeed(
+            Execution,
+            t3Execution({
+              project: f.host.repository,
+              projectId: 'project-id',
+              binary: f.host.binary,
+            })
+          )
+        )
+      )
+    )
+  );
+  const job = await worker.runPromise(Job);
+  const runtime = ManagedRuntime.make(
+    SchedulerLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Issues, issues),
+          Layer.succeed(JobPool, { job: () => Effect.succeed(job) }),
+          Layer.succeed(ScheduleStore, store),
+          Layer.succeed(Plan, {
+            preview: () => Effect.die('Reserved slot must reconcile before planning'),
+          }),
+          Layer.succeed(PlanningSource, {
+            read: () => Effect.die('Reserved slot must reconcile before discovery'),
+          })
+        )
+      )
+    )
+  );
+  return {
+    scheduler: await runtime.runPromise(Scheduler),
+    run: <A>(effect: Effect.Effect<A, import('../src/capabilities/job/index.js').Unavailable>) =>
+      runtime.runPromise(effect),
+    store: persisted,
+    issues,
+    job,
+    close: async () => {
+      await runtime.dispose();
+      await worker.dispose();
+    },
+  };
+}
+
+it('starts the reserved comparison when default advances between reservation and job inspection', async () => {
+  const f = await fixture();
+  const r = await reservedRuntime(f, async () => {
+    await advanceDefault(f);
+  });
+  try {
+    const result = await r.run(
+      r.scheduler.start({ issue: 574, base: f.host.base, context: 'Only B' })
+    );
+    expect(result.kind).toBe('job');
+    if (result.kind !== 'job' || result.execution.kind !== 'found')
+      throw new Error('Missing bound job');
+    expect(result.intent).toMatchObject({ base: f.landed, prBase: 'main', context: 'Only B' });
+    expect(await readFile(join(result.execution.worktree, 'landed-A.txt'), 'utf8')).toBe(
+      'required landed A'
+    );
+    await r.run(r.scheduler.tick(f.host.base));
+    expect((await Effect.runPromise(r.store.read())).admissions).toHaveLength(1);
+    expect(
+      (await f.host.calls()).filter(
+        (call) => call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+  } finally {
+    await r.close();
+    await f.close();
+  }
+});
+
+it.each([false, true])(
+  'recovers a durable pre-launch reservation after a safe advance, lost launch response %s',
+  async (lost) => {
+    const f = await fixture();
+    let r = await reservedRuntime(f);
+    try {
+      const proof = await Effect.runPromise(r.issues.inspect(574));
+      expect(proof.prerequisite?.base).toBe(f.landed);
+      const reserved = {
+        issue: 574,
+        base: f.landed,
+        prBase: 'main',
+        prerequisiteEvidence: 'Original admitted A evidence',
+        context: 'Retain exact context',
+      };
+      const state = await Effect.runPromise(r.store.read());
+      expect(
+        await Effect.runPromise(
+          r.store.save({ ...state, revision: state.revision + 1, admissions: [reserved] })
+        )
+      ).toBe(true);
+      expect(await Effect.runPromise(r.job.status())).toEqual({ kind: 'empty' });
+      await r.close();
+      const tip = await advanceDefault(f);
+      await f.host.save({ ...f.observation, defaultBranch: { name: 'main', tip }, lost });
+      r = await reservedRuntime(f);
+      const first = await r.run(r.scheduler.tick(f.host.base));
+      expect(first.jobs[0]?.kind).toBe('job');
+      const job = first.jobs[0];
+      if (job?.kind !== 'job' || job.execution.kind !== 'found')
+        throw new Error('Missing recovered worker');
+      expect(job.intent).toMatchObject({
+        issue: 574,
+        base: f.landed,
+        prBase: 'main',
+        context: reserved.context,
+      });
+      expect(await readFile(join(job.execution.worktree, 'landed-A.txt'), 'utf8')).toBe(
+        'required landed A'
+      );
+      const next = await r.run(r.scheduler.tick(f.host.base));
+      expect(next.state.admissions).toEqual([reserved]);
+      expect(next.jobs[0]).toMatchObject({
+        kind: 'job',
+        intent: { id: job.intent.id, base: f.landed },
+      });
+      expect(
+        (await f.host.calls()).filter(
+          (call) => call.args[1] === 'start' && call.args.includes('--worktree')
+        )
+      ).toHaveLength(1);
+    } finally {
+      await r.close();
+      await f.close();
+    }
+  }
+);
+
+it.each([
+  'required-code',
+  'target',
+  'operator-pin',
+  'divergent',
+  'missing-object',
+  'malformed',
+] as const)('does not certify an invalid reserved comparison: %s', async (kind) => {
+  const f = await fixture();
+  try {
+    const initial = githubIssues({
+      project: f.host.repository,
+      base: f.host.base,
+      prerequisites: [],
+    });
+    await Effect.runPromise(initial.inspect(574));
+    const tip = await advanceDefault(f);
+    let candidate = f.landed;
+    if (kind === 'divergent') {
+      f.git('-C', f.host.repository, 'checkout', '--detach', f.landed);
+      f.git(
+        '-C',
+        f.host.repository,
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.invalid',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'divergent candidate'
+      );
+      candidate = f.git('-C', f.host.repository, 'rev-parse', 'HEAD');
+    }
+    if (kind === 'required-code')
+      await f.host.save({
+        ...f.observation,
+        defaultBranch: { name: 'main', tip },
+        mergedPrerequisites: {
+          591: { ...f.observation.mergedPrerequisites[591], merge_commit_sha: tip },
+        },
+      });
+    if (kind === 'missing-object') candidate = 'f'.repeat(40);
+    if (kind === 'malformed') candidate = 'not-a-commit';
+    const issues = githubIssues({
+      project: f.host.repository,
+      base: kind === 'operator-pin' ? tip : f.host.base,
+      prerequisites: [],
+    });
+    const result = issues.inspect(574, {
+      base: candidate,
+      prBase: kind === 'target' ? 'other-target' : 'main',
+    });
+    if (kind === 'missing-object')
+      await expect(Effect.runPromise(result)).rejects.toMatchObject({ _tag: 'Unavailable' });
+    else expect(await Effect.runPromise(result)).toMatchObject({ blockersReady: false });
+  } finally {
+    await f.close();
+  }
+});
+
+it('revalidates current open-prerequisite CI and head evidence for candidate proofs', async () => {
+  const f = await fixture();
+  try {
+    // Bring the accepted open prerequisite's Git objects into the owning repository.
+    f.git(
+      '-C',
+      f.host.repository,
+      'fetch',
+      '--no-tags',
+      '--no-write-fetch-head',
+      'origin',
+      f.landed
+    );
+    const issues = githubIssues({
+      project: f.host.repository,
+      base: f.host.base,
+      prerequisites: [{ issue: 573, pr: 591, commit: f.landed }],
+    });
+    for (const state of ['SUCCESS', 'FAILURE', 'changed-head']) {
+      await f.host.save({
+        ...f.observation,
+        issueStates: { 573: 'OPEN' },
+        prerequisiteHeads: { 591: state === 'changed-head' ? f.host.base : f.landed },
+        prerequisiteCI: state === 'FAILURE' ? 'FAILURE' : 'SUCCESS',
+      });
+      const result = await Effect.runPromise(
+        issues.inspect(574, { base: f.landed, prBase: 'factory/pr-591' })
+      );
+      expect(result.blockersReady).toBe(state === 'SUCCESS');
+    }
+  } finally {
+    await f.close();
+  }
+});
+
+it('keeps a pre-launch reservation without dispatch when its current required code has changed', async () => {
+  const f = await fixture();
+  const r = await reservedRuntime(f);
+  try {
+    await Effect.runPromise(r.issues.inspect(574));
+    const reserved = { issue: 574, base: f.landed, prBase: 'main', context: 'Only B' };
+    const state = await Effect.runPromise(r.store.read());
+    expect(
+      await Effect.runPromise(
+        r.store.save({ ...state, revision: state.revision + 1, admissions: [reserved] })
+      )
+    ).toBe(true);
+    const tip = await advanceDefault(f);
+    await f.host.save({
+      ...f.observation,
+      defaultBranch: { name: 'main', tip },
+      mergedPrerequisites: {
+        591: { ...f.observation.mergedPrerequisites[591], merge_commit_sha: tip },
+      },
+    });
+    for (let observation = 0; observation < 2; observation++) {
+      const pending = await r.run(r.scheduler.tick(f.host.base));
+      expect(pending.jobs).toEqual([{ kind: 'empty' }]);
+      expect(pending.state.admissions).toEqual([reserved]);
+    }
+    expect(
+      await Effect.runPromise(fileStore(join(f.host.directory, 'reserved-job')).read())
+    ).toBeNull();
+    expect(
+      (await f.host.calls()).filter(
+        (call) => call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(0);
+  } finally {
+    await r.close();
+    await f.close();
+  }
+});
+
+it('distinguishes fresh tip selection from proof of an existing containing comparison', async () => {
+  const f = await fixture();
+  try {
+    const issues = githubIssues({
+      project: f.host.repository,
+      base: f.host.base,
+      prerequisites: [],
+    });
+    expect(await Effect.runPromise(issues.inspect(574))).toMatchObject({
+      prerequisite: { base: f.landed, prBase: 'main' },
+    });
+    const tip = await advanceDefault(f);
+    expect(await Effect.runPromise(issues.inspect(574))).toMatchObject({
+      prerequisite: { base: tip, prBase: 'main' },
+    });
+    expect(await Effect.runPromise(issues.inspect(574, { base: f.landed }))).toMatchObject({
+      blockersReady: true,
+      prerequisite: { base: f.landed, prBase: 'main' },
+    });
+    expect(f.git('-C', f.host.repository, 'rev-parse', 'HEAD')).toBe(f.host.base);
+  } finally {
+    await f.close();
+  }
+});

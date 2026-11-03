@@ -19,7 +19,10 @@ const facts = {
   blockersReady: true,
   url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
 };
-function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) {
+function setup(
+  issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts,
+  inspect: IssuePort['inspect'] = () => Effect.succeed(issue)
+) {
   const store = controlledStore();
   let launches = 0;
   const runtime = ManagedRuntime.make(
@@ -30,7 +33,7 @@ function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) 
           Layer.succeed(JobStore, store),
           Layer.succeed(Issues, {
             pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
-            inspect: () => Effect.succeed(issue),
+            inspect,
           }),
           Layer.succeed(Execution, {
             interrupt: () => Effect.void,
@@ -128,3 +131,32 @@ it.each(['a', 'b'])(
     }
   }
 );
+
+it('requests proof for the selected comparison before creating the immutable job', async () => {
+  const seen: Parameters<IssuePort['inspect']>[] = [];
+  const app = setup(facts, (number, candidate) => {
+    seen.push([number, candidate]);
+    return Effect.succeed({
+      ...facts,
+      prerequisite: {
+        base: candidate?.base ?? 'b'.repeat(40),
+        prBase: 'factory/A',
+        evidence: 'Current proof for selected A',
+      },
+    });
+  });
+  try {
+    expect(await app.start()).toMatchObject({
+      kind: 'job',
+      intent: {
+        base: 'a'.repeat(40),
+        prBase: 'factory/A',
+        prerequisiteEvidence: 'Current proof for selected A',
+      },
+    });
+    expect(seen).toEqual([[576, { base: 'a'.repeat(40), prBase: undefined }]]);
+    expect(app.launches()).toBe(1);
+  } finally {
+    await app.runtime.dispose();
+  }
+});

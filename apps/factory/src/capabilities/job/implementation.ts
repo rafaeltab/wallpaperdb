@@ -95,7 +95,10 @@ export const JobLive = Layer.effect(
         Effect.gen(function* () {
           if (yield* store.read()) return { kind: 'occupied' as const };
           if (!validCommand(command)) return { kind: 'rejected' as const };
-          const issue = yield* issues.inspect(command.issue);
+          const issue = yield* issues.inspect(command.issue, {
+            base: command.base,
+            prBase: command.prBase,
+          });
           if (!eligible(issue)) return { kind: 'rejected' as const };
           if (!matchesPrerequisite(command, issue.prerequisite))
             return { kind: 'rejected' as const };

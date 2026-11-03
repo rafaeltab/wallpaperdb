@@ -28,7 +28,7 @@ export function githubIssues(config: {
     command('gh', args, config.project, signal).then((text) => JSON.parse(text));
   return {
     pullRequest: (intent) => publication(gh, targetBase(intent.prBase, config.prBase))(intent),
-    inspect: (number) =>
+    inspect: (number, candidate) =>
       Effect.tryPromise({
         try: async (signal) => {
           const issue = issueSchema.parse(
@@ -72,7 +72,8 @@ export function githubIssues(config: {
             { ...config, prerequisites: [...dynamic, ...config.prerequisites] },
             numbers,
             gh,
-            signal
+            signal,
+            candidate
           );
           return {
             open: issue.state === 'OPEN',

@@ -74,7 +74,14 @@ export interface Control {
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface Issues {
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
-  inspect(issue: number): Effect.Effect<
+  /** A candidate is a previously selected launch comparison, not a replacement
+   * operator pin. For prerequisites, return that exact base only after current
+   * proof, original-pin containment and target compatibility are verified;
+   * otherwise remain blocked/unavailable. No reservation or launch is changed. */
+  inspect(
+    issue: number,
+    candidate?: { readonly base: string; readonly prBase?: string }
+  ): Effect.Effect<
     {
       open: boolean;
       author: string;

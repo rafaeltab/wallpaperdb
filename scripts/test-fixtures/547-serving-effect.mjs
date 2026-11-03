@@ -24,8 +24,10 @@ const mode = process.argv[2];
 if (mode === "historical") console.log(JSON.stringify(identity()));
 else if (mode === "dev") {
 	console.log("Watch enabled");
-	const timer = setInterval(() => {}, 1000);
-	process.on("SIGTERM", () => clearInterval(timer));
+	if (!process.env.CONTROL_DEV_EXIT_BEFORE_READY) {
+		const timer = setInterval(() => {}, 1000);
+		process.on("SIGTERM", () => clearInterval(timer));
+	}
 } else {
 	const port = Number(
 		fs.readFileSync(".worktree", "utf8").match(/^INGRESS_PORT=(\d+)/m)[1],

@@ -372,6 +372,139 @@ test("547 ready milestone owns real Make serving captures and publishes readines
 const jsonLines = (file) =>
 	fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
 
+test("547 serving receipt I/O rejection retires the other capture and stops once", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	let dev;
+	const result = await f.run({
+		make: async (argv, options) => {
+			const capture = await f.make(argv, options);
+			if (options.serving && argv[1] === "dev") dev = capture;
+			return capture;
+		},
+	});
+	const done = result.serving.done.then(
+		(value) => ({ status: "fulfilled", value }),
+		(error) => ({ status: "rejected", error }),
+	);
+	// A real final receipt write, after terminal/drain, now fails at the filesystem.
+	fs.mkdirSync(path.join(f.config.evidence, "startup/dev/receipt.json"));
+	await assert.rejects(dev.stop(), /EEXIST/);
+	const ended = await done;
+	try {
+		assert.equal(ended.status, "fulfilled", ended.error?.message);
+		assert.equal(ended.value.compute.status, "STOPPED_ACCOUNTED");
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(a) => a[1] === "boat-stop",
+			).length,
+			1,
+		);
+		const other = json(
+			path.join(f.config.evidence, "startup/preview/disposal.json"),
+		);
+		assert.equal(other.pipesClosed, true);
+		assert.deepEqual(other.unresolved, []);
+	} finally {
+		await result.serving.stop();
+	}
+});
+
+test("547 startup revokes late readiness while the owning stop is still pending", {
+	timeout: 15000,
+}, async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const entered = Promise.withResolvers(),
+		release = Promise.withResolvers();
+	let now = mono();
+	const operation = f.run({
+		clock: () => now,
+		publication(file, value) {
+			fs.writeFileSync(file, JSON.stringify(value));
+			if (file.endsWith("startup/result.json")) now += 601;
+		},
+		make: async (argv, options) => {
+			if (argv[1] === "boat-stop") {
+				entered.resolve();
+				await release.promise;
+			}
+			return f.make(argv, options);
+		},
+	});
+	const ended = assert.rejects(operation, /Original startup deadline/);
+	try {
+		await entered.promise;
+		const pending = json(path.join(f.config.evidence, "startup/result.json"));
+		assert.equal(pending.status, "FAIL");
+		assert.equal(pending.next, undefined);
+		assert.equal(pending.acceptedAt, undefined);
+		assert.equal(pending.cleanup.status, "PENDING_OWNING_STOP");
+		assert.notEqual(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+	} finally {
+		release.resolve();
+		await ended;
+	}
+});
+
+test("547 serving receipt rejection before readiness is handled and stopped", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	f.env.CONTROL_DEV_EXIT_BEFORE_READY = "1";
+	await assert.rejects(
+		f.run({
+			make: async (argv, options) => {
+				const capture = await f.make(argv, options);
+				if (options.serving && argv[1] === "dev")
+					fs.mkdirSync(path.join(options.directory, "receipt.json"));
+				return capture;
+			},
+		}),
+		/Serving Make capture ended/,
+	);
+	const result = json(path.join(f.config.evidence, "startup/result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+	assert.equal(json(path.join(f.root, ".boat/state.json")).runningSince, null);
+	assert.equal(
+		jsonLines(path.join(f.root, "commands.jsonl")).filter(
+			(a) => a[1] === "boat-stop",
+		).length,
+		1,
+	);
+});
+
+test("547 startup revocation survives cleanup evidence I/O failure", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	let now = mono();
+	await assert.rejects(
+		f.run({
+			clock: () => now,
+			publication(file, value) {
+				fs.writeFileSync(file, JSON.stringify(value));
+				if (file.endsWith("startup/result.json")) {
+					fs.mkdirSync(path.join(f.config.evidence, "startup/cleanup.json"));
+					now += 601;
+				}
+			},
+		}),
+		/Original startup deadline/,
+	);
+	const result = json(path.join(f.config.evidence, "startup/result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(result.next, undefined);
+	assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+	assert.match(result.cleanup.publicationError, /EISDIR/);
+});
+
 test("547 startup inventory crosses real Make queue and worker observation with controlled Docker", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";

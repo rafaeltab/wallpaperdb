@@ -125,11 +125,14 @@ export async function start547Application(context) {
 		compute: "OPEN",
 	};
 	const handles = [];
+	const completions = [];
 	let acquired = false;
 	let cleanupPromise;
 	const retire = () => {
 		cleanupPromise ??= (async () => {
-			const captures = await Promise.allSettled(handles.map((h) => h.stop()));
+			const captures = await Promise.allSettled(
+				handles.map((h) => Promise.resolve().then(() => h.stop())),
+			);
 			const transports = captures.map((r) =>
 				r.status === "fulfilled" ? r.value : { failure: r.reason.message },
 			);
@@ -148,19 +151,50 @@ export async function start547Application(context) {
 			});
 			const value = {
 				...stopped,
-				status: drained ? stopped.status : "UNRESOLVED_LOCAL_TRANSPORT",
+				status: !drained
+					? "UNRESOLVED_LOCAL_TRANSPORT"
+					: captures.some((r) => r.status === "rejected")
+						? "CAPTURE_FINALIZATION_FAILED"
+						: stopped.status,
 				compute: stopped,
 				transports,
 			};
-			publish(
-				acquired
-					? path.join(directory, "cleanup.json")
-					: path.join(config.evidence, "startup-cleanup.json"),
-				value,
-			);
+			try {
+				publish(
+					acquired
+						? path.join(directory, "cleanup.json")
+						: path.join(config.evidence, "startup-cleanup.json"),
+					value,
+				);
+			} catch (error) {
+				value.publicationError = error.message;
+			}
 			return value;
 		})();
 		return cleanupPromise;
+	};
+	const record = () => {
+		try {
+			publish(
+				acquired
+					? path.join(directory, "result.json")
+					: path.join(config.evidence, "startup-failure.json"),
+				result,
+			);
+		} catch (error) {
+			result.publicationError = error.message;
+		}
+	};
+	const revoke = (error, status = "FAIL") => {
+		delete result.next;
+		delete result.acceptedAt;
+		Object.assign(result, {
+			status,
+			error: error.message,
+			failedAt: clock(),
+			cleanup: { status: "PENDING_OWNING_STOP" },
+		});
+		record();
 	};
 	const within = () => {
 		require(clock() <
@@ -178,7 +212,7 @@ export async function start547Application(context) {
 			path.join(root, "Makefile"),
 		];
 	};
-	const fixed = [source, observer].map(fileIdentity);
+	let fixed;
 	const preserved = () => {
 		inputs();
 		require(JSON.stringify(fixed) ===
@@ -229,12 +263,21 @@ export async function start547Application(context) {
 			serving: true,
 		});
 		handles.push(handle);
+		// Observe rejection immediately, including exits before startup acceptance.
+		// A rejected final receipt is an ended capture, not permission to skip cleanup.
+		completions.push(
+			handle.completion.then(
+				(value) => ({ name, value }),
+				(error) => ({ name, error }),
+			),
+		);
 		within();
 		return handle;
 	};
 	try {
 		fs.mkdirSync(directory, { mode: 0o700 });
 		acquired = true;
+		fixed = [source, observer].map(fileIdentity);
 		preserved();
 		within();
 		require(/^[A-Za-z0-9_-]+$/.test(
@@ -396,36 +439,30 @@ export async function start547Application(context) {
 		);
 		preserved();
 		within();
-		const done = Promise.race(handles.map((h) => h.completion)).then(
-			async () => {
-				delete result.next;
-				Object.assign(result, {
-					status: "SERVING_ENDED",
-					cleanup: await retire(),
-				});
-				result.compute = result.cleanup.compute.status;
+		const done = Promise.race(completions).then(async (completion) => {
+			revoke(
+				completion.error ??
+					new Error(`${completion.name} serving capture ended`),
+				"SERVING_ENDED",
+			);
+			result.cleanup = await retire();
+			result.compute = result.cleanup.compute.status;
+			record();
+			try {
 				publish(path.join(directory, "serving-ended.json"), result);
-				return result.cleanup;
-			},
-		);
+				manifest(directory);
+			} catch (error) {
+				result.cleanup.publicationError = error.message;
+			}
+			return result.cleanup;
+		});
 		Object.defineProperty(result, "serving", { value: { done, stop: retire } });
 		return result;
 	} catch (error) {
-		delete result.next;
-		delete result.acceptedAt;
-		Object.assign(result, {
-			status: "FAIL",
-			error: error.message,
-			failedAt: clock(),
-			cleanup: await retire(),
-		});
+		revoke(error);
+		result.cleanup = await retire();
 		result.compute = result.cleanup.compute.status;
-		publish(
-			acquired
-				? path.join(directory, "result.json")
-				: path.join(config.evidence, "startup-failure.json"),
-			result,
-		);
+		record();
 		if (acquired) manifest(directory);
 		throw error;
 	}

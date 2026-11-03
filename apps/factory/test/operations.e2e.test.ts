@@ -237,7 +237,9 @@ it('previews automatically discovered work without starting an implementation wo
       if (!address || typeof address === 'string') throw new Error('Missing listener');
       await page.goto(`http://127.0.0.1:${address.port}`);
       await page.getByLabel('Pause admissions').check();
+      const savedDocument = page.waitForEvent('load');
       await page.getByRole('button', { name: 'Save scheduler controls' }).click();
+      await savedDocument;
       await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
       await page.getByRole('button', { name: 'Generate plan preview' }).click();
       await browserExpect(page.locator('#plan')).toContainText('Validated advisory proposal');

@@ -52,8 +52,9 @@ export function retryAction(
     if (!stage || !eligibleRetry(stage, control, observation, delivery)) return undefined;
     const evidence = yield* execution.inspectStage(intent, stage);
     if (!matchingEvidence(evidence, stage, observation.run)) return undefined;
+    if (!retryWorktree(stage, evidence)) return undefined;
     if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
-    if (!(yield* reconcilePublication(issues, intent, stage))) return undefined;
+    if (!(yield* reconcilePublication(issues, intent, stage, evidence))) return undefined;
     return { index: stage.index, runId: evidence.runId, revision: control.revision };
   });
 }
@@ -126,9 +127,28 @@ function matchingEvidence(
   );
 }
 
-function reconcilePublication(issues: Issues, intent: Intent, stage: StageRequest) {
+function retryWorktree(stage: StageRequest, evidence: StageEvidence) {
+  return (
+    stage.stage !== 'publication' ||
+    (evidence.commit === stage.commit && evidence.worktreeClean === true)
+  );
+}
+
+function reconcilePublication(
+  issues: Issues,
+  intent: Intent,
+  stage: StageRequest,
+  evidence: StageEvidence
+) {
   if (!['publication', 'babysitting'].includes(stage.stage)) return Effect.succeed(true);
-  return issues.pullRequest(intent).pipe(Effect.map((pr) => publicationMatches(pr, stage)));
+  return issues.pullRequest(intent).pipe(
+    Effect.flatMap((pr) => {
+      if (publicationMatches(pr, stage)) return Effect.succeed(true);
+      if (stage.stage !== 'publication' || pr.kind !== 'found') return Effect.succeed(false);
+      if (pr.manualRecovery || !pr.maintenancePending) return Effect.succeed(false);
+      return issues.claimPublicationRetry?.(intent, stage, evidence) ?? Effect.succeed(false);
+    })
+  );
 }
 function publicationMatches(pr: PullRequestObservation, stage: StageRequest) {
   if (pr.kind === 'absent') return stage.stage === 'publication';

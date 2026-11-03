@@ -112,6 +112,13 @@ export type RecoveryAdmission = (
   continuation?: ContinuationReceipt
 ) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
+  /** Verify a terminal publication against its retained reviewed correction and
+   * reacquire that generation's writer claim. Never publishes or grants readiness. */
+  claimPublicationRetry?(
+    intent: Intent,
+    request: StageRequest,
+    evidence: StageEvidence
+  ): Effect.Effect<boolean, Unavailable>;
   /** Coordinate a known replay repair with the publication journal. Review/publication
    * authority is supplied only after validating the current clean owning-stage receipt.
    * Review may reserve an unpublished correction; publication must confirm the exact head. */

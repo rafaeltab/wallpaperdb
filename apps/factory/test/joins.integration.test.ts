@@ -3286,6 +3286,116 @@ it.each(['C', 'B'])(
         return { request, evidence };
       };
       const reviewed = await authority('review');
+      const retryInterruptedPublication = async (phase: string) => {
+        const resourcePath = join(f.host.directory, 'resource.json');
+        const savedResource = await readFile(resourcePath, 'utf8');
+        const savedConfig = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        const publication = (await authority('publication')).request;
+        const resource = JSON.parse(await readFile(resourcePath, 'utf8'));
+        resource.status = 'interrupted';
+        resource.latestRunId = `interrupted-publication-${phase}`;
+        await writeFile(resourcePath, JSON.stringify(resource));
+        await f.host.save({
+          ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+          messages: [],
+        });
+        const store = fileStore(join(f.host.directory, `publication-retry-${phase}`));
+        await Effect.runPromise(store.reserve(intent));
+        // Seed the retained earlier stages through the public durable store.
+        // The current review and terminal publication use actual T3 inspection.
+        const stages = [
+          'implementation',
+          'review',
+          'publication',
+          'ci',
+          'babysitting',
+          'review',
+        ] as const;
+        for (const [index, stage] of stages.entries())
+          await Effect.runPromise(
+            store.saveStage({
+              ...reviewed.request,
+              index,
+              stage,
+              ordinal: index < 3 ? index + 1 : index,
+            })
+          );
+        await Effect.runPromise(store.saveStage(publication));
+        await Effect.runPromise(store.claimStage(publication.index));
+        const runtime = ManagedRuntime.make(
+          JobLive.pipe(
+            Layer.provide(
+              Layer.mergeAll(
+                Layer.succeed(JobStore, store),
+                Layer.succeed(Issues, f.reopen()),
+                Layer.succeed(Execution, execution),
+                Layer.succeed(Time, { now: () => Effect.succeed(0) })
+              )
+            )
+          )
+        );
+        try {
+          const job = await runtime.runPromise(Job);
+          const evidence = await Effect.runPromise(execution.inspectStage(intent, publication));
+          if (!evidence) throw new Error('Missing terminal publication evidence');
+          const retryPort = f.reopen().claimPublicationRetry;
+          if (!retryPort) throw new Error('Missing publication retry port');
+          for (const request of [
+            { ...publication, stage: 'babysitting' as const },
+            { ...publication, threadId: 'other-owner' },
+            { ...publication, index: reviewed.request.index },
+            { ...publication, commit: h1 },
+            { ...publication, comparison: undefined },
+            {
+              ...publication,
+              comparison: { ...publication.comparison!, previousHead: start.commit },
+            },
+            { ...publication, comparison: { ...publication.comparison!, base: f.host.base } },
+            { ...publication, comparison: { ...publication.comparison!, prBase: 'other' } },
+          ])
+            expect(await Effect.runPromise(retryPort(intent, request, evidence))).toBe(false);
+          for (const invalid of [
+            { ...evidence, accepted: true },
+            { ...evidence, worktreeClean: false },
+            { ...evidence, commit: h1 },
+            { ...evidence, ordinal: evidence.ordinal + 1 },
+            { ...evidence, runId: publication.previousRunId! },
+            { ...evidence, stageIndex: publication.index + 1 },
+          ])
+            expect(await Effect.runPromise(retryPort(intent, publication, invalid))).toBe(false);
+          await writeFile(join(owning, 'uncommitted-retry.txt'), 'keep this work pending');
+          expect(await runtime.runPromise(job.status())).toMatchObject({ resume: undefined });
+          await unlink(join(owning, 'uncommitted-retry.txt'));
+          const currentConfig = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+          await f.host.save({ ...currentConfig, joinWriter: true, joinWriterBranch: branch });
+          expect(await Effect.runPromise(retryPort(intent, publication, evidence))).toBe(false);
+          await f.host.save(currentConfig);
+          const before = await runtime.runPromise(job.status());
+          if (before.kind !== 'job') throw new Error('Missing retained job');
+          expect(before.resume).toMatchObject({
+            index: publication.index,
+            runId: resource.latestRunId,
+          });
+          if (!before.resume) throw new Error('Missing reviewed publication retry');
+          const command = { jobId: intent.id, ...before.resume };
+          const deliveries = () =>
+            f.host
+              .calls()
+              .then((calls) =>
+                calls.filter((call) => call.args[1] === 'send' && !call.args.includes('--help'))
+              );
+          const calls = (await deliveries()).length;
+          expect(await runtime.runPromise(job.resume(command))).toMatchObject({
+            delivery: { stage: 'publication', ready: false },
+          });
+          expect(await deliveries()).toHaveLength(calls + 1);
+          expect(await runtime.runPromise(job.resume(command))).toEqual({ kind: 'rejected' });
+        } finally {
+          await runtime.dispose();
+          await f.host.save(savedConfig);
+          await writeFile(resourcePath, savedResource);
+        }
+      };
       await writeFile(join(owning, 'dirty-proof.txt'), 'dirty');
       expect(
         (await Effect.runPromise(execution.inspectStage(intent, reviewed.request)))?.accepted
@@ -3353,6 +3463,7 @@ it.each(['C', 'B'])(
         maintenancePending: true,
         manualRecovery: false,
       });
+      if (branch === 'C') await retryInterruptedPublication('before-push');
       expect(
         await Effect.runPromise(
           f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
@@ -3371,6 +3482,7 @@ it.each(['C', 'B'])(
         maintenancePending: true,
         manualRecovery: false,
       });
+      if (branch === 'B') await retryInterruptedPublication('after-push');
       const published = await authority('publication');
       expect(
         await Effect.runPromise(

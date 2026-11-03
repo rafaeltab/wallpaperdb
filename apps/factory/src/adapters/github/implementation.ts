@@ -193,6 +193,20 @@ export function githubIssues(config: {
     };
   }
   return {
+    claimPublicationRetry: (intent, request, evidence) =>
+      contextualPromise({
+        try: (signal) =>
+          joins?.claimPublicationRetry(
+            intent.issue,
+            intent.branch,
+            { request, evidence },
+            signal
+          ) ?? Promise.resolve(false),
+        catch: (cause) => new Unavailable({ operation: 'claim-publication-retry', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.github.publication-retry')
+      ),
     recoveries: () =>
       contextualPromise({
         try: (signal) => joins?.recoveries(signal) ?? Promise.resolve([]),

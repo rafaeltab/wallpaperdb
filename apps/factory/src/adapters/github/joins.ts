@@ -249,7 +249,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const head = await git(['rev-parse', '--verify', `refs/heads/${branch}^{commit}`], signal);
     return containsPrerequisite(layers, head, signal);
   };
-  const writers = async (layers: readonly Layer[], signal?: AbortSignal, excludedPath?: string) => {
+  const writers = async (
+    layers: readonly Layer[],
+    signal?: AbortSignal,
+    excludedPath?: string,
+    terminalOwner?: { threadId: string; branch: string }
+  ) => {
     const listed = z
       .array(z.object({ threadId: z.string() }))
       .parse(
@@ -283,7 +288,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           )
         ).thread;
       if (detail.projectId !== config.projectId) throw new Error('Mismatched writer project');
-      if (!idleWriter(detail) && (await affectedBranch(layers, detail.branch, signal)))
+      if (
+        !idleWriter(detail) &&
+        !terminalPublicationOwner(entry.threadId, detail, terminalOwner) &&
+        (await affectedBranch(layers, detail.branch, signal))
+      )
         return false;
     }
     return await cleanWorktrees(layers, signal, excludedPath);
@@ -2335,10 +2344,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     operation: Intent,
     issue: number,
     head: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    terminalOwner?: { threadId: string; branch: string }
   ) => {
     if (!(await claimRepair(operation, head, signal))) return false;
-    if (!(await writers(operation.layers, signal))) return false;
+    if (!(await writers(operation.layers, signal, undefined, terminalOwner))) return false;
     if (!(await landingStillPresent(operation.landing, signal))) return false;
     return manualWritersReady(
       operation.layers.filter((value) => value.issue !== issue),
@@ -2596,6 +2606,53 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       manual: false,
     };
   };
+  const claimPublicationRetry = async (
+    issue: number,
+    branch: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    for (const record of await replayRecords())
+      for (const item of record.operation.replay) {
+        if (item.issue !== issue || item.branch !== branch) continue;
+        const saved = await read(record.directory, reviewName(record.operation, issue));
+        if (!saved) continue;
+        if (
+          await claimReviewedRetry(record, item, reviewCorrection.parse(saved), authority, signal)
+        )
+          return true;
+      }
+    return false;
+  };
+  const claimReviewedRetry = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    correction: z.infer<typeof reviewCorrection>,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    if (!reviewedRetryReceipt(authority.request, correction)) return false;
+    if (!reviewedRetryEvidence(authority)) return false;
+    if (!(await operationFactsValid(record.operation, signal))) return false;
+    if (
+      !(await reviewedSourceValid(
+        record,
+        item,
+        correction.fixed,
+        authority.request.commit,
+        correction.receipt.source,
+        signal
+      ))
+    )
+      return false;
+    const current = await prState(item, signal);
+    if (!reviewedRetryPublication(current, item, correction.fixed.next)) return false;
+    if ((await remote(item.branch, signal)) !== current.headRefOid) return false;
+    return repairWriters(record.operation, item.issue, item.next, signal, {
+      threadId: authority.request.threadId,
+      branch: item.branch,
+    });
+  };
   const correctedHead = async (
     item: Intent['replay'][number],
     commit: string,
@@ -2835,6 +2892,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     recoveries,
     maintain,
     repair,
+    claimPublicationRetry,
     boundaryProblem,
   };
 }
@@ -2893,6 +2951,19 @@ function allowedPublication(
 
 function idleWriter(detail: { status: string; pendingRequestCount: number }) {
   return ['completed', 'idle'].includes(detail.status) && detail.pendingRequestCount === 0;
+}
+
+function terminalPublicationOwner(
+  threadId: string,
+  detail: { branch: string | null; status: string; pendingRequestCount: number },
+  owner?: { threadId: string; branch: string }
+) {
+  return (
+    owner?.threadId === threadId &&
+    owner.branch === detail.branch &&
+    detail.pendingRequestCount === 0 &&
+    ['failed', 'interrupted'].includes(detail.status)
+  );
 }
 
 function reviewOrigin(item: Layer) {
@@ -3180,5 +3251,59 @@ function sameCorrectionReceipt(
     first.commit === current.commit &&
     first.base === current.base &&
     first.target === current.target
+  );
+}
+
+function reviewedRetryReceipt(request: StageRequest, correction: z.infer<typeof reviewCorrection>) {
+  const { receipt } = correction;
+  return (
+    request.stage === 'publication' &&
+    receipt.stage === 'review' &&
+    request.threadId === receipt.threadId &&
+    request.index > receipt.index &&
+    request.commit === receipt.commit &&
+    reviewedRetryComparison(request.comparison, receipt)
+  );
+}
+
+function reviewedRetryComparison(
+  comparison: StageRequest['comparison'],
+  receipt: z.infer<typeof correctionReceipt>
+) {
+  return (
+    comparison?.previousHead === receipt.source &&
+    comparison.base === receipt.base &&
+    comparison.prBase === receipt.target
+  );
+}
+
+function reviewedRetryEvidence({ request, evidence }: RepairAuthority) {
+  return (
+    !evidence.accepted &&
+    evidence.worktreeClean === true &&
+    evidence.commit === request.commit &&
+    evidence.ordinal === (request.ordinal ?? request.index + 1) &&
+    evidence.runId !== request.previousRunId &&
+    (evidence.stageIndex === undefined || evidence.stageIndex === request.index)
+  );
+}
+
+function reviewedRetryPublication(
+  current: {
+    state: string;
+    headRefName: string;
+    url: string;
+    baseRefName: string;
+    headRefOid: string;
+  },
+  item: Intent['replay'][number],
+  commit: string
+) {
+  return (
+    current.state === 'OPEN' &&
+    current.headRefName === item.branch &&
+    current.url === item.url &&
+    current.baseRefName === item.target &&
+    [item.next, commit].includes(current.headRefOid)
   );
 }

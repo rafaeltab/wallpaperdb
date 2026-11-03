@@ -137,6 +137,8 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let manualRecovery = false;
   let repairAllowed = true;
   const repairs: unknown[] = [];
+  let publicationRetryAllowed = false;
+  const publicationRetries: unknown[] = [];
   let now = 100;
   let progress = 'run-1:failed';
   let waiting = false;
@@ -152,6 +154,11 @@ async function stagesFixture(admission?: ContinuationAdmission) {
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
+      claimPublicationRetry: (_intent, request, evidence) =>
+        Effect.sync(() => {
+          publicationRetries.push({ request, evidence });
+          return publicationRetryAllowed;
+        }),
       repairReplay: (_intent, head, repaired, authority) =>
         Effect.sync(() => {
           repairs.push({ head, repaired, authority });
@@ -246,6 +253,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
     );
   return {
     repairs: () => repairs,
+    publicationRetries: () => publicationRetries,
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
     status: () => run((job) => job.status()),
     cancel: (id: string) => run((job) => job.cancel(id)),
@@ -270,6 +278,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       maintenancePending?: boolean;
       manualRecovery?: boolean;
       repairAllowed?: boolean;
+      publicationRetryAllowed?: boolean;
       now?: number;
       progress?: string;
       waiting?: boolean;
@@ -296,6 +305,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       maintenancePending = value.maintenancePending ?? maintenancePending;
       manualRecovery = value.manualRecovery ?? manualRecovery;
       repairAllowed = value.repairAllowed ?? repairAllowed;
+      publicationRetryAllowed = value.publicationRetryAllowed ?? publicationRetryAllowed;
       now = value.now ?? now;
       progress = value.progress ?? progress;
       waiting = value.waiting ?? waiting;
@@ -1033,6 +1043,53 @@ it('retains review and publication authority after a replay repair correction', 
   });
 });
 
+it.each([false, true])(
+  'retries a pending reviewed publication only with its current writer claim: %s',
+  async (allowed) => {
+    const job = await stagesFixture();
+    await job.start();
+    await job.status();
+    await job.status();
+    job.change({
+      prCommit: 'c'.repeat(40),
+      reviewedCommit: 'b'.repeat(40),
+      failed: true,
+      maintenancePending: true,
+    });
+    await job.status();
+    job.change({ commit: 'd'.repeat(40), prCommit: 'd'.repeat(40), failed: false });
+    await job.status();
+    job.change({ commit: 'f'.repeat(40) });
+    expect(await job.status()).toMatchObject({ delivery: { stage: 'publication' } });
+    job.change({
+      accepted: false,
+      status: 'interrupted',
+      publicationRetryAllowed: allowed,
+    });
+    const before = await job.status();
+    if (before.kind !== 'job') throw new Error('Missing retained job');
+    expect(Boolean(before.resume)).toBe(allowed);
+    expect(job.publicationRetries().at(-1)).toMatchObject({
+      request: {
+        stage: 'publication',
+        commit: 'f'.repeat(40),
+        comparison: { previousHead: 'd'.repeat(40) },
+      },
+      evidence: { accepted: false, commit: 'f'.repeat(40) },
+    });
+    if (allowed) {
+      if (!before.resume) throw new Error('Missing retry');
+      const sends = job.sends();
+      const command = { jobId: before.intent.id, ...before.resume };
+      expect(await job.resume(command)).toMatchObject({
+        delivery: { stage: 'publication', ready: false },
+      });
+      expect(job.sends()).toBe(sends + 1);
+      expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    }
+  }
+);
+
 it.each(['status', 'tick'] as const)(
   'reacquires a deferred replay continuation slot through scheduler %s',
   async (method) => {
@@ -1294,6 +1351,11 @@ it.each(['publication', 'babysitting'] as const)(
     job.change({ runId: command.runId, ordinal: 99 });
     expect(await job.resume(command)).toEqual({ kind: 'rejected' });
     job.change({ ordinal: stage === 'publication' ? 3 : 4 });
+    if (stage === 'publication') {
+      job.change({ worktreeClean: false });
+      expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+      job.change({ worktreeClean: true });
+    }
     for (const status of ['running', 'cancelled', 'completed', 'waiting-for-input']) {
       job.change({ status });
       expect(await job.resume(command)).toEqual({ kind: 'rejected' });

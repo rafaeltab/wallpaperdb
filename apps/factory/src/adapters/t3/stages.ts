@@ -337,6 +337,7 @@ function needsWorktree(
 ) {
   return (
     pending.waitingForGitHub ||
-    (request.stage === 'babysitting' && ['failed', 'interrupted'].includes(status))
+    (['publication', 'babysitting'].includes(request.stage) &&
+      ['failed', 'interrupted'].includes(status))
   );
 }

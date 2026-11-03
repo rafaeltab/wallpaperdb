@@ -503,6 +503,7 @@ it.each([false, true])(
 
 it.each([
   'valid',
+  'valid-after-maintenance',
   'arbitrary-target',
   'head-drift',
   'closed-unmerged',
@@ -517,6 +518,7 @@ it.each([
   'retains completed review provenance while separately checking an anchor landing: %s',
   async (kind) => {
     const f = await fixture();
+    const valid = kind === 'valid' || kind === 'valid-after-maintenance';
     try {
       if (!f.issues.prepare) throw new Error('Missing prepare');
       await Effect.runPromise(f.issues.prepare(5));
@@ -568,6 +570,7 @@ it.each([
       await f.host.save({
         ...config,
         issueStates: { 3: 'CLOSED' },
+        landing: { pr: 103, merge: landed, head: f.d },
         defaultBranch: { name: 'main', tip: kind === 'unknown-default' ? 'f'.repeat(40) : landed },
         landedPrerequisites: { 3: kind === 'missing-proof' ? [] : [103] },
         mergedPrerequisites: {
@@ -596,6 +599,10 @@ it.each([
               },
             })
           : f.reopen();
+      if (kind === 'valid-after-maintenance') {
+        if (!issues.reconcile) throw new Error('Missing maintenance reconciliation');
+        await Effect.runPromise(issues.reconcile());
+      }
       if (kind === 'unknown-default') {
         await expect(Effect.runPromise(issues.inspect(5))).rejects.toMatchObject({
           _tag: 'Unavailable',
@@ -616,10 +623,10 @@ it.each([
           expectedStage: 'implementation',
         })
       );
-      expect(observed).toMatchObject({ kind: 'found', ready: kind === 'valid' });
+      expect(observed).toMatchObject({ kind: 'found', ready: valid });
       if (kind !== 'head-drift')
         expect(observed).toMatchObject({ commit: joined, reviewedCommit: f.c });
-      if (kind === 'valid') {
+      if (valid) {
         expect(await Effect.runPromise(issues.inspect(5))).toMatchObject({
           blockersReady: true,
           prerequisite: { base: joined, prBase: 'C' },
@@ -665,7 +672,7 @@ it.each([
           await runtime.dispose();
         }
       }
-      expect((await Effect.runPromise(issues.inspect(5))).blockersReady).toBe(kind === 'valid');
+      expect((await Effect.runPromise(issues.inspect(5))).blockersReady).toBe(valid);
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D')).toBe('');
     } finally {
       await f.close();
@@ -1896,6 +1903,120 @@ it.each([false, true])(
     }
   }
 );
+it.each(['valid', 'conflicting', 'retired-target'] as const)(
+  'retains equivalent same-head certificates after a fast-forward landing, case=%s',
+  async (kind) => {
+    const conflicting = kind === 'conflicting';
+    const f = await landedFixture();
+    const command = (issue: number, branch: string, base: string, prBase: string) => ({
+      id: branch,
+      issue,
+      issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${issue}`,
+      branch,
+      base,
+      prBase,
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    });
+    try {
+      if (!f.issues.reconcile) throw new Error('Missing reconciliation');
+      await Effect.runPromise(f.issues.reconcile());
+      const assertions: import('../src/adapters/github/index.js').VerifiedPrerequisite[] =
+        f.config.prerequisites.slice(0, 1);
+      for (const intent of [
+        command(2, 'B', f.a, 'A'),
+        command(3, 'D', f.b, 'B'),
+        command(4, 'C', f.a, 'A'),
+      ]) {
+        const observed = await Effect.runPromise(f.issues.pullRequest(intent));
+        if (observed.kind !== 'found' || !observed.parent)
+          throw new Error('Missing initial replay');
+        assertions.push({
+          issue: intent.issue,
+          pr: intent.issue + 100,
+          commit: observed.commit,
+          parent: observed.parent,
+          reviewedCommit: observed.reviewedCommit,
+          prBase: observed.base,
+          branch: intent.branch,
+        });
+      }
+      const b = assertions.find((item) => item.issue === 2);
+      const c = assertions.find((item) => item.issue === 4);
+      if (!b || !c) throw new Error('Missing replay assertions');
+      f.git('switch', 'main');
+      f.git('merge', '--ff-only', b.commit);
+      f.git('push', 'origin', 'main');
+      f.git('switch', '--detach', f.host.base);
+      f.git('push', 'origin', '--delete', 'B');
+      const path = join(f.host.directory, 'join-live.json');
+      const live = JSON.parse(await readFile(path, 'utf8'));
+      Object.assign(live.prs[102], { base: 'main', state: 'MERGED', head: b.commit });
+      live.prs[103].base = 'main';
+      await writeFile(path, JSON.stringify(live));
+      await saveLanding(f, {
+        join: live,
+        landing: {
+          merge: f.merged,
+          head: f.a,
+          merges: { 102: { merge: b.commit, head: b.commit } },
+        },
+      });
+      const current = githubIssues({ ...f.config, prerequisites: assertions });
+      if (!current.reconcile) throw new Error('Missing current reconciliation');
+      await Effect.runPromise(current.reconcile());
+      if (kind === 'retired-target') {
+        const d = assertions.find((item) => item.issue === 3);
+        if (!d) throw new Error('Missing D replay');
+        f.git('switch', 'main');
+        f.git('merge', '--ff-only', d.commit);
+        f.git('push', 'origin', 'main');
+        f.git('switch', '--detach', f.host.base);
+        f.git('push', 'origin', '--delete', 'D');
+        const state = JSON.parse(await readFile(path, 'utf8'));
+        Object.assign(state.prs[103], { base: 'main', state: 'MERGED', head: d.commit });
+        state.prs[104].base = 'main';
+        await writeFile(path, JSON.stringify(state));
+        await saveLanding(f, {
+          join: state,
+          landing: {
+            merge: f.merged,
+            head: f.a,
+            merges: {
+              102: { merge: b.commit, head: b.commit },
+              103: { merge: d.commit, head: d.commit },
+            },
+          },
+        });
+        await Effect.runPromise(current.reconcile());
+      }
+      if (conflicting) {
+        const root = join(f.host.directory, 'joins');
+        for (const key of await readdir(root)) {
+          if (!/^[a-f0-9]{64}$/.test(key)) continue;
+          const path = join(root, key, 'intent.json');
+          const saved = JSON.parse(await readFile(path, 'utf8'));
+          if (!saved.members.includes(102)) continue;
+          const replay = saved.replay.find((item: { issue: number }) => item.issue === 4);
+          replay.reviewedCommit = f.b;
+          await writeFile(path, JSON.stringify(saved));
+        }
+      }
+      const observed = await Effect.runPromise(current.pullRequest(command(4, 'C', f.a, 'A')));
+      expect(observed).toMatchObject({ ready: !conflicting, commit: c.commit });
+      if (!conflicting) expect(observed).toMatchObject({ reviewedCommit: f.c });
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(c.commit);
+      const after = JSON.parse(await readFile(path, 'utf8'));
+      expect(after.members).toEqual(
+        [103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
+      );
+    } finally {
+      await f.close();
+    }
+  }
+);
+
 it('surfaces a concurrent expected-head lease conflict during landing maintenance without overwriting the external tip', async () => {
   const f = await landedFixture();
   try {

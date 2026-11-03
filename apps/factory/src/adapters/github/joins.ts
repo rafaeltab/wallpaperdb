@@ -4,11 +4,13 @@ import { join, dirname } from 'node:path';
 import { z } from 'zod';
 import { command } from '../../platform/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
+import { landedPrerequisite } from './landed-prerequisite.js';
 import {
   joinBoundary,
   type JoinBoundary,
   containsRequired,
   boundaryStillValid,
+  boundaryFactsValid,
   landedParentCovered,
   openReplayParent,
   closedParentsKnown,
@@ -821,6 +823,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const current = await prState(item, signal);
       if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
     }
+    return groupingMatches(operation, signal);
+  };
+  const groupingMatches = async (operation: Intent, signal?: AbortSignal) => {
     const groups = await groupsFor(operation.members, signal);
     return groups.some((value) =>
       containsMembers(
@@ -828,6 +833,60 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         operation.members
       )
     );
+  };
+  const authenticatedTarget = async (
+    operation: Intent,
+    item: Intent['replay'][number],
+    target: string,
+    signal?: AbortSignal
+  ) => {
+    const parents = [
+      ...operation.layers,
+      ...operation.replay.map((value) => ({ ...value, commit: value.next })),
+    ];
+    const parent = parents.find(
+      (value) => value.branch === item.target && value.commit === item.onto
+    );
+    if (!parent) return false;
+    const landed = await landedPrerequisite(project, parent.issue, gh, signal);
+    if (
+      !landed ||
+      landed.pr !== parent.pr ||
+      landed.originalHead !== parent.commit ||
+      landed.branch !== target
+    )
+      return false;
+    return isAncestor(landed.commit, item.next, signal);
+  };
+  const currentComparison = async (
+    operation: Intent,
+    item: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(item, signal);
+    if (current.state !== 'OPEN' || current.headRefOid !== item.next) return false;
+    if (current.baseRefName !== item.target)
+      return authenticatedTarget(operation, item, current.baseRefName, signal);
+    const head = await remote(item.target, signal);
+    return !!head && (await isAncestor(item.onto, head, signal));
+  };
+  const completedFactsValid = async (operation: Intent, signal?: AbortSignal) => {
+    if (!operation.boundary) return false;
+    if (!(await boundaryFactsValid(project, base, operation.boundary, gh, signal))) return false;
+    return finalContainsFacts(operation, signal);
+  };
+  // Completed history is immutable. Its current comparison can change only
+  // with authenticated landing evidence; the preparation guards stay strict.
+  const completedComparisonsValid = async (operation: Intent, signal?: AbortSignal) => {
+    if (
+      (await operationFactsValid(operation, signal)) &&
+      (await metadataMatches(operation, signal))
+    )
+      return true;
+    if (!(await completedFactsValid(operation, signal))) return false;
+    for (const item of operation.replay)
+      if (!(await currentComparison(operation, item, signal))) return false;
+    return groupingMatches(operation, signal);
   };
   const verifyReplayTree = async (
     item: Intent['replay'][number],
@@ -843,8 +902,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const evidence = async (numbers: readonly number[], signal?: AbortSignal) => {
     const operation = await load(numbers);
     if (!operation || !(await read(directory(numbers), 'complete.json'))) return [];
-    if (!(await operationFactsValid(operation, signal))) return [];
-    if (!(await metadataMatches(operation, signal))) return [];
+    if (!(await completedComparisonsValid(operation, signal))) return [];
     for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
   };
@@ -852,11 +910,15 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const saved = await read(join(config.directory, key), 'intent.json');
     if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
     const operation = intent.parse(saved);
-    if (!(await operationFactsValid(operation, signal))) return null;
     const item = operation.replay.find((value) => value.issue === issue);
-    if (!item || !(await metadataMatches(operation, signal))) return null;
+    if (!item) return null;
     await verifyReplayTree(item, join(config.directory, key), signal);
-    return item;
+    const current = await prState(item, signal);
+    return {
+      ...item,
+      comparison: current.baseRefName,
+      comparisonReady: await completedComparisonsValid(operation, signal),
+    };
   };
   const operationDirectories = async () => {
     let entries: string[];

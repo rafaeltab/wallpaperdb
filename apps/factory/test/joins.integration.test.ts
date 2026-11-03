@@ -623,3 +623,175 @@ it.each([false, true])(
     }
   }
 );
+
+it.each([
+  'valid',
+  'arbitrary-target',
+  'head-drift',
+  'closed-unmerged',
+  'missing-proof',
+  'wrong-head-proof',
+  'non-containing-landing',
+  'failed-ci',
+  'corrupt-group',
+  'changed-pin',
+  'unknown-default',
+] as const)(
+  'retains completed review provenance while separately checking an anchor landing: %s',
+  async (kind) => {
+    const f = await fixture();
+    try {
+      if (!f.issues.prepare) throw new Error('Missing prepare');
+      await Effect.runPromise(f.issues.prepare(5));
+      const before = await Effect.runPromise(f.issues.inspect(5));
+      const joined = before.prerequisite?.base;
+      if (!joined) throw new Error('Missing completed join');
+      const tree = f.git('rev-parse', `${joined}^{tree}`);
+      const path = join(f.host.directory, 'join-live.json');
+      const state = JSON.parse(await readFile(path, 'utf8'));
+      // Real isolated default landing and deletion; no real project PR or worker.
+      f.git('switch', 'main');
+      f.git('merge', '--ff-only', 'D');
+      let landed = f.d;
+      if (kind === 'non-containing-landing') {
+        f.git('switch', '--detach', f.d);
+        f.git('commit', '--allow-empty', '-m', 'different landing result');
+        landed = f.git('rev-parse', 'HEAD');
+        f.git('branch', '-f', 'main', landed);
+      }
+      f.git('switch', '--detach', f.host.base);
+      f.git('push', 'origin', 'main');
+      f.git('push', 'origin', '--delete', 'D');
+      state.prs['103'] = {
+        ...state.prs['103'],
+        state: kind === 'closed-unmerged' ? 'CLOSED' : 'MERGED',
+        head: f.d,
+        base: 'main',
+      };
+      state.prs['104'].base = 'main';
+      if (kind === 'arbitrary-target') {
+        f.git('branch', 'other', f.d);
+        f.git('push', 'origin', 'other');
+        state.prs['104'].base = 'other';
+      }
+      if (kind === 'head-drift') {
+        f.git('switch', '--detach', joined);
+        await writeFile(join(f.host.repository, 'external.txt'), 'external change');
+        f.git('add', '.');
+        f.git('commit', '-m', 'external change');
+        f.git('push', 'origin', 'HEAD:refs/heads/C');
+      }
+      if (kind === 'failed-ci') state.newCI = 'FAILURE';
+      if (kind === 'corrupt-group') {
+        state.members = [];
+        state.groups = [];
+      }
+      await writeFile(path, JSON.stringify(state));
+      const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      await f.host.save({
+        ...config,
+        issueStates: { 3: 'CLOSED' },
+        defaultBranch: { name: 'main', tip: kind === 'unknown-default' ? 'f'.repeat(40) : landed },
+        landedPrerequisites: { 3: kind === 'missing-proof' ? [] : [103] },
+        mergedPrerequisites: {
+          103: {
+            merged: kind !== 'closed-unmerged',
+            merge_commit_sha: landed,
+            head: { sha: kind === 'wrong-head-proof' ? f.c : f.d },
+            html_url: 'https://github.com/rafaeltab/wallpaperdb/pull/103',
+            base: { ref: 'main', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+          },
+        },
+      });
+      const issues =
+        kind === 'changed-pin'
+          ? githubIssues({
+              project: f.host.repository,
+              base: f.d,
+              prerequisites: [
+                { issue: 3, pr: 103, commit: f.d },
+                { issue: 4, pr: 104, commit: f.c },
+              ],
+              joins: {
+                directory: join(f.host.directory, 'joins'),
+                binary: f.host.binary,
+                projectId: 'project-id',
+              },
+            })
+          : f.reopen();
+      if (kind === 'unknown-default') {
+        await expect(Effect.runPromise(issues.inspect(5))).rejects.toMatchObject({
+          _tag: 'Unavailable',
+        });
+        expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(joined);
+        return;
+      }
+      const observed = await Effect.runPromise(
+        issues.pullRequest({
+          id: 'C-job',
+          issue: 4,
+          issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+          base: f.host.base,
+          prBase: 'A',
+          branch: 'C',
+          context: '',
+          createdAt: 0,
+          expectedStage: 'implementation',
+        })
+      );
+      expect(observed).toMatchObject({ kind: 'found', ready: kind === 'valid' });
+      if (kind !== 'head-drift')
+        expect(observed).toMatchObject({ commit: joined, reviewedCommit: f.c });
+      if (kind === 'valid') {
+        expect(await Effect.runPromise(issues.inspect(5))).toMatchObject({
+          blockersReady: true,
+          prerequisite: { base: joined, prBase: 'C' },
+        });
+        expect(f.git('rev-parse', `${joined}^{tree}`)).toBe(tree);
+        expect(f.git('ls-tree', '--name-only', joined)).toBe('A.txt\nB.txt\nC.txt\nD.txt');
+        expect(f.git('diff', '--name-only', `${landed}..${joined}`)).toBe('C.txt');
+        const runtime = ManagedRuntime.make(
+          JobLive.pipe(
+            Layer.provide(
+              Layer.mergeAll(
+                Layer.succeed(JobStore, fileStore(join(f.host.directory, 'next-dependent'))),
+                Layer.succeed(Issues, issues),
+                Layer.succeed(Time, { now: () => Effect.succeed(5) }),
+                Layer.succeed(
+                  Execution,
+                  t3Execution({
+                    project: f.host.repository,
+                    projectId: 'project-id',
+                    binary: f.host.binary,
+                  })
+                )
+              )
+            )
+          )
+        );
+        try {
+          const job = await runtime.runPromise(Job);
+          const next = await runtime.runPromise(
+            job.start({
+              issue: 5,
+              base: joined,
+              prBase: 'C',
+              context: 'Verified completed join after anchor landing',
+            })
+          );
+          if (next.kind !== 'job' || next.execution.kind !== 'found')
+            throw new Error('Missing next dependent');
+          expect(next.intent.base).toBe(joined);
+          for (const name of ['A', 'B', 'C', 'D'])
+            expect(await readFile(join(next.execution.worktree, `${name}.txt`), 'utf8')).toBe(name);
+        } finally {
+          await runtime.dispose();
+        }
+      }
+      expect((await Effect.runPromise(issues.inspect(5))).blockersReady).toBe(kind === 'valid');
+      expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D')).toBe('');
+    } finally {
+      await f.close();
+    }
+  }
+);

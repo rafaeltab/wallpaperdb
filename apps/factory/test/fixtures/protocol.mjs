@@ -109,7 +109,9 @@ if (config.join && basename(process.argv[1]) === 'gh') {
     ];
   else if (args[0] === 'pr' && ['view', 'list'].includes(args[1])) {
     const item = state.prs[String(number)];
-    const head = git('ls-remote', '--heads', 'origin', `refs/heads/${item.branch}`).split(/\s/)[0];
+    const head =
+      item.head ??
+      git('ls-remote', '--heads', 'origin', `refs/heads/${item.branch}`).split(/\s/)[0];
     result = {
       url: `https://github.com/rafaeltab/wallpaperdb/pull/${number}`,
       headRefOid: head,

@@ -3515,6 +3515,13 @@ process.exit(result.status ?? 1);
           )
         ),
     };
+    let unrelated: Status = { kind: 'job', intent: { ...intent, id: 'unrelated', issue: 99, branch: 'unrelated' }, execution: { kind: 'absent' }, elapsedMs: 0 };
+    const unrelatedJob: import('../src/capabilities/job/index.js').Job = {
+      status: () => Effect.succeed(unrelated),
+      start: () => Effect.die('Retained unrelated work must not launch again'),
+      resume: () => Effect.succeed({ kind: 'rejected' as const }),
+      cancel: () => Effect.succeed({ kind: 'rejected' as const }),
+    };
     const schedule = controlledScheduleStore();
     const admission = { issue: 2, base: intent.base, context: '' };
     await Effect.runPromise(
@@ -3531,7 +3538,7 @@ process.exit(result.status ?? 1);
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(ScheduleStore, schedule),
-            Layer.succeed(JobPool, { job: () => Effect.succeed(observedJob) }),
+            Layer.succeed(JobPool, { job: (number) => Effect.succeed(number === 99 ? unrelatedJob : observedJob) }),
             Layer.succeed(Issues, issues),
             Layer.succeed(Plan, { preview: () => Effect.die('Paused scheduler must not plan') }),
             Layer.succeed(PlanningSource, {
@@ -3560,7 +3567,14 @@ process.exit(result.status ?? 1);
       },
     ];
     await writeFile(path, JSON.stringify(saved));
-    await schedulerRuntime.runPromise(scheduler.tick(f.host.base));
+    const retained = await Effect.runPromise(schedule.read());
+    const unrelatedAdmission = { issue: 99, base: intent.base, context: '' };
+    await Effect.runPromise(schedule.save({ ...retained, revision: retained.revision + 1, concurrency: 1, allowance: 2, admissions: [admission, unrelatedAdmission] }));
+    await schedulerRuntime.runPromise(scheduler.status());
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation))).toHaveLength(0);
+    if (unrelated.kind !== 'job') throw new Error('Missing unrelated job');
+    unrelated = { ...unrelated, delivery: { stage: 'publication', commit: intent.base, ready: true, landed: false } };
+    await schedulerRuntime.runPromise(scheduler.status());
     const sends = (await f.host.calls()).filter(
       (call) =>
         call.args[1] === 'send' &&
@@ -3569,7 +3583,7 @@ process.exit(result.status ?? 1);
     );
     expect(sends).toHaveLength(1);
     expect(maximumDepth).toBeLessThan(3);
-    expect((await Effect.runPromise(schedule.read())).admissions).toEqual([admission]);
+    expect((await Effect.runPromise(schedule.read())).admissions).toEqual([admission, unrelatedAdmission]);
     expect(await Effect.runPromise(jobStore.readStage(4))).toEqual(request);
     expect(await Effect.runPromise(jobStore.readStage(5))).toBeNull();
   } finally {

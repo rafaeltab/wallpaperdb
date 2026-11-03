@@ -2850,16 +2850,15 @@ function reviewOrigin(item: Layer) {
 function replayOwner(item: Intent['replay'][number]) {
   return JSON.stringify([item.issue, item.pr, item.branch, item.url]);
 }
+// Reusing the same reviewed head after an authenticated landing can change
+// the source comparison while preserving this completed replay certificate.
 function replayProvenance(item: Intent['replay'][number]) {
   return JSON.stringify([
     replayOwner(item),
-    item.commit,
     item.next,
     item.tree,
     item.onto,
     item.target,
-    item.parent,
-    item.prBase,
     reviewOrigin(item),
   ]);
 }

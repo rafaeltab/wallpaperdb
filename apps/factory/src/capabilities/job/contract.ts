@@ -94,11 +94,14 @@ export interface RecoveryStatus {
 /** Scheduler authorization to resume recovery work without a new issue admission. */
 export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
-  /** Coordinate a known replay repair with the existing publication journal. */
+  /** Coordinate a known replay repair with the publication journal. Review/publication
+   * authority is supplied only after validating the current clean owning-stage receipt.
+   * Review may reserve an unpublished correction; publication must confirm the exact head. */
   repairReplay?(
     intent: Intent,
     head: string,
-    repaired?: string
+    repaired?: string,
+    authority?: { readonly request: StageRequest; readonly evidence: StageEvidence }
   ): Effect.Effect<boolean, Unavailable>;
   /** Observe recovery state and durably retain known adverse publication changes
    * before later maintenance. Restoration or verified landing is observed before clearing them. */

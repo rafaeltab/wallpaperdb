@@ -126,6 +126,7 @@ async function stagesFixture() {
   let maintenancePending = false;
   let manualRecovery = false;
   let repairAllowed = true;
+  const repairs: unknown[] = [];
   let now = 100;
   let progress = 'run-1:failed';
   let waiting = false;
@@ -136,7 +137,11 @@ async function stagesFixture() {
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
-      repairReplay: () => Effect.succeed(repairAllowed),
+      repairReplay: (_intent, head, repaired, authority) =>
+        Effect.sync(() => {
+          repairs.push({ head, repaired, authority });
+          return repairAllowed;
+        }),
       inspect: () =>
         Effect.succeed({
           open: true,
@@ -214,6 +219,7 @@ async function stagesFixture() {
       Effect.flatMap(Job, operation).pipe(Effect.provide(JobLive.pipe(Layer.provide(deps))))
     );
   return {
+    repairs: () => repairs,
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
     status: () => run((job) => job.status()),
     cancel: (id: string) => run((job) => job.cancel(id)),
@@ -885,6 +891,7 @@ it('keeps repaired replay maintenance incomplete through fresh review and public
     commit: 'd'.repeat(40),
     comparison: { base: 'e'.repeat(40), prBase: 'D' },
   });
+  job.change({ repairAllowed: false });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
   job.change({ maintenancePending: false });
@@ -930,4 +937,58 @@ it('repairs a failure observed immediately after the original publication receip
     previousRunId: 'run-3',
   });
   expect(job.sends()).toBe(3);
+});
+
+it('retains review and publication authority after a replay repair correction', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({
+    prCommit: 'c'.repeat(40),
+    reviewedCommit: 'b'.repeat(40),
+    failed: true,
+    maintenancePending: true,
+  });
+  await job.status();
+  job.change({ commit: 'd'.repeat(40), prCommit: 'd'.repeat(40), failed: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  job.change({ commit: 'f'.repeat(40), repairAllowed: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  job.change({ repairAllowed: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'publication', commit: 'f'.repeat(40), ready: false },
+  });
+  expect(job.repairs().at(-1)).toMatchObject({
+    head: 'd'.repeat(40),
+    repaired: 'f'.repeat(40),
+    authority: {
+      request: { stage: 'review', commit: 'd'.repeat(40) },
+      evidence: { commit: 'f'.repeat(40), accepted: true },
+    },
+  });
+  job.change({ prCommit: 'f'.repeat(40), repairAllowed: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
+  await job.status();
+  expect(job.sends()).toBe(5);
+  job.change({ repairAllowed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+  expect(job.repairs().at(-1)).toMatchObject({
+    head: 'f'.repeat(40),
+    repaired: 'f'.repeat(40),
+    authority: {
+      request: {
+        stage: 'publication',
+        commit: 'f'.repeat(40),
+        comparison: { previousHead: 'd'.repeat(40) },
+      },
+      evidence: { commit: 'f'.repeat(40), accepted: true },
+    },
+  });
+  job.change({ maintenancePending: false });
+  expect(await job.status()).toMatchObject({
+    delivery: { ready: true, reviewedCommit: 'b'.repeat(40) },
+  });
 });

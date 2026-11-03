@@ -13,7 +13,11 @@ import {
 import { dirname, join } from 'node:path';
 import { Effect, Layer as EffectLayer } from 'effect';
 import { z } from 'zod';
-import { Unavailable } from '../../capabilities/job/index.js';
+import {
+  Unavailable,
+  type StageRequest,
+  type StageEvidence,
+} from '../../capabilities/job/index.js';
 import {
   type RecoveryOutcome,
   RecoveryPorts,
@@ -77,6 +81,7 @@ const intent = z.object({
   replay: z.array(layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha })),
 });
 type Intent = z.infer<typeof intent>;
+type RepairAuthority = { request: StageRequest; evidence: StageEvidence };
 export interface JoinConfiguration {
   readonly directory: string;
   readonly binary: string;
@@ -1583,6 +1588,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     const current = await prState(item, signal);
+    const reviewed = await reviewedObservation(record, item, current, signal);
+    if (reviewed) return reviewed;
     if (current.state !== 'OPEN' || current.headRefOid !== item.next) return null;
     const allowed = allowedPublication(current, item);
     const certified = !allowed && (await historicalComparisonValid(record, signal));
@@ -2509,14 +2516,245 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!accepted) return false;
     return !(await read(record.directory, repairRequestName(record.operation, head)));
   };
+  const reviewName = (operation: Intent, issue: number) =>
+    `review-${operation.generation ?? 'initial'}-${issue}.json`;
+  const reviewedObservation = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    current: Awaited<ReturnType<typeof prState>>,
+    signal?: AbortSignal
+  ) => {
+    const saved = await read(record.directory, reviewName(record.operation, item.issue));
+    if (!saved) return null;
+    const correction = reviewCorrection.parse(saved);
+    if (!currentComparison(current, { next: correction.fixed.next, target: item.target }))
+      return null;
+    if (
+      !correctionMatches(correction.fixed, item) ||
+      !(await operationFactsValid(record.operation, signal))
+    )
+      return null;
+    return {
+      ...correction.fixed,
+      pending: true,
+      comparison: item.target,
+      comparisonReady: false,
+      automatic: false,
+      uncertain: false,
+      manual: false,
+    };
+  };
+  const correctedHead = async (
+    item: Intent['replay'][number],
+    commit: string,
+    signal?: AbortSignal
+  ) => {
+    if (!(await isAncestor(item.next, commit, signal))) return null;
+    return {
+      ...item,
+      commit: item.next,
+      next: commit,
+      tree: await git(['rev-parse', `${commit}^{tree}`], signal),
+      reviewedCommit: reviewOrigin(item),
+    };
+  };
+  const prepareCorrection = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(item, signal);
+    if (!currentComparison(current, item)) return false;
+    if ((await remote(item.branch, signal)) !== item.next) return false;
+    if (!(await repairWriters(record.operation, item.issue, head, signal))) return false;
+    return requestRepair(record, item, head, current, signal);
+  };
+  const reserveReviewed = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    const receipt = reviewAuthority(authority, item, head, commit);
+    if (!receipt) return false;
+    const fixed = await correctedHead(item, commit, signal);
+    if (!fixed) return false;
+    if (!(await prepareCorrection(record, item, head, signal))) return false;
+    const name = reviewName(record.operation, item.issue);
+    await publish(record.directory, name, { fixed, receipt });
+    const retained = reviewCorrection.parse(await read(record.directory, name));
+    return (
+      JSON.stringify(retained.fixed) === JSON.stringify(fixed) &&
+      sameCorrectionReceipt(retained.receipt, receipt)
+    );
+  };
+  const publishedCorrectionHead = async (
+    item: Intent['replay'][number],
+    commit: string,
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(item, signal);
+    if (!currentComparison(current, { next: commit, target: item.target })) return false;
+    return (await remote(item.branch, signal)) === commit;
+  };
+  const reviewedSourceValid = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    fixed: Intent['replay'][number],
+    commit: string,
+    source: string,
+    signal?: AbortSignal
+  ) => {
+    if (fixed.next !== commit || !correctionMatches(fixed, item) || fixed.commit !== source)
+      return false;
+    if (!(await read(record.directory, repairRequestName(record.operation, item.next))))
+      return false;
+    return (await git(['rev-parse', `${commit}^{tree}`], signal)) === fixed.tree;
+  };
+  const commitReviewed = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    correction: z.infer<typeof reviewCorrection>,
+    receipt: z.infer<typeof correctionReceipt>,
+    commit: string,
+    signal?: AbortSignal
+  ) => {
+    if (
+      !(await reviewedSourceValid(record, item, correction.fixed, commit, receipt.source, signal))
+    )
+      return false;
+    if (!(await repairWriters(record.operation, item.issue, item.next, signal))) return false;
+    const name = `published-${reviewName(record.operation, item.issue)}`;
+    await publish(record.directory, name, receipt);
+    if (
+      !sameCorrectionReceipt(correctionReceipt.parse(await read(record.directory, name)), receipt)
+    )
+      return false;
+    return promoteRepair(record, correction.fixed, signal);
+  };
+  const publishReviewed = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    const receipt = reviewAuthority(authority, item, head, commit);
+    if (!receipt) return false;
+    if (!(await operationFactsValid(record.operation, signal))) return false;
+    if (!(await publishedCorrectionHead(item, commit, signal))) return false;
+    const saved = await read(record.directory, reviewName(record.operation, item.issue));
+    if (!saved) return head === item.next;
+    return commitReviewed(record, item, reviewCorrection.parse(saved), receipt, commit, signal);
+  };
+  const reserveSelectedReview = async (
+    records: readonly ReplayRecord[],
+    issue: number,
+    branch: string,
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    for (const record of records) {
+      const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
+      if (!item) continue;
+      return reserveCurrentReview(record, item, head, commit, authority, signal);
+    }
+    return false;
+  };
+  const reserveCurrentReview = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    const selected = await repairComparison(record, item, head, signal);
+    if (!selected) return false;
+    const current = selected.operation.replay.find((value) => value.issue === item.issue);
+    return current ? reserveReviewed(selected, current, head, commit, authority, signal) : false;
+  };
+  const matchingReviewedHead = async (record: ReplayRecord, issue: number, head: string) => {
+    const saved = await read(record.directory, reviewName(record.operation, issue));
+    return Boolean(saved && reviewCorrection.parse(saved).fixed.next === head);
+  };
+  const publishedKnownHead = async (
+    records: readonly ReplayRecord[],
+    issue: number,
+    branch: string,
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    for (const record of records) {
+      const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
+      if (item) return publishReviewed(record, item, head, commit, authority, signal);
+    }
+    return false;
+  };
+  const publishSelectedReview = async (
+    records: readonly ReplayRecord[],
+    issue: number,
+    branch: string,
+    head: string,
+    commit: string,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    for (const record of records) {
+      const item = record.operation.replay.find(
+        (value) => value.issue === issue && value.branch === branch
+      );
+      if (!item) continue;
+      if (await matchingReviewedHead(record, issue, head))
+        return publishReviewed(record, item, head, commit, authority, signal);
+    }
+    return publishedKnownHead(records, issue, branch, head, commit, authority, signal);
+  };
+  const reconcileReviewed = async (
+    records: readonly ReplayRecord[],
+    issue: number,
+    branch: string,
+    head: string,
+    commit: string | undefined,
+    authority: RepairAuthority,
+    signal?: AbortSignal
+  ) => {
+    if (!commit) return false;
+    if (authority.request.stage === 'review')
+      return reserveSelectedReview(records, issue, branch, head, commit, authority, signal);
+    if (authority.request.stage === 'publication')
+      return publishSelectedReview(records, issue, branch, head, commit, authority, signal);
+    return false;
+  };
   const repair = async (
+    issue: number,
+    branch: string,
+    head: string,
+    repaired?: string,
+    signal?: AbortSignal,
+    authority?: RepairAuthority
+  ) => {
+    const records = await replayRecords();
+    if (authority)
+      return reconcileReviewed(records, issue, branch, head, repaired, authority, signal);
+    return repairKnown(records, issue, branch, head, repaired, signal);
+  };
+  const repairKnown = async (
+    records: readonly ReplayRecord[],
     issue: number,
     branch: string,
     head: string,
     repaired?: string,
     signal?: AbortSignal
   ) => {
-    const records = await replayRecords();
     for (const record of records) {
       if (await acceptedRepair(record, issue, branch, head, repaired)) return true;
       const item = record.operation.replay.find((value) => sameReplay(value, issue, branch, head));
@@ -2792,5 +3030,104 @@ function knownLayerHead(operation: Intent, item: Layer, head: string) {
     head === item.commit ||
     head === changed?.next ||
     Boolean(operation.generation && head === changed?.commit)
+  );
+}
+
+const correctionReceipt = z
+  .object({
+    threadId: z.string(),
+    index: z.number().int().nonnegative(),
+    stage: z.enum(['review', 'publication']),
+    runId: z.string().min(1),
+    ordinal: z.number().int().positive(),
+    previousRunId: z.string().nullable(),
+    commit: sha,
+    source: sha,
+    base: sha,
+    target: z.string(),
+  })
+  .strict();
+const reviewCorrection = z
+  .object({
+    fixed: layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha }),
+    receipt: correctionReceipt,
+  })
+  .strict();
+function correctionMatches(fixed: Intent['replay'][number], item: Intent['replay'][number]) {
+  return (
+    sameOwningIssue(fixed, item) &&
+    fixed.commit === item.next &&
+    fixed.onto === item.onto &&
+    fixed.target === item.target
+  );
+}
+function correctionEvidenceValid(authority: RepairAuthority, head: string, commit: string) {
+  return (
+    authority.evidence.accepted &&
+    authority.evidence.commit === commit &&
+    authority.request.commit === head
+  );
+}
+function correctionRunValid(authority: RepairAuthority) {
+  const { request, evidence } = authority;
+  return (
+    evidence.runId !== request.previousRunId &&
+    evidence.ordinal === (request.ordinal ?? request.index + 1) &&
+    evidence.stageIndex === request.index
+  );
+}
+function correctionComparisonValid(request: StageRequest, item: Intent['replay'][number]) {
+  if (request.comparison?.base !== item.onto || request.comparison.prBase !== item.target)
+    return false;
+  return !item.owningThreadId || item.owningThreadId === request.threadId;
+}
+function correctionStageValid(authority: RepairAuthority, item: Intent['replay'][number]) {
+  if (authority.request.stage === 'review') return true;
+  return (
+    authority.request.stage === 'publication' &&
+    Boolean(authority.evidence.linked?.includes(item.url))
+  );
+}
+function reviewAuthority(
+  authority: RepairAuthority,
+  item: Intent['replay'][number],
+  head: string,
+  commit: string
+) {
+  const { request } = authority;
+  if (!correctionStageValid(authority, item) || !correctionEvidenceValid(authority, head, commit))
+    return null;
+  if (!correctionRunValid(authority) || !correctionComparisonValid(request, item)) return null;
+  return receiptForCorrection(authority, head, commit);
+}
+
+function receiptForCorrection(authority: RepairAuthority, head: string, commit: string) {
+  const { request, evidence } = authority;
+  const parsed = correctionReceipt.safeParse({
+    threadId: request.threadId,
+    index: request.index,
+    stage: request.stage,
+    runId: evidence.runId,
+    ordinal: evidence.ordinal,
+    previousRunId: request.previousRunId,
+    commit,
+    source: request.stage === 'review' ? head : request.comparison?.previousHead,
+    base: request.comparison?.base,
+    target: request.comparison?.prBase,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+function sameCorrectionReceipt(
+  first: z.infer<typeof correctionReceipt>,
+  current: z.infer<typeof correctionReceipt>
+) {
+  return (
+    first.threadId === current.threadId &&
+    first.stage === current.stage &&
+    first.source === current.source &&
+    first.commit === current.commit &&
+    first.base === current.base &&
+    first.target === current.target
   );
 }

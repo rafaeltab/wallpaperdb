@@ -224,10 +224,10 @@ export function githubIssues(config: {
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.github.joins.reconcile')
       ),
-    repairReplay: (intent, head, repaired) =>
+    repairReplay: (intent, head, repaired, authority) =>
       contextualPromise({
         try: (signal) =>
-          joins?.repair(intent.issue, intent.branch, head, repaired, signal) ??
+          joins?.repair(intent.issue, intent.branch, head, repaired, signal, authority) ??
           Promise.resolve(false),
         catch: (cause) => new Unavailable({ operation: 'repair-replay', cause }),
       }).pipe(

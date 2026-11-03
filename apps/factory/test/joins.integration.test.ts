@@ -3042,3 +3042,321 @@ it.each([
     }
   }
 );
+
+it.each(['C', 'B'])(
+  'retains a locally reviewed correction and reconciles its published replay head on %s',
+  async (branch) => {
+    const f = await landedFixture();
+    try {
+      await Effect.runPromise(f.issues.reconcile!());
+      const intent = {
+        id: `${branch}-job`,
+        issue: branch === 'C' ? 4 : 2,
+        issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${branch === 'C' ? 4 : 2}`,
+        base: f.host.base,
+        branch,
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      };
+      const livePath = join(f.host.directory, 'join-live.json');
+      const changeCI = async (value: string) => {
+        const live = JSON.parse(await readFile(livePath, 'utf8'));
+        live.newCI = value;
+        await writeFile(livePath, JSON.stringify(live));
+      };
+      const start = await Effect.runPromise(f.issues.pullRequest(intent));
+      if (start.kind !== 'found') throw new Error('Missing replay');
+      await changeCI('FAILURE');
+      expect(await Effect.runPromise(f.issues.repairReplay!(intent, start.commit))).toBe(true);
+      f.git('switch', '--detach', start.commit);
+      await writeFile(join(f.host.repository, 'fixed.txt'), 'CI correction');
+      f.git('add', '.');
+      f.git('commit', '-m', 'CI correction');
+      const h1 = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${start.commit}`,
+        'origin',
+        `${h1}:refs/heads/${branch}`
+      );
+      await changeCI('SUCCESS');
+      expect(await Effect.runPromise(f.issues.repairReplay!(intent, start.commit, h1))).toBe(true);
+      await Effect.runPromise(f.reopen().reconcile!());
+      await writeFile(join(f.host.repository, 'review.txt'), 'authorized correction');
+      f.git('add', '.');
+      f.git('commit', '-m', 'review correction');
+      const h2 = f.git('rev-parse', 'HEAD');
+      const owning = join(f.host.directory, 'review-owner');
+      f.git('worktree', 'add', owning, branch);
+      execFileSync('git', ['-C', owning, 'reset', '--hard', h2]);
+      const execution = t3Execution({
+        binary: f.host.binary,
+        project: f.host.repository,
+        projectId: 'project-id',
+      });
+      const authority = async (stage: 'review' | 'publication', commit = h2, attempt = 0) => {
+        const index = (stage === 'review' ? 5 : 6) + attempt;
+        const runId = `${stage}-run-${attempt}`;
+        const request: import('../src/capabilities/job/index.js').StageRequest = {
+          stage,
+          index,
+          ordinal: index,
+          previousRunId: attempt
+            ? `${stage}-run-${attempt - 1}`
+            : stage === 'review'
+              ? 'babysitting-run'
+              : 'review-run-0',
+          threadId: 'review-owner',
+          commit: stage === 'review' ? h1 : commit,
+          comparison: {
+            base: start.parent!,
+            prBase: start.base!,
+            previousHead: stage === 'publication' ? h1 : (start.previousHead ?? start.commit),
+          },
+        };
+        const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+        await f.host.save({
+          ...config,
+          joinWriter: false,
+          messages: [
+            {
+              role: 'assistant',
+              runId,
+              text: JSON.stringify({
+                jobId: intent.id,
+                stage,
+                base: start.parent,
+                commit,
+                outcome: stage === 'review' ? '<REVIEW>COMPLETE</REVIEW>' : '<PR>CREATED</PR>',
+                tests: true,
+                coverage: true,
+                crap: true,
+                reviews: true,
+              }),
+            },
+          ],
+        });
+        await writeFile(
+          join(f.host.directory, 'resource.json'),
+          JSON.stringify({
+            threadId: request.threadId,
+            title: `Factory ${intent.id}`,
+            projectId: 'project-id',
+            providerInstanceId: 'codex',
+            model: 'gpt-6.1-sol',
+            branch,
+            worktreePath: owning,
+            status: 'completed',
+            latestRunId: runId,
+            runCount: index,
+            pendingRequestCount: 0,
+            pullRequests: [{ url: start.url }],
+          })
+        );
+        const evidence = await Effect.runPromise(execution.inspectStage(intent, request));
+        if (!evidence?.accepted) throw new Error('Missing actual clean T3 receipt');
+        return { request, evidence };
+      };
+      const reviewed = await authority('review');
+      await writeFile(join(owning, 'dirty-proof.txt'), 'dirty');
+      expect(
+        (await Effect.runPromise(execution.inspectStage(intent, reviewed.request)))?.accepted
+      ).not.toBe(true);
+      await unlink(join(owning, 'dirty-proof.txt'));
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h1, h2, {
+            ...reviewed,
+            evidence: { ...reviewed.evidence, ordinal: reviewed.evidence.ordinal + 1 },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h1, h2, {
+            ...reviewed,
+            evidence: { ...reviewed.evidence, runId: reviewed.request.previousRunId! },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h1, h2, {
+            ...reviewed,
+            evidence: { ...reviewed.evidence, accepted: false },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h1, h2, {
+            ...reviewed,
+            request: {
+              ...reviewed.request,
+              comparison: { ...reviewed.request.comparison!, base: f.host.base },
+            },
+          })
+        )
+      ).toBe(false);
+      const oldConfig = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      await f.host.save({ ...oldConfig, joinWriter: true, joinWriterBranch: branch });
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
+        false
+      );
+      await f.host.save(oldConfig);
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
+        true
+      );
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h1, h2, await authority('review', h2, 1))
+        )
+      ).toBe(true);
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
+        true
+      );
+
+      expect(f.git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0]).toBe(
+        h1
+      );
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: h1,
+        ready: false,
+        maintenancePending: true,
+        manualRecovery: false,
+      });
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+        )
+      ).toBe(false);
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${h1}`,
+        'origin',
+        `${h2}:refs/heads/${branch}`
+      );
+      await changeCI('FAILURE');
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: h2,
+        ready: false,
+        maintenancePending: true,
+        manualRecovery: false,
+      });
+      const published = await authority('publication');
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, {
+            ...published,
+            request: {
+              ...published.request,
+              comparison: undefined,
+            },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, {
+            ...published,
+            request: {
+              ...published.request,
+              comparison: { ...published.request.comparison!, previousHead: start.commit },
+            },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, {
+            ...published,
+            evidence: { ...published.evidence, linked: [] },
+          })
+        )
+      ).toBe(false);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+        )
+      ).toBe(true);
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: h2,
+        ready: false,
+        manualRecovery: false,
+      });
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h2))).toBe(true);
+      await changeCI('SUCCESS');
+      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h2, h2))).toBe(true);
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        commit: h2,
+        ready: true,
+        reviewedCommit: branch === 'C' ? f.c : f.b,
+      });
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+        )
+      ).toBe(true);
+      const assertions: import('../src/adapters/github/index.js').VerifiedPrerequisite[] =
+        f.config.prerequisites.slice(0, 1);
+      for (const [issue, name] of [
+        [2, 'B'],
+        [3, 'D'],
+        [4, 'C'],
+      ] as const) {
+        const observed = await Effect.runPromise(
+          f.reopen().pullRequest({ ...intent, issue, branch: name })
+        );
+        if (observed.kind !== 'found' || !observed.ready || !observed.parent)
+          throw new Error('Missing verified current publication');
+        assertions.push({
+          issue,
+          pr: 100 + issue,
+          commit: observed.commit,
+          reviewedCommit: observed.reviewedCommit,
+          parent: observed.parent,
+          prBase: observed.base,
+        });
+      }
+      const ready = await Effect.runPromise(
+        githubIssues({ ...f.config, prerequisites: assertions }).inspect(5)
+      );
+      expect(ready.blockersReady).toBe(true);
+      const tip = ready.prerequisite?.base;
+      if (!tip) throw new Error('Missing descendants');
+      expect(f.git('show', `${tip}:review.txt`)).toBe('authorized correction');
+      expect(f.git('merge-base', '--is-ancestor', h2, tip)).toBe('');
+      expect(f.git('rev-list', '--merges', `${f.host.base}..${tip}`)).toBe('');
+      if (branch === 'B') expect(f.git('log', '--format=%s', `${h2}..${tip}`)).toBe('C\nD');
+      await writeFile(join(f.host.repository, 'external.txt'), 'unreviewed');
+      f.git('add', '.');
+      f.git('commit', '-m', 'external');
+      const unknown = f.git('rev-parse', 'HEAD');
+      f.git(
+        'push',
+        `--force-with-lease=refs/heads/${branch}:${h2}`,
+        'origin',
+        `${unknown}:refs/heads/${branch}`
+      );
+      execFileSync('git', ['-C', owning, 'reset', '--hard', unknown]);
+      expect(
+        await Effect.runPromise(
+          f.reopen().repairReplay!(
+            intent,
+            unknown,
+            unknown,
+            await authority('publication', unknown)
+          )
+        )
+      ).toBe(false);
+      expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+        ready: false,
+        manualRecovery: true,
+      });
+    } finally {
+      await f.close();
+    }
+  }
+);

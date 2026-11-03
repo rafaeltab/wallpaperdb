@@ -915,8 +915,10 @@ it.each([
       );
     }
 
-    if (kind === 'rollback')
+    if (kind === 'rollback') {
+      live.prs['104'].base = 'D';
       f.git('push', `--force-with-lease=refs/heads/C:${next}`, 'origin', `${first}:refs/heads/C`);
+    }
     if (kind === 'drift') {
       f.git('switch', '--detach', next);
       await writeFile(join(f.host.repository, 'external.txt'), 'external');

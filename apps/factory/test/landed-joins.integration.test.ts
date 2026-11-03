@@ -476,3 +476,101 @@ it('retains multiple closed native members in ancestry order when the pin alread
     await f.close();
   }
 });
+
+it.each([
+  'valid',
+  'missing-proof',
+  'wrong-head-proof',
+  'closed-unmerged',
+  'non-containing-result',
+  'failed-ci',
+  'corrupt-group',
+  'changed-pin',
+  'unchanged-target-unproved',
+] as const)('validates a landed earlier member of a completed mixed replay: %s', async (kind) => {
+  const f = await fixture();
+  try {
+    const initial = f.issues();
+    if (!initial.prepare) throw new Error('Missing prepare');
+    await Effect.runPromise(initial.prepare(4));
+    const joined = (await Effect.runPromise(initial.inspect(4))).prerequisite?.base;
+    if (!joined) throw new Error('Missing completed mixed join');
+    const b = f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0];
+    if (!b) throw new Error('Missing replayed B');
+    const tree = f.git('rev-parse', `${joined}^{tree}`);
+    f.git('switch', 'primary');
+    f.git('merge', '--ff-only', b);
+    let merged = b;
+    if (kind === 'non-containing-result') {
+      await f.commit('different-result');
+      merged = f.git('rev-parse', 'HEAD');
+    }
+    f.git('push', 'origin', 'primary');
+    f.git('switch', '--detach', f.host.base);
+    f.git('push', 'origin', '--delete', 'B');
+    const path = join(f.host.directory, 'join-live.json');
+    const state = JSON.parse(await readFile(path, 'utf8'));
+    state.prs['102'] = {
+      ...state.prs['102'],
+      head: b,
+      state: kind === 'closed-unmerged' ? 'CLOSED' : 'MERGED',
+      base: 'primary',
+    };
+    state.prs['103'].base = kind === 'unchanged-target-unproved' ? 'B' : 'primary';
+    if (kind === 'failed-ci') state.newCI = 'FAILURE';
+    if (kind === 'corrupt-group') state.groups = [];
+    await writeFile(path, JSON.stringify(state));
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    await f.host.save({
+      ...config,
+      issueStates: { ...config.issueStates, 2: 'CLOSED' },
+      defaultBranch: { name: 'primary', tip: merged },
+      landedPrerequisites: {
+        ...config.landedPrerequisites,
+        2: ['missing-proof', 'unchanged-target-unproved'].includes(kind) ? [] : [102],
+      },
+      mergedPrerequisites: {
+        ...config.mergedPrerequisites,
+        102: {
+          merged: kind !== 'closed-unmerged',
+          merge_commit_sha: merged,
+          head: { sha: kind === 'wrong-head-proof' ? f.b : b },
+          html_url: 'https://github.com/rafaeltab/wallpaperdb/pull/102',
+          base: { ref: 'primary', repo: { full_name: 'rafaeltab/wallpaperdb' } },
+        },
+      },
+    });
+    const issues = kind === 'changed-pin' ? f.issues(f.landed) : f.issues();
+    const observed = await Effect.runPromise(
+      issues.pullRequest({
+        id: 'C',
+        issue: 3,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/3',
+        base: f.host.base,
+        prBase: 'A',
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation',
+      })
+    );
+    expect(observed).toMatchObject({
+      kind: 'found',
+      commit: joined,
+      reviewedCommit: f.c,
+      ready: kind === 'valid',
+    });
+    expect((await Effect.runPromise(issues.inspect(4))).blockersReady).toBe(kind === 'valid');
+    expect(f.git('rev-parse', `${joined}^{tree}`)).toBe(tree);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B')).toBe('');
+    if (kind === 'valid') {
+      expect(f.git('show', `${joined}:A.txt`)).toBe('A');
+      expect(f.git('show', `${joined}:B.txt`)).toBe('B');
+      expect(f.git('show', `${joined}:C.txt`)).toBe('C');
+      expect(f.git('diff', '--name-only', `${merged}..${joined}`)).toBe('C.txt');
+      expect(f.git('merge-base', '--is-ancestor', merged, joined)).toBe('');
+    }
+  } finally {
+    await f.close();
+  }
+});

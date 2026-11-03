@@ -63,7 +63,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         base: host.base,
         overrides: { status: 'completed' },
         prs: [{ ...pr, state: 'MERGED' }],
-        landing: { merge: host.base, head: host.base },
+        landing: { pr: 999, merge: host.base, head: host.base },
       });
       await browserExpect
         .poll(async () => {

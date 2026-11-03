@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, rename } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
@@ -1172,3 +1172,51 @@ it('reconciles the original join request when explicit blockers include a closed
     await f.close();
   }
 });
+
+it.each(['unrelated', 'valid', 'missing-object'] as const)(
+  'observes a completed clean recovery with %s ancestry through Issues',
+  async (kind) => {
+    const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE', question: 'Wait' } });
+    try {
+      await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+      await Effect.runPromise(f.issues.reconcile?.() ?? Effect.void);
+      const path = join(f.host.directory, 'restacker.json');
+      const saved = JSON.parse(await readFile(path, 'utf8'));
+      if (kind === 'unrelated') {
+        f.git('-C', saved.thread.worktreePath, 'reset', '--hard', f.c);
+        saved.head = f.c;
+      }
+      if (kind === 'missing-object') {
+        const refs = f.git('rev-parse', '--git-common-dir');
+        // Remove the required onto object only in this isolated fixture repository.
+        const object = join(f.host.repository, refs, 'objects', f.d.slice(0, 2), f.d.slice(2));
+        await unlink(object);
+      }
+      saved.thread.status = 'completed';
+      saved.thread.pendingRequestCount = 0;
+      saved.messages = [
+        {
+          role: 'assistant',
+          runId: 'resolve-run',
+          text: JSON.stringify({
+            operation: saved.operation,
+            commit: saved.head,
+            outcome: '<RESTACK>SIMPLE</RESTACK>',
+          }),
+        },
+      ];
+      await writeFile(path, JSON.stringify(saved));
+      const check = Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+      if (kind === 'missing-object')
+        await expect(check).rejects.toMatchObject({ _tag: 'Unavailable' });
+      else {
+        await check;
+        expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(
+          kind === 'valid'
+        );
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);

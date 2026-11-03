@@ -253,6 +253,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       headRefName: item.branch,
       baseRefName: item.base,
       baseRefOid: git('rev-parse', item.base),
+      author: item.author === undefined ? { login: 'rafaeltab' } : item.author,
       body: item.body ?? '',
       comments: item.comments ?? [],
       state: item.state ?? 'OPEN',

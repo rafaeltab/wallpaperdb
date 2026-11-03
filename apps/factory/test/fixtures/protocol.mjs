@@ -1,5 +1,12 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, existsSync, appendFileSync, readdirSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  existsSync,
+  appendFileSync,
+  readdirSync,
+} from 'node:fs';
 import { basename, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
@@ -171,12 +178,19 @@ if (config.join && basename(process.argv[1]) === 'gh') {
         : args[0] === 'issue' && args[1] === 'comment'
           ? 'evidence'
           : null;
+  const save = () => {
+    const next = `${statePath}.${process.pid}.next`;
+    writeFileSync(next, JSON.stringify(state));
+    renameSync(next, statePath);
+  };
   if (state.lose === boundary && boundary) {
     state.lose = null;
-    writeFileSync(statePath, JSON.stringify(state));
+    save();
     process.exit(1);
   }
-  writeFileSync(statePath, JSON.stringify(state));
+  // Queries can overlap each other and metadata edits. They must not publish
+  // their old snapshots over a completed edit or expose a truncated JSON file.
+  if (boundary || (args[0] === 'api' && args.includes('POST'))) save();
   console.log(JSON.stringify(result));
   process.exit(0);
 }

@@ -562,7 +562,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const prState = async (item: Intent['replay'][number], signal?: AbortSignal) => {
     return z
-      .object({ headRefOid: sha, baseRefName: z.string(), state: z.string() })
+      .object({
+        headRefOid: sha,
+        headRefName: z.string(),
+        url: z.string(),
+        baseRefName: z.string(),
+        state: z.string(),
+      })
       .parse(
         await gh(
           [
@@ -572,7 +578,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
             '--repo',
             'rafaeltab/wallpaperdb',
             '--json',
-            'headRefOid,baseRefName,state',
+            'headRefOid,headRefName,url,baseRefName,state',
           ],
           signal
         )
@@ -906,18 +912,76 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.replay) await verifyReplayTree(item, directory(numbers), signal);
     return operation.replay;
   };
-  const completedReplay = async (key: string, issue: number, signal?: AbortSignal) => {
+  const completedReplay = async (key: string, issue: number) => {
     const saved = await read(join(config.directory, key), 'intent.json');
     if (!saved || !(await read(join(config.directory, key), 'complete.json'))) return null;
     const operation = intent.parse(saved);
     const item = operation.replay.find((value) => value.issue === issue);
     if (!item) return null;
-    await verifyReplayTree(item, join(config.directory, key), signal);
-    const current = await prState(item, signal);
+    return { item, operation, directory: join(config.directory, key) };
+  };
+  type CompletedReplay = NonNullable<Awaited<ReturnType<typeof completedReplay>>>;
+  const currentCompleted = async (records: readonly CompletedReplay[], signal?: AbortSignal) => {
+    const terminal = records.filter(
+      (record) =>
+        !records.some(
+          (other) =>
+            replayOwner(record.item) === replayOwner(other.item) &&
+            other.item.commit === record.item.next &&
+            other.item.next !== record.item.next
+        )
+    );
+    const matches = [];
+    for (const record of terminal) {
+      const current = await prState(record.item, signal);
+      if (
+        current.headRefOid === record.item.next &&
+        current.headRefName === record.item.branch &&
+        current.url === record.item.url
+      )
+        matches.push({ record, current });
+    }
+    return matches;
+  };
+  const matchingComparisonsValid = async (
+    records: readonly CompletedReplay[],
+    signal?: AbortSignal
+  ) => {
+    let valid = false;
+    for (const record of records) {
+      await verifyReplayTree(record.item, record.directory, signal);
+      if (await completedComparisonsValid(record.operation, signal)) valid = true;
+    }
+    return valid;
+  };
+  const observeCompleted = async (records: readonly CompletedReplay[], signal?: AbortSignal) => {
+    const matches = await currentCompleted(records, signal);
+    const selected = matches[0];
+    if (!selected) {
+      const record = records[0];
+      if (!record) return null;
+      const current = await prState(record.item, signal);
+      return {
+        ...record.item,
+        comparison: current.baseRefName,
+        comparisonReady: false,
+        ambiguous: true,
+      };
+    }
+    const ambiguous = matches.some(
+      (value) => replayProvenance(value.record.item) !== replayProvenance(selected.record.item)
+    );
+    const comparisonReady =
+      !ambiguous &&
+      (await matchingComparisonsValid(
+        matches.map((value) => value.record),
+        signal
+      ));
     return {
-      ...item,
-      comparison: current.baseRefName,
-      comparisonReady: await completedComparisonsValid(operation, signal),
+      ...selected.record.item,
+      comparison: selected.current.baseRefName,
+      comparisonReady,
+      ambiguous,
     };
   };
   const operationDirectories = async () => {
@@ -931,12 +995,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return entries;
   };
   const replayFor = async (issue: number, signal?: AbortSignal) => {
-    const entries = await operationDirectories();
-    for (const key of entries.filter((value) => /^[a-f0-9]{64}$/.test(value))) {
-      const item = await completedReplay(key, issue, signal);
-      if (item) return item;
+    const records = [];
+    for (const key of (await operationDirectories()).filter((value) =>
+      /^[a-f0-9]{64}$/.test(value)
+    )) {
+      const record = await completedReplay(key, issue);
+      if (record) records.push(record);
     }
-    return null;
+    return observeCompleted(records, signal);
   };
   const reconcile = async (signal?: AbortSignal) => {
     for (const key of await operationDirectories()) {
@@ -979,4 +1045,21 @@ function idleWriter(detail: { status: string; pendingRequestCount: number }) {
 
 function reviewOrigin(item: Layer) {
   return item.reviewedCommit ?? item.commit;
+}
+
+function replayOwner(item: Intent['replay'][number]) {
+  return JSON.stringify([item.issue, item.pr, item.branch, item.url]);
+}
+function replayProvenance(item: Intent['replay'][number]) {
+  return JSON.stringify([
+    replayOwner(item),
+    item.commit,
+    item.next,
+    item.tree,
+    item.onto,
+    item.target,
+    item.parent,
+    item.prBase,
+    reviewOrigin(item),
+  ]);
 }

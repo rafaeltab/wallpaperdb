@@ -3562,7 +3562,10 @@ process.exit(result.status ?? 1);
     await writeFile(path, JSON.stringify(saved));
     await schedulerRuntime.runPromise(scheduler.tick(f.host.base));
     const sends = (await f.host.calls()).filter(
-      (call) => call.args[1] === 'send' && call.args[2] === saved.thread.threadId
+      (call) =>
+        call.args[1] === 'send' &&
+        call.args[2] === saved.thread.threadId &&
+        call.args[3]?.includes(saved.operation)
     );
     expect(sends).toHaveLength(1);
     expect(maximumDepth).toBeLessThan(3);

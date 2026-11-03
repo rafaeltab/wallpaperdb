@@ -268,6 +268,70 @@ test("547 preparation publishes failure and stops once without advancing the fix
 	assert.equal(commands.filter((a) => a.includes("PACKAGE=asset")).length, 0);
 });
 
+test("547 runner discovers and retires a candidate after prepublication preparation failure", async (t) => {
+	const f = preparationFixture(t);
+	fs.symlinkSync(
+		path.join(repository, "scripts"),
+		path.join(f.root, "scripts"),
+	);
+	f.env.CONTROL_PENDING_CANDIDATE = "yes";
+	installPendingCli(f.root);
+	const stops = [];
+	await assert.rejects(
+		() =>
+			f.run({
+				make: async (argv, options) => {
+					if (argv[1] !== "boat-stop") return f.make(argv, options);
+					stops.push(argv);
+					// The runner calls the real repository stop/controller; only its provider is controlled.
+					return runner.makeCommand(argv, {
+						...options,
+						env: {
+							...f.env,
+							PATH: process.env.PATH,
+							HOME: path.join(f.root, "home"),
+							BOAT_SHUTDOWN_BUDGET_MS: "30000",
+							BOAT_EXEC: "local",
+						},
+					});
+				},
+			}),
+		/Native Make terminal or drainage failed/,
+	);
+	assert.deepEqual(stops, [
+		[
+			"make",
+			"boat-stop",
+			"BOAT_EXPECTED_ADMISSION=11111111-2222-4333-8444-555555555555",
+		],
+	]);
+	const result = json(path.join(f.config.evidence, "preparation-result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(
+		result.cleanup.status,
+		"STOPPED_ACCOUNTED",
+		JSON.stringify({
+			cleanup: result.cleanup,
+			stderr: fs.readFileSync(
+				path.join(f.config.evidence, "owning-stop/stderr.raw"),
+				"utf8",
+			),
+		}),
+	);
+	assert.equal(result.cleanup.worker, "controlled-candidate");
+	const state = json(path.join(f.root, ".boat/state.json"));
+	assert.equal(state.id, null);
+	assert.equal(state.admission.runningSince, null);
+	assert.ok(state.admission.shutdownAttempt.accountingAppliedAt);
+	const calls = fs
+		.readFileSync(path.join(f.root, "provider-calls"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(calls.filter((args) => args.includes("stop")).length, 1);
+	assert.equal(fs.existsSync(path.join(f.config.evidence, "red-user")), false);
+});
+
 test("547 every native baseline failure must be the expected closure assertion", async (t) => {
 	const f = preparationFixture(t);
 	f.env.CONTROL_ERROR_CASE = "user-non-assertion";
@@ -480,6 +544,20 @@ test("547 preparation owns its cold origin and rejects caller clock calculations
 	assert.equal(commands, 0);
 });
 
+function installPendingCli(root) {
+	fs.mkdirSync(path.join(root, ".mise/boat"), { recursive: true });
+	fs.writeFileSync(
+		path.join(root, ".mise/boat/boat"),
+		`#!/usr/bin/env node
+const fs=require('node:fs'),args=process.argv.slice(2);fs.appendFileSync('provider-calls',JSON.stringify(args)+'\\n');
+if(args.includes('info')){const a=JSON.parse(fs.readFileSync('.boat/state.json')).admission,stopped=fs.existsSync('stopped');console.log(JSON.stringify({sandbox:{id:a.candidate.id,name:a.name,type:'large',state:stopped?'stopped':'ready',stop:stopped?{id:'controlled-stop',status:'completed',forced:false,error:null,endedAt:'2026-11-03T00:00:00Z'}:undefined}}));}
+else if(args.includes('stop')){fs.writeFileSync('stopped','yes');console.log('{}');}
+else if(args.includes('usage'))console.log('{}');
+`,
+		{ mode: 0o700 },
+	);
+}
+
 for (const [matches, otherLive] of [
 	[true, false],
 	[false, false],
@@ -536,17 +614,7 @@ for (const [matches, otherLive] of [
 				},
 			}),
 		);
-		fs.mkdirSync(path.join(root, ".mise/boat"), { recursive: true });
-		fs.writeFileSync(
-			path.join(root, ".mise/boat/boat"),
-			`#!/usr/bin/env node
-const fs=require('node:fs'),args=process.argv.slice(2);fs.appendFileSync('provider-calls',JSON.stringify(args)+'\\n');
-if(args.includes('info')){const a=JSON.parse(fs.readFileSync('.boat/state.json')).admission,stopped=fs.existsSync('stopped');console.log(JSON.stringify({sandbox:{id:a.candidate.id,name:a.name,type:'large',state:stopped?'stopped':'ready',stop:stopped?{id:'controlled-stop',status:'completed',forced:false,error:null,endedAt:'2026-11-03T00:00:00Z'}:undefined}}));}
-else if(args.includes('stop')){fs.writeFileSync('stopped','yes');console.log('{}');}
-else if(args.includes('usage'))console.log('{}');
-`,
-			{ mode: 0o700 },
-		);
+		installPendingCli(root);
 		fs.mkdirSync(path.join(root, "evidence"));
 		const r = await runner.makeCommand(
 			[

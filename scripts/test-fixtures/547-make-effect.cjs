@@ -57,6 +57,28 @@ if (target === "boat-enroll") {
 		},
 	});
 	event("toolchain-preparation");
+	if (process.env.CONTROL_PENDING_CANDIDATE) {
+		const token = "11111111-2222-4333-8444-555555555555";
+		const name = `wallpaperdb-557-c-${key}-${token}`;
+		save(".boat/state.json", {
+			id: null,
+			runningSince: null,
+			admission: {
+				status: "candidate-owned",
+				owner: { root, key },
+				token,
+				name,
+				size: "large",
+				previousWorkerId: null,
+				runningSince: Date.now(),
+				candidate: { id: "controlled-candidate", name, size: "large" },
+			},
+		});
+		console.error(
+			"Controlled preparation failed before main worker publication",
+		);
+		process.exitCode = 1;
+	}
 } else if (target === "test-focused") {
 	const color = fs.existsSync("patches/nats-2.29.3.patch") ? "green" : "red";
 	phase = `${color}-${value("ARGS").includes("protected-broker") ? "auth" : value("PACKAGE")}`;

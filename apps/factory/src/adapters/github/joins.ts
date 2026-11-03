@@ -1809,8 +1809,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const name of (await operationDirectories()).filter((value) =>
       value.startsWith('repair-replay-')
     )) {
-      const parent = name.slice('repair-replay-'.length, 'repair-replay-'.length + 64);
-      if (await completed(join(config.directory, parent))) continue;
+      if (await scratchReleased(name)) continue;
       const value = await recoveryStatus(join(config.directory, name));
       if (value) result.push(value);
     }
@@ -2224,7 +2223,24 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
   };
   const repairDirectory = (record: ReplayRecord, head: string) =>
-    join(config.directory, `repair-replay-${id(record.operation.numbers)}-${head}`);
+    join(
+      config.directory,
+      `repair-replay-${id(record.operation.numbers)}-${record.operation.generation ?? 'initial'}-${head}`
+    );
+  const scratchOwner = (record: ReplayRecord, head: string) => ({
+    parent: id(record.operation.numbers),
+    generation: record.operation.generation ?? 'initial',
+    head,
+  });
+  const scratchReleased = async (name: string) => {
+    const owner = z
+      .object({ parent: z.string(), generation: z.string(), head: sha })
+      .safeParse(await read(join(config.directory, name), 'owner.json'));
+    if (!owner.success) return false;
+    const { parent, generation, head } = owner.data;
+    if (name !== `repair-replay-${parent}-${generation}-${head}`) return false;
+    return released(name);
+  };
   const repairSources = (operation: Intent) =>
     operation.replay.map((old) => ({
       ...old,
@@ -2232,6 +2248,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       parent: old.onto,
       reviewedCommit: reviewOrigin(old),
     }));
+  const repairScratchAvailable = async (record: ReplayRecord, head: string) => {
+    const legacy = join(config.directory, `repair-replay-${id(record.operation.numbers)}-${head}`);
+    if (await read(legacy, 'seed.json')) return false;
+    const dir = repairDirectory(record, head);
+    const owner = await read(dir, 'owner.json');
+    if (owner) return JSON.stringify(owner) === JSON.stringify(scratchOwner(record, head));
+    return !(await read(dir, 'seed.json'));
+  };
   const legacyRepairBoundary = async (operation: Intent, signal?: AbortSignal) => {
     if (
       operation.numbers.some((number) => number < 1) ||
@@ -2257,6 +2281,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return boundary;
   };
   const recoverRepair = async (record: ReplayRecord, head: string, signal?: AbortSignal) => {
+    if (!(await repairScratchAvailable(record, head))) return;
     const dir = repairDirectory(record, head);
     if (!(await blockingFile(dir))) return;
     const sources = repairSources(record.operation);
@@ -2331,8 +2356,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const issue = fixed.issue;
     const repaired = fixed.next;
     const dir = repairDirectory(record, repaired);
-    const boundary = await repairBoundary(record, dir, signal);
+    const boundary = await scratchBoundary(record, repaired, signal);
     if (!boundary) return null;
+    // Scratch activity belongs to this source generation. Only its authoritative
+    // successor append and completion can retire it, just like writer ownership.
+    await publish(dir, 'owner.json', scratchOwner(record, repaired));
     await publish(dir, 'seed.json', repairSources(operation));
     const replay: Intent['replay'] = [];
     for (const old of operation.replay) {
@@ -2357,6 +2385,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       replay.push(next);
     }
     return replay;
+  };
+  const scratchBoundary = async (record: ReplayRecord, head: string, signal?: AbortSignal) => {
+    if (!(await repairScratchAvailable(record, head))) return null;
+    return repairBoundary(record, repairDirectory(record, head), signal);
   };
   const comparisonTargetsValid = async (original: Intent, current: Intent) => {
     for (const item of original.replay) {

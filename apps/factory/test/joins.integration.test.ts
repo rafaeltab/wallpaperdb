@@ -2555,7 +2555,31 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       const results = [];
       for (let i = 0; i < 8; i++) {
         results.push(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit, repaired)));
-        await Effect.runPromise(f.issues.recoveries!());
+        const recovering = await Effect.runPromise(f.issues.recoveries!());
+        if (i === 0)
+          expect(recovering).toContainEqual(expect.objectContaining({ issue: 3, active: true }));
+        if (i === 0) {
+          const root = join(f.host.directory, 'joins');
+          const scratch = (await readdir(root)).find((name) => name.startsWith('repair-replay-'));
+          if (!scratch) throw new Error('Missing active scratch');
+          const path = join(root, scratch, 'owner.json');
+          const saved = await readFile(path, 'utf8');
+          const deliveries = async () =>
+            (await f.host.calls()).filter(
+              (call) => call.args[0] === 'thread' && ['start', 'send'].includes(call.args[1] ?? '')
+            ).length;
+          const before = await deliveries();
+          await unlink(path);
+          expect(
+            await Effect.runPromise(f.reopen().repairReplay!(intent, pr.commit, repaired))
+          ).toBe(false);
+          await writeFile(path, JSON.stringify({ ...JSON.parse(saved), head: f.host.base }));
+          expect(
+            await Effect.runPromise(f.reopen().repairReplay!(intent, pr.commit, repaired))
+          ).toBe(false);
+          expect(await deliveries()).toBe(before);
+          await writeFile(path, saved);
+        }
       }
       expect(results.at(-1)).toBe(true);
       await Effect.runPromise(f.issues.reconcile!());
@@ -2568,6 +2592,51 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       expect(
         (await Effect.runPromise(f.issues.recoveries!())).every((value) => value.active !== true)
       ).toBe(true);
+      const childIntent = { ...intent, issue: 4, branch: 'C' };
+      expect(await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit))).toBe(
+        true
+      );
+      expect(
+        (await Effect.runPromise(f.reopen().recoveries!())).filter((value) => value.active)
+      ).toEqual([]);
+      const root = join(f.host.directory, 'joins');
+      const scratch = (await readdir(root)).find((name) => name.startsWith('repair-replay-'));
+      if (!scratch) throw new Error('Missing repair scratch');
+      const ownerPath = join(root, scratch, 'owner.json');
+      const owner = JSON.parse(await readFile(ownerPath, 'utf8'));
+      const parent = join(root, owner.parent);
+      const successor = JSON.parse(
+        await readFile(join(parent, `repair-${owner.generation}.json`), 'utf8')
+      );
+      const completion = join(parent, `complete-${successor.generation}.json`);
+      await rename(completion, `${completion}.pending`);
+      expect(await Effect.runPromise(f.reopen().recoveries!())).toContainEqual(
+        expect.objectContaining({ issue: 4, active: true })
+      );
+      await rename(`${completion}.pending`, completion);
+      await rename(ownerPath, `${ownerPath}.legacy`);
+      expect(await Effect.runPromise(f.reopen().recoveries!())).toContainEqual(
+        expect.objectContaining({ issue: 4, active: true })
+      );
+      await rename(`${ownerPath}.legacy`, ownerPath);
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit, child.commit))
+      ).toBe(true);
+      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit))).toBe(
+        true
+      );
+      expect(
+        (await Effect.runPromise(f.reopen().recoveries!())).filter((value) => value.active)
+      ).toEqual([]);
+      expect(
+        await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit, child.commit))
+      ).toBe(true);
+      await Effect.runPromise(f.reopen().reconcile!());
+      const generations = (await readdir(root)).filter(
+        (name) => name.startsWith('repair-replay-') && name.endsWith(`-${child.commit}`)
+      );
+      expect(generations).toHaveLength(2);
     } finally {
       await f.close();
     }

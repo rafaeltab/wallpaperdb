@@ -815,3 +815,159 @@ it.each([
     }
   }
 );
+
+it.each([
+  'valid',
+  'rollback',
+  'drift',
+  'failed-ci',
+  'corrupt-group',
+  'changed-pin',
+  'ambiguous-review',
+  'ambiguous-owner',
+  'wrong-tree',
+] as const)('selects current completed provenance after successive joins: %s', async (kind) => {
+  const f = await fixture();
+  try {
+    if (!f.issues.prepare) throw new Error('Missing prepare');
+    await Effect.runPromise(f.issues.prepare(5));
+    const first = (await Effect.runPromise(f.issues.inspect(5))).prerequisite?.base;
+    if (!first) throw new Error('Missing first join');
+    f.git('switch', '-c', 'G', f.d);
+    await writeFile(join(f.host.repository, 'G.txt'), 'G');
+    f.git('add', '.');
+    f.git('commit', '-m', 'G');
+    const g = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', 'G');
+    f.git('switch', '--detach', f.host.base);
+    const path = join(f.host.directory, 'join-live.json');
+    const state = JSON.parse(await readFile(path, 'utf8'));
+    state.prs['106'] = { branch: 'G', base: 'D' };
+    state.originalHeads['106'] = g;
+    state.evidence += `\nhttps://github.com/rafaeltab/wallpaperdb/pull/106 ${g}`;
+    state.blockers = [
+      { number: 6, state: 'open' },
+      { number: 4, state: 'open' },
+    ];
+    await writeFile(path, JSON.stringify(state));
+    const config = {
+      project: f.host.repository,
+      base: f.host.base,
+      prerequisites: [
+        { issue: 6, pr: 106, commit: g },
+        { issue: 4, pr: 104, commit: first, reviewedCommit: f.c },
+      ],
+      joins: {
+        directory: join(f.host.directory, 'joins'),
+        binary: f.host.binary,
+        projectId: 'project-id',
+      },
+    };
+    const second = githubIssues(config);
+    if (!second.prepare) throw new Error('Missing second prepare');
+    await Effect.runPromise(second.prepare(7));
+    const next = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    if (!next) throw new Error('Missing next head');
+    expect(next).not.toBe(first);
+    expect(f.git('log', '--format=%s', `${g}..${next}`)).toBe('C');
+    const journals = (await readdir(join(f.host.directory, 'joins'))).filter((x) =>
+      /^[a-f0-9]{64}$/.test(x)
+    );
+    expect(journals).toHaveLength(2);
+    const live = JSON.parse(await readFile(path, 'utf8'));
+    // Conflicting recovered journal facts must never be selected by directory order.
+    const records = await Promise.all(
+      journals.map(async (key) => ({
+        key,
+        value: JSON.parse(
+          await readFile(join(f.host.directory, 'joins', key, 'intent.json'), 'utf8')
+        ),
+      }))
+    );
+    const latest = records.find((r) =>
+      r.value.replay.some((r: { next: string }) => r.next === next)
+    );
+    const older = records.find((r) => r !== latest);
+    if (!latest || !older) throw new Error('Missing completed histories');
+    if (kind === 'wrong-tree') {
+      latest.value.replay.find((r: { issue: number }) => r.issue === 4).tree = 'f'.repeat(40);
+      await writeFile(
+        join(f.host.directory, 'joins', latest.key, 'intent.json'),
+        JSON.stringify(latest.value)
+      );
+    }
+    if (kind === 'ambiguous-review' || kind === 'ambiguous-owner') {
+      const replay = { ...latest.value.replay.find((r: { issue: number }) => r.issue === 4) };
+      if (kind === 'ambiguous-review') replay.reviewedCommit = f.d;
+      else {
+        replay.pr = 204;
+        replay.url = 'https://github.com/rafaeltab/wallpaperdb/pull/204';
+        live.prs['204'] = { ...live.prs['104'] };
+      }
+      older.value.replay = [replay];
+      await writeFile(
+        join(f.host.directory, 'joins', older.key, 'intent.json'),
+        JSON.stringify(older.value)
+      );
+      await writeFile(
+        join(f.host.directory, 'joins', older.key, `ci-${next}.json`),
+        JSON.stringify({ commit: next, tree: replay.tree })
+      );
+    }
+
+    if (kind === 'rollback')
+      f.git('push', `--force-with-lease=refs/heads/C:${next}`, 'origin', `${first}:refs/heads/C`);
+    if (kind === 'drift') {
+      f.git('switch', '--detach', next);
+      await writeFile(join(f.host.repository, 'external.txt'), 'external');
+      f.git('add', '.');
+      f.git('commit', '-m', 'external');
+      f.git('push', 'origin', 'HEAD:refs/heads/C');
+    }
+    if (kind === 'failed-ci') live.newCI = 'FAILURE';
+    if (kind === 'corrupt-group') live.groups = [];
+    await writeFile(path, JSON.stringify(live));
+    const current = githubIssues({ ...config, base: kind === 'changed-pin' ? g : config.base });
+    if (kind === 'wrong-tree') {
+      await expect(
+        Effect.runPromise(
+          current.pullRequest({
+            id: 'C',
+            issue: 4,
+            issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+            base: f.host.base,
+            prBase: 'A',
+            branch: 'C',
+            context: '',
+            createdAt: 0,
+            expectedStage: 'implementation',
+          })
+        )
+      ).rejects.toMatchObject({ _tag: 'Unavailable' });
+      return;
+    }
+    const observed = await Effect.runPromise(
+      current.pullRequest({
+        id: 'C',
+        issue: 4,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+        base: f.host.base,
+        prBase: 'A',
+        branch: 'C',
+        context: '',
+        createdAt: 0,
+        expectedStage: 'implementation',
+      })
+    );
+    expect(observed).toMatchObject({ kind: 'found', ready: kind === 'valid' });
+    if (!['rollback', 'drift', 'ambiguous-review', 'ambiguous-owner'].includes(kind))
+      expect(observed).toMatchObject({ commit: next, reviewedCommit: f.c });
+    if (kind === 'valid')
+      expect(await Effect.runPromise(current.inspect(7))).toMatchObject({
+        blockersReady: true,
+        prerequisite: { base: next, prBase: 'C' },
+      });
+  } finally {
+    await f.close();
+  }
+});

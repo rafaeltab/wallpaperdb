@@ -249,6 +249,7 @@ function replayMatches(
 ) {
   return (
     replay &&
+    !replay.ambiguous &&
     observed.kind === 'found' &&
     replay.branch === branch &&
     observed.commit === replay.next &&

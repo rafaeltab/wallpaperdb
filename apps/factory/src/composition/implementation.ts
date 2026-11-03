@@ -10,6 +10,7 @@ import {
   Time,
   Unavailable,
   type Status,
+  type RecoveryAdmission,
 } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
 import { fileStore, fileScheduleStore } from '../adapters/store/index.js';
@@ -104,6 +105,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       }
       return result;
     });
+  let recoveryAdmission: RecoveryAdmission = () => Effect.succeed(false);
   const jobDeps = (directory: string) =>
     Layer.mergeAll(
       Layer.succeed(Time, systemTime),
@@ -116,6 +118,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           base: configuration.FACTORY_BASE,
           prerequisites: configuration.FACTORY_PREREQUISITES,
           readyPrerequisites,
+          admitRecovery: (issue) => recoveryAdmission(issue),
           joins: {
             directory: resolve(configuration.FACTORY_STATE, 'joins'),
             binary: configuration.FACTORY_T3_BINARY,
@@ -232,6 +235,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     )
   );
   const scheduler = await runtime.runPromise(Scheduler);
+  recoveryAdmission = scheduler.authorizeRecovery;
   const job: Job = {
     status: () =>
       Effect.map(scheduler.status(), (value) => value.jobs[0] ?? { kind: 'empty' as const }),

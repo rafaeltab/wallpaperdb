@@ -395,6 +395,7 @@ it('translates scheduler controls including unlimited limits and stale revisions
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       configure: (command) =>
         Effect.sync(() => {
@@ -459,6 +460,7 @@ it('renders server-owned scheduler settings and all reserved jobs', async () => 
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [{ kind: 'empty' }, { kind: 'empty' }, job] }),
       configure: () => Effect.succeed('saved'),
       tick: () => Effect.succeed({ state, jobs: [] }),
@@ -487,6 +489,7 @@ it('translates a valid scheduler command rejected by the capability into 422 Pro
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       configure: () => Effect.succeed('rejected'),
       tick: () => Effect.succeed({ state, jobs: [] }),
@@ -522,6 +525,7 @@ it.each([false, true])(
       job: idle,
       run: Effect.runPromise,
       scheduler: {
+        authorizeRecovery: () => Effect.succeed(false),
         status: () =>
           Effect.succeed({
             state,

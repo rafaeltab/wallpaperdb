@@ -27,7 +27,9 @@ const stageSchema = z
         base: z.string().regex(/^[a-f0-9]{40}$/),
         prBase: z.string().min(1),
         previousHead: z.string().regex(/^[a-f0-9]{40}$/),
+        owningHeads: z.array(z.string().regex(/^[a-f0-9]{40}$/)).optional(),
       })
+      .strict()
       .optional(),
     continuation: z.boolean().optional(),
     resume: z.boolean().optional(),

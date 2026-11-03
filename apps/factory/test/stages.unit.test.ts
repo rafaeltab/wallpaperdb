@@ -117,6 +117,7 @@ async function stagesFixture() {
   let links = ['https://github.com/rafaeltab/wallpaperdb/pull/999'];
   let prCommit = commit;
   let reviewedCommit: string | undefined;
+  let owningHeads: readonly string[] | undefined;
   let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
   let sends = 0;
   let interrupts = 0;
@@ -153,6 +154,7 @@ async function stagesFixture() {
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
                 reviewedCommit,
+                owningHeads,
                 parent: 'e'.repeat(40),
                 base: 'D',
                 maintenancePending,
@@ -225,6 +227,7 @@ async function stagesFixture() {
       links?: string[];
       prCommit?: string;
       reviewedCommit?: string;
+      owningHeads?: readonly string[];
       prKind?: typeof prKind;
       failed?: boolean;
       maintenancePending?: boolean;
@@ -245,6 +248,7 @@ async function stagesFixture() {
       links = value.links ?? links;
       prCommit = value.prCommit ?? prCommit;
       reviewedCommit = value.reviewedCommit ?? reviewedCommit;
+      owningHeads = value.owningHeads ?? owningHeads;
       prKind = value.prKind ?? prKind;
       failed = value.failed ?? failed;
       maintenancePending = value.maintenancePending ?? maintenancePending;
@@ -814,13 +818,19 @@ it.each([false, true])(
     job.change({
       prCommit: 'c'.repeat(40),
       reviewedCommit: 'b'.repeat(40),
+      owningHeads: ['b'.repeat(40), 'd'.repeat(40)],
       maintenancePending,
       failed: true,
     });
     expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
     expect(await Effect.runPromise(job.store.readStage(4))).toMatchObject({
       commit: 'c'.repeat(40),
-      comparison: { base: 'e'.repeat(40), prBase: 'D', previousHead: 'b'.repeat(40) },
+      comparison: {
+        base: 'e'.repeat(40),
+        prBase: 'D',
+        previousHead: 'b'.repeat(40),
+        owningHeads: ['b'.repeat(40), 'd'.repeat(40)],
+      },
     });
     job.change({ accepted: false });
     await job.status();

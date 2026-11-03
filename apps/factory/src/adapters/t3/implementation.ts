@@ -5,6 +5,7 @@ import {
   type Execution,
   type Intent,
   type Observation,
+  type StageRequest,
   Unavailable,
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
@@ -90,7 +91,7 @@ ${receiptInstructions(intent, 'implementation')}`,
         ),
         Effect.withSpan('factory.t3.launch')
       ),
-    observe: (intent: Intent) =>
+    observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({
         try: async (signal): Promise<Observation> => {
           const matches = listing
@@ -122,12 +123,7 @@ ${receiptInstructions(intent, 'implementation')}`,
           const branch = (
             await command('git', ['branch', '--show-current'], worktree, signal)
           ).trim();
-          await command(
-            'git',
-            ['merge-base', '--is-ancestor', intent.base, 'HEAD'],
-            worktree,
-            signal
-          );
+          await verifyObservedHead(worktree, intent, thread.threadId, repair, signal);
           if (branch !== intent.branch) return { kind: 'ambiguous' };
           const questions = await questionObservation(config, thread, signal);
           return {
@@ -206,4 +202,33 @@ async function questionObservation(
 }
 function currentRun(thread: z.infer<typeof detail>['thread']) {
   return thread.latestRunId ? { id: thread.latestRunId, ordinal: thread.runCount } : undefined;
+}
+
+function exactReplayHead(head: string, repair?: StageRequest) {
+  if (repair?.stage !== 'babysitting' || !repair.comparison) return false;
+  return (
+    head === repair.comparison.previousHead ||
+    Boolean(repair.comparison.owningHeads?.includes(head))
+  );
+}
+function replayObservationBase(intent: Intent, repair?: StageRequest) {
+  return repair?.stage === 'babysitting' && repair.comparison ? repair.commit : intent.base;
+}
+
+async function verifyObservedHead(
+  worktree: string,
+  intent: Intent,
+  threadId: string,
+  repair: StageRequest | undefined,
+  signal: AbortSignal
+) {
+  const bound = repair?.threadId === threadId ? repair : undefined;
+  const head = (await command('git', ['rev-parse', 'HEAD'], worktree, signal)).trim();
+  if (exactReplayHead(head, bound)) return;
+  await command(
+    'git',
+    ['merge-base', '--is-ancestor', replayObservationBase(intent, bound), 'HEAD'],
+    worktree,
+    signal
+  );
 }

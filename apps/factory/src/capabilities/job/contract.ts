@@ -157,7 +157,8 @@ export interface Execution {
   ): Effect.Effect<StageEvidence | null, Unavailable>;
   sendStage(intent: Intent, request: StageRequest): Effect.Effect<void, Unavailable>;
   launch(intent: Intent): Effect.Effect<{ kind: 'submitted' | 'uncertain' }, Unavailable>;
-  observe(intent: Intent): Effect.Effect<Observation, Unavailable>;
+  /** A persisted owned replay stage may bind exact historical heads and repairs of its current commit. */
+  observe(intent: Intent, repair?: StageRequest): Effect.Effect<Observation, Unavailable>;
 }
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
@@ -199,6 +200,7 @@ export interface StageRequest {
     readonly base: string;
     readonly prBase: string;
     readonly previousHead: string;
+    readonly owningHeads?: readonly string[];
   };
   readonly index: number;
   readonly ordinal?: number;
@@ -232,6 +234,8 @@ export type PullRequestObservation =
       /** Original accepted/reviewed commit of a durable issue-only replay. Current CI and maintenance still gate readiness. */
       readonly reviewedCommit?: string;
       readonly previousHead?: string;
+      /** Exact previously verified issue-only heads, not arbitrary ancestors. */
+      readonly owningHeads?: readonly string[];
       readonly parent?: string;
       readonly base?: string;
       readonly ci?: { readonly failed: boolean; readonly progress: string };

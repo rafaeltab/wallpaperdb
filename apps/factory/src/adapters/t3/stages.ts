@@ -59,7 +59,7 @@ export function stageExecution(
     sendStage: (original, request) =>
       Effect.gen(function* () {
         const intent = comparisonIntent(original, request);
-        const binding = yield* observe(original);
+        const binding = yield* observe(original, request);
         if (!sendBinding(binding, request))
           return yield* Effect.fail(
             new Unavailable({ operation: 'stage-binding-changed', cause: null })
@@ -107,7 +107,7 @@ export function stageExecution(
     inspectStage: (original, request) =>
       Effect.gen(function* () {
         const intent = comparisonIntent(original, request);
-        const binding = yield* observe(intent);
+        const binding = yield* observe(intent, request);
         if (binding.kind !== 'found' || binding.threadId !== request.threadId) return null;
         return yield* Effect.tryPromise({
           try: async (signal) => {
@@ -308,10 +308,14 @@ function publicationBase(intent: Intent, fallback: string) {
 function deliveryHead(head: string, request: StageRequest) {
   return (
     head === request.commit ||
-    (request.stage === 'babysitting' && head === request.comparison?.previousHead)
+    (request.stage === 'babysitting' && knownOwningHead(head, request.comparison))
   );
 }
 function replayInstructions(request: StageRequest) {
   if (!request.comparison) return '';
-  return `Owned replay CI repair at ${request.commit}, actual comparison ${request.comparison.base}, PR target ${request.comparison.prBase}. Before editing reconcile this clean owning worktree from the prior accepted head ${request.comparison.previousHead} to exactly the already-published replay head ${request.commit}, with expected-head checks and affected-writer coordination. Preserve every published tip and original review provenance. Do not replay landed prerequisites. Return no success until actual repairs are independently reviewed and current-tree CI passes.`;
+  return `Owned replay CI repair at ${request.commit}, actual comparison ${request.comparison.base}, PR target ${request.comparison.prBase}. Before editing reconcile this clean owning worktree from the prior accepted head ${request.comparison.previousHead} to exactly the already-published replay head ${request.commit}, with expected-head checks and affected-writer coordination. Earlier exact owning associations ${JSON.stringify(request.comparison.owningHeads ?? [])} are also eligible starting heads; do not treat arbitrary ancestors as authorized. Preserve every published tip and original review provenance. Do not replay landed prerequisites. Return no success until actual repairs are independently reviewed and current-tree CI passes.`;
+}
+
+function knownOwningHead(head: string, comparison: StageRequest['comparison']) {
+  return head === comparison?.previousHead || Boolean(comparison?.owningHeads?.includes(head));
 }

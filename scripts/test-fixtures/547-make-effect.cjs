@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
+const assert = require("node:assert/strict");
 const read = (p) => JSON.parse(fs.readFileSync(p));
 const save = (p, v) => fs.writeFileSync(p, JSON.stringify(v));
 const args = JSON.parse(process.env.CONTROL_MAKE_ARGV);
@@ -41,7 +42,41 @@ const event = (kind) =>
 	);
 fs.appendFileSync("commands.jsonl", JSON.stringify(args) + "\n");
 let phase = target;
-if (target === "run" && value("SCRIPT") === "boat:observe-preview") {
+if (target === "infra-start") {
+	// Independent destinations/hashes from the frozen SDK8 workload contract.
+	// This check runs before the controlled infrastructure side effect.
+	const expected = {
+		"apps/user/src/boat-live-547.ts":
+			"0b3163257ffa0f393227470c98cf157d2dc0d394c2c9f6fe9b49651172b0f877",
+		"apps/wallpaper/src/boat-live-547.ts":
+			"0329aa9616c5b2f0cc690661a5ceb8609939f02317362bc871c90f2f594d2d45",
+		"apps/asset/src/boat-live-547.ts":
+			"aa6eb023541d9aa06acf3855c9461c6df55cbaae5806360f8d77ec8c55348906",
+		"apps/asset/test/fixtures/remediation-live.mjs":
+			"9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e",
+		"apps/asset/test/fixtures/remediation-sdk-proof.ts":
+			"d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+		"apps/user/src/boat-sdk-proof-547.ts":
+			"d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+		"apps/wallpaper/src/boat-sdk-proof-547.ts":
+			"d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+		"apps/asset/src/boat-sdk-proof-547.ts":
+			"d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+	};
+	for (const [file, hash] of Object.entries(expected)) {
+		assert.equal(
+			fs.lstatSync(file).isFile(),
+			true,
+			`SDK input must be regular before infra: ${file}`,
+		);
+		assert.equal(
+			createHash("sha256").update(fs.readFileSync(file)).digest("hex"),
+			hash,
+			`Exact SDK input before infra: ${file}`,
+		);
+	}
+	save("sdk8-observed-before-infra.json", expected);
+} else if (target === "run" && value("SCRIPT") === "boat:observe-preview") {
 	const input = value("ARGS").replace(/^'|'$/g, "");
 	const r = spawnSync(
 		"python",
@@ -219,6 +254,25 @@ if (target === "run" && value("SCRIPT") === "boat:observe-preview") {
 	console.log(`BOAT_INFRA_IMAGES ${JSON.stringify(observed)}`);
 	event("infra-image-preparation");
 } else if (target === "boat-stop") {
+	const retired = {};
+	for (const name of ["dev", "preview"]) {
+		const capture = path.join("evidence/startup", name);
+		if (!fs.existsSync(path.join(capture, "invocation.json"))) continue;
+		const disposal = read(path.join(capture, "disposal.json"));
+		assert.equal(
+			disposal.pipesClosed,
+			true,
+			`${name} capture must drain before worker stop`,
+		);
+		assert.deepEqual(
+			disposal.unresolved,
+			[],
+			`${name} ownership must retire before worker stop`,
+		);
+		retired[name] = disposal;
+	}
+	if (Object.keys(retired).length)
+		save("retirement-observed-before-stop.json", retired);
 	const state = read(".boat/state.json"),
 		when = new Date().toISOString();
 	if (

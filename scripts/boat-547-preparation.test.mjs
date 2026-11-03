@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import net from "node:net";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,61 @@ import { objects547 } from "./test-fixtures/547-inputs.mjs";
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
+
+async function servingPorts(t) {
+	const leases = path.join(os.tmpdir(), "wallpaperdb-547-test-ports");
+	fs.mkdirSync(leases, { recursive: true, mode: 0o700 });
+	const until = mono() + 5;
+	while (mono() < until) {
+		const sockets = [net.createServer(), net.createServer()],
+			claimed = [];
+		const release = async () =>
+			Promise.all(
+				sockets.map((server) =>
+					server.listening
+						? new Promise((resolve, reject) =>
+								server.close((error) => (error ? reject(error) : resolve())),
+							)
+						: undefined,
+				),
+			);
+		const remove = () => {
+			for (const file of claimed) fs.unlinkSync(file);
+		};
+		try {
+			const listen = (server, port) =>
+				new Promise((resolve, reject) => {
+					server.once("error", reject);
+					server.listen(port, "127.0.0.1", resolve);
+				});
+			await listen(sockets[0], 0);
+			const ingress = sockets[0].address().port;
+			if (ingress + 20000 > 65535) {
+				await release();
+				continue;
+			}
+			// Keep a cooperative lease through the listener handoff. Other fixture
+			// processes cannot choose these ports between reservation and startup.
+			for (const port of [ingress, ingress + 20000]) {
+				const file = path.join(leases, String(port));
+				const fd = fs.openSync(file, "wx", 0o600);
+				fs.closeSync(fd);
+				claimed.push(file);
+			}
+			await listen(sockets[1], ingress + 20000);
+			t.after(async () => {
+				await release();
+				remove();
+			});
+			return { ingress, release };
+		} catch (error) {
+			await release();
+			remove();
+			if (!["EADDRINUSE", "EEXIST"].includes(error.code)) throw error;
+		}
+	}
+	throw new Error("No isolated #547 serving port pair available");
+}
 
 function preparationFixture(t, nativeObjects = false) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-preparation-"));
@@ -100,24 +156,41 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 			path.join(repository, "scripts/boat-workloads/547-preparation.json"),
 		).cliSha256,
 	});
+	let portPromise;
 	const f = {
 		root,
 		config,
 		env,
 		observeCli,
-		make: (argv, options) =>
-			runner.makeCommand(argv, {
+		servingPorts: () =>
+			(portPromise ??= servingPorts(t).then((ports) => {
+				const file = path.join(root, ".worktree");
+				fs.writeFileSync(
+					file,
+					fs
+						.readFileSync(file, "utf8")
+						.replace(/^INGRESS_PORT=10760$/m, `INGRESS_PORT=${ports.ingress}`),
+				);
+				return ports;
+			})),
+		make: async (argv, options) => {
+			if (options.serving && argv[1] === "boat-preview")
+				await (await f.servingPorts()).release();
+			return runner.makeCommand(argv, {
 				...options,
 				env: { ...env, CONTROL_MAKE_ARGV: JSON.stringify(argv) },
-			}),
+			});
+		},
 	};
-	f.run = (extra = {}) =>
-		runner.execute547Preparation(config, {
+	f.run = async (extra = {}) => {
+		if (config.until === "ready") await f.servingPorts();
+		return runner.execute547Preparation(config, {
 			make: f.make,
 			observeCli,
 			objects: nativeObjects ? undefined : objects547,
 			...extra,
 		});
+	};
 	return f;
 }
 
@@ -191,6 +264,32 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 	);
 });
 
+test("547 ready fixtures run concurrently with independent native listeners", async (t) => {
+	const fixtures = [preparationFixture(t), preparationFixture(t)];
+	for (const f of fixtures) f.config.until = "ready";
+	const outcomes = await Promise.allSettled(fixtures.map((f) => f.run()));
+	try {
+		assert.deepEqual(
+			outcomes.map((r) => r.status),
+			["fulfilled", "fulfilled"],
+			JSON.stringify(
+				outcomes.map((r) =>
+					r.status === "rejected" ? r.reason.message : r.value.url,
+				),
+			),
+		);
+		assert.notEqual(outcomes[0].value.url, outcomes[1].value.url);
+		for (const r of outcomes)
+			assert.equal(r.value.status, "PASS_STARTUP_READY");
+	} finally {
+		await Promise.all(
+			outcomes
+				.filter((r) => r.status === "fulfilled")
+				.map((r) => r.value.serving.stop()),
+		);
+	}
+});
+
 test("547 ready milestone owns real Make serving captures and publishes readiness before returning", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";
@@ -236,8 +335,9 @@ test("547 ready milestone owns real Make serving captures and publishes readines
 	);
 	assert.equal(result.acceptedAt < result.deadline, true);
 	assert.equal(
-		fs.existsSync(path.join(f.root, "apps/user/src/boat-live-547.ts")),
-		true,
+		Object.keys(json(path.join(f.root, "sdk8-observed-before-infra.json")))
+			.length,
+		8,
 	);
 	assert.equal(
 		fs.existsSync(path.join(f.config.evidence, "startup/dev/receipt.json")),
@@ -374,6 +474,12 @@ for (const scenario of ["route", "service", "late-publication"]) {
 		assert.equal(result.status, "FAIL");
 		assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
 		assert.equal(result.next, undefined);
+		assert.deepEqual(
+			Object.keys(
+				json(path.join(f.root, "retirement-observed-before-stop.json")),
+			).sort(),
+			["dev", "preview"],
+		);
 		const commands = jsonLines(path.join(f.root, "commands.jsonl"));
 		assert.equal(commands.filter((a) => a[1] === "boat-stop").length, 1);
 		if (scenario === "service")
@@ -417,6 +523,7 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 	}, async (t) => {
 		const f = preparationFixture(t, true);
 		f.config.until = "ready";
+		await (await f.servingPorts()).release();
 		fs.symlinkSync(
 			path.join(repository, "scripts"),
 			path.join(f.root, "scripts"),

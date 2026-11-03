@@ -1471,7 +1471,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return !!head && (await isAncestor(item.onto, head, signal));
   };
   const completedFactsValid = async (operation: Intent, signal?: AbortSignal) => {
-    if (!operation.boundary) return false;
+    if (!operation.boundary) return operationFactsValid(operation, signal);
     if (!(await boundaryFactsValid(project, base, operation.boundary, gh, signal))) return false;
     return finalContainsFacts(operation, signal);
   };
@@ -1559,9 +1559,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         return {
           ...item,
           pending: true,
+          comparison: item.target,
+          comparisonReady: false,
           automatic: false,
           uncertain: false,
-          manual: await publicationGuard(issue, item.commit, current),
+          manual:
+            (await publicationGuard(issue, item.commit, current)) ||
+            !(await replayFactsValid(records, item, signal)),
         };
     }
     if (!latest) return null;
@@ -1574,17 +1578,31 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     const current = await prState(latest.item, signal);
-    const automatic = await automaticReplayRetarget(latest.item, current, records, signal);
+    const retargeted = await automaticReplayRetarget(latest.item, current, records, signal);
     const retired = await verifiedRetiredReplay(current, latest.item, signal);
-    const record = changedPublication(current, latest.item) && !automatic && !retired;
-    const manual = await publicationGuard(
-      issue,
-      latest.item.next,
-      current,
-      record ? latest.item.target : undefined,
-      retired
-    );
-    return { ...latest.item, pending: false, uncertain: latest.uncertain, manual, automatic };
+    const facts = await replayFactsValid(records, latest.item, signal);
+    const comparisonReady = facts && (await replayComparisonReady(records, latest.item, signal));
+    const automatic = retargeted && !comparisonReady;
+    const record =
+      changedPublication(current, latest.item) && !retargeted && !retired && !comparisonReady;
+    const manual =
+      !facts ||
+      (await publicationGuard(
+        issue,
+        latest.item.next,
+        current,
+        record ? latest.item.target : undefined,
+        retired
+      ));
+    return {
+      ...latest.item,
+      comparison: current.baseRefName,
+      comparisonReady,
+      pending: false,
+      uncertain: latest.uncertain,
+      manual,
+      automatic,
+    };
   };
   const operationDirectories = async () => {
     let entries: string[];
@@ -1596,21 +1614,38 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return entries;
   };
+  const matchingReplays = (records: readonly ReplayRecord[], item: Intent['replay'][number]) =>
+    records.filter((record) =>
+      record.operation.replay.some(
+        (value) => sameOwningIssue(value, item) && value.next === item.next
+      )
+    );
   const replayFactsValid = async (
     records: readonly ReplayRecord[],
     item: Intent['replay'][number],
     signal?: AbortSignal
   ) => {
-    for (const record of records) {
-      if (
-        !record.operation.replay.some(
-          (value) => value.issue === item.issue && value.next === item.next
-        )
-      )
-        continue;
-      if (!(await operationFactsValid(record.operation, signal))) return false;
+    for (const record of matchingReplays(records, item)) {
+      const valid = record.complete
+        ? await completedFactsValid(record.operation, signal)
+        : await operationFactsValid(record.operation, signal);
+      if (!valid) return false;
     }
     return true;
+  };
+  const replayComparisonReady = async (
+    records: readonly ReplayRecord[],
+    item: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    for (const record of matchingReplays(records, item).filter((record) => record.complete)) {
+      if (
+        (await completedComparisonValid(record.operation, item, signal)) &&
+        (await groupingMatches(record.operation, signal))
+      )
+        return true;
+    }
+    return false;
   };
   const owningHeads = async (records: readonly ReplayRecord[], item: Intent['replay'][number]) => {
     const heads = new Set<string>([reviewOrigin(item)]);
@@ -1632,7 +1667,6 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return {
       ...item,
       owningHeads: await owningHeads(records, item),
-      manual: item.manual || !(await replayFactsValid(records, item, signal)),
     };
   };
   const recoveryNumbers = async (key: string, layers: readonly Layer[]) => {
@@ -2502,7 +2536,19 @@ function latestReplay(candidates: readonly Intent['replay'][number][]) {
     (item) => !candidates.some((other) => other.commit === item.next && other.next !== item.next)
   );
   const item = terminal[0] ?? candidates[0];
-  return item ? { item, uncertain: terminal.length !== 1 } : null;
+  const equivalent =
+    item &&
+    terminal.length > 0 &&
+    terminal.every(
+      (other) =>
+        sameOwningIssue(item, other) &&
+        item.pr === other.pr &&
+        item.next === other.next &&
+        item.tree === other.tree &&
+        item.onto === other.onto &&
+        item.target === other.target
+    );
+  return item ? { item, uncertain: !equivalent } : null;
 }
 function publicationProblem(
   current: { state: string; headRefOid: string; baseRefName: string },

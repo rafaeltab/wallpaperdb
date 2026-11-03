@@ -245,7 +245,7 @@ export function githubIssues(config: {
         );
         const observed = yield* publication(
           gh,
-          replay?.target ?? targetBase(intent.prBase, config.prBase),
+          replay?.comparison ?? targetBase(intent.prBase, config.prBase),
           replay ?? undefined
         )(intent);
         const blocked = yield* contextualPromise({
@@ -378,7 +378,11 @@ function replayObservation(
 
 function invalidReplay(replay: NonNullable<Replay>, observed: { commit: string }) {
   return (
-    replay.manual || (!replay.pending && (replay.uncertain || observed.commit !== replay.next))
+    replay.manual ||
+    (!replay.pending &&
+      (replay.uncertain ||
+        (!replay.automatic && !replay.comparisonReady) ||
+        observed.commit !== replay.next))
   );
 }
 

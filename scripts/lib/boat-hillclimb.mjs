@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { captureCommand } from "./boat-capture.mjs";
+import { captureCommand, captureServingCommand } from "./boat-capture.mjs";
+import { start547Application } from "./boat-547-startup.mjs";
 import { assessAssetBaseline } from "./boat-547-baseline.mjs";
 import {
 	create547Preparation,
@@ -126,7 +127,9 @@ export function makeCommand(argv, options) {
 		argv.some((x) => typeof x !== "string" || x.includes("\0"))
 	)
 		throw new Error("Expected Make argv data");
-	return captureCommand({ ...options, argv });
+	return options.serving
+		? captureServingCommand({ ...options, argv })
+		: captureCommand({ ...options, argv });
 }
 
 function captured(directory, receipt, expectedArgv, code = 2) {
@@ -169,13 +172,16 @@ function captured(directory, receipt, expectedArgv, code = 2) {
 	);
 }
 
-function manifest(directory) {
+function manifest(directory, exclude = []) {
 	const files = [];
 	const collect = (folder) => {
 		for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
 			const file = path.join(folder, entry.name);
 			if (entry.isDirectory()) collect(file);
-			else if (file !== path.join(directory, "manifest.json"))
+			else if (
+				file !== path.join(directory, "manifest.json") &&
+				!exclude.includes(file)
+			)
 				files.push({
 					...fileIdentity(file),
 					name: path.relative(directory, file),
@@ -404,12 +410,16 @@ export async function execute547Preparation(config, dependencies = {}) {
 	if (
 		Object.keys(config).some(
 			(key) =>
-				!["worktree", "round", "evidence", "cacheNamespace"].includes(key),
+				!["worktree", "round", "evidence", "cacheNamespace", "until"].includes(
+					key,
+				),
 		)
 	)
 		throw new Error(
-			"Preparation configuration accepts only worktree, round, evidence and cacheNamespace",
+			"Preparation configuration accepts only worktree, round, evidence, cacheNamespace and until",
 		);
+	if (config.until !== undefined && !["images", "ready"].includes(config.until))
+		throw new Error("Preparation until must be images or ready");
 	const {
 		make = makeCommand,
 		clock = monotonic,
@@ -533,6 +543,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			return cleanupResult;
 		}
 	};
+	let prepared;
 	const run = async (id, argv, options = {}) => {
 		const internal = { ...config, coldDeadline: coldDeadline ?? clock() + 180 };
 		const result = await execute547Phase(
@@ -714,7 +725,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			scope: "LIVE",
 			elapsed: clock() - coldStarted,
 			compute: "OPEN",
-			next: "HOLD_BEFORE_SDK8",
+			next: config.until === "ready" ? "STARTUP_PENDING" : "HOLD_BEFORE_SDK8",
 		});
 		publication(path.join(config.evidence, "preparation-result.json"), summary);
 		manifest(config.evidence);
@@ -724,7 +735,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			throw new Error(
 				"Original cold deadline exceeded before final publication",
 			);
-		return summary;
+		prepared = summary;
 	} catch (error) {
 		delete summary.next;
 		Object.assign(summary, {
@@ -739,4 +750,35 @@ export async function execute547Preparation(config, dependencies = {}) {
 		manifest(config.evidence);
 		throw error;
 	}
+	if (config.until !== "ready") return prepared;
+	return start547Application({
+		config,
+		binding,
+		workload,
+		preservedImplementation,
+		cleanup,
+		make,
+		clock,
+		publication,
+		publish,
+		manifest,
+		fileIdentity,
+		runPhase: (spec, deadline, cleanupStartup) =>
+			execute547Phase(
+				{
+					...config,
+					evidence: path.join(config.evidence, "startup"),
+					coldDeadline: deadline,
+				},
+				{
+					make,
+					clock,
+					publication,
+					binding,
+					checkOwner: currentOwner,
+					cleanup: () => cleanupStartup(),
+				},
+				spec,
+			),
+	});
 }

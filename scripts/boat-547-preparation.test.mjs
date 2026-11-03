@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as runner from "./lib/boat-hillclimb.mjs";
+import { captureServingCommand } from "./lib/boat-capture.mjs";
 import { objects547 } from "./test-fixtures/547-inputs.mjs";
 
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -78,7 +79,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop\nboat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start dev boat-preview\nboat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -190,6 +191,206 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 	);
 });
 
+test("547 ready milestone owns real Make serving captures and publishes readiness before returning", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const result = await f.run();
+	t.after(() => result.serving.stop());
+	assert.equal(result.status, "PASS_STARTUP_READY");
+	assert.equal(result.owner.worker, "controlled-worker");
+	assert.equal(result.deadline - result.started, 600);
+	assert.equal(result.containers.length, 10);
+	assert.deepEqual(result.containers.map((x) => x.service).sort(), [
+		"asset",
+		"caddy",
+		"color-extractor",
+		"gateway",
+		"ingestor",
+		"tags",
+		"user",
+		"variant-generator",
+		"wallpaper",
+		"web",
+	]);
+	assert.deepEqual(
+		result.routes.map((r) => r.path).sort(),
+		[
+			"/web/",
+			"/ingestor/ready",
+			"/asset/ready",
+			"/wallpaper/ready",
+			"/gateway/ready",
+			"/variant-generator/ready",
+			"/color-extractor/ready",
+			"/user/ready",
+		].sort(),
+	);
+	assert.equal(result.preview.ready, true);
+	assert.equal(
+		result.ownership.capturedObservations.some((x) => x.status === "absent"),
+		true,
+	);
+	assert.equal(
+		json(path.join(f.config.evidence, "startup/result.json")).status,
+		result.status,
+	);
+	assert.equal(result.acceptedAt < result.deadline, true);
+	assert.equal(
+		fs.existsSync(path.join(f.root, "apps/user/src/boat-live-547.ts")),
+		true,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.config.evidence, "startup/dev/receipt.json")),
+		false,
+	);
+	assert.deepEqual(
+		jsonLines(path.join(f.root, "routes-observed.jsonl")).sort(),
+		result.routes.map((r) => r.path).sort(),
+	);
+	const proof = json(path.join(f.config.evidence, "startup/manifest.json"));
+	assert.equal(
+		proof.files.some((r) => r.name === "dev/stdout.raw"),
+		false,
+	);
+	assert.equal(
+		proof.files.some((r) => r.name === "dev/stdout.ready.raw"),
+		true,
+	);
+	await result.serving.stop();
+	assert.equal(
+		json(path.join(f.config.evidence, "startup/cleanup.json")).status,
+		"STOPPED_ACCOUNTED",
+	);
+	for (const name of ["dev", "preview"])
+		assert.equal(
+			json(path.join(f.config.evidence, `startup/${name}/disposal.json`))
+				.pipesClosed,
+			true,
+		);
+});
+
+const jsonLines = (file) =>
+	fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
+
+test("547 startup inventory crosses real Make queue and worker observation with controlled Docker", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	fs.symlinkSync(
+		path.join(repository, "scripts"),
+		path.join(f.root, "scripts"),
+	);
+	fs.writeFileSync(
+		path.join(f.root, "bin/docker"),
+		`#!/bin/sh\nexec node ${repository}/scripts/test-fixtures/547-docker-effect.cjs "$@"\n`,
+		{ mode: 0o700 },
+	);
+	const makeDirectory = path.dirname(
+		execFileSync("which", ["make"], { encoding: "utf8" }).trim(),
+	);
+	const result = await f.run({
+		make: (argv, options) =>
+			argv.some((arg) => arg.includes("application-"))
+				? runner.makeCommand(argv, {
+						...options,
+						env: {
+							...f.env,
+							PATH: `${makeDirectory}:${f.env.PATH}`,
+							BOAT_EXEC: "local",
+							DOCKER_VALIDATION_LOCK_FILE: path.join(f.root, "docker.lock"),
+						},
+					})
+				: f.make(argv, options),
+	});
+	try {
+		assert.equal(result.containers.length, 10);
+		const output = fs.readFileSync(
+			path.join(f.config.evidence, "startup/app-inventory/command/stdout.raw"),
+			"utf8",
+		);
+		assert.match(output, /Docker validation waited/);
+		assert.match(output, /BOAT547_APPLICATION/);
+	} finally {
+		await result.serving.stop();
+	}
+});
+
+test("547 startup cannot leave held compute open when its evidence directory cannot be acquired", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	await assert.rejects(
+		f.run({
+			publication(file, value) {
+				fs.writeFileSync(file, JSON.stringify(value));
+				if (file.endsWith("preparation-result.json")) {
+					fs.mkdirSync(path.join(f.config.evidence, "startup"));
+					fs.writeFileSync(
+						path.join(f.config.evidence, "startup/prior"),
+						"preserve",
+					);
+				}
+			},
+		}),
+		/EEXIST/,
+	);
+	assert.equal(json(path.join(f.root, ".boat/state.json")).runningSince, null);
+	assert.equal(
+		fs.readFileSync(path.join(f.config.evidence, "startup/prior"), "utf8"),
+		"preserve",
+	);
+	assert.equal(
+		jsonLines(path.join(f.root, "commands.jsonl")).filter(
+			(a) => a[1] === "boat-stop",
+		).length,
+		1,
+	);
+});
+
+for (const scenario of ["route", "service", "late-publication"]) {
+	test(`547 startup refuses ${scenario} and retires serving captures before one owning stop`, async (t) => {
+		const f = preparationFixture(t);
+		f.config.until = "ready";
+		if (scenario === "route") f.env.CONTROL_BAD_ROUTE = "/asset/ready";
+		if (scenario === "service") f.env.CONTROL_MISSING_SERVICE = "1";
+		let now = mono();
+		const options =
+			scenario === "late-publication"
+				? {
+						clock: () => now,
+						publication(file, result) {
+							fs.writeFileSync(file, JSON.stringify(result));
+							if (file.endsWith("startup/result.json")) now += 601;
+						},
+					}
+				: {};
+		await assert.rejects(
+			f.run(options),
+			scenario === "route"
+				? /Readiness route failed/
+				: scenario === "service"
+					? /Required ten/
+					: /Original startup deadline/,
+		);
+		const result = json(path.join(f.config.evidence, "startup/result.json"));
+		assert.equal(result.status, "FAIL");
+		assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+		assert.equal(result.next, undefined);
+		const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+		assert.equal(commands.filter((a) => a[1] === "boat-stop").length, 1);
+		if (scenario === "service")
+			assert.equal(
+				commands.some((a) => a.some((x) => x.includes("application-inspect"))),
+				false,
+			);
+		for (const name of ["dev", "preview"]) {
+			const disposal = json(
+				path.join(f.config.evidence, `startup/${name}/disposal.json`),
+			);
+			assert.equal(disposal.pipesClosed, true);
+			assert.deepEqual(disposal.unresolved, []);
+		}
+	});
+}
+
 function publicEntry(f) {
 	fs.symlinkSync(
 		path.join(repository, "scripts"),
@@ -211,6 +412,68 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
+	test("547 qualified public ready entry owns preparation through serving and signal cleanup", {
+		timeout: 30000,
+	}, async (t) => {
+		const f = preparationFixture(t, true);
+		f.config.until = "ready";
+		fs.symlinkSync(
+			path.join(repository, "scripts"),
+			path.join(f.root, "scripts"),
+		);
+		fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+		fs.copyFileSync(
+			process.env.BOAT_547_QUALIFIED_CLI,
+			path.join(f.root, ".mise/boat/boat"),
+		);
+		const file = path.join(f.root, "config.json");
+		fs.writeFileSync(file, JSON.stringify(f.config));
+		const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
+		const capture = captureServingCommand({
+			argv: [make, "boat-hillclimb-547"],
+			directory: path.join(f.root, "entry-capture"),
+			cwd: f.root,
+			env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
+		});
+		try {
+			const deadline = mono() + 15;
+			const resultFile = path.join(f.config.evidence, "startup/result.json");
+			while (!fs.existsSync(resultFile)) {
+				capture.assertRunning();
+				assert.ok(
+					mono() < deadline,
+					"Public ready entry must publish inside control deadline",
+				);
+				await new Promise((resolve) => setTimeout(resolve, 25));
+			}
+			const result = json(resultFile);
+			assert.equal(result.status, "PASS_STARTUP_READY", JSON.stringify(result));
+			assert.equal(result.containers.length, 10);
+			assert.equal(result.routes.length, 8);
+			assert.ok(result.acceptedAt < result.deadline);
+		} finally {
+			await capture.stop();
+		}
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(a) => a[1] === "boat-stop",
+			).length,
+			1,
+		);
+		assert.equal(
+			json(path.join(f.root, "entry-capture/disposal.json")).pipesClosed,
+			true,
+		);
+		assert.deepEqual(
+			json(path.join(f.root, "entry-capture/disposal.json")).unresolved,
+			[],
+		);
+	});
+
 	test("547 qualified public missing artifact refuses missing post-bootstrap artifact before compute", (t) => {
 		const f = preparationFixture(t, true);
 		const r = publicEntry(f);

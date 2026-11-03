@@ -141,6 +141,44 @@ function chromium() {
 	});
 }
 
+function application(mode) {
+	const { execFileSync } = require("node:child_process");
+	const args =
+		mode === "application-ps"
+			? [
+					"compose",
+					"-p",
+					process.argv[3],
+					"-f",
+					"infra/docker-compose.apps.yml",
+					"ps",
+					"--all",
+					"--format",
+					"json",
+				]
+			: [
+					"inspect",
+					"--format",
+					'{"id":{{json .Id}},"image":{{json .Image}},"state":{{json .State}},"restartCount":{{json .RestartCount}},"created":{{json .Created}},"labels":{{json .Config.Labels}},"ports":{{json .NetworkSettings.Ports}}}',
+					...process.argv.slice(3),
+				];
+	const values = process.argv.slice(3);
+	if (
+		mode === "application-ps"
+			? values.length !== 1 || !/^[A-Za-z0-9_-]+$/.test(values[0])
+			: values.length !== 10 ||
+				values.some((id) => !/^[a-f0-9]{12,64}$/.test(id))
+	)
+		throw new Error("Invalid application observation arguments");
+	const bytes = execFileSync("docker", args, { maxBuffer: 16 * 1024 * 1024 });
+	console.log(
+		"BOAT547_APPLICATION " +
+			JSON.stringify({ mode, nativeStdout: bytes.toString("base64") }),
+	);
+}
+
 if (process.argv[2] === "metadata") metadata();
 else if (process.argv[2] === "chromium") chromium();
-else throw new Error("Expected metadata or chromium observation");
+else if (["application-ps", "application-inspect"].includes(process.argv[2]))
+	application(process.argv[2]);
+else throw new Error("Unknown #547 worker observation");

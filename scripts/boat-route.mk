@@ -58,5 +58,5 @@ boat-bootstrap: ## Install the checksum-pinned prototype Boat CLI privately
 	@sh scripts/boat-bootstrap.sh
 
 .PHONY: boat-hillclimb-547
-boat-hillclimb-547: ## Execute fixed #547 preparation with continuous acceptance (BOAT_HILLCLIMB_CONFIG=JSON path)
+boat-hillclimb-547: ## Execute fixed #547 preparation and optional startup (BOAT_HILLCLIMB_CONFIG=JSON path)
 	@node scripts/boat-hillclimb.mjs

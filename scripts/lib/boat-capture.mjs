@@ -21,7 +21,7 @@ function save(file, value) {
 		fs.closeSync(dir);
 	}
 }
-export async function captureCommand({
+function beginCapture({
 	argv,
 	directory: dir,
 	deadline,
@@ -29,8 +29,12 @@ export async function captureCommand({
 	limit = 16777216,
 	env = process.env,
 	disposalMs = 5000,
+	serving = false,
 }) {
-	if (!Number.isFinite(deadline) || deadline - mono() <= disposalMs / 1000)
+	if (
+		!serving &&
+		(!Number.isFinite(deadline) || deadline - mono() <= disposalMs / 1000)
+	)
 		throw new Error("Insufficient original command deadline");
 	fs.mkdirSync(dir, { mode: 0o700 }); // Exclusive phase directory. No overwrite/retry.
 	const parent = fs.openSync(path.dirname(dir), "r");
@@ -50,7 +54,9 @@ export async function captureCommand({
 	save(path.join(dir, "invocation.json"), { argv, began, deadline, limit });
 	const phase = {
 		phase: "547-command",
-		deadline: performance.now() + Math.max(0, deadline - mono()) * 1000,
+		deadline: serving
+			? Infinity
+			: performance.now() + Math.max(0, deadline - mono()) * 1000,
 		disposalMs,
 		record: (r) => save(path.join(dir, "disposal.json"), r),
 	};
@@ -77,6 +83,7 @@ export async function captureCommand({
 	});
 	child.on("exit", (code, signal) => {
 		terminal = { code, signal };
+		if (serving) shorten();
 	});
 	for (const name of ["stdout", "stderr"]) {
 		child[name].on("error", () => {
@@ -102,46 +109,114 @@ export async function captureCommand({
 			}
 		});
 	}
-	try {
-		await finiteShutdownProcess(child, phase);
-	} catch (e) {
-		failure ??= e.message;
-	} finally {
-		for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.off(sig, cancel);
-		for (const s of Object.values(streams)) {
-			try {
-				fs.fsyncSync(s.fd);
-			} catch {
-				failure ??= "capture fsync failed";
-			}
-			try {
-				fs.closeSync(s.fd);
-			} catch {
-				failure ??= "capture close failed";
+	const completion = (async () => {
+		try {
+			await finiteShutdownProcess(child, phase);
+		} catch (e) {
+			failure ??= e.message;
+		} finally {
+			for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"])
+				process.off(sig, cancel);
+			for (const s of Object.values(streams)) {
+				try {
+					fs.fsyncSync(s.fd);
+				} catch {
+					failure ??= "capture fsync failed";
+				}
+				try {
+					fs.closeSync(s.fd);
+				} catch {
+					failure ??= "capture close failed";
+				}
 			}
 		}
-	}
-	const files = {};
-	for (const name of ["stdout", "stderr"]) {
-		const data = fs.readFileSync(path.join(dir, `${name}.raw`));
-		files[name] = {
-			bytes: data.length,
-			sha256: sha(data),
-			overflow: streams[name].overflow,
+		const files = {};
+		for (const name of ["stdout", "stderr"]) {
+			const data = fs.readFileSync(path.join(dir, `${name}.raw`));
+			files[name] = {
+				bytes: data.length,
+				sha256: sha(data),
+				overflow: streams[name].overflow,
+			};
+		}
+		const receipt = {
+			argv,
+			began,
+			ended: { utc: new Date().toISOString(), monotonic: mono() },
+			deadline,
+			byteLimitPerStream: limit,
+			terminal,
+			spawnError,
+			failure,
+			files,
+			captureComplete: !failure && !spawnError,
 		};
-	}
-	const receipt = {
-		argv,
-		began,
-		ended: { utc: new Date().toISOString(), monotonic: mono() },
-		deadline,
-		byteLimitPerStream: limit,
-		terminal,
-		spawnError,
-		failure,
-		files,
-		captureComplete: !failure && !spawnError,
+		save(path.join(dir, "receipt.json"), receipt);
+		return receipt;
+	})();
+	return {
+		pid: child.pid,
+		checkpointDirectory: dir,
+		completion,
+		stop: () => {
+			shorten();
+			return completion;
+		},
+		assertRunning() {
+			if (failure || spawnError || terminal)
+				throw new Error(
+					`Serving Make capture ended: ${failure ?? spawnError ?? JSON.stringify(terminal)}`,
+				);
+		},
+		checkpoint() {
+			this.assertRunning();
+			const checkpoint = {
+				argv,
+				pid: child.pid,
+				began,
+				directory: dir,
+				files: Object.fromEntries(
+					Object.entries(streams).map(([name, stream]) => {
+						fs.fsyncSync(stream.fd);
+						const bytes = fs.readFileSync(path.join(dir, `${name}.raw`));
+						const snapshot = path.join(dir, `${name}.ready.raw`);
+						const fd = fs.openSync(snapshot, "wx", 0o600);
+						try {
+							fs.writeFileSync(fd, bytes);
+							fs.fsyncSync(fd);
+						} finally {
+							fs.closeSync(fd);
+						}
+						return [
+							name,
+							{ path: snapshot, bytes: bytes.length, sha256: sha(bytes) },
+						];
+					}),
+				),
+			};
+			const fd = fs.openSync(dir, "r");
+			try {
+				fs.fsyncSync(fd);
+			} finally {
+				fs.closeSync(fd);
+			}
+			return checkpoint;
+		},
 	};
-	save(path.join(dir, "receipt.json"), receipt);
-	return receipt;
+}
+
+export async function captureCommand(options) {
+	return beginCapture(options).completion;
+}
+
+// A healthy serving command has no lifetime deadline. Its ordinary signal
+// handler gets its full cooperative disposal window before transport escalation.
+export function captureServingCommand(options) {
+	return beginCapture({
+		...options,
+		deadline: null,
+		limit: Infinity,
+		disposalMs: 30000,
+		serving: true,
+	});
 }

@@ -269,7 +269,9 @@ export function create547Preparation(root, objects = nativeObjects) {
 		verify();
 		// Validate the complete group before its first owned write.
 		const payloads = inputs.map((input) => {
-			const bytes = objects.readBlob(input.gitBlob);
+			const bytes = input.source
+				? (objects.readLiveFile ?? fs.readFileSync)(input.source)
+				: objects.readBlob(input.gitBlob);
 			require(sha(bytes) ===
 				input.sha256, `Frozen blob changed: ${input.path}`);
 			return { input, bytes };
@@ -320,6 +322,23 @@ export function create547Preparation(root, objects = nativeObjects) {
 		verify,
 		stageTests: () => stage(workload.inputs.tests),
 		stageRepair: () => stage(workload.inputs.repair),
+		stageSdk() {
+			const proof = workload.live.fixtures.find((f) =>
+				f.destination.endsWith("remediation-sdk-proof.ts"),
+			);
+			stage([
+				...workload.live.fixtures.map((f) => ({
+					path: f.destination,
+					source: f.stagedSource,
+					sha256: f.stagedSha256,
+				})),
+				...["user", "wallpaper", "asset"].map((name) => ({
+					path: `apps/${name}/src/boat-sdk-proof-547.ts`,
+					source: proof.stagedSource,
+					sha256: proof.stagedSha256,
+				})),
+			]);
+		},
 		assessTests,
 		initialLock,
 		acceptGenerated(directory) {

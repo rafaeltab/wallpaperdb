@@ -24,6 +24,13 @@ try {
 			outcome: result.outcome,
 		}),
 	);
+	if (result.serving) {
+		const cleanup = await result.serving.done;
+		console.log(
+			JSON.stringify({ status: "SERVING_ENDED", cleanup: cleanup.status }),
+		);
+		process.exitCode = 1;
+	}
 } catch (error) {
 	console.error(JSON.stringify({ status: "FAIL", error: error.message }));
 	process.exitCode = 1;

@@ -14,6 +14,19 @@ const data = read(
 const root = process.cwd();
 const key = createHash("sha256").update(root).digest("hex").slice(0, 12);
 const target = args[1];
+const services = [
+	"asset",
+	"caddy",
+	"color-extractor",
+	"gateway",
+	"ingestor",
+	"tags",
+	"user",
+	"variant-generator",
+	"wallpaper",
+	"web",
+];
+const id = (index) => (index + 1).toString(16).padStart(64, "0");
 const value = (name) =>
 	args.find((x) => x.startsWith(`${name}=`))?.slice(name.length + 1);
 const event = (kind) =>
@@ -28,7 +41,64 @@ const event = (kind) =>
 	);
 fs.appendFileSync("commands.jsonl", JSON.stringify(args) + "\n");
 let phase = target;
-if (target === "boat-enroll") {
+if (target === "run" && value("SCRIPT") === "boat:observe-preview") {
+	const input = value("ARGS").replace(/^'|'$/g, "");
+	const r = spawnSync(
+		"python",
+		[path.join(repository, "scripts/boat-preview-observation.py"), input],
+		{ stdio: "inherit" },
+	);
+	process.exitCode = r.status ?? 1;
+} else if (target === "docker-run" && value("ARGS").includes(" application-")) {
+	const inspect = value("ARGS").includes(" application-inspect ");
+	const rows = inspect
+		? services.map((service, i) => ({
+				id: id(i),
+				image: `sha256:${id(i + 10)}`,
+				state: {
+					Running: true,
+					Status: "running",
+					Pid: i + 100,
+					StartedAt: "2026-11-03T00:00:00Z",
+				},
+				restartCount: 0,
+				created: "2026-11-03T00:00:00Z",
+				labels: {
+					"com.docker.compose.service": service,
+					"com.docker.compose.project": process.env.CONTROL_PROJECT,
+					"com.docker.compose.config-hash": id(i + 20),
+				},
+				ports: {},
+			}))
+		: [
+				...services,
+				"postgres",
+				"minio",
+				"nats",
+				"redis",
+				"opensearch",
+				"lgtm",
+				"migrations",
+				"setup",
+			].map((Service, i) => ({
+				ID: id(i),
+				Service,
+				Project: process.env.CONTROL_PROJECT,
+				State: "running",
+			}));
+	if (process.env.CONTROL_MISSING_SERVICE) rows[0].Service = "postgres";
+	console.log("Reusing the inherited Docker host lock.");
+	console.log(
+		"BOAT547_APPLICATION " +
+			JSON.stringify({
+				mode: inspect ? "application-inspect" : "application-ps",
+				nativeStdout: Buffer.from(
+					rows.map((r) => JSON.stringify(r)).join("\n") + "\n",
+				).toString("base64"),
+			}),
+	);
+	console.log("Docker validation waited 0.0s; execution 0.0s; exit 0.");
+} else if (target === "boat-enroll") {
 	fs.mkdirSync(".boat");
 	save(".boat/enrollment.json", {
 		root,

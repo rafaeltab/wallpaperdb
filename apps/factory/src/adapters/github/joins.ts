@@ -1564,6 +1564,39 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return result;
   };
+  const historicalComparisonValid = async (record: ReplayRecord, signal?: AbortSignal) =>
+    !!(await read(record.directory, completionName(record.operation))) &&
+    (await completedComparisonsValid(record.operation, signal));
+  const pendingReplayManual = async (
+    records: readonly ReplayRecord[],
+    item: Intent['replay'][number],
+    current: Awaited<ReturnType<typeof prState>>,
+    certified: boolean,
+    signal?: AbortSignal
+  ) =>
+    (await publicationGuard(item.issue, item.commit, current)) ||
+    (!certified && !(await replayFactsValid(records, item, signal)));
+  const pendingReplayObservation = async (
+    records: readonly ReplayRecord[],
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    signal?: AbortSignal
+  ) => {
+    const current = await prState(item, signal);
+    if (current.state !== 'OPEN' || current.headRefOid !== item.next) return null;
+    const allowed = allowedPublication(current, item);
+    const certified = !allowed && (await historicalComparisonValid(record, signal));
+    if (!allowed && !certified) return null;
+    return {
+      ...item,
+      pending: true,
+      comparison: current.baseRefName,
+      comparisonReady: false,
+      automatic: false,
+      uncertain: false,
+      manual: await pendingReplayManual(records, item, current, certified, signal),
+    };
+  };
   const lookupReplay = async (
     records: readonly ReplayRecord[],
     issue: number,
@@ -1571,29 +1604,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   ) => {
     const candidates = await completedCandidates(records, issue);
     const latest = latestReplay(candidates);
-    const pending = records
-      .filter((record) => !record.complete)
-      .flatMap((record) => record.operation.replay)
-      .filter((item) => item.issue === issue);
-    for (const item of pending) {
-      const current = await prState(item, signal);
-      if (
-        current.state === 'OPEN' &&
-        current.headRefOid === item.next &&
-        allowedPublication(current, item)
-      )
-        return {
-          ...item,
-          pending: true,
-          comparison: item.target,
-          comparisonReady: false,
-          automatic: false,
-          uncertain: false,
-          manual:
-            (await publicationGuard(issue, item.commit, current)) ||
-            !(await replayFactsValid(records, item, signal)),
-        };
-    }
+    for (const record of records.filter((value) => !value.complete))
+      for (const item of record.operation.replay.filter((value) => value.issue === issue)) {
+        const pending = await pendingReplayObservation(records, record, item, signal);
+        if (pending) return pending;
+      }
     if (!latest) return null;
     return observedReplay(records, issue, latest, signal);
   };
@@ -2381,7 +2396,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const original = record.operation;
     const current = await prState(item, signal);
     if (current.baseRefName === item.target) return record;
-    if (!record.complete || !(await completedComparisonsValid(original, signal))) return null;
+    if (!(await historicalComparisonValid(record, signal))) return null;
     const operation = await currentRepairOperation(original, signal);
     if (!operation) return null;
 

@@ -367,9 +367,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       signal
     );
     return {
-      issue: issueContext,
-      parent: parentContext,
-      pr: prContext,
+      issue: trustedRecoveryContext(issueContext),
+      parent: parentContext ? trustedRecoveryContext(parentContext) : null,
+      pr: trustedRecoveryContext(prContext),
       retained: item.context ?? '',
       owningThreadId: item.owningThreadId ?? null,
       instructions:
@@ -1410,6 +1410,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return result;
   };
   return { prepare, evidence, state, replayFor, reconcile, recoveries };
+}
+
+function trustedRecoveryContext(value: unknown) {
+  const context = z
+    .object({
+      body: z.string(),
+      comments: z.array(
+        z.object({ body: z.string(), author: z.object({ login: z.string() }).nullable() })
+      ),
+    })
+    .parse(value);
+  return {
+    ...context,
+    comments: context.comments.filter(
+      ({ author }) => author && ['rafaeltab', 'zero-two-rafaeltab'].includes(author.login)
+    ),
+  };
 }
 
 function runRecovery(ports: RecoveryPorts, signal?: AbortSignal) {

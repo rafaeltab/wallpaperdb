@@ -221,6 +221,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
       labels: [{ name: 'ready-for-agent' }],
       body: state.evidence,
+      comments: state.issueComments?.[number] ?? [],
     };
   else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');
   else if (args[0] === 'api' && args[1] === 'graphql')
@@ -243,6 +244,8 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       headRefName: item.branch,
       baseRefName: item.base,
       baseRefOid: git('rev-parse', item.base),
+      body: item.body ?? '',
+      comments: item.comments ?? [],
       state: item.state ?? 'OPEN',
       isDraft: false,
       mergeable: 'MERGEABLE',

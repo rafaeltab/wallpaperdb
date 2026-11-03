@@ -1106,6 +1106,38 @@ it('passes retained owning scope and its exact thread into the isolated recovery
   }
 });
 
+it('passes only trusted-author comments from the issue, parent and PR into recovery', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  const comments = (source: string) => [
+    { author: { login: 'rafaeltab' }, body: `maintainer-${source}` },
+    { author: { login: 'zero-two-rafaeltab' }, body: `agent-${source}` },
+    { author: { login: 'outside-contributor' }, body: `untrusted-${source}` },
+    { author: null, body: `unknown-author-${source}` },
+  ];
+  try {
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    config.join.issueComments = { 4: comments('issue'), 571: comments('parent') };
+    config.join.prs[104].body = 'Retain the accepted PR behavior';
+    config.join.prs[104].comments = comments('pr');
+    await f.host.save(config);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    const launch = (await f.host.calls()).find((call) => call.args[1] === 'start');
+    expect(launch).toBeDefined();
+    const prompt = launch?.args[3] ?? '';
+    for (const source of ['issue', 'parent', 'pr']) {
+      expect(prompt).toContain(`maintainer-${source}`);
+      expect(prompt).toContain(`agent-${source}`);
+      expect(prompt).not.toContain(`untrusted-${source}`);
+      expect(prompt).not.toContain(`unknown-author-${source}`);
+    }
+    expect(prompt).toContain('Retain the accepted PR behavior');
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
 it('reconciles the original join request when explicit blockers include a closed issue', async () => {
   const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
   try {

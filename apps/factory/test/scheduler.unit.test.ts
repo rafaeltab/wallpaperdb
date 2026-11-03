@@ -2,6 +2,7 @@ import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
   PlanLive,
+  Plan,
   PlanningSource,
   IPlanner,
   Scheduler,
@@ -738,3 +739,82 @@ it('counts conflict recovery against concurrency and releases parked or verified
     await f.runtime.dispose();
   }
 });
+
+it.each([-1, 1, 2])(
+  'does not recursively observe an admitted repair while deciding recovery capacity, concurrency=%s',
+  async (concurrency) => {
+    const store = controlledScheduleStore();
+    const admitted = { issue: 2, base, context: 'Retained repair' };
+    const busy: Status = {
+      kind: 'job',
+      intent: {
+        ...admitted,
+        id: 'B',
+        branch: 'B',
+        issueUrl: issue(2).url,
+        createdAt: 0,
+        expectedStage: 'implementation',
+      },
+      execution: { kind: 'absent' },
+      elapsedMs: 0,
+    };
+    let admission: import('../src/capabilities/job/index.js').RecoveryAdmission | undefined;
+    let depth = 0;
+    let maximumDepth = 0;
+    const decisions: boolean[] = [];
+    const job: Job = {
+      status: () =>
+        Effect.gen(function* () {
+          depth++;
+          maximumDepth = Math.max(maximumDepth, depth);
+          // Bound the adverse recursion rather than waiting for the test deadline.
+          expect(depth).toBeLessThan(3);
+          if (admission) yield* admission(4);
+          depth--;
+          return busy;
+        }),
+      start: () => Effect.die('Existing admission must not launch again'),
+      resume: () => Effect.succeed({ kind: 'rejected' as const }),
+      cancel: () => Effect.succeed({ kind: 'rejected' as const }),
+    };
+    const runtime = ManagedRuntime.make(
+      SchedulerLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(ScheduleStore, store),
+            Layer.succeed(JobPool, { job: () => Effect.succeed(job) }),
+            Layer.succeed(Issues, {
+              inspect: () => Effect.die('Recovery must not discover new issues'),
+              pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
+              recoveries: () => Effect.succeed([]),
+              reconcile: (authorize) =>
+                Effect.gen(function* () {
+                  if (!authorize) throw new Error('Missing recovery authorization');
+                  admission = authorize;
+                  decisions.push(yield* authorize(4));
+                  admission = undefined;
+                }),
+            }),
+            Layer.succeed(Plan, { preview: () => Effect.die('Paused admissions must not plan') }),
+            Layer.succeed(PlanningSource, {
+              read: () => Effect.die('Paused admissions must not discover'),
+            })
+          )
+        )
+      )
+    );
+    try {
+      await Effect.runPromise(
+        store.save({ revision: 0, concurrency, allowance: 1, paused: true, admissions: [admitted] })
+      );
+      const scheduler = await runtime.runPromise(Scheduler);
+      await runtime.runPromise(scheduler.tick(base));
+      await runtime.runPromise(scheduler.tick(base));
+      expect(maximumDepth).toBe(1);
+      expect(decisions).toEqual([concurrency !== 1, concurrency !== 1]);
+      expect((await runtime.runPromise(scheduler.status())).state.admissions).toEqual([admitted]);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

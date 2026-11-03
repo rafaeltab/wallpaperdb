@@ -104,7 +104,6 @@ export const JobLive = Layer.effect(
           if (!intent) return { kind: 'rejected' as const };
           if ('runId' in command) return yield* retryStage(store, intent, command, observe);
           return yield* resumeQuestion(intent, command);
-
         }).pipe(Effect.withSpan('factory.job.resume')),
       cancel: (jobId) =>
         Effect.gen(function* () {

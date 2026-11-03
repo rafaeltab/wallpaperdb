@@ -2858,9 +2858,14 @@ it.each(['review', 'publication', 'ci'] as const)(
   }
 );
 
-it.each([false, true])(
-  'admits owned CI repair before and after authenticated target retirement, retired=%s',
-  async (retired) => {
+it.each([
+  { retired: false, pending: false },
+  { retired: true, pending: false },
+  { retired: false, pending: true },
+  { retired: true, pending: true },
+])(
+  'admits owned CI repair across authenticated target retirement: %j',
+  async ({ retired, pending }) => {
     const f = await fixture({ groups: true });
     try {
       await Effect.runPromise(f.issues.prepare!(5));
@@ -2879,6 +2884,13 @@ it.each([false, true])(
       if (before.kind !== 'found') throw new Error('Missing replay');
       const path = join(f.host.directory, 'join-live.json');
       const live = JSON.parse(await readFile(path, 'utf8'));
+      if (pending) {
+        live.newCI = 'FAILURE';
+        await writeFile(path, JSON.stringify(live));
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+        live.newCI = 'SUCCESS';
+        await writeFile(path, JSON.stringify(live));
+      }
       if (retired) {
         f.git('switch', 'main');
         f.git('merge', '--ff-only', 'D');
@@ -2906,8 +2918,20 @@ it.each([false, true])(
           },
         });
       }
+      if (retired && pending) {
+        const root = join(f.host.directory, 'joins');
+        const original = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
+        if (!original) throw new Error('Missing operation');
+        const certificatePath = join(root, original, 'complete.json');
+        const certificate = await readFile(certificatePath);
+        await unlink(certificatePath);
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(
+          false
+        );
+        await writeFile(certificatePath, certificate);
+      }
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
-        ready: true,
+        ready: !pending,
         commit: before.commit,
         reviewedCommit: f.c,
       });
@@ -2931,7 +2955,10 @@ it.each([false, true])(
         await writeFile(join(root, successor, 'request.json'), JSON.stringify({ numbers: [4, 6] }));
         for (const resource of ['branch:C', 'group:9']) {
           const claims = join(root, 'writers', createHash('sha256').update(resource).digest('hex'));
-          const name = join(claims, 'writer-1.json');
+          const ordinals = (await readdir(claims))
+            .filter((name) => /^writer-\d+.json$/.test(name))
+            .map((name) => Number(name.match(/\d+/)?.[0]));
+          const name = join(claims, `writer-${Math.max(...ordinals) + 1}.json`);
           await writeFile(name, JSON.stringify({ key: successor }));
           expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(
             false
@@ -2959,6 +2986,23 @@ it.each([false, true])(
         commit: before.commit,
         maintenancePending: true,
       });
+      if (pending) {
+        const recovered = JSON.parse(await readFile(path, 'utf8'));
+        recovered.newCI = 'SUCCESS';
+        await writeFile(path, JSON.stringify(recovered));
+        expect(
+          await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, before.commit))
+        ).toBe(true);
+        await Effect.runPromise(f.reopen().reconcile!());
+        expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
+          ready: true,
+          commit: before.commit,
+          reviewedCommit: f.c,
+        });
+        recovered.newCI = 'FAILURE';
+        await writeFile(path, JSON.stringify(recovered));
+        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+      }
       f.git('switch', '--detach', before.commit);
       await writeFile(join(f.host.repository, 'repair.txt'), 'repaired after target retirement');
       f.git('add', '.');

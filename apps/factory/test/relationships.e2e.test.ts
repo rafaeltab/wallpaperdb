@@ -80,6 +80,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
         { issue: 3, blockers: [2] },
       ]),
     scheduler: {
+      authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [current] }),
       tick: () => Effect.succeed({ state, jobs: [current] }),
       configure: () => Effect.succeed('saved'),

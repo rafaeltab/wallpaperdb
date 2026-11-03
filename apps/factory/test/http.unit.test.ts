@@ -617,6 +617,7 @@ it('renders current dependency direction from the admitted issue read model and 
           ]);
     },
     scheduler: {
+      authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       tick: () => Effect.succeed({ state, jobs: [] }),
       configure: () => Effect.succeed('saved'),

@@ -453,11 +453,17 @@ it.each(['implementation', 'publication'] as const)(
           });
           await browserExpect
             .poll(
-              async () =>
-                (await (await page.request.get(`http://127.0.0.1:${address.port}/api/job`)).json())
-                  .delivery?.stage
+              async () => {
+                const observation = await (
+                  await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+                ).json();
+                return {
+                  stage: observation.delivery?.stage,
+                  run: observation.execution?.run?.id,
+                };
+              }
             )
-            .toBe('publication');
+            .toEqual({ stage: 'publication', run: 'run-3' });
           publication = await readFile(join(host.directory, 'pr.json'), 'utf8');
         }
         await host.save({ overrides: { status: 'interrupted' } });

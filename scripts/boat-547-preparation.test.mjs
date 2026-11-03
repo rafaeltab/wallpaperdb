@@ -135,7 +135,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -315,6 +315,7 @@ test("547 reused wanted development prepares workspace and images before its fir
 				"boat-prepare-toolchain",
 				"boat-prepare-workspace",
 				"boat-prepare-infra-images",
+				"boat-prepare-app-images",
 			],
 		);
 		assert.equal(
@@ -327,6 +328,23 @@ test("547 reused wanted development prepares workspace and images before its fir
 	} finally {
 		if (outcome.value) await outcome.value.serving.stop();
 	}
+});
+
+test("547 failed wanted app-image preparation stops its worker before any ordinary baseline", async (t) => {
+	const f = preparationFixture(t);
+	await stoppedWantedDevelopment(f);
+	f.env.CONTROL_FAIL = "boat-prepare-app-images";
+	await assert.rejects(f.run());
+	const result = json(path.join(f.config.evidence, "preparation-result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+	assert.equal(json(path.join(f.root, ".boat/state.json")).runningSince, null);
+	const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+	assert.equal(commands.filter((a) => a[1] === "boat-stop").length, 1);
+	assert.equal(
+		commands.some((a) => a[1] === "test-focused"),
+		false,
+	);
 });
 
 test("547 ready fixtures run concurrently with independent native listeners", async (t) => {
@@ -1194,6 +1212,7 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 					for (const name of [
 						"prepare-workspace",
 						"prepare-images-before-restoration",
+						"prepare-app-images-before-restoration",
 						"prepare-infra-images",
 					])
 						assert.equal(

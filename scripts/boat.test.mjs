@@ -15576,6 +15576,161 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
+async function appImagesCheckout(t, fresh = false) {
+	const f = await toolchainCheckout(t, fresh);
+	f.local(
+		".worktree",
+		"INGRESS_PORT=9120\nCOMPOSE_PROJECT_NAME=fixture-app-images\n",
+	);
+	const docker = path.join(f.directory, "home/.local/bin/docker");
+	fs.renameSync(docker, `${docker}-ordinary`);
+	fs.writeFileSync(
+		docker,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
+if(a[0]==='compose'&&a.includes('build')){
+ fs.writeFileSync(path.join(c,'app-build-argv'),JSON.stringify(a));
+ console.log('Application build printed success before completion');fs.writeFileSync(path.join(c,'app-build-entered'),'yes');
+ while(fs.existsSync(path.join(c,'hold-app-build'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ if(fs.existsSync(path.join(c,'fail-app-build'))){console.error('native application image build failed');process.exit(23);}
+ fs.writeFileSync(path.join(c,'app-images-built'),'yes');console.error('native application image build stderr drained');process.exit(0);
+}
+process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process.env,stdio:'inherit'}).status??1);
+`,
+		{ mode: 0o755 },
+	);
+	return f;
+}
+
+test("app image phase awaits the ordinary build before deferring fresh wanted restoration", async (t) => {
+	const f = await appImagesCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
+	);
+	flag(f, "hold-app-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "app-build-entered"));
+		}, "application image build barrier");
+		assert.equal(
+			fs.existsSync(path.join(f.control, "app-images-built")),
+			false,
+		);
+		assertPreparationDefersDevelopment(f);
+		assert.equal(
+			fs
+				.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+				.split("\n")
+				.filter(Boolean)
+				.map(JSON.parse)
+				.some((e) => e.kind === "app-image-preparation" && e.completed),
+			false,
+		);
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(
+		fs.readFileSync(path.join(f.control, "app-images-built"), "utf8"),
+		"yes",
+	);
+	assert.deepEqual(
+		JSON.parse(fs.readFileSync(path.join(f.control, "app-build-argv"), "utf8")),
+		[
+			"compose",
+			"-p",
+			"fixture-app-images",
+			"-f",
+			"infra/docker-compose.apps.yml",
+			"build",
+		],
+	);
+	assert.match(result.output, /native application image build stderr drained/);
+	assertPreparationDefersDevelopment(f);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "app-image-preparation");
+	assert.equal(event.workerId, "fake-new-worker");
+	assert.equal(event.completed, true);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("app image phase preserves pending restoration after a failed build", async (t) => {
+	const f = await appImagesCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "fail-app-build");
+	const result = await f.observe(f.run("boat-prepare-app-images"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /native application image build failed/);
+	assert.equal(fs.existsSync(path.join(f.control, "app-images-built")), false);
+	assertPreparationDefersDevelopment(f);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "app-image-preparation");
+	assert.equal(event.completed, false);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("app image phase refuses a selected generation change before completion", async (t) => {
+	const f = await appImagesCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "hold-app-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "app-build-entered"));
+		}, "application build before generation change");
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				id: "replacement-worker",
+			}),
+		);
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation changed/);
+	assertPreparationDefersDevelopment(f);
+	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.split("\n")
+		.filter(Boolean)
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "app-image-preparation");
+	assert.equal(event.completed, false);
+});
+
 function assertPreparationDefersDevelopment(f) {
 	const state = f.json(".boat/state.json");
 	assert.equal(state.developmentWanted, true);

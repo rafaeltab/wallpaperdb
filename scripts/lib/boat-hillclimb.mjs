@@ -660,6 +660,15 @@ export async function execute547Preparation(config, dependencies = {}) {
 				}),
 			});
 			await prepareImages("prepare-images-before-restoration");
+			await run(
+				"prepare-app-images-before-restoration",
+				["make", "boat-prepare-app-images"],
+				{
+					assess: (_raw, { receipt }) => ({
+						event: event("app-image-preparation", receipt),
+					}),
+				},
+			);
 		}
 		const tests = (name) => [
 			"make",

@@ -1567,20 +1567,33 @@ async function command() {
 			});
 			return;
 		}
-		if (targets[0] === "boat-prepare-infra-images") {
+		const imagePreparation = new Map([
+			[
+				"boat-prepare-infra-images",
+				{
+					target: "boat-prepare-infra-images",
+					event: "infra-image-preparation",
+				},
+			],
+			[
+				"boat-prepare-app-images",
+				{ target: "apps-build", event: "app-image-preparation" },
+			],
+		]).get(targets[0]);
+		if (imagePreparation) {
 			let completed = false;
 			try {
 				await lock(async () => {
 					startupWorker(id);
 					await ssh(
 						id,
-						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make boat-prepare-infra-images BOAT_EXEC=worker`,
+						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make ${imagePreparation.target} BOAT_EXEC=worker`,
 					);
 					startupWorker(id);
 					completed = true;
 				});
 			} finally {
-				event("infra-image-preparation", {
+				event(imagePreparation.event, {
 					workerId: id,
 					ms: Date.now() - entered,
 					completed,

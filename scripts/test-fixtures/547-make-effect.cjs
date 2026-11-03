@@ -211,6 +211,10 @@ if (target === "infra-start") {
 } else if (target === "boat-prepare-workspace") {
 	save("workspace-prepared.json", { completed: true });
 	event("workspace-preparation");
+} else if (target === "boat-prepare-app-images") {
+	assert.equal(fs.existsSync("infra-images-prepared.json"), true);
+	save("restoration-app-images-prepared.json", { completed: true });
+	event("app-image-preparation");
 } else if (target === "test-focused") {
 	const color = fs.existsSync("patches/nats-2.29.3.patch") ? "green" : "red";
 	phase = `${color}-${value("ARGS").includes("protected-broker") ? "auth" : value("PACKAGE")}`;
@@ -229,6 +233,11 @@ if (target === "infra-start") {
 			"Infrastructure images must be prepared before wanted restoration",
 		);
 		const state = read(".boat/state.json");
+		assert.equal(
+			fs.existsSync("restoration-app-images-prepared.json"),
+			true,
+			"Application images must be prepared before wanted restoration",
+		);
 		save("intent-at-first-ordinary.json", {
 			wanted: state.developmentWanted,
 			pending: state.reconciliationPending,

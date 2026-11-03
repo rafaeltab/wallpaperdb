@@ -22,13 +22,15 @@ endif
 endif
 endif
 
-.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-infra-images boat-status boat-stop boat-delete boat-preview boat-settle boat-test boat-cache
+.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-infra-images boat-prepare-app-images boat-status boat-stop boat-delete boat-preview boat-settle boat-test boat-cache
 boat-enroll: boat-bootstrap ## Enroll this isolated worktree (MODE=validation/development; SIZE=large; COHORT=smoke; LIFECYCLE=snapshot/fresh-after-stop)
 	@node scripts/boat.mjs enroll "$(or $(MODE),validation)" "$(or $(SIZE),large)" "$(or $(COHORT),smoke)" "$(or $(LIFECYCLE),snapshot)"
 boat-prepare-toolchain: ## Prepare only this enrolled worker's locked tools, without dependencies or applications
 	@node scripts/boat.mjs command -- boat-prepare-toolchain
 boat-prepare-workspace: ## Frozen-prepare the owned workspace without cache or development restoration
 	@node scripts/boat.mjs command -- boat-prepare-workspace
+boat-prepare-app-images: ## Build owned development images without starting apps or restoring development
+	@node scripts/boat.mjs command -- boat-prepare-app-images
 boat-prepare-infra-images: ## Acquire and verify default infrastructure images without starting containers
 ifeq ($(BOAT_EXEC),worker)
 	@node scripts/boat.mjs prepare-infra-images "$(COMPOSE_PROJECT_NAME)"

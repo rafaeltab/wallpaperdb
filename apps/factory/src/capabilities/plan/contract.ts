@@ -101,6 +101,9 @@ export interface ScheduleStatus {
   readonly jobs: readonly Status[];
 }
 export interface Scheduler {
+  /** Check current continuation capacity without another issue admission.
+   * The recovery journal must retain its active reservation before delivery. */
+  authorizeRecovery(issue: number): Effect.Effect<boolean, Unavailable>;
   status(): Effect.Effect<ScheduleStatus, Unavailable>;
   configure(command: {
     revision: number;

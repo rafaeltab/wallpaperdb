@@ -8,6 +8,7 @@ const execution = new AsyncLocalStorage<Context.Context<never>>();
 const admission = new AsyncLocalStorage<RecoveryAdmission>();
 export function contextualPromise<A>(options: {
   admitRecovery?: RecoveryAdmission;
+  defaultRecoveryAdmission?: RecoveryAdmission;
   try: (signal: AbortSignal) => Promise<A>;
   catch: (cause: unknown) => Unavailable;
 }): Effect.Effect<A, Unavailable> {
@@ -16,7 +17,10 @@ export function contextualPromise<A>(options: {
       try: (signal) =>
         execution.run(context, () =>
           admission.run(
-            options.admitRecovery ?? admission.getStore() ?? (() => Effect.succeed(true)),
+            options.admitRecovery ??
+              admission.getStore() ??
+              options.defaultRecoveryAdmission ??
+              (() => Effect.succeed(true)),
             () => options.try(signal)
           )
         ),

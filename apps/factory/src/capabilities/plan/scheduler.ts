@@ -191,6 +191,7 @@ export const SchedulerLive = Layer.effect(
         }
       });
     return {
+      authorizeRecovery: admitRecovery,
       status,
       configure: (command) =>
         Effect.gen(function* () {

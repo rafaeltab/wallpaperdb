@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
-import { contextualPromise, runInContext } from './context.js';
+import { contextualPromise as githubPromise, runInContext } from './context.js';
 import { command } from '../../platform/index.js';
 import { prerequisiteJoin, type JoinConfiguration } from './joins.js';
 import { publication } from './publication.js';
@@ -26,7 +26,10 @@ export function githubIssues(config: {
   prBase?: string;
   prerequisites: readonly VerifiedPrerequisite[];
   readyPrerequisites?: () => Effect.Effect<readonly VerifiedPrerequisite[], Unavailable>;
+  admitRecovery?: import('../../capabilities/job/index.js').RecoveryAdmission;
 }): Issues {
+  const contextualPromise: typeof githubPromise = (options) =>
+    githubPromise({ ...options, defaultRecoveryAdmission: config.admitRecovery });
   const gh = (args: string[], signal?: AbortSignal) =>
     command('gh', args, config.project, signal).then((text) =>
       text.trim() ? JSON.parse(text) : null

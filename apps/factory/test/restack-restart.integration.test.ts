@@ -1,6 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { chmod, readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { Effect } from 'effect';
@@ -75,13 +75,56 @@ const fs=require('fs'); const args=process.argv.slice(2); const result=require('
         { issue: 4, pr: 104, commit: f.c },
       ]),
     };
-    const launch = () =>
-      spawn(process.execPath, [resolve('dist/main.js')], { env, stdio: 'ignore' });
+    const children: ChildProcess[] = [];
+    const launch = () => {
+      const child = spawn(process.execPath, [resolve('dist/main.js')], {
+        env,
+        stdio: 'ignore',
+        detached: true,
+      });
+      children.push(child);
+      return child;
+    };
     const stop = async (child: ChildProcess) => {
       if (child.exitCode !== null || child.signalCode !== null) return;
       const exit = once(child, 'exit');
       child.kill('SIGKILL');
       await exit;
+    };
+    const activeOwnedProcesses = async () => {
+      const groups = new Set(children.map((child) => String(child.pid)));
+      const entries = (await readdir('/proc')).filter((entry) => /^\d+$/.test(entry));
+      const members = await Promise.all(
+        entries.map(async (pid) => {
+          let stat: string;
+          try {
+            stat = await readFile(`/proc/${pid}/stat`, 'utf8');
+          } catch (error) {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+            throw error;
+          }
+          const [state, , group] = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+          return group && groups.has(group) && state !== 'Z' && state !== 'X' ? pid : undefined;
+        })
+      );
+      return members.filter((pid) => pid !== undefined);
+    };
+    const stopOwnedProcesses = async () => {
+      // Keep the first crash parent-only. Descendants are stopped only after the
+      // recovery scenario, before any fixture files can be removed under them.
+      for (const owned of children) {
+        if (!owned.pid) continue;
+        try {
+          process.kill(-owned.pid, 'SIGKILL');
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+        }
+      }
+      await Promise.all(children.map(stop));
+      await vi.waitFor(async () => expect(await activeOwnedProcesses()).toEqual([]), {
+        timeout: 10000,
+        interval: 30,
+      });
     };
     const ready = () =>
       vi.waitFor(async () => expect((await fetch(`${origin}/health`)).ok).toBe(true), {
@@ -215,7 +258,7 @@ const fs=require('fs'); const args=process.argv.slice(2); const result=require('
       );
     } finally {
       await writeFile(release, 'cleanup');
-      await stop(child);
+      await stopOwnedProcesses();
       await f.close();
     }
   });

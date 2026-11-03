@@ -39,7 +39,8 @@ export async function prerequisiteReadiness(
   },
   numbers: readonly number[],
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  candidate?: { readonly base: string; readonly prBase?: string }
 ) {
   if (numbers.length > 100) return { blockersReady: false };
   const verified = [];
@@ -70,7 +71,8 @@ export async function prerequisiteReadiness(
     if (!accepted) return { blockersReady: false };
     verified.push(accepted);
   }
-  return selectBase(config, verified, landed, signal);
+  const readiness = await selectBase(config, verified, landed, signal);
+  return candidateReadiness(config, readiness, [...verified, ...landed], candidate, signal);
 }
 async function openPrerequisite(
   config: { prerequisites: readonly VerifiedPrerequisite[] },
@@ -168,4 +170,36 @@ function issueEvidence(observed: z.infer<typeof issue>) {
 }
 function trustedComment(comment: { author: { login: string } | null }) {
   return comment.author && ['rafaeltab', 'zero-two-rafaeltab'].includes(comment.author.login);
+}
+
+async function candidateReadiness(
+  config: { project: string; base: string },
+  readiness: {
+    blockersReady: boolean;
+    prerequisite?: { base: string; prBase: string; evidence: string };
+  },
+  required: readonly { commit: string }[],
+  candidate: { base: string; prBase?: string } | undefined,
+  signal?: AbortSignal
+) {
+  if (!candidate || !readiness.blockersReady || !readiness.prerequisite) return readiness;
+  if (!(await validCandidate(config, required, readiness.prerequisite, candidate, signal)))
+    return { ...readiness, blockersReady: false, prerequisite: undefined };
+  return { ...readiness, prerequisite: { ...readiness.prerequisite, base: candidate.base } };
+}
+async function validCandidate(
+  config: { project: string; base: string },
+  required: readonly { commit: string }[],
+  current: { base: string; prBase: string },
+  candidate: { base: string; prBase?: string },
+  signal?: AbortSignal
+) {
+  if (!/^[a-f0-9]{40}$/.test(candidate.base)) return false;
+  if (candidate.prBase !== undefined && candidate.prBase !== current.prBase) return false;
+  if (!(await ancestor(config.project, config.base, candidate.base, signal))) return false;
+  for (const item of required)
+    if (!(await ancestor(config.project, item.commit, candidate.base, signal))) return false;
+  // Only retain a comparison on the currently certified lineage. A changed or
+  // divergent proof is not permission to rebase or rewrite the reservation.
+  return ancestor(config.project, candidate.base, current.base, signal);
 }

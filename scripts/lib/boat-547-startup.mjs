@@ -683,6 +683,7 @@ export async function start547Application(context) {
 			undefined,
 			workload.stageSdk,
 		);
+		await run("apps-build", ["make", "apps-build"]);
 		dev = await launch("dev", ["make", "dev"]);
 		await wait(
 			() =>

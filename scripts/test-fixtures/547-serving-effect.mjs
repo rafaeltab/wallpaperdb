@@ -25,6 +25,11 @@ if (["dev", "preview"].includes(mode))
 	fs.appendFileSync("serving-commands.jsonl", `${JSON.stringify(mode)}\n`);
 if (mode === "historical") console.log(JSON.stringify(identity()));
 else if (mode === "dev") {
+	if (
+		process.env.CONTROL_REQUIRE_APP_IMAGES &&
+		!fs.existsSync("application-images-prepared.json")
+	)
+		throw new Error("Application image build must finish before Watch");
 	console.log("Watch enabled");
 	if (!process.env.CONTROL_DEV_EXIT_BEFORE_READY) {
 		const timer = setInterval(() => {}, 1000);

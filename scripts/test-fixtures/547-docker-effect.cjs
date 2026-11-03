@@ -1,4 +1,5 @@
 // Docker's driven-adapter responses for the real Make/runtime-observation control.
+const fs = require("node:fs");
 const services = [
 	"asset",
 	"caddy",
@@ -16,6 +17,19 @@ const args = process.argv.slice(2);
 if (args[0] === "compose") {
 	if (args[1] !== "-p" || args[2] !== "wallpaperdb-control")
 		throw new Error("Wrong project transport");
+	if (args.includes("build")) {
+		if (
+			JSON.stringify(args.slice(3)) !==
+			JSON.stringify(["-f", "infra/docker-compose.apps.yml", "build"])
+		)
+			throw new Error("Wrong application image build transport");
+		fs.writeFileSync(
+			"native-app-build.json",
+			JSON.stringify({ completed: true }),
+		);
+		console.log("Controlled native app image build completed");
+		process.exit(0);
+	}
 	for (const [i, Service] of [
 		...services,
 		"postgres",

@@ -42,6 +42,17 @@ const event = (kind) =>
 	);
 fs.appendFileSync("commands.jsonl", JSON.stringify(args) + "\n");
 let phase = target;
+if (target === "apps-build") {
+	fs.writeFileSync("app-build-entered", "entered");
+	console.log("Application images prepared");
+	const gate = process.env.CONTROL_APP_IMAGE_GATE;
+	const until = Date.now() + 10000;
+	while (gate && !fs.existsSync(gate)) {
+		assert.ok(Date.now() < until, "Controlled app image build gate expired");
+		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+	}
+	save("application-images-prepared.json", { completed: true });
+}
 if (target === "infra-start") {
 	// Independent destinations/hashes from the frozen SDK8 workload contract.
 	// This check runs before the controlled infrastructure side effect.

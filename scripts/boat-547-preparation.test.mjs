@@ -135,7 +135,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start dev boat-preview\nboat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -371,6 +371,91 @@ test("547 ready milestone owns real Make serving captures and publishes readines
 
 const jsonLines = (file) =>
 	fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
+
+test("547 startup awaits ordinary app image build before launching Watch", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	f.env.CONTROL_REQUIRE_APP_IMAGES = "1";
+	f.env.CONTROL_APP_IMAGE_GATE = path.join(f.root, "release-app-build");
+	let outcome;
+	const operation = f.run().then(
+		(value) => (outcome = { value }),
+		(error) => (outcome = { error }),
+	);
+	try {
+		const until = mono() + 10;
+		while (!fs.existsSync(path.join(f.root, "app-build-entered"))) {
+			if (outcome?.error) throw outcome.error;
+			assert.ok(mono() < until, "Application image build was not launched");
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		}
+		assert.equal(
+			fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(
+				path.join(f.config.evidence, "startup/apps-build/result.json"),
+			),
+			false,
+		);
+		fs.writeFileSync(f.env.CONTROL_APP_IMAGE_GATE, "release");
+		const completed = await operation;
+		assert.ifError(completed.error);
+		assert.equal(completed.value.status, "PASS_STARTUP_READY");
+		assert.equal(completed.value.deadline - completed.value.started, 600);
+		assert.equal(
+			json(path.join(f.config.evidence, "startup/apps-build/result.json"))
+				.status,
+			"PASS",
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(argv) => argv[1] === "apps-build",
+			).length,
+			1,
+		);
+	} finally {
+		fs.writeFileSync(f.env.CONTROL_APP_IMAGE_GATE, "release");
+		const completed = await operation;
+		if (completed.value) await completed.value.serving.stop();
+	}
+});
+
+test("547 startup app image failure never launches Watch and stops its owner once", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	f.env.CONTROL_FAIL = "apps-build";
+	const outcome = await f.run().then(
+		(value) => ({ value }),
+		(error) => ({ error }),
+	);
+	try {
+		assert.match(
+			outcome.error?.message ?? "",
+			/Native Make terminal or drainage failed/,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
+			false,
+		);
+		const result = json(path.join(f.config.evidence, "startup/result.json"));
+		assert.equal(result.status, "FAIL");
+		assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(argv) => argv[1] === "boat-stop",
+			).length,
+			1,
+		);
+	} finally {
+		if (outcome.value) await outcome.value.serving.stop();
+	}
+});
 
 test("547 replacement hands the owned serving lifetime to one new ordinary preview", async (t) => {
 	const f = preparationFixture(t);
@@ -838,6 +923,7 @@ test("547 startup inventory crosses real Make queue and worker observation with 
 	);
 	const result = await f.run({
 		make: (argv, options) =>
+			argv[1] === "apps-build" ||
 			argv.some((arg) => arg.includes("application-"))
 				? runner.makeCommand(argv, {
 						...options,
@@ -852,6 +938,10 @@ test("547 startup inventory crosses real Make queue and worker observation with 
 	});
 	try {
 		assert.equal(result.containers.length, 10);
+		assert.equal(
+			json(path.join(f.root, "native-app-build.json")).completed,
+			true,
+		);
 		const output = fs.readFileSync(
 			path.join(f.config.evidence, "startup/app-inventory/command/stdout.raw"),
 			"utf8",

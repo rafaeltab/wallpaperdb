@@ -2645,11 +2645,20 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ))
     )
       return false;
+    return claimReviewedPublication(record, item, correction.fixed.next, authority.request, signal);
+  };
+  const claimReviewedPublication = async (
+    record: ReplayRecord,
+    item: Intent['replay'][number],
+    commit: string,
+    request: StageRequest,
+    signal?: AbortSignal
+  ) => {
     const current = await prState(item, signal);
-    if (!reviewedRetryPublication(current, item, correction.fixed.next)) return false;
+    if (!reviewedRetryPublication(current, item, commit)) return false;
     if ((await remote(item.branch, signal)) !== current.headRefOid) return false;
     return repairWriters(record.operation, item.issue, item.next, signal, {
-      threadId: authority.request.threadId,
+      threadId: request.threadId,
       branch: item.branch,
     });
   };

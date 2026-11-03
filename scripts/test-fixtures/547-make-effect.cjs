@@ -122,6 +122,14 @@ if (target === "infra-start") {
 				State: "running",
 			}));
 	if (process.env.CONTROL_MISSING_SERVICE) rows[0].Service = "postgres";
+	if (inspect && process.env.CONTROL_CONTAINER_CHANGED) {
+		const n = fs.existsSync("inspect-count.json")
+			? read("inspect-count.json") + 1
+			: 1;
+		save("inspect-count.json", n);
+		if (n === (process.env.CONTROL_CONTAINER_CHANGED === "before" ? 1 : 2))
+			rows[0].restartCount += 1;
+	}
 	console.log("Reusing the inherited Docker host lock.");
 	console.log(
 		"BOAT547_APPLICATION " +
@@ -255,7 +263,7 @@ if (target === "infra-start") {
 	event("infra-image-preparation");
 } else if (target === "boat-stop") {
 	const retired = {};
-	for (const name of ["dev", "preview"]) {
+	for (const name of ["dev", "preview", "replacement-preview"]) {
 		const capture = path.join("evidence/startup", name);
 		if (!fs.existsSync(path.join(capture, "invocation.json"))) continue;
 		const disposal = read(path.join(capture, "disposal.json"));

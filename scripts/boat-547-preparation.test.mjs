@@ -372,6 +372,175 @@ test("547 ready milestone owns real Make serving captures and publishes readines
 const jsonLines = (file) =>
 	fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
 
+test("547 replacement hands the owned serving lifetime to one new ordinary preview", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const result = await f.run();
+	const old = structuredClone(result.preview);
+	try {
+		const changed = await result.serving.replacePreview({
+			action: "replace-preview",
+			worker: result.owner.worker,
+			admission: result.owner.admission,
+			generation: old.generation,
+		});
+		assert.equal(changed.status, "PASS_PREVIEW_REPLACEMENT");
+		assert.equal(changed.deadline - changed.started, 600);
+		assert.ok(changed.acceptedAt < changed.deadline);
+		assert.notEqual(changed.preview.generation, old.generation);
+		assert.notEqual(changed.preview.pid, old.pid);
+		assert.deepEqual(changed.containers, changed.before.containers);
+		assert.equal(changed.dev.pid, result.dev.pid);
+		assert.equal(changed.retired.closed, true);
+		assert.equal(changed.oldCapture.captureComplete, true);
+		assert.equal(changed.oldDisposal.pipesClosed, true);
+		assert.deepEqual(changed.oldDisposal.unresolved, []);
+		assert.equal(changed.routes.length, 8);
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince !== null,
+			true,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(a) => a[1] === "boat-stop",
+			).length,
+			0,
+		);
+		const commands = jsonLines(path.join(f.root, "serving-commands.jsonl"));
+		assert.deepEqual(commands, ["dev", "preview", "preview"]);
+		await assert.rejects(
+			result.serving.replacePreview({
+				action: "replace-preview",
+				worker: result.owner.worker,
+				admission: result.owner.admission,
+				generation: changed.preview.generation,
+			}),
+			/already consumed/,
+		);
+	} finally {
+		await result.serving.stop();
+	}
+});
+
+test("547 replacement refuses stale input before any runtime effect", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const result = await f.run();
+	try {
+		const before = fs.readFileSync(path.join(f.root, "commands.jsonl"), "utf8");
+		await assert.rejects(
+			result.serving.replacePreview({
+				action: "replace-preview",
+				worker: result.owner.worker,
+				admission: result.owner.admission,
+				generation: "stale-generation",
+			}),
+			/Stale or invalid/,
+		);
+		assert.equal(
+			fs.readFileSync(path.join(f.root, "commands.jsonl"), "utf8"),
+			before,
+		);
+		assert.deepEqual(jsonLines(path.join(f.root, "serving-commands.jsonl")), [
+			"dev",
+			"preview",
+		]);
+		assert.equal(
+			json(path.join(f.root, ".boat/preview-process.json")).generation,
+			result.preview.generation,
+		);
+		assert.notEqual(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+	} finally {
+		await result.serving.stop();
+	}
+});
+
+for (const fault of ["source", "containers-before", "containers", "late"]) {
+	test(`547 replacement ${fault} failure preserves evidence and stops the same owner once`, async (t) => {
+		const f = preparationFixture(t);
+		f.config.until = "ready";
+		let now = mono();
+		const result = await f.run(
+			fault === "late"
+				? {
+						clock: () => now,
+						publication(file, value) {
+							fs.writeFileSync(file, JSON.stringify(value));
+							if (
+								file.endsWith("preview-replacement.json") &&
+								value.status === "PASS_PREVIEW_REPLACEMENT"
+							)
+								now += 601;
+						},
+					}
+				: {},
+		);
+		if (fault === "source")
+			fs.appendFileSync(
+				path.join(f.root, "apps/user/src/boat-live-547.ts"),
+				"\n// unexpected input\n",
+			);
+		if (fault.startsWith("containers"))
+			f.env.CONTROL_CONTAINER_CHANGED =
+				fault === "containers-before" ? "before" : "1";
+		await assert.rejects(
+			result.serving.replacePreview({
+				action: "replace-preview",
+				worker: result.owner.worker,
+				admission: result.owner.admission,
+				generation: result.preview.generation,
+			}),
+			fault === "source"
+				? /Frozen workload changed/
+				: fault.startsWith("containers")
+					? /Application identities changed/
+					: /Original startup deadline/,
+		);
+		await result.serving.done;
+		assert.equal(
+			json(path.join(f.config.evidence, "startup/preview-replacement.json"))
+				.status,
+			"FAIL",
+		);
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(a) => a[1] === "boat-stop",
+			).length,
+			1,
+		);
+		if (["source", "containers-before"].includes(fault)) {
+			assert.deepEqual(jsonLines(path.join(f.root, "serving-commands.jsonl")), [
+				"dev",
+				"preview",
+			]);
+			if (fault === "source")
+				assert.match(
+					fs.readFileSync(
+						path.join(f.root, "apps/user/src/boat-live-547.ts"),
+						"utf8",
+					),
+					/unexpected input/,
+				);
+		} else {
+			const disposal = json(
+				path.join(
+					f.config.evidence,
+					"startup/replacement-preview/disposal.json",
+				),
+			);
+			assert.equal(disposal.pipesClosed, true);
+			assert.deepEqual(disposal.unresolved, []);
+		}
+	});
+}
+
 test("547 serving receipt I/O rejection retires the other capture and stops once", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";
@@ -481,7 +650,7 @@ test("547 serving receipt rejection before readiness is handled and stopped", as
 				return capture;
 			},
 		}),
-		/Serving Make capture ended/,
+		/Serving Make capture ended|EEXIST/,
 	);
 	const result = json(path.join(f.config.evidence, "startup/result.json"));
 	assert.equal(result.status, "FAIL");
@@ -670,7 +839,7 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
-	test("547 qualified public ready entry owns preparation through serving and signal cleanup", {
+	test("547 qualified public ready entry owns preparation, stdin replacement and cleanup", {
 		timeout: 30000,
 	}, async (t) => {
 		const f = preparationFixture(t, true);
@@ -693,6 +862,7 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 			directory: path.join(f.root, "entry-capture"),
 			cwd: f.root,
 			env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
+			input: true,
 		});
 		try {
 			const deadline = mono() + 15;
@@ -710,6 +880,32 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 			assert.equal(result.containers.length, 10);
 			assert.equal(result.routes.length, 8);
 			assert.ok(result.acceptedAt < result.deadline);
+			capture.writeInput(
+				`${JSON.stringify({ action: "replace-preview", worker: result.owner.worker, admission: result.owner.admission, generation: result.preview.generation })}\n`,
+			);
+			const changedFile = path.join(
+				f.config.evidence,
+				"startup/preview-replacement.json",
+			);
+			while (
+				!fs.existsSync(changedFile) ||
+				json(changedFile).status === "RUNNING"
+			) {
+				capture.assertRunning();
+				assert.ok(
+					mono() < deadline,
+					"Public replacement must finish inside control deadline",
+				);
+				await new Promise((resolve) => setTimeout(resolve, 25));
+			}
+			const changed = json(changedFile);
+			assert.equal(
+				changed.status,
+				"PASS_PREVIEW_REPLACEMENT",
+				JSON.stringify(changed),
+			);
+			assert.notEqual(changed.preview.generation, result.preview.generation);
+			assert.equal(changed.next, "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST");
 		} finally {
 			await capture.stop();
 		}

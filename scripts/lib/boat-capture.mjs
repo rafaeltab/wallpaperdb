@@ -30,6 +30,7 @@ function beginCapture({
 	env = process.env,
 	disposalMs = 5000,
 	serving = false,
+	input = false,
 }) {
 	if (
 		!serving &&
@@ -73,7 +74,7 @@ function beginCapture({
 	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, cancel);
 	const child = spawn(argv[0], argv.slice(1), {
 		detached: true,
-		stdio: ["ignore", "pipe", "pipe"],
+		stdio: [input ? "pipe" : "ignore", "pipe", "pipe"],
 		env,
 		cwd,
 	});
@@ -81,9 +82,18 @@ function beginCapture({
 		spawnError = e.code ?? "spawn-error";
 		shorten();
 	});
+	child.stdin?.on("error", () => {
+		failure ??= "stdin transport error";
+		shorten();
+	});
 	child.on("exit", (code, signal) => {
 		terminal = { code, signal };
-		if (serving) shorten();
+		if (serving && !Number.isFinite(phase.deadline)) {
+			// Natural terminal/close may finish normally. Bound only lingering
+			// descendants or pipes; do not label natural retirement as cancellation.
+			phase.deadline = performance.now() + 30000;
+			phase.disposalMs = 5000;
+		}
 	});
 	for (const name of ["stdout", "stderr"]) {
 		child[name].on("error", () => {
@@ -158,6 +168,10 @@ function beginCapture({
 		pid: child.pid,
 		checkpointDirectory: dir,
 		completion,
+		writeInput(value) {
+			if (!child.stdin) throw new Error("Capture input is not enabled");
+			child.stdin.write(value);
+		},
 		stop: () => {
 			shorten();
 			return completion;

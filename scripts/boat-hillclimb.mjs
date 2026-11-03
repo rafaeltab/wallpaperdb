@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createInterface } from "node:readline";
 import {
 	execute547Asset,
 	execute547Preparation,
@@ -22,10 +23,50 @@ try {
 			round: result.round,
 			scope: result.scope,
 			outcome: result.outcome,
+			url: result.url,
+			worker: result.owner?.worker,
+			admission: result.owner?.admission,
+			generation: result.preview?.generation,
 		}),
 	);
 	if (result.serving) {
+		const input = createInterface({
+			input: process.stdin,
+			terminal: false,
+			crlfDelay: Infinity,
+		});
+		const requests = new Set();
+		input.on("line", (line) => {
+			const request = (async () => {
+				try {
+					const changed = await result.serving.replacePreview(JSON.parse(line));
+					console.log(
+						JSON.stringify({
+							status: changed.status,
+							phase: changed.phase,
+							round: changed.round,
+							url: changed.url,
+							worker: changed.owner.worker,
+							admission: changed.owner.admission,
+							generation: changed.preview.generation,
+							next: changed.next,
+						}),
+					);
+				} catch (error) {
+					console.error(
+						JSON.stringify({
+							status: error.actionStarted ? "FAIL" : "REFUSED",
+							error: error.message,
+						}),
+					);
+				}
+			})();
+			requests.add(request);
+			void request.finally(() => requests.delete(request));
+		});
 		const cleanup = await result.serving.done;
+		input.close();
+		await Promise.allSettled(requests);
 		console.log(
 			JSON.stringify({ status: "SERVING_ENDED", cleanup: cleanup.status }),
 		);

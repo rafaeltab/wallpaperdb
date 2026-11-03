@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { quote } from "./boat.mjs";
 import { markedObservation } from "./boat-547-preparation.mjs";
 
@@ -125,10 +126,24 @@ export async function start547Application(context) {
 		compute: "OPEN",
 	};
 	const handles = [];
-	const completions = [];
+	const ended = Promise.withResolvers();
+	const expectedEnds = new Set(),
+		settlements = new Map();
+	let armed = false,
+		transitioning = false,
+		replacement,
+		consumed = false;
+	let activeDeadline = deadline;
+	let dev, preview;
 	let acquired = false;
 	let cleanupPromise;
 	const retire = () => {
+		if (replacement?.status === "RUNNING")
+			failReplacement(
+				new Error(
+					"Preview replacement phase failed; see captured phase result",
+				),
+			);
 		cleanupPromise ??= (async () => {
 			const captures = await Promise.allSettled(
 				handles.map((h) => Promise.resolve().then(() => h.stop())),
@@ -196,10 +211,31 @@ export async function start547Application(context) {
 		});
 		record();
 	};
+	const recordReplacement = () => {
+		try {
+			publish(path.join(directory, "preview-replacement.json"), replacement);
+		} catch (error) {
+			replacement.publicationError = error.message;
+		}
+	};
+	const failReplacement = (error) => {
+		Object.assign(replacement, {
+			status: "FAIL",
+			error: error.message,
+			failedAt: clock(),
+		});
+		delete replacement.acceptedAt;
+		recordReplacement();
+		revoke(error);
+	};
 	const within = () => {
 		require(clock() <
-			deadline, "Original startup deadline exceeded before acceptance");
-		for (const handle of handles) handle.assertRunning();
+			activeDeadline, "Original startup deadline exceeded before acceptance");
+		for (const handle of handles) {
+			const settled = settlements.get(handle);
+			if (settled?.error) throw settled.error;
+			if (!expectedEnds.has(handle)) handle.assertRunning();
+		}
 	};
 	const inputs = () => {
 		preservedImplementation();
@@ -238,14 +274,14 @@ export async function start547Application(context) {
 		within();
 		const phase = await runPhase(
 			{ id, argv, inputs, assess, prepare },
-			deadline,
+			activeDeadline,
 			retire,
 		);
 		within();
 		return phase.outcome;
 	};
 	const wait = async (predicate, usable) => {
-		const until = Math.min(deadline, clock() + usable);
+		const until = Math.min(activeDeadline, clock() + usable);
 		for (;;) {
 			within();
 			require(clock() < until, "Serving readiness deadline exceeded");
@@ -265,52 +301,23 @@ export async function start547Application(context) {
 		handles.push(handle);
 		// Observe rejection immediately, including exits before startup acceptance.
 		// A rejected final receipt is an ended capture, not permission to skip cleanup.
-		completions.push(
-			handle.completion.then(
-				(value) => ({ name, value }),
-				(error) => ({ name, error }),
-			),
+		const observe = (completion) => {
+			settlements.set(handle, completion);
+			if (
+				armed &&
+				!transitioning &&
+				(!expectedEnds.has(handle) || completion.error)
+			)
+				ended.resolve(completion);
+		};
+		handle.completion.then(
+			(value) => observe({ name, value }),
+			(error) => observe({ name, error }),
 		);
 		within();
 		return handle;
 	};
-	try {
-		fs.mkdirSync(directory, { mode: 0o700 });
-		acquired = true;
-		fixed = [source, observer].map(fileIdentity);
-		preserved();
-		within();
-		require(/^[A-Za-z0-9_-]+$/.test(
-			binding.project,
-		), "Invalid generated Compose project");
-		require(!fs.existsSync(
-			path.join(root, ".boat/preview-process.json"),
-		), "Startup found an existing preview owner; no replacement authorized");
-		await run(
-			"infra-start",
-			["make", "infra-start", "ARGS=--pull=never"],
-			undefined,
-			workload.stageSdk,
-		);
-		const dev = await launch("dev", ["make", "dev"]);
-		await wait(
-			() =>
-				fs
-					.readFileSync(path.join(directory, "dev/stdout.raw"), "utf8")
-					.includes("Watch enabled"),
-			60,
-		);
-		const preview = await launch("preview", ["make", "boat-preview"]);
-		const current = await wait(() => {
-			const file = path.join(root, ".boat/preview-process.json");
-			if (!fs.existsSync(file)) return false;
-			const value = read(file);
-			return value.ready === true && value.phase === "ready" && value;
-		}, 175);
-		require(typeof current.generation === "string" &&
-			current.generation &&
-			current.forward?.startTicks &&
-			current.cwd === root, "Published preview identity is incomplete");
+	const collectRoutes = async (label = "") => {
 		const observations = await Promise.allSettled(
 			routes.map(async (route) => {
 				const response = await fetch(
@@ -334,21 +341,24 @@ export async function start547Application(context) {
 			}),
 		);
 		publish(
-			path.join(directory, "routes.json"),
+			path.join(directory, `${label}routes.json`),
 			observations.map((r) =>
 				r.status === "fulfilled" ? r.value : { error: r.reason.message },
 			),
 		);
-		result.routes = observations.map((r) => {
+		const accepted = observations.map((r) => {
 			if (r.status === "rejected") throw r.reason;
 			require(r.value.status ===
 				200, `Readiness route failed: ${r.value.path}`);
 			return r.value;
 		});
 		within();
+		return accepted;
+	};
+	const collectInventory = async (label = "") => {
 		let selected;
 		await run(
-			"app-inventory",
+			`${label}app-inventory`,
 			[
 				"make",
 				"docker-run",
@@ -371,8 +381,8 @@ export async function start547Application(context) {
 				return selected;
 			},
 		);
-		result.containers = await run(
-			"app-identities",
+		return await run(
+			`${label}app-identities`,
 			[
 				"make",
 				"docker-run",
@@ -389,15 +399,20 @@ export async function start547Application(context) {
 					binding.project,
 				),
 		);
-		const observation = path.join(directory, "preview-observation-input.json");
+	};
+	const collectOwnership = async (current, dev, label = "") => {
+		const observation = path.join(
+			directory,
+			`${label}preview-observation-input.json`,
+		);
 		publish(observation, {
 			oldPreview: current,
 			devLauncher: launcher(dev.pid, root),
 			root,
 			ports: [binding.ingress, binding.ingress + 20000],
 		});
-		result.ownership = await run(
-			"preview-ownership",
+		return await run(
+			`${label}preview-ownership`,
 			[
 				"make",
 				"run",
@@ -408,6 +423,279 @@ export async function start547Application(context) {
 			],
 			(raw) => markedObservation(raw, "BOAT547_PREVIEW_OBSERVATION"),
 		);
+	};
+	const waitPreview = async (previous) => {
+		const value = await wait(() => {
+			const file = path.join(root, ".boat/preview-process.json");
+			if (!fs.existsSync(file)) return false;
+			const current = read(file);
+			return (
+				current.ready === true &&
+				current.phase === "ready" &&
+				current.generation !== previous &&
+				current
+			);
+		}, 175);
+		require(typeof value.generation === "string" &&
+			value.generation &&
+			value.forward?.startTicks &&
+			value.cwd === root, "Published preview identity is incomplete");
+		return value;
+	};
+	const liveRaw = () =>
+		handles
+			.filter((h) => !expectedEnds.has(h))
+			.flatMap((h) =>
+				["stdout", "stderr"].map((name) =>
+					path.join(h.checkpointDirectory, `${name}.raw`),
+				),
+			);
+	const stableContainers = (rows) =>
+		rows.map((r) => ({
+			service: r.service,
+			id: r.id,
+			image: r.image,
+			created: r.created,
+			restartCount: r.restartCount,
+			labels: r.labels,
+			ports: r.ports,
+			pid: r.state.Pid,
+			started: r.state.StartedAt,
+			status: r.state.Status,
+			running: r.state.Running,
+			health: r.state.Health?.Status ?? null,
+		}));
+	const immutableProcess = (r) => ({
+		pid: r.pid,
+		startTicks: r.startTicks,
+		group: r.group,
+		session: r.session,
+		cwd: r.cwd,
+	});
+	const replacePreview = async (request) => {
+		require(!consumed, "Preview replacement already consumed");
+		require(request &&
+			typeof request === "object" &&
+			Object.keys(request).sort().join(",") ===
+				"action,admission,generation,worker" &&
+			request.action === "replace-preview" &&
+			request.worker === binding.worker &&
+			request.admission === binding.admission &&
+			request.generation ===
+				result.preview
+					.generation, "Stale or invalid preview replacement request; no action executed");
+		require(!cleanupPromise, "Serving cleanup already started");
+		consumed = true;
+		const began = clock();
+		activeDeadline = began + 600;
+		transitioning = true;
+		replacement = {
+			phase: "preview-replacement",
+			request: structuredClone(request),
+			owner: binding,
+			round: config.round,
+			started: began,
+			deadline: activeDeadline,
+			status: "RUNNING",
+		};
+		result.startupTiming = {
+			started: result.started,
+			deadline: result.deadline,
+			acceptedAt: result.acceptedAt,
+		};
+		result.phase = "preview-replacement";
+		result.started = began;
+		result.deadline = activeDeadline;
+		delete result.acceptedAt;
+		result.status = "PREVIEW_REPLACEMENT_PENDING";
+		delete result.next;
+		record();
+		recordReplacement();
+		const oldHandle = preview;
+		try {
+			within();
+			preserved();
+			const old = read(path.join(root, ".boat/preview-process.json"));
+			require(old.ready &&
+				old.phase === "ready" &&
+				old.generation === request.generation &&
+				old.pid === result.preview.pid &&
+				old.startTicks === result.preview.startTicks &&
+				JSON.stringify(old.forward) ===
+					JSON.stringify(
+						result.preview.forward,
+					), "Current preview changed before replacement");
+			replacement.before = {
+				preview: old,
+				containers: await collectInventory("replacement-before-"),
+				ownership: await collectOwnership(old, dev, "replacement-before-"),
+			};
+			require(isDeepStrictEqual(
+				stableContainers(result.containers),
+				stableContainers(replacement.before.containers),
+			), "Application identities changed before local preview replacement");
+			within();
+			preserved();
+			// Only ordinary Make/controller receives predecessor-retirement authority.
+			expectedEnds.add(oldHandle);
+			const next = await launch("replacement-preview", [
+				"make",
+				"boat-preview",
+			]);
+			const current = await waitPreview(old.generation);
+			await wait(() => settlements.get(oldHandle), 5);
+			within();
+			replacement.oldCapture = read(
+				path.join(oldHandle.checkpointDirectory, "receipt.json"),
+			);
+			replacement.oldDisposal = read(
+				path.join(oldHandle.checkpointDirectory, "disposal.json"),
+			);
+			require(replacement.oldCapture.captureComplete &&
+				replacement.oldDisposal.pipesClosed &&
+				replacement.oldDisposal.unresolved?.length === 0 &&
+				!replacement.oldDisposal
+					.failure, "Old preview terminal or drainage is unresolved");
+			const eventBytes = fs.readFileSync(path.join(root, ".boat/events.jsonl"));
+			publish(path.join(directory, "replacement-events.json"), {
+				nativeUtf8: eventBytes.toString("utf8"),
+			});
+			const text = eventBytes.toString("utf8"),
+				lines = text
+					.slice(0, text.lastIndexOf("\n") + 1)
+					.split("\n")
+					.filter(Boolean)
+					.map(JSON.parse);
+			const events = lines.filter((e) => e.kind === "preview-lifetime");
+			replacement.retired = events.findLast(
+				(e) => e.generation === old.generation && e.stage === "retired",
+			);
+			replacement.predecessorRetired = events.findLast(
+				(e) =>
+					e.generation === current.generation &&
+					e.stage === "predecessor-retired",
+			);
+			replacement.ready = events.findLast(
+				(e) => e.generation === current.generation && e.stage === "ready",
+			);
+			require(replacement.retired?.closed === true &&
+				replacement.retired.terminal &&
+				replacement.predecessorRetired?.predecessor?.generation ===
+					old.generation &&
+				replacement.ready &&
+				!events.some(
+					(e) =>
+						[old.generation, current.generation].includes(e.generation) &&
+						["failed", "unresolved"].includes(e.stage),
+				), "Native preview retirement/readiness proof differs");
+			require(JSON.stringify(immutableProcess(replacement.retired.forward)) ===
+				JSON.stringify(immutableProcess(old.forward)) &&
+				JSON.stringify(
+					immutableProcess(replacement.predecessorRetired.forward),
+				) === JSON.stringify(immutableProcess(old.forward)) &&
+				JSON.stringify(immutableProcess(replacement.ready.forward)) ===
+					JSON.stringify(
+						immutableProcess(current.forward),
+					), "Native preview forward identities differ");
+			require(current.generation !== old.generation &&
+				current.pid !== old.pid &&
+				current.forward.pid !==
+					old.forward
+						.pid, "Replacement did not acquire distinct actual identities");
+			replacement.routes = await collectRoutes("replacement-");
+			replacement.containers = await collectInventory("replacement-after-");
+			require(isDeepStrictEqual(
+				stableContainers(replacement.before.containers),
+				stableContainers(replacement.containers),
+			), "Application identities changed during local preview replacement");
+			replacement.ownership = await collectOwnership(
+				current,
+				dev,
+				"replacement-after-",
+			);
+			require(JSON.stringify(
+				immutableProcess(replacement.before.ownership.dev),
+			) ===
+				JSON.stringify(
+					immutableProcess(replacement.ownership.dev),
+				), "Development launcher changed during preview replacement");
+			preserved();
+			within();
+			const latest = read(path.join(root, ".boat/preview-process.json"));
+			require(latest.ready &&
+				latest.generation === current.generation &&
+				latest.pid === current.pid &&
+				latest.startTicks === current.startTicks &&
+				JSON.stringify(latest.forward) ===
+					JSON.stringify(
+						current.forward,
+					), "New preview changed before acceptance");
+			Object.assign(replacement, {
+				status: "PASS_PREVIEW_REPLACEMENT",
+				preview: current,
+				previewCapture: next.checkpoint(),
+				dev: immutableProcess(replacement.ownership.dev),
+				url: result.url,
+				acceptedAt: clock(),
+				next: "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST",
+			});
+			publication(
+				path.join(directory, "preview-replacement.json"),
+				replacement,
+			);
+			manifest(directory, liveRaw());
+			preserved();
+			within();
+			preview = next;
+			result.preview = current;
+			result.previewCapture = replacement.previewCapture;
+			result.status = "PASS_PREVIEW_REPLACEMENT";
+			result.acceptedAt = replacement.acceptedAt;
+			result.next = replacement.next;
+			record();
+			transitioning = false;
+			return replacement;
+		} catch (error) {
+			error.actionStarted = true;
+			failReplacement(error);
+			replacement.cleanup = await retire();
+			recordReplacement();
+			transitioning = false;
+			ended.resolve({ name: "preview replacement", error });
+			throw error;
+		}
+	};
+	try {
+		fs.mkdirSync(directory, { mode: 0o700 });
+		acquired = true;
+		fixed = [source, observer].map(fileIdentity);
+		preserved();
+		within();
+		require(/^[A-Za-z0-9_-]+$/.test(
+			binding.project,
+		), "Invalid generated Compose project");
+		require(!fs.existsSync(
+			path.join(root, ".boat/preview-process.json"),
+		), "Startup found an existing preview owner; no replacement authorized");
+		await run(
+			"infra-start",
+			["make", "infra-start", "ARGS=--pull=never"],
+			undefined,
+			workload.stageSdk,
+		);
+		dev = await launch("dev", ["make", "dev"]);
+		await wait(
+			() =>
+				fs
+					.readFileSync(path.join(directory, "dev/stdout.raw"), "utf8")
+					.includes("Watch enabled"),
+			60,
+		);
+		preview = await launch("preview", ["make", "boat-preview"]);
+		const current = await waitPreview();
+		result.routes = await collectRoutes();
+		result.containers = await collectInventory();
+		result.ownership = await collectOwnership(current, dev);
 		preserved();
 		within();
 		const latest = read(path.join(root, ".boat/preview-process.json"));
@@ -439,7 +727,8 @@ export async function start547Application(context) {
 		);
 		preserved();
 		within();
-		const done = Promise.race(completions).then(async (completion) => {
+		armed = true;
+		const done = ended.promise.then(async (completion) => {
 			revoke(
 				completion.error ??
 					new Error(`${completion.name} serving capture ended`),
@@ -456,7 +745,9 @@ export async function start547Application(context) {
 			}
 			return result.cleanup;
 		});
-		Object.defineProperty(result, "serving", { value: { done, stop: retire } });
+		Object.defineProperty(result, "serving", {
+			value: { done, stop: retire, replacePreview },
+		});
 		return result;
 	} catch (error) {
 		revoke(error);

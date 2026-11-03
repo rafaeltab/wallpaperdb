@@ -21,6 +21,8 @@ function identity() {
 	};
 }
 const mode = process.argv[2];
+if (["dev", "preview"].includes(mode))
+	fs.appendFileSync("serving-commands.jsonl", `${JSON.stringify(mode)}\n`);
 if (mode === "historical") console.log(JSON.stringify(identity()));
 else if (mode === "dev") {
 	console.log("Watch enabled");

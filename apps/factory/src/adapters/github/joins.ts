@@ -827,7 +827,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const metadataMatches = async (operation: Intent, signal?: AbortSignal) => {
     for (const item of operation.replay) {
       const current = await prState(item, signal);
-      if (current.headRefOid !== item.next || current.baseRefName !== item.target) return false;
+      if (
+        current.state !== 'OPEN' ||
+        current.headRefOid !== item.next ||
+        current.baseRefName !== item.target
+      )
+        return false;
     }
     return groupingMatches(operation, signal);
   };
@@ -864,13 +869,33 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       return false;
     return isAncestor(landed.commit, item.next, signal);
   };
+  const authenticatedRetiredReplay = async (
+    operation: Intent,
+    item: Intent['replay'][number],
+    target: string,
+    signal?: AbortSignal
+  ) => {
+    const landed = await landedPrerequisite(project, item.issue, gh, signal);
+    if (
+      !landed ||
+      landed.pr !== item.pr ||
+      landed.originalHead !== item.next ||
+      landed.branch !== target
+    )
+      return false;
+    const tip = replayTip(operation);
+    return !!tip && (await isAncestor(landed.commit, tip, signal));
+  };
   const currentComparison = async (
     operation: Intent,
     item: Intent['replay'][number],
     signal?: AbortSignal
   ) => {
     const current = await prState(item, signal);
-    if (current.state !== 'OPEN' || current.headRefOid !== item.next) return false;
+    if (current.headRefOid !== item.next) return false;
+    if (current.state === 'MERGED')
+      return authenticatedRetiredReplay(operation, item, current.baseRefName, signal);
+    if (current.state !== 'OPEN') return false;
     if (current.baseRefName !== item.target)
       return authenticatedTarget(operation, item, current.baseRefName, signal);
     const head = await remote(item.target, signal);

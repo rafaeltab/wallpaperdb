@@ -1,4 +1,4 @@
-import { Effect, Layer, Semaphore } from 'effect';
+import { Effect, Layer, Option, Semaphore } from 'effect';
 import { Issues, type Start, type Status } from '../job/index.js';
 import {
   Plan,
@@ -47,6 +47,7 @@ export const SchedulerLive = Layer.effect(
     const issues = yield* Issues;
     const source = yield* PlanningSource;
     const writers = yield* Semaphore.make(1);
+    const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
     let retryPreview: Preview | undefined;
     const observe = (
@@ -93,7 +94,12 @@ export const SchedulerLive = Layer.effect(
           slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) <
             snapshot.state.concurrency
         );
-      });
+      }).pipe(
+        // Job.status can reconcile the same repair that requested capacity.
+        // A nested query must defer, never wait on its own observation or send.
+        recoveryObservations.withPermitsIfAvailable(1),
+        Effect.map(Option.getOrElse(() => false))
+      );
     const reconcile = () =>
       Effect.gen(function* () {
         yield* issues.reconcile?.(admitRecovery) ?? Effect.void;

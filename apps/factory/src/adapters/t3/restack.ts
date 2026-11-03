@@ -88,8 +88,17 @@ export function t3Restacker(
     const git = async (args: string[]) => (await command('git', args, path, signal)).trim();
     if (await git(['status', '--porcelain'])) return null;
     const head = sha.parse(await git(['rev-parse', 'HEAD']));
-    await git(['merge-base', '--is-ancestor', operation.onto, head]);
+    if (!(await containsOnto(git, head))) return null;
     return (await validComparison(git, head)) ? head : null;
+  };
+  const containsOnto = async (git: (args: string[]) => Promise<string>, head: string) => {
+    try {
+      await git(['merge-base', '--is-ancestor', operation.onto, head]);
+      return true;
+    } catch (cause) {
+      if (cause instanceof Error && 'code' in cause && cause.code === 1) return false;
+      throw cause;
+    }
   };
   const validComparison = async (git: (args: string[]) => Promise<string>, head: string) => {
     if (await git(['rev-list', '--merges', `${operation.onto}..${head}`])) return false;

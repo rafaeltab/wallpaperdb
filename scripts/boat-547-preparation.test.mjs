@@ -422,6 +422,84 @@ test("547 replacement hands the owned serving lifetime to one new ordinary previ
 	}
 });
 
+for (const failure of ["terminal", "receipt-rejection"]) {
+	test(`547 replacement ${failure} automatically retires serving and accounts compute`, async (t) => {
+		const f = preparationFixture(t);
+		f.config.until = "ready";
+		let preview;
+		const result = await f.run({
+			make: async (argv, options) => {
+				const capture = await f.make(argv, options);
+				if (options.directory.endsWith("/replacement-preview"))
+					preview = capture;
+				return capture;
+			},
+		});
+		let timer;
+		try {
+			const changed = await result.serving.replacePreview({
+				action: "replace-preview",
+				worker: result.owner.worker,
+				admission: result.owner.admission,
+				generation: result.preview.generation,
+			});
+			assert.equal(changed.status, "PASS_PREVIEW_REPLACEMENT");
+			assert.ok(preview);
+			if (failure === "receipt-rejection") {
+				fs.mkdirSync(path.join(preview.checkpointDirectory, "receipt.json"));
+				await assert.rejects(preview.stop(), /EEXIST/);
+			} else await preview.stop();
+			// End the replacement capture independently; the serving owner must notice
+			// and clean up without an explicit serving.stop() from this control.
+			const cleanup = await Promise.race([
+				result.serving.done,
+				new Promise((_, reject) => {
+					timer = setTimeout(
+						() => reject(new Error("Replacement completion was not observed")),
+						10000,
+					);
+				}),
+			]);
+			const expected =
+				failure === "receipt-rejection"
+					? "CAPTURE_FINALIZATION_FAILED"
+					: "STOPPED_ACCOUNTED";
+			assert.equal(cleanup.status, expected);
+			assert.equal(cleanup.compute.status, "STOPPED_ACCOUNTED");
+			const ended = json(path.join(f.config.evidence, "startup/result.json"));
+			assert.equal(ended.status, "SERVING_ENDED");
+			assert.equal(ended.next, undefined);
+			assert.equal(ended.acceptedAt, undefined);
+			assert.equal(ended.cleanup.status, expected);
+			assert.equal(ended.cleanup.compute.status, "STOPPED_ACCOUNTED");
+			if (failure === "receipt-rejection")
+				assert.ok(
+					cleanup.transports.some((capture) => /EEXIST/.test(capture.failure)),
+				);
+			assert.equal(
+				json(path.join(f.root, ".boat/state.json")).runningSince,
+				null,
+			);
+			assert.equal(
+				jsonLines(path.join(f.root, "commands.jsonl")).filter(
+					(argv) => argv[1] === "boat-stop",
+				).length,
+				1,
+			);
+			for (const name of ["dev", "preview", "replacement-preview"]) {
+				const disposal = json(
+					path.join(f.config.evidence, `startup/${name}/disposal.json`),
+				);
+				assert.equal(disposal.pipesClosed, true);
+				assert.deepEqual(disposal.unresolved, []);
+			}
+		} finally {
+			clearTimeout(timer);
+			await result.serving.stop();
+		}
+	});
+}
+
 test("547 replacement refuses stale input before any runtime effect", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";
@@ -463,6 +541,8 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 		const f = preparationFixture(t);
 		f.config.until = "ready";
 		let now = mono();
+		const entered = Promise.withResolvers(),
+			release = Promise.withResolvers();
 		const result = await f.run(
 			fault === "late"
 				? {
@@ -475,6 +555,13 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 							)
 								now += 601;
 						},
+						make: async (argv, options) => {
+							if (argv[1] === "boat-stop") {
+								entered.resolve();
+								await release.promise;
+							}
+							return f.make(argv, options);
+						},
 					}
 				: {},
 		);
@@ -486,7 +573,7 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 		if (fault.startsWith("containers"))
 			f.env.CONTROL_CONTAINER_CHANGED =
 				fault === "containers-before" ? "before" : "1";
-		await assert.rejects(
+		const rejected = assert.rejects(
 			result.serving.replacePreview({
 				action: "replace-preview",
 				worker: result.owner.worker,
@@ -499,6 +586,40 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 					? /Application identities changed/
 					: /Original startup deadline/,
 		);
+		let timer;
+		try {
+			if (fault === "late") {
+				await Promise.race([
+					entered.promise,
+					new Promise((_, reject) => {
+						timer = setTimeout(
+							() => reject(new Error("Owning stop was not reached")),
+							10000,
+						);
+					}),
+				]);
+				const replacement = json(
+					path.join(f.config.evidence, "startup/preview-replacement.json"),
+				);
+				assert.equal(replacement.status, "FAIL");
+				assert.equal(replacement.acceptedAt, undefined);
+				const pending = json(
+					path.join(f.config.evidence, "startup/result.json"),
+				);
+				assert.equal(pending.status, "FAIL");
+				assert.equal(pending.next, undefined);
+				assert.equal(pending.acceptedAt, undefined);
+				assert.equal(pending.cleanup.status, "PENDING_OWNING_STOP");
+				assert.notEqual(
+					json(path.join(f.root, ".boat/state.json")).runningSince,
+					null,
+				);
+			}
+		} finally {
+			clearTimeout(timer);
+			release.resolve();
+			await rejected;
+		}
 		await result.serving.done;
 		assert.equal(
 			json(path.join(f.config.evidence, "startup/preview-replacement.json"))

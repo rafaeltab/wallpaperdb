@@ -13,7 +13,7 @@
 		"boat:watch": "node boat-watch.mjs",
 		"boat:probe": "node boat-probe.mjs",
 		"boat:ready": "cd .. && node --experimental-strip-types scripts/boat-ready.mjs",
-		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs lib/boat-snapshot.mjs lib/boat-reconstruction.mjs lib/boat-shutdown.mjs lib/boat-preview.mjs test-fixtures/preview-claim-observer.mjs test-fixtures/preview-reaping-observer.mjs lib/boat-source-generation.mjs lib/boat-source-command.mjs lib/boat-source-command.test.mjs lib/boat-source-ownership.test.mjs lib/boat-asset-migration.mjs",
+		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs lib/boat-snapshot.mjs lib/boat-reconstruction.mjs lib/boat-shutdown.mjs lib/boat-preview.mjs test-fixtures/preview-claim-observer.mjs test-fixtures/preview-reaping-observer.mjs lib/boat-source-generation.mjs lib/boat-source-command.mjs lib/boat-source-command.test.mjs lib/boat-source-ownership.test.mjs lib/boat-asset-migration.mjs boat-hillclimb.mjs boat-hillclimb.test.mjs lib/boat-capture.mjs lib/boat-547-baseline.mjs lib/boat-hillclimb.mjs",
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
 		"test:boat-bootstrap": "node --test boat-bootstrap.test.mjs",
@@ -37,7 +37,8 @@
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
 		"test:operator-inbox": "node --test operator-inbox.test.mjs",
-		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts"
+		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts",
+		"test:boat-hillclimb": "cd .. && node --test scripts/boat-hillclimb.test.mjs scripts/makefile.test.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

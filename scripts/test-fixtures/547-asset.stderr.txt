@@ -1,0 +1,71 @@
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 16 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-cleanup.integration.test.ts[2m > [22mcloses the native silent-peer socket after timeout
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-cleanup.integration.test.ts[2m > [22mcloses the native silent-peer socket after cancellation
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-cleanup.integration.test.ts[2m > [22mcloses the native silent-peer socket after disposal
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-commands.integration.test.ts[2m > [22mcloses the native silent-peer socket after timeout
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-commands.integration.test.ts[2m > [22mcloses the native silent-peer socket after cancellation
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-commands.integration.test.ts[2m > [22mcloses the native silent-peer socket after disposal
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-events.integration.test.ts[2m > [22mcloses the native silent-peer socket after timeout
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-events.integration.test.ts[2m > [22mcloses the native silent-peer socket after cancellation
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-events.integration.test.ts[2m > [22mcloses the native silent-peer socket after disposal
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-notifications.integration.test.ts[2m > [22mcloses the native silent-peer socket after timeout
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-notifications.integration.test.ts[2m > [22mcloses the native silent-peer socket after cancellation
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-notifications.integration.test.ts[2m > [22mcloses the native silent-peer socket after disposal
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-sources.integration.test.ts[2m > [22mcloses the native silent-peer socket after timeout
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-sources.integration.test.ts[2m > [22mcloses the native silent-peer socket after cancellation
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-sources.integration.test.ts[2m > [22mcloses the native silent-peer socket after disposal
+[31m[1mAssertionError[22m: expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m test/fixtures/broker-acquisition.ts:[2m35:68[22m[39m
+    [90m 33|[39m         if (ending === 'timeout') await acquisition;
+    [90m 34|[39m         const closure = (async () => {
+    [90m 35|[39m           await expect.poll(() => sockets.size, { timeout: 1000 }).toB…
+    [90m   |[39m                                                                    [31m^[39m
+    [90m 36|[39m         })();
+    [90m 37|[39m         const [result] = await Promise.all([acquisition, closure, disp…
+[90m [2m❯[22m test/fixtures/broker-acquisition.ts:[2m36:9[22m[39m
+
+[31m[1mCaused by: Error[22m: Matcher did not succeed in time.[39m
+[36m [2m❯[22m test/fixtures/broker-acquisition.ts:[2m35:11[22m[39m
+[90m [2m❯[22m test/fixtures/broker-acquisition.ts:[2m37:26[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[46m asset-integration [49m[39m test/broker-acquisition-errors.integration.test.ts[2m > [22mcloses the native silent-peer socket on explicit abort without dialing the remaining candidate
+[31m[1mAssertionError[22m: expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m76:68[22m[39m
+    [90m 74|[39m         controller.abort();
+    [90m 75|[39m         const closure = (async () => {
+    [90m 76|[39m           await expect.poll(() => sockets.size, { timeout: 1000 }).toB…
+    [90m   |[39m                                                                    [31m^[39m
+    [90m 77|[39m         })();
+    [90m 78|[39m         const [result] = await Promise.all([outcome, closure]);
+[90m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m77:9[22m[39m
+[90m [2m❯[22m withBrokerAddresses test/fixtures/broker-addresses.ts:[2m25:12[22m[39m
+[90m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m61:5[22m[39m
+
+[31m[1mCaused by: Error[22m: Matcher did not succeed in time.[39m
+[36m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m76:11[22m[39m
+[90m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m78:26[22m[39m
+[90m [2m❯[22m withBrokerAddresses test/fixtures/broker-addresses.ts:[2m25:12[22m[39m
+[90m [2m❯[22m test/broker-acquisition-errors.integration.test.ts:[2m61:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯[22m[39m
+
+make: *** [Makefile:105: test-focused] Error 1
+make: *** [Makefile:283: test-focused] Error 2

@@ -1,0 +1,147 @@
+// Extracted from the qualified #557 capture. Ownership/retirement stays in boat-shutdown.
+import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { finiteShutdownProcess } from "./boat-shutdown.mjs";
+const mono = () => Number(process.hrtime.bigint()) / 1e9;
+const sha = (b) => createHash("sha256").update(b).digest("hex");
+function save(file, value) {
+	const fd = fs.openSync(file, "wx", 0o600);
+	try {
+		fs.writeFileSync(fd, JSON.stringify(value, null, 2) + "\n");
+		fs.fsyncSync(fd);
+	} finally {
+		fs.closeSync(fd);
+	}
+	const dir = fs.openSync(path.dirname(file), "r");
+	try {
+		fs.fsyncSync(dir);
+	} finally {
+		fs.closeSync(dir);
+	}
+}
+export async function captureCommand({
+	argv,
+	directory: dir,
+	deadline,
+	cwd,
+	limit = 16777216,
+	env = process.env,
+	disposalMs = 5000,
+}) {
+	if (!Number.isFinite(deadline) || deadline - mono() <= disposalMs / 1000)
+		throw new Error("Insufficient original command deadline");
+	fs.mkdirSync(dir, { mode: 0o700 }); // Exclusive phase directory. No overwrite/retry.
+	const parent = fs.openSync(path.dirname(dir), "r");
+	try {
+		fs.fsyncSync(parent);
+	} finally {
+		fs.closeSync(parent);
+	}
+	const began = { utc: new Date().toISOString(), monotonic: mono() };
+	const streams = {};
+	for (const name of ["stdout", "stderr"])
+		streams[name] = {
+			fd: fs.openSync(path.join(dir, `${name}.raw`), "wx", 0o600),
+			bytes: 0,
+			overflow: false,
+		};
+	save(path.join(dir, "invocation.json"), { argv, began, deadline, limit });
+	const phase = {
+		phase: "547-command",
+		deadline: performance.now() + Math.max(0, deadline - mono()) * 1000,
+		disposalMs,
+		record: (r) => save(path.join(dir, "disposal.json"), r),
+	};
+	let failure = null,
+		spawnError = null,
+		terminal = null;
+	const shorten = () => {
+		phase.deadline = Math.min(phase.deadline, performance.now() + disposalMs);
+	};
+	const cancel = () => {
+		failure ??= "local interruption";
+		shorten();
+	};
+	for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, cancel);
+	const child = spawn(argv[0], argv.slice(1), {
+		detached: true,
+		stdio: ["ignore", "pipe", "pipe"],
+		env,
+		cwd,
+	});
+	child.on("error", (e) => {
+		spawnError = e.code ?? "spawn-error";
+		shorten();
+	});
+	child.on("exit", (code, signal) => {
+		terminal = { code, signal };
+	});
+	for (const name of ["stdout", "stderr"]) {
+		child[name].on("error", () => {
+			failure ??= `${name} transport error`;
+			shorten();
+		});
+		child[name].on("data", (b) => {
+			const s = streams[name],
+				keep = Math.min(b.length, Math.max(0, limit - s.bytes));
+			try {
+				let written = 0;
+				while (written < keep)
+					written += fs.writeSync(s.fd, b, written, keep - written);
+				s.bytes += keep; // Bytes are saved before any parsing. No parsing occurs here.
+				if (keep < b.length) {
+					s.overflow = true;
+					failure ??= `${name} overflow`;
+					shorten();
+				}
+			} catch {
+				failure ??= `${name} capture write failed`;
+				shorten();
+			}
+		});
+	}
+	try {
+		await finiteShutdownProcess(child, phase);
+	} catch (e) {
+		failure ??= e.message;
+	} finally {
+		for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.off(sig, cancel);
+		for (const s of Object.values(streams)) {
+			try {
+				fs.fsyncSync(s.fd);
+			} catch {
+				failure ??= "capture fsync failed";
+			}
+			try {
+				fs.closeSync(s.fd);
+			} catch {
+				failure ??= "capture close failed";
+			}
+		}
+	}
+	const files = {};
+	for (const name of ["stdout", "stderr"]) {
+		const data = fs.readFileSync(path.join(dir, `${name}.raw`));
+		files[name] = {
+			bytes: data.length,
+			sha256: sha(data),
+			overflow: streams[name].overflow,
+		};
+	}
+	const receipt = {
+		argv,
+		began,
+		ended: { utc: new Date().toISOString(), monotonic: mono() },
+		deadline,
+		byteLimitPerStream: limit,
+		terminal,
+		spawnError,
+		failure,
+		files,
+		captureComplete: !failure && !spawnError,
+	};
+	save(path.join(dir, "receipt.json"), receipt);
+	return receipt;
+}

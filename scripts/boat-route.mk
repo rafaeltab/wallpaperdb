@@ -56,3 +56,7 @@ boat-await: ## Wait for coordinator enrollment before measured implementation
 .PHONY: boat-bootstrap
 boat-bootstrap: ## Install the checksum-pinned prototype Boat CLI privately
 	@sh scripts/boat-bootstrap.sh
+
+.PHONY: boat-hillclimb-547
+boat-hillclimb-547: ## Execute the fixed #547 Asset baseline with continuous acceptance (BOAT_HILLCLIMB_CONFIG=JSON path)
+	@node scripts/boat-hillclimb.mjs

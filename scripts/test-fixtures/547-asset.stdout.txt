@@ -1,0 +1,282 @@
+Authenticated cache forward ready
+
+   • turbo 2.11.10
+   • Packages in scope: @wallpaperdb/biome-test-rules, @wallpaperdb/core, @wallpaperdb/crap-typescript-core, @wallpaperdb/events, @wallpaperdb/scripts, @wallpaperdb/test-logger, @wallpaperdb/test-utils, @wallpaperdb/testcontainers, @wallpaperdb/vitest-config
+   • Running build in 9 packages
+   • Remote caching enabled
+
+@wallpaperdb/vitest-config:build: cache hit, replaying logs 37281d8475e3d6da
+@wallpaperdb/vitest-config:build: 
+@wallpaperdb/vitest-config:build: > @wallpaperdb/vitest-config@0.1.0 build /home/user/wallpaperdb/packages/vitest-config
+@wallpaperdb/vitest-config:build: > tsc
+@wallpaperdb/vitest-config:build: 
+
+ Tasks:    1 successful, 1 total
+Cached:    1 cached, 1 total
+  Time:    108ms >>> FULL TURBO
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.2 [39m[90m/home/user/wallpaperdb/apps/asset[39m
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-errors.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 17287[2mms[22m[39m
+   [32m✓[39m preserves authorization denial across multiple resolved address candidates without an abort signal[32m 43[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket on explicit abort without dialing the remaining candidate[39m[32m 4019[2mms[22m[39m
+   [32m✓[39m preserves healthy authenticated acquisition and native broker shutdown with multiple candidates[32m 36[2mms[22m[39m
+[90mstdout[2m | test/broker-acquisition-commands.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after timeout
+[22m[39m[00:05:02.558] ERROR (#2): Protected Asset broker operation failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: TIMEOUT
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at timeout (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/util.js:69:48)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:415:44)
+      at Generator.next (<anonymous>)
+      at /home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:8:71
+      at new Promise (<anonymous>)
+      at __awaiter (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:4:12)
+      at ProtocolHandler.dial (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:411:16)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:482:32)
+      at Generator.next (<anonymous>) {
+    code: [32m'TIMEOUT'[39m,
+    chainedError: [90mundefined[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-commands.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after disposal
+[22m[39m[00:05:04.648] ERROR (#7): Protected Asset broker operation failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-commands.integration.test.ts
+[22m[39m[00:05:05.704] ERROR (#10): Protected Asset broker operation failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-commands.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 8166[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after timeout[39m[32m 6042[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after cancellation[39m[32m 1065[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after disposal[39m[32m 1057[2mms[22m[39m
+[90mstdout[2m | test/broker-acquisition-sources.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after timeout
+[22m[39m[00:05:11.916] ERROR (#2): Source confirmation transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: TIMEOUT
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at timeout (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/util.js:69:48)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:415:44)
+      at Generator.next (<anonymous>)
+      at /home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:8:71
+      at new Promise (<anonymous>)
+      at __awaiter (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:4:12)
+      at ProtocolHandler.dial (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:411:16)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:482:32)
+      at Generator.next (<anonymous>) {
+    code: [32m'TIMEOUT'[39m,
+    chainedError: [90mundefined[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-sources.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after disposal
+[22m[39m[00:05:13.997] ERROR (#6): Source confirmation transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-sources.integration.test.ts
+[22m[39m[00:05:15.052] ERROR (#9): Source confirmation transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-sources.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 8156[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after timeout[39m[32m 6034[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after cancellation[39m[32m 1062[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after disposal[39m[32m 1059[2mms[22m[39m
+[90mstdout[2m | test/broker-acquisition-cleanup.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after timeout
+[22m[39m[00:05:20.800] ERROR (#2): Cleanup operator transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: TIMEOUT
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at timeout (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/util.js:69:48)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:415:44)
+      at Generator.next (<anonymous>)
+      at /home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:8:71
+      at new Promise (<anonymous>)
+      at __awaiter (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:4:12)
+      at ProtocolHandler.dial (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:411:16)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:482:32)
+      at Generator.next (<anonymous>) {
+    code: [32m'TIMEOUT'[39m,
+    chainedError: [90mundefined[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-cleanup.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after disposal
+[22m[39m[00:05:22.871] ERROR (#7): Cleanup operator transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-cleanup.integration.test.ts
+[22m[39m[00:05:23.927] ERROR (#10): Cleanup operator transport failed {
+  operation: [32m'connect'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-cleanup.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 8146[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after timeout[39m[32m 6029[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after cancellation[39m[32m 1057[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after disposal[39m[32m 1058[2mms[22m[39m
+[90mstdout[2m | test/broker-acquisition-notifications.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after timeout
+[22m[39m[00:05:29.274] ERROR (#2): Operator notification operation failed { operation: [32m'connect-notifications'[39m }
+
+[90mstdout[2m | test/broker-acquisition-notifications.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after disposal
+[22m[39m[00:05:31.350] ERROR (#4): Operator notification operation failed { operation: [32m'connect-notifications'[39m }
+
+[90mstdout[2m | test/broker-acquisition-notifications.integration.test.ts
+[22m[39m[00:05:32.411] ERROR (#7): Operator notification operation failed { operation: [32m'connect-notifications'[39m }
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-notifications.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 8151[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after timeout[39m[32m 6031[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after cancellation[39m[32m 1059[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after disposal[39m[32m 1059[2mms[22m[39m
+[90mstdout[2m | test/broker-acquisition-events.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after timeout
+[22m[39m[00:05:38.111] ERROR (#2): Asset broker operation failed {
+  operation: [32m'connect-events'[39m,
+  cause: NatsError: TIMEOUT
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at timeout (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/util.js:69:48)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:415:44)
+      at Generator.next (<anonymous>)
+      at /home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:8:71
+      at new Promise (<anonymous>)
+      at __awaiter (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:4:12)
+      at ProtocolHandler.dial (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:411:16)
+      at ProtocolHandler.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/protocol.js:482:32)
+      at Generator.next (<anonymous>) {
+    code: [32m'TIMEOUT'[39m,
+    chainedError: [90mundefined[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-events.integration.test.ts[2m > [22m[2mcloses the native silent-peer socket after disposal
+[22m[39m[00:05:40.186] ERROR (#4): Asset broker operation failed {
+  operation: [32m'connect-events'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+[90mstdout[2m | test/broker-acquisition-events.integration.test.ts
+[22m[39m[00:05:41.239] ERROR (#7): Asset broker operation failed {
+  operation: [32m'connect-events'[39m,
+  cause: NatsError: CONNECTION_REFUSED
+      at Function.errorForCode (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/nats-base-client/core.js:143:16)
+      at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:56)
+      at Generator.throw (<anonymous>)
+      at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m {
+    code: [32m'CONNECTION_REFUSED'[39m,
+    chainedError: Error: node provided an undefined error!
+        at NodeTransport.<anonymous> (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:95:117)
+        at Generator.throw (<anonymous>)
+        at rejected (/home/user/wallpaperdb/node_modules/[4m.pnpm[24m/nats@2.29.3/node_modules/[4mnats[24m/lib/src/node_transport.js:6:65)
+    [90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+  }
+}
+
+ [31m❯[39m [30m[46m asset-integration [49m[39m test/broker-acquisition-events.integration.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 8140[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after timeout[39m[32m 6021[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after cancellation[39m[32m 1060[2mms[22m[39m
+[31m   [31m×[31m closes the native silent-peer socket after disposal[39m[32m 1057[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m6 failed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m16 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (18)[39m
+[2m   Start at [22m 00:04:38
+[2m   Duration [22m 62.58s[2m (tests 94%, import 4%, transform 2%)[22m
+
+undefined
+/home/user/wallpaperdb/apps/asset:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --maxWorkers=1 --no-file-parallelism --config vitest.integration.config.ts test/broker-acquisition

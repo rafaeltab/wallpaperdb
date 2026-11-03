@@ -269,6 +269,26 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
   }
 });
 
+it('inspects a reserved comparison without preparing a pending join', async () => {
+  const f = await fixture();
+  try {
+    expect(
+      await Effect.runPromise(f.issues.inspect(5, { base: f.host.base, prBase: 'main' }))
+    ).toMatchObject({ blockersReady: false, joinRequired: true });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    const writes = (await f.host.calls()).filter(
+      ({ args }) =>
+        (args[0] === 'pr' && args[1] === 'edit') ||
+        (args[0] === 'api' && args.includes('POST')) ||
+        (args[0] === 'issue' && args[1] === 'comment') ||
+        (args[0] === 'thread' && args[1] === 'start')
+    );
+    expect(writes).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});
+
 it('retains conflicting branches and exposes a durable blocked outcome without publication', async () => {
   const f = await fixture({ conflict: true });
   try {

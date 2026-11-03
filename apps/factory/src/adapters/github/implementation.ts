@@ -33,11 +33,7 @@ export function githubIssues(config: {
   const joins = config.joins
     ? prerequisiteJoin(config.project, config.base, config.joins, gh)
     : undefined;
-  const inspect = (
-    number: number,
-    prepare = false,
-    candidate?: Parameters<Issues['inspect']>[1]
-  ) =>
+  const inspect = (number: number, prepare = false, candidate?: Parameters<Issues['inspect']>[1]) =>
     Effect.tryPromise({
       try: async (signal) => {
         return await inspectIssue(number, prepare, signal, candidate);

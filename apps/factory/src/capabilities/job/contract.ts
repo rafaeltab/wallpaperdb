@@ -81,14 +81,16 @@ export interface RecoveryStatus {
   readonly threadId?: string;
   readonly question?: string;
 }
+/** Scheduler authorization to resume recovery work without a new issue admission. */
+export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
   recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
   /** Advance only already durable prerequisite joins, even while their CI waits
    * occupy capacity. Never reserves a new join or admits a child. */
-  reconcile?(): Effect.Effect<void, Unavailable>;
+  reconcile?(admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
-  prepare?(issue: number): Effect.Effect<void, Unavailable>;
+  prepare?(issue: number, admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
   /** A candidate is a previously selected launch comparison, not a replacement
    * operator pin. For prerequisites, return that exact base only after current

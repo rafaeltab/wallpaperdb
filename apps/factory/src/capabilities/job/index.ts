@@ -4,6 +4,7 @@ export { JobLive } from './implementation.js';
 
 export type {
   RecoveryStatus,
+  RecoveryAdmission,
   Control,
   WaitState,
   Stage,

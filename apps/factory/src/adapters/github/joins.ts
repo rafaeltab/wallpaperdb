@@ -21,7 +21,7 @@ import {
 } from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { t3Restacker } from '../t3/index.js';
-import { runInContext } from './context.js';
+import { runInContext, admitRecovery } from './context.js';
 import { command } from '../../platform/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
@@ -438,11 +438,38 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       }
     );
     let reviewed = false;
+    let capacityPending = false;
+    let observation: import('../../capabilities/restack/index.js').Resolution | undefined;
     const result = await runRecovery(
       {
-        resolve: () => agent.resolve(),
+        resolve: () =>
+          agent.resolve().pipe(
+            Effect.tap((value) =>
+              Effect.sync(() => {
+                observation = value;
+              })
+            )
+          ),
         review: (commit) =>
-          agent.review(commit).pipe(
+          Effect.tryPromise({
+            try: async () => {
+              if (!(await admitRecovery(item.issue, signal))) {
+                capacityPending = true;
+                return false;
+              }
+              await saveRecoveryProgress(dir, {
+                ...observation,
+                issue: item.issue,
+                pr: item.url,
+                classification: 'COMPLEX',
+                active: true,
+                progress: 'Independent review capacity reserved',
+              });
+              return true;
+            },
+            catch: (cause) => new Unavailable({ operation: 'reserve-recovery-capacity', cause }),
+          }).pipe(
+            Effect.flatMap((reserved) => (reserved ? agent.review(commit) : Effect.succeed(false))),
             Effect.tap((result) =>
               Effect.sync(() => {
                 reviewed = result;
@@ -454,12 +481,20 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       },
       signal
     );
-    const progressPath = join(await mkdtemp(join(dir, '.progress-')), 'value');
-    await writeDurable(progressPath, { ...result, issue: item.issue, pr: item.url });
-    await rename(progressPath, join(dir, 'recovery-progress.json'));
-    await rmdir(dirname(progressPath));
-    await syncDirectory(dir);
+    await saveRecoveryProgress(dir, {
+      ...result,
+      issue: item.issue,
+      pr: item.url,
+      ...(capacityPending ? { active: false, progress: 'Waiting for recovery capacity' } : {}),
+    });
     return recordResolution(dir, item, value, result, reviewed, signal);
+  };
+  const saveRecoveryProgress = async (dir: string, progress: unknown) => {
+    const path = join(await mkdtemp(join(dir, '.progress-')), 'value');
+    await writeDurable(path, progress);
+    await rename(path, join(dir, 'recovery-progress.json'));
+    await rmdir(dirname(path));
+    await syncDirectory(dir);
   };
   const recordResolution = async (
     dir: string,

@@ -1247,6 +1247,49 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 			const ready = json(path.join(f.config.evidence, "startup/result.json"));
 			assert.equal(ready.status, "PASS_STARTUP_READY");
 			assert.ok(Array.isArray(ready.inputs));
+			// Independent #547 contract: include every workload/SDK destination and
+			// the existing source/configuration controls, not the producer's list.
+			const required = [
+				"pnpm-lock.yaml",
+				"pnpm-workspace.yaml",
+				"patches/nats-2.29.3.patch",
+				"apps/asset/test/protected-broker.integration.test.ts",
+				"apps/asset/test/broker-acquisition-cleanup.integration.test.ts",
+				"apps/asset/test/broker-acquisition-commands.integration.test.ts",
+				"apps/asset/test/broker-acquisition-errors.integration.test.ts",
+				"apps/asset/test/broker-acquisition-events.integration.test.ts",
+				"apps/asset/test/broker-acquisition-notifications.integration.test.ts",
+				"apps/asset/test/broker-acquisition-sources.integration.test.ts",
+				"apps/asset/test/fixtures/broker-acquisition.ts",
+				"apps/asset/test/fixtures/broker-addresses.ts",
+				"apps/user/test/broker-acquisition.integration.test.ts",
+				"apps/wallpaper/test/broker-acquisition.integration.test.ts",
+				"apps/asset/src/adapters/cleanup/worker.ts",
+				"apps/asset/src/adapters/commands/notifications.ts",
+				"apps/asset/src/adapters/commands/runtime.ts",
+				"apps/asset/src/adapters/events/broker.ts",
+				"apps/asset/src/adapters/sources/publisher.ts",
+				"apps/user/src/adapters/picture-attachments/index.ts",
+				"apps/wallpaper/src/adapters/asset-workflow/index.ts",
+				"apps/user/src/boat-live-547.ts",
+				"apps/wallpaper/src/boat-live-547.ts",
+				"apps/asset/src/boat-live-547.ts",
+				"apps/user/src/boat-sdk-proof-547.ts",
+				"apps/wallpaper/src/boat-sdk-proof-547.ts",
+				"apps/asset/src/boat-sdk-proof-547.ts",
+				"apps/asset/test/fixtures/remediation-live.mjs",
+				"apps/asset/test/fixtures/remediation-sdk-proof.ts",
+				".worktree",
+				"Makefile",
+			].map((file) => path.join(f.root, file));
+			required.push(
+				path.join(repository, "scripts/lib/boat-547-startup.mjs"),
+				path.join(repository, "scripts/boat-preview-observation.py"),
+			);
+			assert.deepEqual(
+				ready.inputs.map((input) => input.path).sort(),
+				required.sort(),
+			);
 			assert.equal(
 				ready.inputs.find(
 					(input) =>

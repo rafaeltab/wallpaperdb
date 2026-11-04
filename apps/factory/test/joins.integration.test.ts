@@ -1134,6 +1134,11 @@ it.each([
     try {
       const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
       config.join.issueComments = { 4: comments('issue'), 571: comments('parent') };
+      config.join.issueAuthors = { 4: author, 571: author };
+      config.join.issueBodyContext = {
+        4: '\nRetain the accepted issue behavior',
+        571: '\nRetain the accepted parent behavior',
+      };
       config.join.prs[104].body = 'Retain the accepted PR behavior';
       config.join.prs[104].author = author;
       config.join.prs[104].comments = comments('pr');
@@ -1150,6 +1155,8 @@ it.each([
         expect(prompt).not.toContain(`unknown-author-${source}`);
       }
       expect(prompt.includes('Retain the accepted PR behavior')).toBe(retainBody);
+      expect.soft(prompt.includes('Retain the accepted issue behavior')).toBe(retainBody);
+      expect.soft(prompt.includes('Retain the accepted parent behavior')).toBe(retainBody);
       expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
     } finally {
       await f.close();

@@ -62,9 +62,15 @@ test.each([
           path.join(root, 'coverage/integration')
         );
       }
-      expect(runner.config.coverage.include).toEqual(['src/**/*.ts']);
+      const sourceIncludes = [...(runner.config.coverage.include ?? [])];
+      if (service === 'asset' && selection === 'integration') {
+        // Native inspector bundles map back to the same source inventory.
+        const artifactInclude = sourceIncludes.pop();
+        expect(artifactInclude).toMatch(/^coverage\/inspector-build-[\w-]+\/\*\*\/\*\.mjs$/);
+      }
+      expect(sourceIncludes).toEqual(['src/**/*.ts']);
       coveragePolicies.push({
-        include: runner.config.coverage.include,
+        include: sourceIncludes,
         // Vitest appends test/config paths outside the source inclusion to each selection.
         exclude: runner.config.coverage.exclude.filter(
           (pattern) => !pattern.startsWith('test/') && !pattern.startsWith('vitest.')

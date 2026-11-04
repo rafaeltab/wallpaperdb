@@ -1,6 +1,14 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
-import { Execution, Issues, Job, JobLive, JobStore, Time, Unavailable } from '../src/capabilities/job/index.js';
+import {
+  Execution,
+  Issues,
+  Job,
+  JobLive,
+  JobStore,
+  Time,
+  Unavailable,
+} from '../src/capabilities/job/index.js';
 import { ContinuationAdmission } from '../src/capabilities/job/index.js';
 import {
   Scheduler,

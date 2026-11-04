@@ -23,7 +23,11 @@ import {
 	finiteShutdownProcess,
 	retireShutdownTunnel,
 } from "./lib/boat-shutdown.mjs";
-import { runPreview } from "./lib/boat-preview.mjs";
+import {
+	runPreview,
+	forwardPreviewUpgrade,
+	retirePreviewConnections,
+} from "./lib/boat-preview.mjs";
 import {
 	freshWorker,
 	assertAdmission,
@@ -389,12 +393,20 @@ const json = async (argv, opts = {}) => {
 };
 const ssh = (id, command, opts = {}) =>
 	boat(["ssh", id, "--", "bash", "-lc", command], opts);
-const retireWatchers = (id, opts = {}) =>
-	ssh(
-		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && sudo -n "$(mise which node)" --input-type=module -`,
-		{ ...opts, input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
-	);
+const retireWatchers = async (id, opts = {}) => {
+	const results = await Promise.allSettled([
+		retirePreviewConnections(root, id, opts.shutdown),
+		ssh(
+			id,
+			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && sudo -n "$(mise which node)" --input-type=module -`,
+			{ ...opts, input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
+		),
+	]);
+	const failures = results.filter((r) => r.status === "rejected");
+	if (failures.length)
+		throw new Error(failures.map((r) => r.reason.message).join("; "));
+};
+
 function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
@@ -1045,20 +1057,28 @@ function daemon() {
 	save(s);
 }
 async function disposeShutdownTunnel(id, protectedPids, budget) {
-	const tunnelFile = path.join(dir, "cache-tunnel.json");
-	const tunnel = read(tunnelFile);
-	if (!tunnel.pid) return;
-	if (tunnel.id !== id)
-		throw new Error(
-			"Shutdown disposal: tunnel worker identity unresolved; record retained",
-		);
-	await retireShutdownTunnel(
-		tunnel,
-		protectedPids,
-		budget.phase("disposal"),
-		(updated) => write(tunnelFile, updated),
-	);
-	fs.rmSync(tunnelFile, { force: true });
+	const results = await Promise.allSettled([
+		retirePreviewConnections(root, id, budget.phase("disposal")),
+		(async () => {
+			const tunnelFile = path.join(dir, "cache-tunnel.json");
+			const tunnel = read(tunnelFile);
+			if (!tunnel.pid) return;
+			if (tunnel.id !== id)
+				throw new Error(
+					"Shutdown disposal: tunnel worker identity unresolved; record retained",
+				);
+			await retireShutdownTunnel(
+				tunnel,
+				protectedPids,
+				budget.phase("disposal"),
+				(updated) => write(tunnelFile, updated),
+			);
+			fs.rmSync(tunnelFile, { force: true });
+		})(),
+	]);
+	const failures = results.filter((r) => r.status === "rejected");
+	if (failures.length)
+		throw new Error(failures.map((r) => r.reason.message).join("; "));
 }
 // Pending candidates are independently owned compute, even before main identity
 // publication. Stop them without creating, bootstrapping or discarding intent.
@@ -2164,43 +2184,12 @@ async function preview() {
 		req.pipe(upstream);
 	});
 	server.on("upgrade", (req, socket, head) => {
-		const upstream = http.request({
-			hostname: "127.0.0.1",
-			port: privatePort,
-			path: req.url,
-			headers: req.headers,
-		});
-		let peer;
-		// This downstream owns both the pending request and any upgraded peer.
-		// An upgraded server socket can receive EOF without emitting close, so
-		// retire it on end as well. No handshake deadline substitutes for EOF.
-		const disconnect = () => {
-			upstream.destroy();
-			peer?.destroy();
-			socket.destroy();
-		};
-		socket.once("end", disconnect);
-		socket.once("close", disconnect);
-		socket.once("error", disconnect);
-		upstream.once("upgrade", (response, upgraded, bytes) => {
-			peer = upgraded;
-			peer.once("error", disconnect);
-			peer.once("close", () => socket.end());
-			if (socket.destroyed) {
-				disconnect();
-				return;
-			}
-			socket.write(
-				`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(response.headers)
-					.map(([k, v]) => `${k}: ${v}`)
-					.join("\r\n")}\r\n\r\n`,
-			);
-			peer.write(head);
-			socket.write(bytes);
-			socket.pipe(peer).pipe(socket);
-		});
-		upstream.once("error", disconnect);
-		upstream.end();
+		forwardPreviewUpgrade(
+			{ root, cli, workerId: id, port, server },
+			req,
+			socket,
+			head,
+		);
 	});
 	await runPreview({
 		root,

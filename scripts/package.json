@@ -40,7 +40,8 @@
 		"test:operator-inbox": "node --test operator-inbox.test.mjs",
 		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts",
 		"test:boat-hillclimb": "cd .. && node --test scripts/boat-hillclimb.test.mjs scripts/boat-547-preparation.test.mjs scripts/makefile.test.mjs",
-		"lint:files": "biome lint"
+		"lint:files": "biome lint",
+		"test:boat-preview-browser": "BOAT_PREVIEW_BROWSER_CONTROL=1 node --test --test-name-pattern=\"^actual Vite\" boat.test.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

@@ -11758,22 +11758,23 @@ if(argv.includes('--status')){console.log(JSON.stringify({running:true,stdout:'W
 if(argv.includes('--detach')){console.log(JSON.stringify({processId:557}));process.exit(0);}
 if(argv.includes('forward')){
  if(argv.includes('--reverse'))throw Error('unexpected reverse forward');
- if(argv[argv.indexOf('--local')+1]!==${JSON.stringify(String(privatePort))}||argv[argv.indexOf('--remote')+1]!==${JSON.stringify(String(port))})throw Error('unexpected forward ports');
+ const selectedLocal=Number(argv[argv.indexOf('--local')+1]),primary=selectedLocal===${privatePort};
+ if(!Number.isSafeInteger(selectedLocal)||selectedLocal<1||selectedLocal>65535||argv[argv.indexOf('--remote')+1]!==${JSON.stringify(String(port))})throw Error('unexpected forward ports');
  ${
 		retirement
 			? `const identity=()=>{const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};};
- const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event,at:Date.now(),monoMs:Number(process.hrtime.bigint()/1000000n),...identity(),...detail})+'\\n');
+ const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event:primary?event:'connection-'+event,at:Date.now(),monoMs:Number(process.hrtime.bigint()/1000000n),...identity(),...detail})+'\\n');
  event('forward-born');process.once('exit',code=>event('forward-exited',{code}));
  const predecessorFile=path.join(control,'predecessor-identity');if(fs.existsSync(predecessorFile)){const prior=JSON.parse(fs.readFileSync(predecessorFile));const observe=record=>{try{const text=fs.readFileSync('/proc/'+record.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:record.pid,startTicks:fields[19],live:fields[0]!=='Z'&&fields[19]===record.startTicks};}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;return {pid:record.pid,startTicks:record.startTicks,live:false};}};event('predecessor-at-birth',{controller:observe(prior.controller),forward:observe(prior.forward)});}
 
  if(fs.existsSync(path.join(control,'fail-forward-start'))){event('forward-rejected');process.exit(43);}
- if(fs.existsSync(path.join(control,'descendant-forward'))&&!argv.includes('--fixture-forward-child')){const child=require('child_process').spawn(process.execPath,[__filename,...argv,'--fixture-forward-child'],{stdio:'inherit'});process.on('SIGTERM',()=>child.kill('SIGTERM'));child.on('exit',code=>process.exit(code??1));setInterval(()=>{if(fs.existsSync(path.join(control,'exit-wrapper-only'))){event('forward-wrapper-exit-requested');process.exit(48);}},10);return;}`
+ if(primary&&fs.existsSync(path.join(control,'descendant-forward'))&&!argv.includes('--fixture-forward-child')){const child=require('child_process').spawn(process.execPath,[__filename,...argv,'--fixture-forward-child'],{stdio:'inherit'});process.on('SIGTERM',()=>child.kill('SIGTERM'));child.on('exit',code=>process.exit(code??1));setInterval(()=>{if(fs.existsSync(path.join(control,'exit-wrapper-only'))){event('forward-wrapper-exit-requested');process.exit(48);}},10);return;}`
 			: ""
  }
  const net=require('net'),peers=new Set();let sequence=0;
  const trace=(connection,event,detail={})=>fs.appendFileSync(path.join(control,'forward-events'),JSON.stringify({pid:process.pid,connection,event,at:Date.now(),...detail})+'\\n');
  const server=net.createServer(socket=>{const connection=++sequence;trace(connection,'downstream-connected',{remotePort:socket.remotePort});const peer=net.connect(${upstreamPort},'127.0.0.1');peer.on('connect',()=>trace(connection,'upstream-connected',{localPort:peer.localPort}));peers.add(socket);peers.add(peer);for(const [role,p] of [['downstream',socket],['upstream',peer]]){p.on('error',()=>{});p.on('end',()=>trace(connection,role+'-end'));p.on('close',()=>{trace(connection,role+'-close');peers.delete(p);socket.destroy();peer.destroy();});}socket.pipe(peer).pipe(socket);});
- const listen=()=>server.listen(${privatePort},'127.0.0.1',()=>{fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid));${retirement ? "event('forward-listening');" : ""}});
+ const listen=()=>server.listen(selectedLocal,'127.0.0.1',()=>{if(primary)fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid));${retirement ? "event('forward-listening');" : ""}});
  ${retirement ? "if(fs.existsSync(path.join(control,'hold-forward-start'))){event('forward-start-held');const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-start'))){clearInterval(timer);listen();}},10);}else listen();setInterval(()=>{if(fs.existsSync(path.join(control,'exit-forward'))){event('forward-exit-requested');for(const p of peers)p.destroy();server.close(()=>process.exit(Number(fs.existsSync(path.join(control,'exit-forward-code'))?fs.readFileSync(path.join(control,'exit-forward-code')):47)));}},10);" : "listen();"}
  ${
 		retirement
@@ -16532,4 +16533,73 @@ test("infra image phase cannot complete after the selected worker generation cha
 		.findLast((x) => x.kind === "infra-image-preparation");
 	assert.equal(event.workerId, "fake-worker");
 	assert.equal(event.completed, false);
+});
+
+// Explicit browser adapter check uses the installed Web workspace browser tools.
+if (process.env.BOAT_PREVIEW_BROWSER_CONTROL === "1") {
+	test("actual Vite preserves the original document across ordinary preview replacement", {
+		timeout: 160000,
+	}, async (t) => {
+		const { previewViteControl } = await import(
+			"./test-fixtures/preview-vite-control.mjs"
+		);
+		await previewViteControl(t, {
+			lockGenerationCheckout,
+			fixtureProcess,
+			fixtureCensus,
+			processGroupRunning,
+		});
+	});
+}
+
+test("preview connection retirement refuses foreign, drifted and expired authority while preserving a closed historical neighbor", async (t) => {
+	const { retirePreviewConnections } = await import("./lib/boat-preview.mjs");
+	const f = await lockGenerationCheckout(t);
+	const canary = f.writer();
+	const original = fixtureProcess(canary.child.pid);
+	assert.ok(original);
+	const directory = path.join(
+		f.root,
+		".boat/preview-connections/guard-control",
+	);
+	fs.mkdirSync(directory, { recursive: true });
+	const file = path.join(directory, "connection.json");
+	const record = { ...original, workerId: "other-worker", phase: "serving" };
+	const save = () => fs.writeFileSync(file, JSON.stringify(record));
+	const survives = () =>
+		assert.equal(fixtureProcess(original.pid)?.startTicks, original.startTicks);
+	save();
+	await assert.rejects(
+		retirePreviewConnections(f.root, "fake-worker", {
+			deadline: performance.now() + 1000,
+		}),
+		/worker ownership/,
+	);
+	survives();
+	record.workerId = "fake-worker";
+	record.startTicks = String(BigInt(original.startTicks) + 1n);
+	save();
+	await assert.rejects(
+		retirePreviewConnections(f.root, "fake-worker", {
+			deadline: performance.now() + 1000,
+		}),
+		/ownership changed/,
+	);
+	survives();
+	record.startTicks = original.startTicks;
+	save();
+	await assert.rejects(
+		retirePreviewConnections(f.root, "fake-worker", {
+			deadline: performance.now() - 1,
+		}),
+		/allowance exhausted/,
+	);
+	survives();
+	record.phase = "closed";
+	record.startTicks = String(BigInt(original.startTicks) + 1n);
+	save();
+	await retirePreviewConnections(f.root, "fake-worker", {
+		deadline: performance.now() + 1000,
+	});
+	survives();
 });

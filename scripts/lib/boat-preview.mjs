@@ -1,10 +1,14 @@
-import { spawn } from "node:child_process";
+import { fork, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import http from "node:http";
+import net from "node:net";
+import { fileURLToPath } from "node:url";
 
 const pause = () => new Promise((resolve) => setTimeout(resolve, 20));
 const now = () => performance.now();
+const nativeNow = () => Number(process.hrtime.bigint()) / 1e6;
 const absent = (error) => ["ENOENT", "ESRCH"].includes(error.code);
 function identity(pid) {
 	try {
@@ -244,22 +248,26 @@ export async function runPreview({
 	server,
 	ready,
 	record,
+	directory = path.join(root, ".boat"),
+	owner = {},
+	signal: cancellation,
+	began = now(),
 }) {
-	const began = now(),
-		deadline = began + 10000,
+	const deadline = began + 10000,
 		acquisitionEnd = deadline - 1000;
 	const generation = randomUUID(),
 		controller = identity(process.pid);
-	const directory = path.join(root, ".boat"),
-		file = path.join(directory, "preview-process.json"),
+	const file = path.join(directory, "preview-process.json"),
 		acquisition = path.join(directory, "preview-acquisition.json"),
 		progress = path.join(directory, `preview-progress-${generation}.json`);
 	const claim = {
+		...owner,
 		...controller,
 		generation,
 		progress: path.basename(progress),
 	};
 	const state = {
+		...owner,
 		...controller,
 		generation,
 		progress: path.basename(progress),
@@ -315,8 +323,14 @@ export async function runPreview({
 		sockets.add(socket);
 		socket.once("close", () => sockets.delete(socket));
 	};
-	server.on("connection", onConnection);
-	server.on("error", onError);
+	server?.on("connection", onConnection);
+	server?.on("error", onError);
+	// An upgraded connection transferred to its own lifetime is no longer an
+	// HTTP generation resource. No socket is exempted until IPC transfer succeeds.
+	const transferred = (socket) => sockets.delete(socket);
+	server?.on("preview-transfer", transferred);
+	cancellation?.addEventListener("abort", cancel, { once: true });
+	if (cancellation?.aborted) cancel();
 	process.on("SIGTERM", cancel);
 	process.on("SIGINT", cancel);
 	const check = () => {
@@ -341,8 +355,8 @@ export async function runPreview({
 		for (const socket of sockets) socket.destroy();
 		// close() also cancels a pending listen. Merely seeing listening=false
 		// does not prove that an acquisition-time bind cannot complete later.
-		let publicClosed = false;
-		server.close((error) => {
+		let publicClosed = !server;
+		server?.close((error) => {
 			publicClosed = !error || error.code === "ERR_SERVER_NOT_RUNNING";
 		});
 		// Startup disposal stays inside acquisition's original total. Once serving,
@@ -416,7 +430,7 @@ export async function runPreview({
 			state.unresolved = unresolved.length ? unresolved : [...capture.values()];
 			state.failure = failure.message;
 			child?.unref();
-			server.unref();
+			server?.unref();
 			try {
 				if (acquired || published || state.spawnedPid || state.predecessor)
 					write(progress, state);
@@ -427,7 +441,9 @@ export async function runPreview({
 		}
 		process.removeListener("SIGTERM", cancel);
 		process.removeListener("SIGINT", cancel);
-		server.removeListener("error", onError);
+		server?.removeListener("error", onError);
+		server?.removeListener("preview-transfer", transferred);
+		cancellation?.removeEventListener("abort", cancel);
 	};
 	let prior;
 	try {
@@ -504,7 +520,8 @@ export async function runPreview({
 			persist();
 			emit("forward-spawned", { forward: state.forward });
 		}
-		server.listen(port, "127.0.0.1", () => {
+		listening = !server;
+		server?.listen(port, "127.0.0.1", () => {
 			listening = true;
 		});
 		for (;;) {
@@ -558,4 +575,310 @@ export async function runPreview({
 		await dispose();
 	}
 	if (failure) throw failure;
+}
+
+// A WebSocket belongs to the development connection, not to the replaceable
+// HTTP listener. Transfer the actual socket; never reconnect/replay its stream.
+function connectionAllowed(root, workerId) {
+	const state = read(path.join(root, ".boat", "state.json"));
+	return (
+		state?.id === workerId &&
+		state.runningSince != null &&
+		!(
+			state.shutdownAttempt?.workerId === workerId &&
+			!state.shutdownAttempt.accountingAppliedAt
+		)
+	);
+}
+export function forwardPreviewUpgrade(options, req, socket, head) {
+	try {
+		transferPreviewUpgrade(options, req, socket, head);
+	} catch (error) {
+		socket.destroy();
+		options.server.emit("error", error);
+	}
+}
+function transferPreviewUpgrade(
+	{ root, cli, workerId, port, server },
+	req,
+	socket,
+	head,
+) {
+	const origin = nativeNow();
+	if (!connectionAllowed(root, workerId)) {
+		socket.destroy();
+		return;
+	}
+	const directory = path.join(
+		root,
+		".boat",
+		"preview-connections",
+		randomUUID(),
+	);
+	fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+	write(path.join(directory, "connection.json"), {
+		workerId,
+		phase: "pending",
+	});
+	const log = fs.openSync(path.join(directory, "transport.log"), "a", 0o600);
+	let child;
+	try {
+		child = fork(
+			fileURLToPath(import.meta.url),
+			[
+				"connection",
+				JSON.stringify({ root, cli, workerId, port, directory, origin }),
+			],
+			{
+				cwd: root,
+				detached: true,
+				serialization: "advanced",
+				stdio: ["ignore", log, log, "ipc"],
+			},
+		);
+	} finally {
+		fs.closeSync(log);
+	}
+	const failed = () => socket.destroy();
+	child.once("error", failed);
+	socket.pause();
+	child.send({ url: req.url, headers: req.headers, head }, socket, (error) => {
+		if (error) failed();
+		else server.emit("preview-transfer", socket);
+		if (child.connected) child.disconnect();
+		child.unref();
+	});
+}
+
+async function servePreviewConnection({
+	root,
+	cli,
+	workerId,
+	port,
+	directory,
+	origin,
+}) {
+	// Preserve the parent's original acquisition origin across the native process
+	// boundary. performance.now() itself has a different origin in each process.
+	const began = now() - (nativeNow() - origin);
+	const controller = identity(process.pid);
+	ownedSession(controller, root);
+	const connectionFile = path.join(directory, "connection.json");
+	write(connectionFile, { ...controller, workerId, phase: "acquiring" });
+	const cancellation = new AbortController();
+	let socket, peer, upstream, timer, monitor, handshakeFailure;
+	const disconnect = () => {
+		socket?.destroy();
+		peer?.destroy();
+		upstream?.destroy();
+		cancellation.abort();
+	};
+	const workerMatches = () => connectionAllowed(root, workerId);
+	try {
+		// The child waits only for its one native handle transfer. Parent loss before
+		// transfer cannot create an orphan tunnel. After transfer IPC is unnecessary.
+		const request = await new Promise((resolve, reject) => {
+			timer = setTimeout(
+				() => reject(Error("Preview connection transfer exhausted")),
+				Math.max(0, began + 9000 - now()),
+			);
+			process.once("disconnect", () => {
+				if (!socket) reject(Error("Preview connection transfer lost"));
+			});
+			process.once("message", (message, handle) => {
+				if (!(handle instanceof net.Socket))
+					return reject(Error("Preview connection socket unavailable"));
+				socket = handle;
+				for (const event of ["end", "close", "error"])
+					socket.once(event, disconnect);
+				resolve(message);
+			});
+		});
+		clearTimeout(timer);
+		if (!workerMatches())
+			throw Error("Preview connection worker changed; no forward");
+		// Private ephemeral loopback endpoint. The existing acquisition proves the
+		// exact CLI session owns the resulting listener; a bind race fails closed.
+		const reservation = net.createServer();
+		await new Promise((resolve, reject) => {
+			reservation.once("error", reject);
+			reservation.listen(0, "127.0.0.1", resolve);
+		});
+		const privatePort = reservation.address().port;
+		await new Promise((resolve) => reservation.close(resolve));
+		monitor = setInterval(() => {
+			try {
+				if (!workerMatches()) disconnect();
+			} catch {
+				disconnect();
+			}
+		}, 100);
+		await runPreview({
+			root,
+			cli,
+			directory,
+			owner: { workerId },
+			privatePort,
+			signal: cancellation.signal,
+			began,
+			argv: [
+				"--no-update",
+				"forward",
+				workerId,
+				"--remote",
+				String(port),
+				"--local",
+				String(privatePort),
+			],
+			record: (kind, detail) =>
+				fs.appendFileSync(
+					path.join(directory, "events.jsonl"),
+					`${JSON.stringify({ kind, ...detail })}\n`,
+					{ mode: 0o600 },
+				),
+			ready: () => {
+				if (!workerMatches() || socket.destroyed) {
+					disconnect();
+					return;
+				}
+				timer = setTimeout(
+					() => {
+						handshakeFailure = Error(
+							"Preview upgrade acquisition allowance exhausted",
+						);
+						disconnect();
+					},
+					Math.max(0, began + 9000 - now()),
+				);
+				upstream = http.request({
+					hostname: "127.0.0.1",
+					port: privatePort,
+					path: request.url,
+					headers: request.headers,
+				});
+				upstream.once("error", disconnect);
+				upstream.once("response", disconnect);
+				upstream.once("upgrade", (response, upgraded, bytes) => {
+					clearTimeout(timer);
+					peer = upgraded;
+					for (const event of ["end", "close", "error"])
+						peer.once(event, disconnect);
+					if (socket.destroyed) {
+						disconnect();
+						return;
+					}
+					socket.write(
+						`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(
+							response.headers,
+						)
+							.map(([k, v]) => `${k}: ${v}`)
+							.join("\r\n")}\r\n\r\n`,
+					);
+					peer.write(request.head);
+					socket.write(bytes);
+					socket.pipe(peer).pipe(socket);
+					socket.resume();
+					write(connectionFile, { ...controller, workerId, phase: "serving" });
+				});
+				upstream.end();
+			},
+		});
+		if (handshakeFailure) throw handshakeFailure;
+		write(connectionFile, { ...controller, workerId, phase: "closed" });
+	} catch (error) {
+		write(connectionFile, {
+			...controller,
+			workerId,
+			phase: "failed",
+			failure: error.message,
+		});
+		throw error;
+	} finally {
+		clearTimeout(timer);
+		clearInterval(monitor);
+		disconnect();
+	}
+}
+
+export async function retirePreviewConnections(
+	root,
+	workerId,
+	phase = { deadline: now() + 10000 },
+) {
+	const directory = path.join(root, ".boat", "preview-connections");
+	if (!fs.existsSync(directory)) return;
+	const errors = [];
+	for (const name of fs.readdirSync(directory)) {
+		try {
+			const ownDirectory = path.join(directory, name);
+			let connection = read(path.join(ownDirectory, "connection.json"));
+			while (
+				connection?.phase === "pending" &&
+				connection.workerId === workerId &&
+				now() < phase.deadline
+			) {
+				await pause();
+				connection = read(path.join(ownDirectory, "connection.json"));
+			}
+			if (!connection)
+				throw Error(
+					"Preview connection ownership unavailable; record retained",
+				);
+			ownedSession(connection, root);
+			const current = identity(connection.pid);
+			if (
+				connection.phase === "closed" &&
+				(!current || current.startTicks !== connection.startTicks)
+			)
+				continue;
+			if (connection.workerId !== workerId)
+				throw Error(
+					"Preview connection worker ownership unavailable; record retained",
+				);
+			if (current && !same(current, connection))
+				throw Error("Preview connection ownership changed; record retained");
+			if (now() >= phase.deadline)
+				throw Error(
+					"Preview connection retirement allowance exhausted; record retained",
+				);
+			if (current) signal(current, "SIGTERM");
+			for (;;) {
+				const live = identity(connection.pid);
+				const ownership =
+					read(path.join(ownDirectory, "preview-process.json")) ??
+					read(path.join(ownDirectory, "preview-acquisition.json"));
+				const unresolved = fs
+					.readdirSync(ownDirectory)
+					.filter((n) => /^preview-progress-.*\.json$/.test(n))
+					.some(
+						(n) => read(path.join(ownDirectory, n))?.phase === "unresolved",
+					);
+				if (!live && unresolved)
+					throw Error(
+						"Preview connection forward retirement unresolved; record retained",
+					);
+				if (!live && !ownership) break;
+				if (now() >= phase.deadline)
+					throw Error(
+						"Preview connection retirement unresolved; record retained",
+					);
+				await pause();
+			}
+		} catch (error) {
+			errors.push(error.message);
+		}
+	}
+	if (errors.length) throw Error(errors.join("; "));
+}
+
+if (
+	process.argv[1] === fileURLToPath(import.meta.url) &&
+	process.argv[2] === "connection"
+) {
+	try {
+		await servePreviewConnection(JSON.parse(process.argv[3]));
+	} catch (error) {
+		console.error(error.message);
+		process.exitCode = 1;
+	}
 }

@@ -806,7 +806,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 		publish,
 		manifest,
 		fileIdentity,
-		runPhase: (spec, deadline, cleanupStartup) =>
+		runPhase: (spec, deadline, cleanupStartup, command = make) =>
 			execute547Phase(
 				{
 					...config,
@@ -814,7 +814,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 					coldDeadline: deadline,
 				},
 				{
-					make,
+					make: command,
 					clock,
 					publication,
 					binding,

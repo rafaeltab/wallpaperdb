@@ -171,6 +171,22 @@ if (target === "infra-start") {
 			}),
 	);
 	console.log("Docker validation waited 0.0s; execution 0.0s; exit 0.");
+} else if (
+	target === "docker-run" &&
+	value("ARGS").includes(" source-observe ")
+) {
+	const command = value("ARGS").split(" ");
+	assert.deepEqual(command.slice(0, 3), [
+		"node",
+		"scripts/boat-workloads/547-runtime.cjs",
+		"source-observe",
+	]);
+	const child = spawnSync(
+		process.execPath,
+		[path.join(repository, command[1]), ...command.slice(2)],
+		{ stdio: "inherit" },
+	);
+	process.exitCode = child.status ?? 1;
 } else if (target === "boat-enroll") {
 	fs.mkdirSync(".boat");
 	save(".boat/enrollment.json", {

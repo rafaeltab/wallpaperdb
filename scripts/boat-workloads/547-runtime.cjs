@@ -177,8 +177,46 @@ function application(mode) {
 	);
 }
 
+function sourceObservation() {
+	const fs = require("node:fs"),
+		path = require("node:path"),
+		{ execFileSync } = require("node:child_process");
+	const [project, source] = process.argv.slice(3);
+	if (
+		process.argv.length !== 5 ||
+		!/^[A-Za-z0-9_-]+$/.test(project) ||
+		!["heading", "presence"].includes(source)
+	)
+		throw Error("Invalid #547 source observation arguments");
+	const program = fs.readFileSync(
+		path.join(__dirname, "547-web-source.cjs"),
+		"utf8",
+	);
+	process.stdout.write(
+		execFileSync(
+			"docker",
+			[
+				"compose",
+				"-p",
+				project,
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"exec",
+				"-T",
+				"web",
+				"node",
+				"-e",
+				program,
+				source,
+			],
+			{ maxBuffer: 1048576 },
+		),
+	);
+}
+
 if (process.argv[2] === "metadata") metadata();
 else if (process.argv[2] === "chromium") chromium();
+else if (process.argv[2] === "source-observe") sourceObservation();
 else if (["application-ps", "application-inspect"].includes(process.argv[2]))
 	application(process.argv[2]);
 else throw new Error("Unknown #547 worker observation");

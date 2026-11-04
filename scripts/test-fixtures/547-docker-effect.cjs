@@ -17,6 +17,68 @@ const args = process.argv.slice(2);
 if (args[0] === "compose") {
 	if (args[1] !== "-p" || args[2] !== "wallpaperdb-control")
 		throw new Error("Wrong project transport");
+	if (args[5] === "exec") {
+		const assert = require("node:assert/strict");
+		const path = require("node:path");
+		assert.deepEqual(args.slice(3, 11), [
+			"-f",
+			"infra/docker-compose.apps.yml",
+			"exec",
+			"-T",
+			"web",
+			"node",
+			"-e",
+			args[10],
+		]);
+		assert.equal(args.length, 12);
+		const root = process.cwd();
+		fs.appendFileSync(
+			"native-source-invocations.jsonl",
+			JSON.stringify({
+				project: args[2],
+				source: args[11],
+				program: args[10],
+			}) + "\n",
+		);
+		const mapped = (p) =>
+			typeof p === "string" && p.startsWith("/app/")
+				? path.join(root, p.slice(5))
+				: p;
+		const opened = new Map();
+		const controlledFs = new Proxy(fs, {
+			get(target, name) {
+				if (!["readFileSync", "lstatSync", "openSync"].includes(name))
+					return target[name];
+				return (file, ...rest) => {
+					const bytes = target[name](mapped(file), ...rest);
+					if (name === "openSync") opened.set(bytes, file);
+					if (
+						name === "readFileSync" &&
+						process.env.CONTROL_SOURCE_HASH_DRIFT &&
+						String(opened.get(file) ?? file).endsWith("boat-547-presence.txt")
+					)
+						return Buffer.from("BOAT-547-PRESENCX\n");
+					return bytes;
+				};
+			},
+		});
+		require("node:vm").runInNewContext(args[10], {
+			require: (name) =>
+				name === "node:fs"
+					? controlledFs
+					: name === "node:os"
+						? { hostname: () => id(9) }
+						: require(name),
+			process: {
+				...process,
+				argv: [process.execPath, args[11]],
+				cwd: () => "/app/apps/web",
+			},
+			console,
+			Buffer,
+		});
+		process.exit(0);
+	}
 	if (args.includes("build")) {
 		if (
 			JSON.stringify(args.slice(3)) !==

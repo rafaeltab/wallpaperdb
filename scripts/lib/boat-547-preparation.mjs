@@ -251,8 +251,9 @@ export function create547Preparation(root, objects = nativeObjects) {
 	for (const file of selected)
 		if (expected.get(file) !== null)
 			modes.set(file, fs.lstatSync(path.join(root, file)).mode & 0o777);
-	const verify = (all = false) => {
+	const verify = (all = false, except) => {
 		for (const file of all ? expected.keys() : selected) {
+			if (file === except) continue;
 			const absolute = path.join(root, file),
 				hash = expected.get(file);
 			if (hash === null) {
@@ -313,6 +314,31 @@ export function create547Preparation(root, objects = nativeObjects) {
 	let generated;
 	let metadata;
 	return {
+		browserSourceInputs(kind) {
+			const files = {
+				heading: "apps/web/src/routes/upload.tsx",
+				presence: "apps/web/src/boat-547-presence.txt",
+			};
+			require(Object.hasOwn(files, kind), "Unknown #547 browser source");
+			const file = files[kind],
+				absolute = path.join(root, file);
+			verify(true, file);
+			const stat = fs.lstatSync(absolute, { throwIfNoEntry: false });
+			if (stat)
+				require(stat.isFile() &&
+					!stat.isSymbolicLink() &&
+					(stat.mode & 0o777) ===
+						(modes.get(file) ??
+							0o600), "Browser source mode or regular-file ownership changed");
+			return [
+				...new Set(
+					[...selected]
+						.filter((name) => expected.get(name) !== null)
+						.map((name) => path.join(root, name))
+						.concat(stat ? [absolute] : []),
+				),
+			];
+		},
 		inputs: () => {
 			verify();
 			return [...selected]

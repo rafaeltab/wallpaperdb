@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { quote } from "./boat.mjs";
 import { markedObservation } from "./boat-547-preparation.mjs";
+import {
+	sourceObservation,
+	sourceObservationInputs,
+} from "./boat-547-source.mjs";
 
 const source = fileURLToPath(import.meta.url);
 const observer = fileURLToPath(
@@ -137,6 +141,8 @@ export async function start547Application(context) {
 	let dev, preview;
 	let acquired = false;
 	let cleanupPromise;
+	let sourceBusy = false,
+		sourceCapture;
 	const retire = () => {
 		if (replacement?.status === "RUNNING")
 			failReplacement(
@@ -151,6 +157,9 @@ export async function start547Application(context) {
 			const transports = captures.map((r) =>
 				r.status === "fulfilled" ? r.value : { failure: r.reason.message },
 			);
+			// A finite source command keeps its original bound and drains before the
+			// same owner stops compute. The source action never owns serving cleanup.
+			await sourceCapture?.catch(() => {});
 			const stopped = await cleanup();
 			const drained = handles.every((h) => {
 				try {
@@ -249,11 +258,12 @@ export async function start547Application(context) {
 		];
 	};
 	let fixed;
+	const fixedPaths = [source, observer, ...sourceObservationInputs];
 	const preserved = () => {
 		inputs();
 		require(JSON.stringify(fixed) ===
 			JSON.stringify(
-				[source, observer].map(fileIdentity),
+				fixedPaths.map(fileIdentity),
 			), "Startup implementation changed");
 		const state = read(path.join(root, ".boat/state.json"));
 		require(state.id === binding.worker &&
@@ -481,6 +491,7 @@ export async function start547Application(context) {
 		cwd: r.cwd,
 	});
 	const replacePreview = async (request) => {
+		require(!sourceBusy, "Source observation is in progress");
 		require(!consumed, "Preview replacement already consumed");
 		require(request &&
 			typeof request === "object" &&
@@ -673,10 +684,73 @@ export async function start547Application(context) {
 			throw error;
 		}
 	};
+	const observeSource = async (request) => {
+		require(!sourceBusy &&
+			!transitioning &&
+			!cleanupPromise, "Managed action or cleanup already in progress");
+		const spec = sourceObservation(request, {
+			root,
+			binding,
+			workload,
+			generation: result.preview.generation,
+			web: result.containers.find((row) => row.service === "web"),
+		});
+		require(!fs.existsSync(
+			path.join(directory, spec.id),
+		), "Source observation ID already consumed");
+		sourceBusy = true;
+		const sourceDeadline = clock() + 180;
+		const sourceInputs = spec.inputs;
+		spec.inputs = () => {
+			require(!cleanupPromise, "Serving cleanup began during source observation");
+			preservedImplementation();
+			require(isDeepStrictEqual(
+				fixed,
+				fixedPaths.map(fileIdentity),
+			), "Startup implementation changed");
+			const current = read(path.join(root, ".boat/preview-process.json"));
+			require(current.ready &&
+				current.generation === request.generation &&
+				current.pid === result.preview.pid &&
+				current.startTicks === result.preview.startTicks &&
+				isDeepStrictEqual(
+					current.forward,
+					result.preview.forward,
+				), "Current preview ownership changed");
+			return sourceInputs();
+		};
+		try {
+			return await runPhase(
+				spec,
+				sourceDeadline,
+				() => {
+					revoke(
+						new Error("Source observation failed; see captured phase result"),
+					);
+					return retire();
+				},
+				(argv, options) => {
+					const command = make(argv, options);
+					sourceCapture = command;
+					return command.finally(() => {
+						if (sourceCapture === command) sourceCapture = undefined;
+					});
+				},
+			);
+		} catch (error) {
+			error.actionStarted = true;
+			revoke(error);
+			await retire();
+			ended.resolve({ name: "source observation", error });
+			throw error;
+		} finally {
+			sourceBusy = false;
+		}
+	};
 	try {
 		fs.mkdirSync(directory, { mode: 0o700 });
 		acquired = true;
-		fixed = [source, observer].map(fileIdentity);
+		fixed = fixedPaths.map(fileIdentity);
 		preserved();
 		within();
 		require(/^[A-Za-z0-9_-]+$/.test(
@@ -755,7 +829,7 @@ export async function start547Application(context) {
 			return result.cleanup;
 		});
 		Object.defineProperty(result, "serving", {
-			value: { done, stop: retire, replacePreview },
+			value: { done, stop: retire, replacePreview, observeSource },
 		});
 		return result;
 	} catch (error) {

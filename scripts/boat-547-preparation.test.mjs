@@ -1283,6 +1283,261 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
+	for (const fault of ["none", "runtime-hash", "unrelated-source"])
+		test(`547 public source observation uses the current runtime adapter and owns cleanup, fault=${fault}`, {
+			timeout: 30000,
+		}, async (t) => {
+			const f = preparationFixture(t, true);
+			f.config.until = "ready";
+			await (await f.servingPorts()).release();
+			fs.symlinkSync(
+				path.join(repository, "scripts"),
+				path.join(f.root, "scripts"),
+			);
+			fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+			fs.copyFileSync(
+				process.env.BOAT_547_QUALIFIED_CLI,
+				path.join(f.root, ".mise/boat/boat"),
+			);
+			fs.writeFileSync(
+				path.join(f.root, "bin/docker"),
+				`#!/bin/sh\nexec node ${repository}/scripts/test-fixtures/547-docker-effect.cjs "$@"\n`,
+				{ mode: 0o700 },
+			);
+			if (fault === "runtime-hash") f.env.CONTROL_SOURCE_HASH_DRIFT = "1";
+			const config = path.join(f.root, "current-inputs.json");
+			fs.writeFileSync(config, JSON.stringify(f.config));
+			const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
+			const capture = captureServingCommand({
+				argv: [make, "boat-hillclimb-547", `BOAT_HILLCLIMB_CONFIG=${config}`],
+				cwd: f.root,
+				directory: path.join(f.root, "public-source-capture"),
+				env: f.env,
+				input: true,
+			});
+			const until = mono() + 20;
+			const wait = async (file, predicate) => {
+				while (!fs.existsSync(file) || !predicate(json(file))) {
+					assert.ok(
+						mono() < until,
+						`Public source result not published: ${file}`,
+					);
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				return json(file);
+			};
+			try {
+				const ready = await wait(
+					path.join(f.config.evidence, "startup/result.json"),
+					(r) => r.status === "PASS_STARTUP_READY",
+				);
+				// The CLI announces readiness only after its final publication checks
+				// and before it starts accepting coordinated source observations.
+				while (
+					!fs
+						.readFileSync(
+							path.join(f.root, "public-source-capture/stdout.raw"),
+							"utf8",
+						)
+						.includes('"status":"PASS_STARTUP_READY"')
+				) {
+					capture.assertRunning();
+					assert.ok(
+						mono() < until,
+						"Public ready announcement was not delivered",
+					);
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				const request = {
+					action: "observe-source",
+					id: "txt-create-1",
+					source: "presence",
+					expected: "present",
+					worker: ready.owner.worker,
+					admission: ready.owner.admission,
+					generation: ready.preview.generation,
+				};
+				capture.writeInput(
+					JSON.stringify({ ...request, admission: "stale-admission" }) + "\n",
+				);
+				while (
+					!fs
+						.readFileSync(
+							path.join(f.root, "public-source-capture/stderr.raw"),
+							"utf8",
+						)
+						.includes('"status":"REFUSED"')
+				) {
+					capture.assertRunning();
+					assert.ok(mono() < until, "Stale source request was not refused");
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				assert.equal(
+					fs.existsSync(path.join(f.root, "native-source-invocations.jsonl")),
+					false,
+				);
+				assert.ok(json(path.join(f.root, ".boat/state.json")).runningSince);
+				const payload = path.join(f.root, "apps/web/src/boat-547-presence.txt");
+				fs.writeFileSync(payload, "BOAT-547-PRESENCE\n", {
+					flag: "wx",
+					mode: 0o600,
+				});
+				if (fault === "unrelated-source")
+					fs.appendFileSync(
+						path.join(f.root, "apps/web/vite.config.ts"),
+						"\n// unrelated test input\n",
+					);
+				capture.writeInput(JSON.stringify(request) + "\n");
+				const file = path.join(
+					f.config.evidence,
+					"startup/source-txt-create-1/result.json",
+				);
+				const result = await wait(file, (r) =>
+					["PASS", "FAIL"].includes(r.status),
+				);
+				if (fault !== "none") {
+					assert.equal(result.status, "FAIL");
+					assert.match(
+						result.error,
+						fault === "runtime-hash"
+							? /Runtime source bytes/
+							: /Frozen workload changed/,
+					);
+					await wait(
+						path.join(f.config.evidence, "startup/cleanup.json"),
+						(r) => r.compute?.status === "STOPPED_ACCOUNTED",
+					);
+					assert.equal(
+						json(path.join(f.config.evidence, "startup/result.json")).next,
+						undefined,
+					);
+					assert.equal(fs.readFileSync(payload, "utf8"), "BOAT-547-PRESENCE\n");
+				} else {
+					assert.equal(result.status, "PASS", JSON.stringify(result));
+					assert.equal(result.outcome.runtime.bytes, 18);
+					assert.deepEqual(
+						result.outcome.runtime.byteValues,
+						[
+							66, 79, 65, 84, 45, 53, 52, 55, 45, 80, 82, 69, 83, 69, 78, 67,
+							69, 10,
+						],
+					);
+					assert.equal(
+						result.outcome.runtime.sha256,
+						"afb7b0e339d3a9151d191aa48982db28838c8b85e50b7787535f21623c6744ab",
+					);
+					assert.ok(result.acceptedAt < result.deadline);
+					assert.ok(json(path.join(f.root, ".boat/state.json")).runningSince);
+					assert.equal(
+						json(
+							path.join(
+								f.config.evidence,
+								"startup/source-txt-create-1/command/receipt.json",
+							),
+						).captureComplete,
+						true,
+					);
+					fs.unlinkSync(payload);
+					capture.writeInput(
+						JSON.stringify({
+							...request,
+							id: "txt-delete-1",
+							expected: "absent",
+						}) + "\n",
+					);
+					const absent = await wait(
+						path.join(
+							f.config.evidence,
+							"startup/source-txt-delete-1/result.json",
+						),
+						(r) => ["PASS", "FAIL"].includes(r.status),
+					);
+					assert.equal(absent.status, "PASS", JSON.stringify(absent));
+					assert.equal(absent.outcome.runtime.lstat, "ENOENT");
+					const heading = path.join(f.root, "apps/web/src/routes/upload.tsx"),
+						original = fs.readFileSync(heading);
+					try {
+						for (const state of ["B", "A"]) {
+							fs.writeFileSync(
+								heading,
+								state === "A"
+									? original
+									: original
+											.toString()
+											.replace(
+												"Upload Wallpapers",
+												"Upload Wallpapers [Boat 547 HMR]",
+											),
+							);
+							capture.writeInput(
+								JSON.stringify({
+									...request,
+									id: `heading-${state}`,
+									source: "heading",
+									expected: state,
+								}) + "\n",
+							);
+							const observed = await wait(
+								path.join(
+									f.config.evidence,
+									`startup/source-heading-${state}/result.json`,
+								),
+								(r) => ["PASS", "FAIL"].includes(r.status),
+							);
+							assert.equal(observed.status, "PASS", JSON.stringify(observed));
+							assert.equal(
+								observed.outcome.runtime.sha256,
+								state === "A"
+									? "d3f4063d7b34435ba0e1a913c3975cfffe5c9ae7d2bc69b9416868966b876170"
+									: "d66f5a18bc16b5ca7282fb67a4dee9ccb547545f6195f5bfcc7a37808cd03ab5",
+							);
+						}
+					} finally {
+						fs.writeFileSync(heading, original);
+					}
+				}
+				const native = path.join(f.root, "native-source-invocations.jsonl");
+				const calls = fs.existsSync(native) ? jsonLines(native) : [];
+				assert.equal(
+					calls.length,
+					fault === "unrelated-source" ? 0 : fault === "runtime-hash" ? 1 : 4,
+				);
+				assert.ok(
+					calls.every(
+						(c) =>
+							c.project === "wallpaperdb-control" &&
+							["presence", "heading"].includes(c.source),
+					),
+				);
+				if (fault !== "unrelated-source")
+					assert.ok(
+						jsonLines(path.join(f.root, "commands.jsonl")).some(
+							(c) =>
+								c[1] === "docker-run" &&
+								c[2] ===
+									"ARGS=node scripts/boat-workloads/547-runtime.cjs source-observe wallpaperdb-control presence",
+						),
+					);
+			} finally {
+				await capture.stop();
+			}
+			assert.equal(
+				json(path.join(f.root, ".boat/state.json")).runningSince,
+				null,
+			);
+			assert.equal(
+				jsonLines(path.join(f.root, "commands.jsonl")).filter(
+					(c) => c[1] === "boat-stop",
+				).length,
+				1,
+			);
+			assert.deepEqual(
+				json(path.join(f.root, "public-source-capture/disposal.json"))
+					.unresolved,
+				[],
+			);
+		});
+
 	for (const extra of [false, true])
 		test(`547 public Make config assignment crosses the real enrolled generator route, explicitExtra=${extra}`, (t) => {
 			const f = preparationFixture(t, true);

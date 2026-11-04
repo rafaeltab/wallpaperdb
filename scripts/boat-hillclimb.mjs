@@ -39,7 +39,11 @@ try {
 		input.on("line", (line) => {
 			const request = (async () => {
 				try {
-					const changed = await result.serving.replacePreview(JSON.parse(line));
+					const data = JSON.parse(line);
+					const changed =
+						data.action === "observe-source"
+							? await result.serving.observeSource(data)
+							: await result.serving.replacePreview(data);
 					console.log(
 						JSON.stringify({
 							status: changed.status,
@@ -48,7 +52,7 @@ try {
 							url: changed.url,
 							worker: changed.owner.worker,
 							admission: changed.owner.admission,
-							generation: changed.preview.generation,
+							generation: changed.preview?.generation,
 							next: changed.next,
 						}),
 					);

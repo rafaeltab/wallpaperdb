@@ -2005,6 +2005,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const progress = z
       .object({
         progress: z.string().default('Automatic conflict recorded; recovery pending'),
+        bindingAvailable: z.boolean().optional(),
         active: z.boolean().default(true),
         classification: z.enum(['SIMPLE', 'COMPLEX']).optional(),
         threadId: z.string().optional(),

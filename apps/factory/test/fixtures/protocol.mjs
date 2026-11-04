@@ -196,7 +196,14 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
     console.log('{}');
   } else if (args[1] === 'list')
     console.log(
-      JSON.stringify(state ? [{ threadId: 'restacker', title: state.thread.title }] : [])
+      JSON.stringify(
+        state
+          ? Array.from({ length: config.duplicate ? 2 : 1 }, () => ({
+              threadId: 'restacker',
+              title: state.thread.title,
+            }))
+          : []
+      )
     );
   else console.log(JSON.stringify(state));
   process.exit(0);

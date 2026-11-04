@@ -331,7 +331,6 @@ export function sourcesLayer(configuration: {
         upload: Effect.fn('asset.sources.upload')(function* (owner, assetId, id, bytes, context) {
           const authorized = yield* candidate(owner, assetId, id, (_state, found) => result(found));
           if (authorized.kind !== 'candidate') return authorized;
-          if (['cancelled', 'rejected'].includes(authorized.candidate.status)) return authorized;
           const selected = yield* store.transact(assetId, null, (state) => ({
             state,
             result: state ? configuration.types[state.asset.assetType] : undefined,

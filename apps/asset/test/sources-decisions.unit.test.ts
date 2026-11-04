@@ -1,3 +1,7 @@
+import { createHttpApp } from '../src/http/index.js';
+import { AuthorAuthentication } from '../src/adapters/authors/index.js';
+import { Availability } from '../src/capabilities/availability/index.js';
+import { AssetDelivery } from '../src/capabilities/delivery/index.js';
 import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
@@ -144,6 +148,9 @@ function fixture(
     get state() {
       return state;
     },
+    services: sourcesLayer({ revision: 'one', types: { [assetType]: policy } }).pipe(
+      Layer.provide(dependencies)
+    ),
     confirmations,
     retirements,
     setPrepare: (value: typeof prepare) => {
@@ -1557,3 +1564,87 @@ describe('canonical picture replacement', () => {
     }
   });
 });
+
+it.each(['rejected', 'cancelled'] as const)(
+  'conflicts on changed-byte replay of a %s candidate through capability and HTTP without reviving it',
+  async (terminal) => {
+    const f = fixture();
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 3003 },
+      Layer.merge(
+        Layer.succeed(Availability, {
+          health: () => Effect.die('unused'),
+          ready: () => Effect.die('unused'),
+        }),
+        Layer.succeed(AssetDelivery, {
+          wallpaper: () => Effect.die('unused'),
+          picture: () => Effect.die('unused'),
+        })
+      ),
+      {
+        sourceServices: Layer.merge(
+          f.services,
+          Layer.succeed(AuthorAuthentication, { verify: () => Effect.succeed(owner) })
+        ),
+      }
+    );
+    try {
+      const first = await create(f, 'accepted');
+      await upload(f, first);
+      const accepted = await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      if (accepted.kind !== 'candidate') throw new Error('Expected accepted Source');
+      const before = await f.call((s) => s.list(owner, 'asset_one'));
+      const id = await create(f, 'terminal', '1');
+      if (terminal === 'rejected')
+        f.setInspect(() => Effect.succeed({ kind: 'rejected', reason: 'unsupported-format' }));
+      await upload(f, id);
+      if (terminal === 'cancelled') await f.call((s) => s.cancel(owner, 'asset_one', id));
+      const outcome = await f.call((s) => s.status(owner, 'asset_one', id));
+      expect(outcome).toMatchObject({ candidate: { status: terminal } });
+      expect(await upload(f, id)).toEqual(outcome);
+      const request = {
+        method: 'PUT' as const,
+        url: `/assets/asset_one/source-candidates/${id}/bytes`,
+        headers: { authorization: 'Bearer owner', 'content-type': 'application/octet-stream' },
+      };
+      const same = await app.inject({ ...request, payload: Buffer.from([1, 2, 3, 4]) });
+      expect(same.statusCode).toBe(200);
+      expect(same.json()).toMatchObject({ status: terminal });
+      // Soft assertions prove both public boundary failures on the unmodified implementation.
+      expect
+        .soft(await upload(f, id, [9, 8, 7]))
+        .toEqual({ kind: 'rejected', reason: 'byte-digest-conflict' });
+      const changed = await app.inject({ ...request, payload: Buffer.from([9, 8, 7]) });
+      expect.soft(changed.statusCode).toBe(409);
+      expect
+        .soft(changed.json())
+        .toMatchObject({
+          status: 409,
+          type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/byte-digest-conflict.md',
+        });
+      expect(await f.call((s) => s.status(owner, 'asset_one', id))).toEqual(outcome);
+      expect(
+        await f.call((s) =>
+          s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: '1' })
+        )
+      ).toEqual({ kind: 'rejected', reason: 'candidate-not-ready' });
+      const after = await f.call((s) => s.list(owner, 'asset_one'));
+      if (before.kind !== 'found' || after.kind !== 'found')
+        throw new Error('Expected Source membership');
+      expect(after.asset.sources).toEqual(before.asset.sources);
+      expect(after.asset.sourceSetRevision).toBe('1');
+      expect(after.asset.defaultSourceId).toBe(before.asset.defaultSourceId);
+      const original = await f.call((s) =>
+        s.original(owner, 'asset_one', accepted.candidate.sourceId)
+      );
+      if (original.kind !== 'original') throw new Error('Expected original');
+      const chunks: number[] = [];
+      for await (const chunk of original.bytes) chunks.push(...chunk);
+      expect(chunks).toEqual([1, 2, 3, 4]);
+      await Effect.runPromise(original.close());
+    } finally {
+      await app.close();
+      await f.close();
+    }
+  }
+);

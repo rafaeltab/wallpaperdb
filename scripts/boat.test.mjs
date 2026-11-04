@@ -11781,7 +11781,7 @@ if(argv.includes('forward')){
 			? `server.on('error',error=>{event('forward-error',{code:error.code});throw error;});
  let closing=false;
  const finish=()=>{if(closing)return;closing=true;for(const p of peers)p.destroy();server.close(()=>{event('forward-closed');process.exit(0);});};
- process.on('SIGTERM',()=>{event('forward-term');if(fs.existsSync(path.join(control,'ignore-forward-term')))return;if(!fs.existsSync(path.join(control,'hold-forward-'+process.pid)))finish();else {const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-'+process.pid))){clearInterval(timer);finish();}},10);}});`
+ process.on('SIGTERM',()=>{event('forward-term');if(fs.existsSync(path.join(control,'ignore-forward-term'))||(!primary&&fs.existsSync(path.join(control,'ignore-connection-term'))))return;if(!fs.existsSync(path.join(control,'hold-forward-'+process.pid)))finish();else {const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-'+process.pid))){clearInterval(timer);finish();}},10);}});`
 			: "process.on('SIGTERM',()=>{for(const p of peers)p.destroy();server.close(()=>process.exit(0));});"
  }
 }else if(argv.includes('ssh')){
@@ -16599,4 +16599,154 @@ test("preview connection retirement isolates workers and refuses drifted or expi
 		deadline: performance.now() + 1000,
 	});
 	survives();
+});
+
+test("preview upgrade handshake keeps TERM-ignoring forward disposal inside its original acquisition total", {
+	timeout: 30000,
+}, async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	const f = await pendingUpgradePreview(
+		t,
+		"managed",
+		archive,
+		"upgrade-handshake-budget",
+	);
+	await archive.scenario(async () => {
+		// Valid neighbor uses the same actual public preview and controlled transport.
+		const [, healthy] = await previewProbe(
+			once(f.request("/ws-healthy", true, true), "upgrade"),
+			"healthy upgrade missing",
+		);
+		await previewFrame(healthy, "before-held-handshake");
+		await f.readiness.wait(
+			() =>
+				fs
+					.readdirSync(path.join(f.root, ".boat/preview-connections"))
+					.some(
+						(n) =>
+							JSON.parse(
+								fs.readFileSync(
+									path.join(
+										f.root,
+										".boat/preview-connections",
+										n,
+										"connection.json",
+									),
+								),
+							).phase === "serving",
+					),
+			"valid neighbor fully published before closure",
+		);
+		healthy.destroy();
+		const directory = path.join(f.root, ".boat/preview-connections");
+		await f.readiness.wait(
+			() =>
+				fs
+					.readdirSync(directory)
+					.every(
+						(n) =>
+							JSON.parse(
+								fs.readFileSync(path.join(directory, n, "connection.json")),
+							).phase === "closed",
+					),
+			"valid uninterrupted neighbor retired before noncooperative control",
+		);
+		const before = new Set(fs.readdirSync(directory));
+		flag(f, "ignore-connection-term");
+		const arrived = f.arrival("/ws-pending-budget");
+		const lower = fixtureNow();
+		// Liveness is installed before awaiting any target operation or completion.
+		const deadline = AbortSignal.timeout(10000);
+		const client = f.request("/ws-pending-budget", true, true);
+		const [downstream] = await previewProbe(
+			once(client, "socket"),
+			"held upgrade socket missing",
+		);
+		let received101 = false;
+		client.once("upgrade", () => {
+			received101 = true;
+		});
+		await previewProbe(arrived, "held 101 did not reach real upstream");
+		const name = fs.readdirSync(directory).find((n) => !before.has(n));
+		assert.ok(name);
+		const ownDirectory = path.join(directory, name);
+		const connection = JSON.parse(
+			fs.readFileSync(path.join(ownDirectory, "connection.json")),
+		);
+		const claim = JSON.parse(
+			fs.readFileSync(
+				path.join(
+					ownDirectory,
+					fs.existsSync(path.join(ownDirectory, "preview-acquisition.json"))
+						? "preview-acquisition.json"
+						: "preview-process.json",
+				),
+				"utf8",
+			),
+		);
+		const progressFile = path.join(ownDirectory, claim.progress);
+		const progress = JSON.parse(fs.readFileSync(progressFile));
+		const forward = progress.forward;
+		assert.equal(fixtureProcess(forward.pid)?.startTicks, forward.startTicks);
+		const argv = fs
+			.readFileSync(`/proc/${forward.pid}/cmdline`, "utf8")
+			.split("\0");
+		const localPort = Number(argv[argv.indexOf("--local") + 1]);
+		assert.equal(previewListenerOwner(forward, localPort).length, 1);
+		let poll;
+		try {
+			await new Promise((resolve, reject) => {
+				const expired = () =>
+					reject(
+						Error(
+							"Handshake acquisition exceeded the original ten-second total",
+						),
+					);
+				deadline.addEventListener("abort", expired, { once: true });
+				const check = () => {
+					if (!fixtureProcess(connection.pid) && !fixtureProcess(forward.pid)) {
+						deadline.removeEventListener("abort", expired);
+						resolve();
+					}
+				};
+				poll = setInterval(check, 10);
+				check();
+				if (deadline.aborted) expired();
+			});
+		} finally {
+			clearInterval(poll);
+		}
+		const completed = fixtureNow();
+		assert.ok(
+			completed <= lower + 10000,
+			"No fresh disposal clock after forward readiness",
+		);
+		assert.equal(received101, false);
+		assert.equal(downstream.destroyed, true);
+		assert.deepEqual(previewListenerOwner(forward, localPort), []);
+		const final = JSON.parse(fs.readFileSync(progressFile));
+		assert.equal(final.phase, "retired");
+		assert.equal(final.closed, true);
+		assert.deepEqual(final.unresolved, []);
+		assert.deepEqual(final.terminal, { code: null, signal: "SIGKILL" });
+		assert.match(final.failure, /acquisition allowance exhausted/);
+		assert.ok(
+			readPreviewRetirementEvents(f).some(
+				(e) => e.pid === forward.pid && e.event === "connection-forward-term",
+			),
+		);
+		f.receipts.handshakeBudget = {
+			lower,
+			completed,
+			connection,
+			forward,
+			localPort,
+			received101,
+			final,
+		};
+		f.phase(
+			"original handshake acquisition and exact forward retirement qualified before cleanup",
+		);
+		await f.healthy(true);
+	});
 });

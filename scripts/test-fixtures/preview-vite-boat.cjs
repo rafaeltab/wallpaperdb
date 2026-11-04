@@ -92,6 +92,23 @@ if (argv.includes("info")) {
 		throw Error("Unexpected controlled port");
 	const peers = new Set();
 	const server = net.createServer((socket) => {
+		let header = Buffer.alloc(0);
+		const observe = (bytes) => {
+			header = Buffer.concat([header, bytes]);
+			if (header.length > 16384) {
+				socket.off("data", observe);
+				return;
+			}
+			if (!header.includes("\r\n\r\n")) return;
+			socket.off("data", observe);
+			const protocol = header
+				.toString("latin1")
+				.match(/^sec-websocket-protocol:\s*([^\r\n]+)/im)?.[1];
+			// Observe only these public protocol names, never auth headers/tokens.
+			if (["vite-ping", "vite-hmr"].includes(protocol))
+				log("upgrade-protocol", { protocol });
+		};
+		socket.on("data", observe);
 		const upstream = net.connect(
 			Number(process.env.CONTROL_VITE_PORT),
 			"127.0.0.1",

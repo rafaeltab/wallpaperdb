@@ -247,6 +247,7 @@ export async function runPreview({
 	port,
 	server,
 	ready,
+	establish,
 	record,
 	directory = path.join(root, ".boat"),
 	owner = {},
@@ -536,6 +537,31 @@ export async function runPreview({
 			await pause();
 		}
 		check();
+		// Listener acquisition is only the first step for an upgraded connection.
+		// Keep its protocol handshake, failure and disposal on this same clock.
+		if (establish) {
+			let established = false,
+				establishmentFailure;
+			Promise.resolve()
+				.then(establish)
+				.then(
+					() => {
+						established = true;
+					},
+					(error) => {
+						establishmentFailure = error;
+						established = true;
+					},
+				);
+			while (!established) {
+				check();
+				survey();
+				persist();
+				await pause();
+			}
+			if (establishmentFailure) throw establishmentFailure;
+			check();
+		}
 		state.ready = true;
 		state.phase = "ready";
 		persist();
@@ -667,7 +693,7 @@ async function servePreviewConnection({
 	const connectionFile = path.join(directory, "connection.json");
 	write(connectionFile, { ...controller, workerId, phase: "acquiring" });
 	const cancellation = new AbortController();
-	let socket, peer, upstream, timer, monitor, handshakeFailure;
+	let socket, peer, upstream, timer, monitor;
 	const disconnect = () => {
 		socket?.destroy();
 		peer?.destroy();
@@ -737,54 +763,54 @@ async function servePreviewConnection({
 					`${JSON.stringify({ kind, ...detail })}\n`,
 					{ mode: 0o600 },
 				),
-			ready: () => {
-				if (!workerMatches() || socket.destroyed) {
-					disconnect();
-					return;
-				}
-				timer = setTimeout(
-					() => {
-						handshakeFailure = Error(
-							"Preview upgrade acquisition allowance exhausted",
-						);
+			establish: () =>
+				new Promise((resolve, reject) => {
+					if (!workerMatches() || socket.destroyed) {
 						disconnect();
-					},
-					Math.max(0, began + 9000 - now()),
-				);
-				upstream = http.request({
-					hostname: "127.0.0.1",
-					port: privatePort,
-					path: request.url,
-					headers: request.headers,
-				});
-				upstream.once("error", disconnect);
-				upstream.once("response", disconnect);
-				upstream.once("upgrade", (response, upgraded, bytes) => {
-					clearTimeout(timer);
-					peer = upgraded;
-					for (const event of ["end", "close", "error"])
-						peer.once(event, disconnect);
-					if (socket.destroyed) {
-						disconnect();
+						reject(Error("Preview connection cancelled before handshake"));
 						return;
 					}
-					socket.write(
-						`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(
-							response.headers,
-						)
-							.map(([k, v]) => `${k}: ${v}`)
-							.join("\r\n")}\r\n\r\n`,
-					);
-					peer.write(request.head);
-					socket.write(bytes);
-					socket.pipe(peer).pipe(socket);
-					socket.resume();
-					write(connectionFile, { ...controller, workerId, phase: "serving" });
-				});
-				upstream.end();
-			},
+					upstream = http.request({
+						hostname: "127.0.0.1",
+						port: privatePort,
+						path: request.url,
+						headers: request.headers,
+					});
+					upstream.once("error", (error) => {
+						reject(error);
+						disconnect();
+					});
+					upstream.once("response", () => {
+						reject(Error("Preview upstream refused upgrade"));
+						disconnect();
+					});
+					upstream.once("upgrade", (response, upgraded, bytes) => {
+						peer = upgraded;
+						for (const event of ["end", "close", "error"])
+							peer.once(event, disconnect);
+						if (socket.destroyed) {
+							disconnect();
+							reject(Error("Preview downstream closed before upgrade"));
+							return;
+						}
+						socket.write(
+							`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(
+								response.headers,
+							)
+								.map(([k, v]) => `${k}: ${v}`)
+								.join("\r\n")}\r\n\r\n`,
+						);
+						peer.write(request.head);
+						socket.write(bytes);
+						socket.pipe(peer).pipe(socket);
+						socket.resume();
+						resolve();
+					});
+					upstream.end();
+				}),
+			ready: () =>
+				write(connectionFile, { ...controller, workerId, phase: "serving" }),
 		});
-		if (handshakeFailure) throw handshakeFailure;
 		write(connectionFile, { ...controller, workerId, phase: "closed" });
 	} catch (error) {
 		write(connectionFile, {

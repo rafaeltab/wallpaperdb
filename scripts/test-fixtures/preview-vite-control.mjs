@@ -294,6 +294,16 @@ export async function previewViteControl(t, helpers) {
 			"Initial preview ready",
 		);
 		record("old-preview-ready", { preview: old });
+		const roleDirectory = path.join(f.root, ".boat/preview-connections");
+		const roles = () =>
+			fs.existsSync(roleDirectory)
+				? fs.readdirSync(roleDirectory).map((n) => ({
+						directory: path.join(roleDirectory, n),
+						...JSON.parse(
+							fs.readFileSync(path.join(roleDirectory, n, "connection.json")),
+						),
+					}))
+				: [];
 		stage = "browser";
 		const pw = require("playwright");
 		browserServer = await pw.chromium.launchServer({
@@ -573,6 +583,7 @@ export async function previewViteControl(t, helpers) {
 			"Delivered client equals actual native Vite response",
 		);
 		// A real full-reload message must still navigate; no reload interception.
+		const beforeReload = new Set(roles().map((r) => r.directory));
 		phase = "GENUINE_FULL_RELOAD";
 		const navigation = page.waitForEvent("load", { timeout: 10000 });
 		vite.ws.send({ type: "full-reload", path: "*" });
@@ -594,6 +605,15 @@ export async function previewViteControl(t, helpers) {
 			10,
 			"HMR after genuine full reload",
 		);
+		await until(
+			() =>
+				roles().some(
+					(r) => !beforeReload.has(r.directory) && r.phase === "serving",
+				),
+			10,
+			"Reloaded HMR connection publication",
+		);
+		const beforeRestart = new Set(roles().map((r) => r.directory));
 		phase = "GENUINE_SERVER_RESTART";
 		const restartNavigation = page.waitForEvent("load", { timeout: 15000 });
 		await bound(vite.close(), 10, "Genuine Vite stop");
@@ -635,16 +655,15 @@ export async function previewViteControl(t, helpers) {
 					e.data.initiator.type === "script",
 			),
 		);
-		const roleDirectory = path.join(f.root, ".boat/preview-connections");
-		const roles = () =>
-			fs.existsSync(roleDirectory)
-				? fs.readdirSync(roleDirectory).map((n) => ({
-						directory: path.join(roleDirectory, n),
-						...JSON.parse(
-							fs.readFileSync(path.join(roleDirectory, n, "connection.json")),
-						),
-					}))
-				: [];
+
+		await until(
+			() =>
+				roles().some(
+					(r) => !beforeRestart.has(r.directory) && r.phase === "serving",
+				),
+			10,
+			"Restarted HMR connection publication",
+		);
 		const active = roles().filter((r) => r.phase === "serving");
 		assert.equal(active.length, 1);
 		assert.notEqual(active[0].pid, old.pid);
@@ -695,35 +714,56 @@ export async function previewViteControl(t, helpers) {
 		});
 
 		assert.ok(roles().every((r) => helpers.fixtureProcess(r.pid) === null));
-		const retiredRoles = roles().map((role) => {
-			const raw = fs.readFileSync(
-				path.join(role.directory, "events.jsonl"),
-				"utf8",
-			);
-			const native = raw.trim().split("\n").map(JSON.parse);
-			const retired = native.findLast((e) => e.stage === "retired");
-			assert.equal(retired?.closed, true);
-			assert.deepEqual(retired.terminal, { code: 0, signal: null });
-			assert.equal(role.phase, "closed");
-			assert.equal(
-				fs.existsSync(path.join(role.directory, "preview-process.json")),
-				false,
-			);
-			return {
-				role,
-				events: native,
-				log: fs.readFileSync(
-					path.join(role.directory, "transport.log"),
-					"utf8",
-				),
-			};
-		});
+		const retiredRoles = roles().map((role) => ({
+			role,
+			events: fs
+				.readFileSync(path.join(role.directory, "events.jsonl"), "utf8")
+				.trim()
+				.split("\n")
+				.map(JSON.parse),
+			log: fs.readFileSync(path.join(role.directory, "transport.log"), "utf8"),
+		}));
+		const transportEvents = fs
+			.readFileSync(path.join(f.control, "offline-transport.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
 		save("development-connection-retirement.json", {
 			roles: retiredRoles,
 			retained,
 			reloaded,
 			sourceAndDelete: "PASS",
+			transportEvents,
 		});
+		for (const { role, events: native } of retiredRoles) {
+			const retired = native.findLast((e) => e.stage === "retired");
+			assert.equal(retired?.closed, true);
+			assert.deepEqual(retired.terminal, { code: 0, signal: null });
+			if (role.phase === "failed") {
+				// Native Vite ping opens then immediately closes its socket. Preserve
+				// its pre-publication cancellation; a failed HMR connection never passes.
+				assert.equal(
+					transportEvents.find(
+						(e) =>
+							e.pid === retired.forward.pid && e.kind === "upgrade-protocol",
+					)?.protocol,
+					"vite-ping",
+				);
+				assert.equal(role.failure, "Preview acquisition cancelled");
+				assert.ok(
+					native.some(
+						(e) =>
+							e.stage === "failed" &&
+							e.message === "Preview acquisition cancelled",
+					),
+				);
+			} else assert.equal(role.phase, "closed");
+			assert.equal(
+				fs.existsSync(path.join(role.directory, "preview-process.json")),
+				false,
+			);
+		}
+
 		const lifetime = fs.readFileSync(
 			path.join(f.root, ".boat/events.jsonl"),
 			"utf8",

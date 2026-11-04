@@ -1476,7 +1476,6 @@ test("547 versioned image allocation reaches actual Make without extending ordin
 			return receipt;
 		},
 	});
-	assert.equal(result.scheduleVersion, "547-cold-v2-image300");
 	assert.equal(result.coldDeadline - result.coldStarted, 1200);
 	const images = new Set([
 		"prepare-images-before-restoration",
@@ -1484,8 +1483,11 @@ test("547 versioned image allocation reaches actual Make without extending ordin
 		"prepare-infra-images",
 	]);
 	for (const p of result.phases) {
-		const expected = images.has(p.phase) ? 300 : 180;
-		assert.equal(p.deadline - p.started, expected, p.phase);
+		const expectedDeadline = images.has(p.phase)
+			? result.coldStarted + 1200
+			: p.started + 180;
+		assert.equal(p.deadline, expectedDeadline, p.phase);
+		const expected = expectedDeadline - p.started;
 		const invocation = captures.get(p.phase);
 		assert.equal(invocation.deadline, p.deadline, p.phase);
 		assert.ok(
@@ -1494,6 +1496,7 @@ test("547 versioned image allocation reaches actual Make without extending ordin
 			p.phase,
 		);
 	}
+	assert.equal(result.scheduleVersion, "547-cold-v3-shared-images");
 });
 
 test("547 image allocation is clamped to the original remaining cold budget", async (t) => {
@@ -1512,11 +1515,40 @@ test("547 image allocation is clamped to the original remaining cold budget", as
 	);
 	assert.equal(result.coldDeadline - result.coldStarted, 1200);
 	assert.equal(image.deadline, result.coldDeadline);
-	assert.ok(image.deadline - image.started < 300);
+	assert.ok(image.deadline - image.started < 1200);
 	assert.ok(image.acceptedAt < result.coldDeadline);
 });
 
-test("547 image acceptance after its new allowance fails before later work and stops once", async (t) => {
+test("547 image acceptance after 300 seconds can use remaining original cold time", async (t) => {
+	const f = preparationFixture(t);
+	await stoppedWantedDevelopment(f);
+	let offset = 0;
+	const result = await f.run({
+		clock: () => mono() + offset,
+		make: async (argv, options) => {
+			const r = await f.make(argv, options);
+			if (options.directory.includes("/prepare-images-before-restoration/"))
+				offset = 301;
+			return r;
+		},
+	});
+	const image = result.phases.find(
+		(p) => p.phase === "prepare-images-before-restoration",
+	);
+	assert.equal(result.status, "PASS_PREDEV_THROUGH_IMAGES");
+	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(image.deadline, result.coldDeadline);
+	assert.ok(image.acceptedAt - image.started > 300);
+	assert.ok(image.acceptedAt < result.coldDeadline);
+	assert.equal(
+		jsonLines(path.join(f.root, "commands.jsonl")).some(
+			(a) => a[1] === "boat-stop",
+		),
+		false,
+	);
+});
+
+test("547 image acceptance after the original cold deadline fails before later work and stops once", async (t) => {
 	const f = preparationFixture(t);
 	await stoppedWantedDevelopment(f);
 	let offset = 0;
@@ -1526,7 +1558,7 @@ test("547 image acceptance after its new allowance fails before later work and s
 			make: async (argv, options) => {
 				const r = await f.make(argv, options);
 				if (options.directory.includes("/prepare-images-before-restoration/"))
-					offset = 301;
+					offset = 1201;
 				return r;
 			},
 		}),
@@ -1539,7 +1571,10 @@ test("547 image acceptance after its new allowance fails before later work and s
 		),
 	);
 	assert.equal(p.status, "FAIL");
-	assert.equal(p.deadline - p.started, 300);
+	assert.equal(
+		p.deadline,
+		json(path.join(f.config.evidence, "preparation-result.json")).coldDeadline,
+	);
 	assert.equal(p.cleanup.status, "STOPPED_ACCOUNTED");
 	assert.equal(
 		fs.existsSync(

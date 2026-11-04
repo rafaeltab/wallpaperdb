@@ -487,7 +487,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-cold-v2-image300",
+		scheduleVersion: "547-cold-v3-shared-images",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -615,10 +615,11 @@ export async function execute547Preparation(config, dependencies = {}) {
 			throw new Error(`Missing current ${kind} completion event`);
 		return matches[0];
 	};
-	const imagePreparationSeconds = 300;
+	// Preparation images share the original aggregate; the phase executor clamps
+	// their deadline to its remaining time, without resetting the cold origin.
 	const prepareImages = (id) =>
 		run(id, ["make", "boat-prepare-infra-images"], {
-			allowanceSeconds: imagePreparationSeconds,
+			allowanceSeconds: coldDeadline - coldStarted,
 			assess: (raw, { receipt }) => ({
 				...workload.acceptImages(raw, identity.project),
 				event: event("infra-image-preparation", receipt),
@@ -671,7 +672,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 				"prepare-app-images-before-restoration",
 				["make", "boat-prepare-app-images"],
 				{
-					allowanceSeconds: imagePreparationSeconds,
+					allowanceSeconds: coldDeadline - coldStarted,
 					assess: (_raw, { receipt }) => ({
 						event: event("app-image-preparation", receipt),
 					}),

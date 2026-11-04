@@ -17,6 +17,7 @@ it('translates external issue observations and rejects unverified or malformed d
       blockers: [],
       blockersReady: true,
       url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
+      title: 'Controlled issue',
     });
     await host.save({ blockers: [{ number: 573, state: 'open' }] });
     expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });

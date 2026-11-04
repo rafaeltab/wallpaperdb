@@ -24,6 +24,7 @@ export interface Intent {
   readonly id: string;
   readonly issue: number;
   readonly issueUrl: string;
+  readonly issueTitle?: string;
   readonly prerequisiteEvidence?: string;
   readonly prBase?: string;
   readonly base: string;
@@ -172,6 +173,7 @@ export interface Issues {
       };
       blockedReason?: string;
       url: string;
+      title?: string;
     },
     Unavailable
   >;

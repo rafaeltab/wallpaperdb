@@ -10,6 +10,7 @@ const intentSchema = z
     id: z.string().min(1),
     issue: z.number().int().positive(),
     issueUrl: z.string().url(),
+    issueTitle: z.string().optional(),
     prerequisiteEvidence: z.string().optional(),
     prBase: z.string().optional(),
     base: z.string().regex(/^[a-f0-9]{40}$/),

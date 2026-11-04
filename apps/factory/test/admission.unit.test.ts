@@ -18,6 +18,7 @@ const facts = {
   blockers: [],
   blockersReady: true,
   url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
+  title: 'Implement a factory worker',
 };
 function setup(
   issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts,
@@ -82,6 +83,7 @@ it('accepts the second trusted maintainer and reports controlled elapsed time', 
   const app = setup({ ...facts, author: 'zero-two-rafaeltab' });
   try {
     expect(await app.start()).toMatchObject({ kind: 'job', elapsedMs: 0 });
+    expect(await app.saved()).toMatchObject({ issueTitle: 'Implement a factory worker' });
     await app.runtime.runPromise(TestClock.adjust(12000));
     expect(await app.runtime.runPromise(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
       kind: 'job',

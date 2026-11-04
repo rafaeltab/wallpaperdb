@@ -1154,6 +1154,161 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
+	for (const extra of [false, true])
+		test(`547 public Make config assignment crosses the real enrolled generator route, explicitExtra=${extra}`, (t) => {
+			const f = preparationFixture(t, true);
+			fs.writeFileSync(
+				path.join(f.root, "Makefile"),
+				`override SHELL := /bin/sh\ninclude ${repository}/Makefile\n`,
+			);
+			fs.symlinkSync(
+				path.join(repository, "scripts"),
+				path.join(f.root, "scripts"),
+			);
+			fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+			fs.copyFileSync(
+				process.env.BOAT_547_QUALIFIED_CLI,
+				path.join(f.root, ".mise/boat/boat"),
+			);
+			const config = path.join(f.root, "config.json");
+			fs.writeFileSync(config, JSON.stringify(f.config));
+			const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
+			// Keep all commands in real Make. The generation command additionally
+			// crosses the enrolled repository route before controlled downstream work.
+			fs.writeFileSync(
+				path.join(f.root, "bin/make"),
+				`#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.slice(2);
+const generation=args.includes('SCRIPT=dependencies:lock');
+if(generation)fs.appendFileSync('make-entry.jsonl',JSON.stringify({args,flags:process.env.MAKEFLAGS,overrides:process.env.MAKEOVERRIDES,mflags:process.env.MFLAGS,level:process.env.MAKELEVEL,gnu:process.env.GNUMAKEFLAGS})+'\\n');
+if(generation&&process.env.CONTROL_EXPLICIT_GENERATOR_EXTRA==='1')args.push('ARGS=--name=unsupported');
+const r=cp.spawnSync(${JSON.stringify(make)},[...(!generation?['-f','controlled.mk']:[]),...args],{stdio:'inherit',env:{...process.env,CONTROL_MAKE_ARGV:JSON.stringify(['make',...args])}});process.exitCode=r.status??1;
+`,
+				{ mode: 0o700 },
+			);
+			fs.writeFileSync(
+				path.join(f.root, "bin/node"),
+				`#!${process.execPath}
+const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.slice(2);
+(async()=>{
+ if(args[0]==='scripts/boat.mjs'&&args[1]==='command'){
+  const targets=args.slice(args.indexOf('--')+1).filter(a=>!a.startsWith('BOAT_EXEC='));
+  fs.appendFileSync('routed-generators.jsonl',JSON.stringify({targets,project:process.env.COMPOSE_PROJECT_NAME,custom:process.env.CONTROL_PRESERVED_ENV,config:process.env.BOAT_HILLCLIMB_CONFIG})+'\\n');
+  const {sourceGeneration}=await import(${JSON.stringify(path.join(repository, "scripts/lib/boat-source-generation.mjs"))});
+  if(sourceGeneration(targets)!=='lock')throw Error('Wrong maintained generator selected');
+  const r=cp.spawnSync(${JSON.stringify(process.execPath)},[${JSON.stringify(path.join(repository, "scripts/test-fixtures/547-make-effect.cjs"))}],{stdio:'inherit',env:{...process.env,CONTROL_MAKE_ARGV:JSON.stringify(['make',...targets])}});process.exitCode=r.status??1;
+ }else{const r=cp.spawnSync(${JSON.stringify(process.execPath)},args,{stdio:'inherit',env:process.env});process.exitCode=r.status??1;}
+})().catch(error=>{console.error(error.message);process.exitCode=1;});
+`,
+				{ mode: 0o700 },
+			);
+			fs.writeFileSync(
+				path.join(f.root, "bin/pnpm"),
+				`#!${process.execPath}\nconsole.error('Enrolled source route was bypassed');process.exitCode=91;\n`,
+				{ mode: 0o700 },
+			);
+			const outerEnv = {
+				...f.env,
+				BOAT_EXEC: "",
+				MAKELEVEL: "0",
+				CONTROL_EXPLICIT_GENERATOR_EXTRA: extra ? "1" : "0",
+				CONTROL_PRESERVED_ENV: "worktree $ and ' bytes",
+			};
+			for (const name of [
+				"MAKEFLAGS",
+				"MAKEOVERRIDES",
+				"MFLAGS",
+				"GNUMAKEFLAGS",
+			])
+				delete outerEnv[name];
+			const result = spawnSync(
+				make,
+				["boat-hillclimb-547", `BOAT_HILLCLIMB_CONFIG=${config}`],
+				{
+					cwd: f.root,
+					env: outerEnv,
+					encoding: "utf8",
+					timeout: 20000,
+				},
+			);
+			assert.equal(result.error, undefined);
+			if (!fs.existsSync(path.join(f.root, "routed-generators.jsonl"))) {
+				for (const name of fs.readdirSync(f.config.evidence)) {
+					const dir = path.join(f.config.evidence, name, "command");
+					if (
+						fs.existsSync(path.join(dir, "receipt.json")) &&
+						!name.startsWith("red-")
+					) {
+						const receipt = json(path.join(dir, "receipt.json"));
+						if (receipt.terminal.code !== 0)
+							t.diagnostic(
+								JSON.stringify({
+									name,
+									terminal: receipt.terminal,
+									stderr: fs.readFileSync(path.join(dir, "stderr.raw"), "utf8"),
+								}),
+							);
+					}
+				}
+			}
+			assert.ok(
+				fs.existsSync(path.join(f.root, "routed-generators.jsonl")),
+				result.stdout + result.stderr,
+			);
+			const routed = jsonLines(path.join(f.root, "routed-generators.jsonl"));
+			t.diagnostic(
+				JSON.stringify({
+					explicitExtra: extra,
+					routed,
+					entries: jsonLines(path.join(f.root, "make-entry.jsonl")),
+				}),
+			);
+			if (extra) {
+				assert.equal(result.status, 2, result.stdout + result.stderr);
+				const raw = fs.readFileSync(
+					path.join(f.config.evidence, "generate/command/stderr.raw"),
+					"utf8",
+				);
+				assert.match(raw, /extra arguments are unsupported/);
+				assert.equal(routed.length, 1);
+				assert.ok(routed[0].targets.includes("ARGS=--name=unsupported"));
+				assert.equal(
+					jsonLines(path.join(f.root, "commands.jsonl")).some((a) =>
+						a.includes("SCRIPT=dependencies:lock"),
+					),
+					false,
+				);
+				assert.equal(
+					json(path.join(f.config.evidence, "preparation-result.json")).cleanup
+						.status,
+					"STOPPED_ACCOUNTED",
+				);
+			} else {
+				assert.equal(result.status, 0, result.stdout + result.stderr);
+				assert.equal(
+					json(path.join(f.config.evidence, "preparation-result.json")).status,
+					"PASS_PREDEV_THROUGH_IMAGES",
+				);
+				assert.equal(routed.length, 2);
+			}
+			for (const entry of routed) {
+				assert.deepEqual(entry.targets, [
+					"run",
+					...(extra ? ["ARGS=--name=unsupported"] : []),
+					"PACKAGE=scripts",
+					"SCRIPT=dependencies:lock",
+				]);
+				assert.equal(entry.project, "wallpaperdb-control");
+				assert.equal(entry.custom, "worktree $ and ' bytes");
+				assert.equal(entry.config, config);
+			}
+			for (const entry of jsonLines(path.join(f.root, "make-entry.jsonl"))) {
+				for (const field of ["flags", "overrides", "mflags", "gnu"])
+					assert.equal(entry[field] ?? "", "", field);
+				assert.equal(entry.level, "0");
+			}
+		});
+
 	for (const wanted of [false, true])
 		test(`547 qualified public ready entry owns preparation, stdin replacement and cleanup, previousWanted=${wanted}`, {
 			timeout: 30000,

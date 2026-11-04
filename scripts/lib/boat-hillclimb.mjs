@@ -127,9 +127,13 @@ export function makeCommand(argv, options) {
 		argv.some((x) => typeof x !== "string" || x.includes("\0"))
 	)
 		throw new Error("Expected Make argv data");
+	// Each independent invocation carries its own options and assignments in argv.
+	const env = { ...(options.env ?? process.env), MAKELEVEL: "0" };
+	for (const name of ["MAKEFLAGS", "MAKEOVERRIDES", "MFLAGS", "GNUMAKEFLAGS"])
+		delete env[name];
 	return options.serving
-		? captureServingCommand({ ...options, argv })
-		: captureCommand({ ...options, argv });
+		? captureServingCommand({ ...options, argv, env })
+		: captureCommand({ ...options, argv, env });
 }
 
 function captured(directory, receipt, expectedArgv, code = 2) {

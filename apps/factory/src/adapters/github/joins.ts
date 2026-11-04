@@ -314,16 +314,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     excludedPath?: string,
     signal?: AbortSignal
   ) => {
-    const head = block.match(/^HEAD ([a-f0-9]{40})$/m)?.[1];
-    if (!head || !(await containsPrerequisite(layers, head, signal))) return true;
     const path = block.split('\n')[0]?.slice('worktree '.length);
     if (path === excludedPath) return true;
-    return path ? cleanOwnedWorktree(path, signal) : false;
+    if (path) {
+      const retained = await retainedConflict(path, signal);
+      if (retained !== undefined) return retained;
+    }
+    return cleanUnretainedWorktree(block, layers, path, signal);
   };
-  const cleanOwnedWorktree = async (path: string, signal?: AbortSignal) => {
-    const retained = await retainedConflict(path, signal);
-    if (retained !== undefined) return retained;
-    return !(await command('git', ['status', '--porcelain'], path, signal)).trim();
+  const cleanUnretainedWorktree = async (
+    block: string,
+    layers: readonly Layer[],
+    path?: string,
+    signal?: AbortSignal
+  ) => {
+    const head = block.match(/^HEAD ([a-f0-9]{40})$/m)?.[1];
+    if (!head || !(await containsPrerequisite(layers, head, signal))) return true;
+    return path ? !(await command('git', ['status', '--porcelain'], path, signal)).trim() : false;
   };
   const operationOwner = async (operation: Intent) => {
     const saved = await read(

@@ -297,12 +297,20 @@ export async function previewViteControl(t, helpers) {
 		const roleDirectory = path.join(f.root, ".boat/preview-connections");
 		const roles = () =>
 			fs.existsSync(roleDirectory)
-				? fs.readdirSync(roleDirectory).map((n) => ({
-						directory: path.join(roleDirectory, n),
-						...JSON.parse(
-							fs.readFileSync(path.join(roleDirectory, n, "connection.json")),
-						),
-					}))
+				? fs.readdirSync(roleDirectory).map((n) => {
+						const directory = path.join(roleDirectory, n);
+						try {
+							return {
+								directory,
+								...JSON.parse(
+									fs.readFileSync(path.join(directory, "connection.json")),
+								),
+							};
+						} catch (error) {
+							if (error.code !== "ENOENT") throw error;
+							return { directory, phase: "pending" };
+						}
+					})
 				: [];
 		stage = "browser";
 		const pw = require("playwright");

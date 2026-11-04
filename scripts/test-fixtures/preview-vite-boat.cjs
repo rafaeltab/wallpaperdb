@@ -36,13 +36,14 @@ if (argv.includes("info")) {
 	// observable request records whether any connection still owns live compute.
 	const directory = path.join(process.cwd(), ".boat/preview-connections");
 	const records = fs.existsSync(directory)
-		? fs
-				.readdirSync(directory)
-				.map((n) =>
-					JSON.parse(
-						fs.readFileSync(path.join(directory, n, "connection.json")),
-					),
-				)
+		? fs.readdirSync(directory).map((n) => {
+				const child = path.join(directory, n, "connection.json");
+				if (fs.existsSync(child)) return JSON.parse(fs.readFileSync(child));
+				const launch = JSON.parse(
+					fs.readFileSync(path.join(directory, n, "launch.json")),
+				);
+				return { ...launch, ...launch.child };
+			})
 		: [];
 	const live = records.filter((r) => {
 		try {

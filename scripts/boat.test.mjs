@@ -11589,6 +11589,7 @@ async function pendingUpgradePreview(
 		),
 	);
 	f = await lockGenerationCheckout(t);
+	const initialCacheTunnel = f.json(".boat/cache-tunnel.json");
 	receipts.directory = f.directory;
 	delete f.env.MAKEFILES;
 	delete f.env.GNUMAKEFLAGS;
@@ -11851,6 +11852,12 @@ if(argv.includes('forward')){
 				true,
 			);
 		}
+		let cacheTunnel = initialCacheTunnel;
+		try {
+			cacheTunnel = f.json(".boat/cache-tunnel.json");
+		} catch (error) {
+			if (error.code !== "ENOENT") throw error;
+		}
 		try {
 			const cleanup = await stopLockFixtureChildren(
 				f.commands,
@@ -11860,7 +11867,7 @@ if(argv.includes('forward')){
 							directory: f.directory,
 							excludedGroups: new Set([
 								f.json(".boat/state.json").daemon.pid,
-								f.json(".boat/cache-tunnel.json").pid,
+								cacheTunnel.pid,
 							]),
 						}
 					: undefined,
@@ -16750,3 +16757,154 @@ test("preview upgrade handshake keeps TERM-ignoring forward disposal inside its 
 		await f.healthy(true);
 	});
 });
+
+for (const mode of [
+	"missing-executable",
+	"invalid-executable",
+	"closed-channel",
+])
+	test(`preview connection launch ${mode} preserves failure and resolves only owned resources`, {
+		timeout: 20000,
+	}, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		const f = await pendingUpgradePreview(
+			t,
+			"managed",
+			archive,
+			`connection-launch-${mode}`,
+			{
+				beforeStart(fixture) {
+					const preload = "scripts/test-fixtures/preview-launch-control.cjs";
+					fixture.local(
+						preload,
+						`
+const path=require('node:path');
+if(path.basename(process.argv[1]||'')==='boat.mjs'&&process.argv[2]==='preview'){
+  const mode=${JSON.stringify(mode)};
+  if(mode==='missing-executable')process.execPath=path.join(process.env.FAKE_CONTROL,'nonexistent-node');
+  else if(mode==='invalid-executable')process.execPath='invalid'+String.fromCharCode(0)+'node';
+  else {
+    const cp=require('node:child_process'),original=cp.fork;
+    cp.fork=(...args)=>{const child=original(...args);child.disconnect();return child;};
+    require('node:module').syncBuiltinESMExports();
+  }
+}
+`,
+					);
+					fixture.env.NODE_OPTIONS =
+						`${fixture.env.NODE_OPTIONS ?? ""} --require=${path.join(fixture.root, preload)}`.trim();
+				},
+			},
+		);
+		await archive.scenario(async () => {
+			const { retirePreviewConnections } = await import(
+				"./lib/boat-preview.mjs"
+			);
+			const request = f.request("/ws-healthy", true, true);
+			let upgraded = false;
+			request.once("upgrade", () => {
+				upgraded = true;
+			});
+			const [socket] = await previewProbe(
+				once(request, "socket"),
+				"failed-launch downstream socket missing",
+			);
+			await previewProbe(
+				once(socket, "close"),
+				"failed-launch downstream remained open",
+				3000,
+			);
+			assert.equal(upgraded, false);
+			const earlyDirectory = path.join(f.root, ".boat/preview-connections");
+			f.receipts.earlyLaunch = fs.readdirSync(earlyDirectory).map((name) => {
+				const directory = path.join(earlyDirectory, name);
+				return {
+					name,
+					files: Object.fromEntries(
+						fs
+							.readdirSync(directory)
+							.filter((n) => n.endsWith(".json") || n.endsWith(".log"))
+							.map((n) => [
+								n,
+								fs.readFileSync(path.join(directory, n), "utf8"),
+							]),
+					),
+				};
+			});
+			f.phase("native launch evidence before retirement acceptance");
+			// A failed native spawn must not poison subsequent bounded owning cleanup.
+			await retirePreviewConnections(f.root, "fake-worker", {
+				deadline: performance.now() + 1000,
+			});
+			const directory = path.join(f.root, ".boat/preview-connections");
+			const names = fs.readdirSync(directory);
+			assert.equal(names.length, 1);
+			const claimDirectory = path.join(directory, names[0]);
+			const launch = JSON.parse(
+				fs.readFileSync(path.join(claimDirectory, "launch.json")),
+			);
+			const connectionFile = path.join(claimDirectory, "connection.json");
+			const connection = fs.existsSync(connectionFile)
+				? JSON.parse(fs.readFileSync(connectionFile))
+				: null;
+			if (mode === "closed-channel") {
+				assert.equal(launch.spawned, true);
+				assert.ok(launch.child?.startTicks);
+				assert.equal(
+					fixtureProcess(launch.child.pid),
+					null,
+					"started child is actually retired",
+				);
+				assert.notEqual(launch.phase, "spawn-failed");
+			} else {
+				assert.equal(launch.phase, "spawn-failed");
+				assert.equal(launch.spawned, false);
+				assert.equal(launch.child, null);
+				assert.equal(launch.processAbsent, true);
+				assert.equal(
+					launch.failure.code,
+					mode === "missing-executable" ? "ENOENT" : "ERR_INVALID_ARG_VALUE",
+				);
+				assert.equal(connection, null);
+			}
+			// Reuse the controlled ordinary-stop seam after preserving the native launch.
+			fs.copyFileSync(
+				path.join(import.meta.dirname, "test-fixtures/preview-vite-boat.cjs"),
+				path.join(f.root, ".mise/boat/boat"),
+			);
+			fs.chmodSync(path.join(f.root, ".mise/boat/boat"), 0o700);
+			const stopped = await previewProbe(
+				f.run(
+					"boat-stop",
+					"BOAT_EXEC=local",
+					"SHELL=/bin/sh",
+					"boat_routed_goals=",
+				).done,
+				"ordinary stop failed after launch refusal",
+				5000,
+			);
+			assert.equal(stopped.status, 0, stopped.output);
+			const state = f.json(".boat/state.json");
+			assert.equal(state.runningSince, null);
+			assert.ok(state.shutdownAttempt.accountingAppliedAt);
+			const effects = fs
+				.readFileSync(path.join(f.control, "offline-transport.jsonl"), "utf8")
+				.trim()
+				.split("\n")
+				.map(JSON.parse)
+				.filter((e) => e.kind === "controlled-stop");
+			assert.equal(effects.length, 1);
+			assert.deepEqual(effects[0].live, []);
+			f.receipts.connectionLaunch = {
+				mode,
+				launch,
+				connection,
+				stopped,
+				effects,
+				accounting: state.shutdownAttempt,
+			};
+			f.phase(
+				"native launch failure and ordinary owning stop qualified before cleanup",
+			);
+		});
+	});

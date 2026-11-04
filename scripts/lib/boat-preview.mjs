@@ -636,20 +636,45 @@ function transferPreviewUpgrade(
 		socket.destroy();
 		return;
 	}
-	const directory = path.join(
-		root,
-		".boat",
-		"preview-connections",
-		randomUUID(),
-	);
+	const attempt = randomUUID();
+	const directory = path.join(root, ".boat", "preview-connections", attempt);
 	fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-	write(path.join(directory, "connection.json"), {
+	// Parent and child never rewrite each other's authority. A native no-child
+	// launch failure can settle without fabricating a child process identity.
+	const launchFile = path.join(directory, "launch.json");
+	const launch = {
 		workerId,
+		attempt,
+		parent: identity(process.pid),
 		phase: "pending",
+		spawned: false,
+		processAbsent: false,
+		child: null,
+		closed: false,
+	};
+	const persistLaunch = (update) => {
+		Object.assign(launch, update);
+		write(launchFile, launch);
+	};
+	persistLaunch({});
+	let child,
+		log,
+		invoked = false;
+	const retainError = (error) => ({
+		code: error.code ?? null,
+		message: error.message,
 	});
-	const log = fs.openSync(path.join(directory, "transport.log"), "a", 0o600);
-	let child;
+	const observe = (update) => {
+		try {
+			persistLaunch(update);
+		} catch (error) {
+			socket.destroy();
+			server.emit("error", error);
+		}
+	};
 	try {
+		log = fs.openSync(path.join(directory, "transport.log"), "a", 0o600);
+		invoked = true;
 		child = fork(
 			fileURLToPath(import.meta.url),
 			[
@@ -663,18 +688,73 @@ function transferPreviewUpgrade(
 				stdio: ["ignore", log, log, "ipc"],
 			},
 		);
+		child.once("spawn", () => {
+			try {
+				persistLaunch({
+					phase: "started",
+					spawned: true,
+					child: launch.child ?? identity(child.pid),
+				});
+				// Native spawn must succeed before an accepted socket can leave the
+				// HTTP owner. Sending a handle to a failed fork can strand that handle.
+				socket.pause();
+				child.send(
+					{ url: req.url, headers: req.headers, head },
+					socket,
+					(error) => {
+						if (error) socket.destroy();
+						else server.emit("preview-transfer", socket);
+						if (child.connected) child.disconnect();
+						child.unref();
+					},
+				);
+			} catch (error) {
+				socket.destroy();
+				if (child.connected) child.disconnect();
+				server.emit("error", error);
+			}
+		});
+		child.on("error", (error) => {
+			socket.destroy();
+			const spawned = launch.spawned || child.pid > 1;
+			observe({
+				phase: spawned ? "started" : "spawn-failed",
+				spawned,
+				processAbsent: !spawned,
+				failure: launch.failure ?? retainError(error),
+			});
+		});
+		child.once("close", (code, signal) =>
+			observe({
+				closed: true,
+				terminal: { code, signal },
+				phase: launch.spawned ? "closed" : "spawn-failed",
+			}),
+		);
+		if (child.pid > 1)
+			persistLaunch({
+				phase: "started",
+				spawned: true,
+				child: identity(child.pid),
+			});
+	} catch (error) {
+		// Pinned Node reports native fork errors here only before a successful
+		// spawn. Unknown exceptions retain uncertainty instead of claiming absence.
+		const noChild =
+			!child &&
+			(!invoked ||
+				error.syscall === "spawn" ||
+				["ERR_INVALID_ARG_TYPE", "ERR_INVALID_ARG_VALUE"].includes(error.code));
+		persistLaunch({
+			phase: noChild ? "spawn-failed" : "uncertain",
+			processAbsent: noChild,
+			closed: noChild,
+			failure: retainError(error),
+		});
+		throw error;
 	} finally {
-		fs.closeSync(log);
+		if (log !== undefined) fs.closeSync(log);
 	}
-	const failed = () => socket.destroy();
-	child.once("error", failed);
-	socket.pause();
-	child.send({ url: req.url, headers: req.headers, head }, socket, (error) => {
-		if (error) failed();
-		else server.emit("preview-transfer", socket);
-		if (child.connected) child.disconnect();
-		child.unref();
-	});
 }
 
 async function servePreviewConnection({
@@ -838,15 +918,56 @@ export async function retirePreviewConnections(
 	for (const name of fs.readdirSync(directory)) {
 		try {
 			const ownDirectory = path.join(directory, name);
-			let connection = read(path.join(ownDirectory, "connection.json"));
+			const observeConnection = () => {
+				const connection = read(path.join(ownDirectory, "connection.json"));
+				if (connection) return { connection };
+				const launch = read(path.join(ownDirectory, "launch.json"));
+				if (!launch) return {};
+				if (launch.workerId !== workerId) return { foreign: true };
+				if (
+					launch.attempt !== name ||
+					!valid(launch.parent) ||
+					launch.parent.cwd !== root
+				)
+					throw Error("Preview launch ownership unavailable; record retained");
+				if (
+					launch.phase === "spawn-failed" &&
+					launch.spawned === false &&
+					launch.child === null &&
+					launch.processAbsent === true &&
+					typeof launch.failure?.message === "string"
+				) {
+					if (
+						fs
+							.readdirSync(ownDirectory)
+							.some((n) =>
+								/^preview-(process|acquisition|progress-.*)\.json$/.test(n),
+							)
+					)
+						throw Error(
+							"Preview launch absence contradicts runtime ownership; record retained",
+						);
+					return { absent: true };
+				}
+				return {
+					connection: launch.child
+						? { ...launch.child, workerId, phase: "pending" }
+						: { workerId, phase: "pending" },
+				};
+			};
+			let observation = observeConnection();
+			let connection = observation.connection;
 			while (
 				connection?.phase === "pending" &&
+				!valid(connection) &&
 				connection.workerId === workerId &&
 				now() < phase.deadline
 			) {
 				await pause();
-				connection = read(path.join(ownDirectory, "connection.json"));
+				observation = observeConnection();
+				connection = observation.connection;
 			}
+			if (observation.absent || observation.foreign) continue;
 			if (!connection)
 				throw Error(
 					"Preview connection ownership unavailable; record retained",

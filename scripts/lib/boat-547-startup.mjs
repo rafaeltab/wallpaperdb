@@ -273,7 +273,15 @@ export async function start547Application(context) {
 	) => {
 		within();
 		const phase = await runPhase(
-			{ id, argv, inputs, assess, prepare },
+			{
+				id,
+				argv,
+				inputs,
+				assess,
+				prepare,
+				// Owned image provisioning shares the original startup enclosure.
+				allowanceSeconds: id === "apps-build" ? deadline - started : undefined,
+			},
 			activeDeadline,
 			retire,
 		);
@@ -683,7 +691,7 @@ export async function start547Application(context) {
 			undefined,
 			workload.stageSdk,
 		);
-		await run("apps-build", ["make", "apps-build"]);
+		await run("apps-build", ["make", "boat-prepare-app-images"]);
 		dev = await launch("dev", ["make", "dev"]);
 		await wait(
 			() =>

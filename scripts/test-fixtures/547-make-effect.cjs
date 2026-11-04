@@ -57,7 +57,11 @@ const event = (kind) =>
 	);
 fs.appendFileSync("commands.jsonl", JSON.stringify(args) + "\n");
 let phase = target;
-if (target === "apps-build") {
+const startupImages =
+	target === "boat-prepare-app-images" &&
+	fs.existsSync("apps/user/src/boat-live-547.ts");
+if (target === "apps-build" || startupImages) {
+	phase = "apps-build";
 	fs.writeFileSync("app-build-entered", "entered");
 	console.log("Application images prepared");
 	const gate = process.env.CONTROL_APP_IMAGE_GATE;
@@ -234,7 +238,12 @@ if (target === "infra-start") {
 	event("chromium-preparation");
 } else if (target === "boat-prepare-app-images") {
 	assert.equal(fs.existsSync("infra-images-prepared.json"), true);
-	save("source-at-app-image-preparation.json", preparationSources());
+	save(
+		startupImages
+			? "source-at-startup-app-image-preparation.json"
+			: "source-at-app-image-preparation.json",
+		preparationSources(),
+	);
 	save("restoration-app-images-prepared.json", { completed: true });
 	event("app-image-preparation");
 } else if (target === "test-focused") {

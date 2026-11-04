@@ -491,7 +491,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-cold-v6-early-chromium",
+		scheduleVersion: "547-v7-early-chromium-serial-startup",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,

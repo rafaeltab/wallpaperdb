@@ -313,7 +313,8 @@ async function execute547Phase(
 	spec,
 ) {
 	const started = clock();
-	const deadline = Math.min(started + 180, config.coldDeadline);
+	const allowanceSeconds = spec.allowanceSeconds ?? 180;
+	const deadline = Math.min(started + allowanceSeconds, config.coldDeadline);
 	const root = fs.realpathSync(config.worktree);
 	if (
 		root !== config.worktree ||
@@ -336,6 +337,7 @@ async function execute547Phase(
 		owner: binding,
 		started,
 		deadline,
+		allowanceSeconds,
 	};
 	const within = () => {
 		if (clock() >= deadline)
@@ -485,6 +487,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
+		scheduleVersion: "547-cold-v2-image300",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -552,6 +555,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			{
 				id,
 				argv,
+				allowanceSeconds: options.allowanceSeconds,
 				code: options.code,
 				prepare: options.prepare,
 				inputs: () => {
@@ -569,6 +573,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 			started: result.started,
 			acceptedAt: result.acceptedAt,
 			deadline: result.deadline,
+			allowanceSeconds: result.allowanceSeconds,
 			outcome: result.outcome,
 		});
 		return result;
@@ -610,8 +615,10 @@ export async function execute547Preparation(config, dependencies = {}) {
 			throw new Error(`Missing current ${kind} completion event`);
 		return matches[0];
 	};
+	const imagePreparationSeconds = 300;
 	const prepareImages = (id) =>
 		run(id, ["make", "boat-prepare-infra-images"], {
+			allowanceSeconds: imagePreparationSeconds,
 			assess: (raw, { receipt }) => ({
 				...workload.acceptImages(raw, identity.project),
 				event: event("infra-image-preparation", receipt),
@@ -664,6 +671,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 				"prepare-app-images-before-restoration",
 				["make", "boat-prepare-app-images"],
 				{
+					allowanceSeconds: imagePreparationSeconds,
 					assess: (_raw, { receipt }) => ({
 						event: event("app-image-preparation", receipt),
 					}),

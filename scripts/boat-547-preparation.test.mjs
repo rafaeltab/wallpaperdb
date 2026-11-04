@@ -1462,41 +1462,135 @@ test("547 a new label and generated identity use unchanged preparation code", as
 	assert.equal(result.phases.at(-1).outcome.project, result.owner.project);
 });
 
-test("547 cold acceptance remains bounded after native completion", async (t) => {
+test("547 versioned image allocation reaches actual Make without extending ordinary commands", async (t) => {
 	const f = preparationFixture(t);
+	await stoppedWantedDevelopment(f);
+	const captures = new Map();
+	const result = await f.run({
+		make: async (argv, options) => {
+			const receipt = await f.make(argv, options);
+			captures.set(path.basename(path.dirname(options.directory)), {
+				deadline: options.deadline,
+				began: receipt.began.monotonic,
+			});
+			return receipt;
+		},
+	});
+	assert.equal(result.scheduleVersion, "547-cold-v2-image300");
+	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	const images = new Set([
+		"prepare-images-before-restoration",
+		"prepare-app-images-before-restoration",
+		"prepare-infra-images",
+	]);
+	for (const p of result.phases) {
+		const expected = images.has(p.phase) ? 300 : 180;
+		assert.equal(p.deadline - p.started, expected, p.phase);
+		const invocation = captures.get(p.phase);
+		assert.equal(invocation.deadline, p.deadline, p.phase);
+		assert.ok(
+			invocation.deadline - invocation.began <= expected &&
+				invocation.deadline - invocation.began > expected - 5,
+			p.phase,
+		);
+	}
+});
+
+test("547 image allocation is clamped to the original remaining cold budget", async (t) => {
+	const f = preparationFixture(t);
+	let now = mono();
+	const result = await f.run({
+		clock: () => now,
+		make: async (argv, options) => {
+			const r = await f.make(argv, options);
+			now += 50;
+			return r;
+		},
+	});
+	const image = result.phases.findLast(
+		(p) => p.phase === "prepare-infra-images",
+	);
+	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(image.deadline, result.coldDeadline);
+	assert.ok(image.deadline - image.started < 300);
+	assert.ok(image.acceptedAt < result.coldDeadline);
+});
+
+test("547 image acceptance after its new allowance fails before later work and stops once", async (t) => {
+	const f = preparationFixture(t);
+	await stoppedWantedDevelopment(f);
 	let offset = 0;
 	await assert.rejects(
-		() =>
-			f.run({
-				observeCli: f.observeCli,
-				clock: () => mono() + offset,
-				make: async (argv, options) => {
-					const result = await f.make(argv, options);
-					if (argv.includes("PACKAGE=user")) offset = 1201;
-					return result;
-				},
-			}),
+		f.run({
+			clock: () => mono() + offset,
+			make: async (argv, options) => {
+				const r = await f.make(argv, options);
+				if (options.directory.includes("/prepare-images-before-restoration/"))
+					offset = 301;
+				return r;
+			},
+		}),
 		/Original phase\/cold deadline exceeded/,
 	);
-	assert.equal(
-		json(path.join(f.config.evidence, "red-user/command/receipt.json")).terminal
-			.code,
-		2,
+	const p = json(
+		path.join(
+			f.config.evidence,
+			"prepare-images-before-restoration/result.json",
+		),
 	);
+	assert.equal(p.status, "FAIL");
+	assert.equal(p.deadline - p.started, 300);
+	assert.equal(p.cleanup.status, "STOPPED_ACCOUNTED");
 	assert.equal(
-		json(path.join(f.config.evidence, "red-user/result.json")).status,
-		"FAIL",
-	);
-	assert.equal(
-		json(path.join(f.config.evidence, "preparation-result.json")).cleanup
-			.status,
-		"STOPPED_ACCOUNTED",
-	);
-	assert.equal(
-		fs.existsSync(path.join(f.config.evidence, "red-wallpaper")),
+		fs.existsSync(
+			path.join(f.config.evidence, "prepare-app-images-before-restoration"),
+		),
 		false,
 	);
+	assert.equal(
+		jsonLines(path.join(f.root, "commands.jsonl")).filter(
+			(a) => a[1] === "boat-stop",
+		).length,
+		1,
+	);
 });
+
+for (const delay of [181, 1201])
+	test(`547 cold acceptance remains bounded after native completion delayed ${delay}`, async (t) => {
+		const f = preparationFixture(t);
+		let offset = 0;
+		await assert.rejects(
+			() =>
+				f.run({
+					observeCli: f.observeCli,
+					clock: () => mono() + offset,
+					make: async (argv, options) => {
+						const result = await f.make(argv, options);
+						if (argv.includes("PACKAGE=user")) offset = delay;
+						return result;
+					},
+				}),
+			/Original phase\/cold deadline exceeded/,
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "red-user/command/receipt.json"))
+				.terminal.code,
+			2,
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "red-user/result.json")).status,
+			"FAIL",
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "preparation-result.json")).cleanup
+				.status,
+			"STOPPED_ACCOUNTED",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.config.evidence, "red-wallpaper")),
+			false,
+		);
+	});
 
 test("547 final cold publication cannot leave a late passing result", async (t) => {
 	const f = preparationFixture(t);

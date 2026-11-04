@@ -45,6 +45,8 @@ export function sourceObservation(request, context) {
 		request.generation === generation &&
 		typeof request.id === "string" &&
 		/^[A-Za-z0-9_-]{1,80}$/.test(request.id) &&
+		typeof request.source === "string" &&
+		typeof request.expected === "string" &&
 		Object.hasOwn(sources, request.source) &&
 		Object.hasOwn(
 			sources[request.source].hashes,

@@ -1283,7 +1283,13 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
-	for (const fault of ["none", "runtime-hash", "unrelated-source"])
+	for (const fault of [
+		"none",
+		"runtime-hash",
+		"unrelated-source",
+		"array-source",
+		"array-expected",
+	])
 		test(`547 public source observation uses the current runtime adapter and owns cleanup, fault=${fault}`, {
 			timeout: 30000,
 		}, async (t) => {
@@ -1326,6 +1332,33 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 				}
 				return json(file);
 			};
+			const send = async (request) => {
+				const files = ["stdout", "stderr"].map((stream) =>
+					path.join(f.root, `public-source-capture/${stream}.raw`),
+				);
+				const offsets = files.map((file) => fs.statSync(file).size);
+				capture.writeInput(JSON.stringify(request) + "\n");
+				for (;;) {
+					const replies = files.flatMap((file, i) => {
+						const text = fs.readFileSync(file).subarray(offsets[i]).toString();
+						return text
+							.slice(0, text.lastIndexOf("\n") + 1)
+							.split("\n")
+							.filter((line) => line.startsWith("{"))
+							.map(JSON.parse);
+					});
+					const reply = replies.find((r) =>
+						["PASS", "FAIL", "REFUSED"].includes(r.status),
+					);
+					if (reply) return reply;
+					capture.assertRunning();
+					assert.ok(
+						mono() < until,
+						"Managed action acknowledgement was not delivered",
+					);
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+			};
 			try {
 				const ready = await wait(
 					path.join(f.config.evidence, "startup/result.json"),
@@ -1357,21 +1390,10 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 					admission: ready.owner.admission,
 					generation: ready.preview.generation,
 				};
-				capture.writeInput(
-					JSON.stringify({ ...request, admission: "stale-admission" }) + "\n",
+				assert.equal(
+					(await send({ ...request, admission: "stale-admission" })).status,
+					"REFUSED",
 				);
-				while (
-					!fs
-						.readFileSync(
-							path.join(f.root, "public-source-capture/stderr.raw"),
-							"utf8",
-						)
-						.includes('"status":"REFUSED"')
-				) {
-					capture.assertRunning();
-					assert.ok(mono() < until, "Stale source request was not refused");
-					await new Promise((resolve) => setTimeout(resolve, 25));
-				}
 				assert.equal(
 					fs.existsSync(path.join(f.root, "native-source-invocations.jsonl")),
 					false,
@@ -1382,142 +1404,179 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 					flag: "wx",
 					mode: 0o600,
 				});
-				if (fault === "unrelated-source")
-					fs.appendFileSync(
-						path.join(f.root, "apps/web/vite.config.ts"),
-						"\n// unrelated test input\n",
-					);
-				capture.writeInput(JSON.stringify(request) + "\n");
-				const file = path.join(
-					f.config.evidence,
-					"startup/source-txt-create-1/result.json",
-				);
-				const result = await wait(file, (r) =>
-					["PASS", "FAIL"].includes(r.status),
-				);
-				if (fault !== "none") {
-					assert.equal(result.status, "FAIL");
-					assert.match(
-						result.error,
-						fault === "runtime-hash"
-							? /Runtime source bytes/
-							: /Frozen workload changed/,
-					);
-					await wait(
-						path.join(f.config.evidence, "startup/cleanup.json"),
-						(r) => r.compute?.status === "STOPPED_ACCOUNTED",
+				if (fault.startsWith("array-")) {
+					const malformed =
+						fault === "array-source"
+							? { source: ["presence"] }
+							: { expected: ["present"] };
+					const reply = await send({ ...request, ...malformed });
+					assert.equal(
+						reply.status,
+						"REFUSED",
+						"Malformed selectors must be refused before execution",
 					);
 					assert.equal(
-						json(path.join(f.config.evidence, "startup/result.json")).next,
-						undefined,
+						fs.existsSync(path.join(f.root, "native-source-invocations.jsonl")),
+						false,
 					);
+					assert.equal(
+						fs.existsSync(
+							path.join(f.config.evidence, "startup/source-txt-create-1"),
+						),
+						false,
+					);
+					assert.equal(
+						jsonLines(path.join(f.root, "commands.jsonl")).filter(
+							(c) => c[1] === "boat-stop",
+						).length,
+						0,
+					);
+					assert.ok(json(path.join(f.root, ".boat/state.json")).runningSince);
 					assert.equal(fs.readFileSync(payload, "utf8"), "BOAT-547-PRESENCE\n");
 				} else {
-					assert.equal(result.status, "PASS", JSON.stringify(result));
-					assert.equal(result.outcome.runtime.bytes, 18);
-					assert.deepEqual(
-						result.outcome.runtime.byteValues,
-						[
-							66, 79, 65, 84, 45, 53, 52, 55, 45, 80, 82, 69, 83, 69, 78, 67,
-							69, 10,
-						],
+					if (fault === "unrelated-source")
+						fs.appendFileSync(
+							path.join(f.root, "apps/web/vite.config.ts"),
+							"\n// unrelated test input\n",
+						);
+					const acknowledgement = await send(request);
+					const file = path.join(
+						f.config.evidence,
+						"startup/source-txt-create-1/result.json",
 					);
-					assert.equal(
-						result.outcome.runtime.sha256,
-						"afb7b0e339d3a9151d191aa48982db28838c8b85e50b7787535f21623c6744ab",
+					const result = await wait(file, (r) =>
+						["PASS", "FAIL"].includes(r.status),
 					);
-					assert.ok(result.acceptedAt < result.deadline);
-					assert.ok(json(path.join(f.root, ".boat/state.json")).runningSince);
-					assert.equal(
-						json(
-							path.join(
-								f.config.evidence,
-								"startup/source-txt-create-1/command/receipt.json",
-							),
-						).captureComplete,
-						true,
-					);
-					fs.unlinkSync(payload);
-					capture.writeInput(
-						JSON.stringify({
+					if (fault !== "none") {
+						assert.equal(acknowledgement.status, "FAIL");
+						assert.equal(result.status, "FAIL");
+						assert.match(
+							result.error,
+							fault === "runtime-hash"
+								? /Runtime source bytes/
+								: /Frozen workload changed/,
+						);
+						await wait(
+							path.join(f.config.evidence, "startup/cleanup.json"),
+							(r) => r.compute?.status === "STOPPED_ACCOUNTED",
+						);
+						assert.equal(
+							json(path.join(f.config.evidence, "startup/result.json")).next,
+							undefined,
+						);
+						assert.equal(
+							fs.readFileSync(payload, "utf8"),
+							"BOAT-547-PRESENCE\n",
+						);
+					} else {
+						assert.equal(acknowledgement.status, "PASS");
+						assert.equal(acknowledgement.phase, "source-txt-create-1");
+						assert.equal(result.status, "PASS", JSON.stringify(result));
+						assert.equal(result.outcome.runtime.bytes, 18);
+						assert.deepEqual(
+							result.outcome.runtime.byteValues,
+							[
+								66, 79, 65, 84, 45, 53, 52, 55, 45, 80, 82, 69, 83, 69, 78, 67,
+								69, 10,
+							],
+						);
+						assert.equal(
+							result.outcome.runtime.sha256,
+							"afb7b0e339d3a9151d191aa48982db28838c8b85e50b7787535f21623c6744ab",
+						);
+						assert.ok(result.acceptedAt < result.deadline);
+						assert.ok(json(path.join(f.root, ".boat/state.json")).runningSince);
+						assert.equal(
+							json(
+								path.join(
+									f.config.evidence,
+									"startup/source-txt-create-1/command/receipt.json",
+								),
+							).captureComplete,
+							true,
+						);
+						fs.unlinkSync(payload);
+						const deletion = await send({
 							...request,
 							id: "txt-delete-1",
 							expected: "absent",
-						}) + "\n",
-					);
-					const absent = await wait(
-						path.join(
-							f.config.evidence,
-							"startup/source-txt-delete-1/result.json",
-						),
-						(r) => ["PASS", "FAIL"].includes(r.status),
-					);
-					assert.equal(absent.status, "PASS", JSON.stringify(absent));
-					assert.equal(absent.outcome.runtime.lstat, "ENOENT");
-					const heading = path.join(f.root, "apps/web/src/routes/upload.tsx"),
-						original = fs.readFileSync(heading);
-					try {
-						for (const state of ["B", "A"]) {
-							fs.writeFileSync(
-								heading,
-								state === "A"
-									? original
-									: original
-											.toString()
-											.replace(
-												"Upload Wallpapers",
-												"Upload Wallpapers [Boat 547 HMR]",
-											),
-							);
-							capture.writeInput(
-								JSON.stringify({
+						});
+						assert.equal(deletion.status, "PASS");
+						assert.equal(deletion.phase, "source-txt-delete-1");
+						const absent = await wait(
+							path.join(
+								f.config.evidence,
+								"startup/source-txt-delete-1/result.json",
+							),
+							(r) => ["PASS", "FAIL"].includes(r.status),
+						);
+						assert.equal(absent.status, "PASS", JSON.stringify(absent));
+						assert.equal(absent.outcome.runtime.lstat, "ENOENT");
+						const heading = path.join(f.root, "apps/web/src/routes/upload.tsx"),
+							original = fs.readFileSync(heading);
+						try {
+							for (const state of ["B", "A"]) {
+								fs.writeFileSync(
+									heading,
+									state === "A"
+										? original
+										: original
+												.toString()
+												.replace(
+													"Upload Wallpapers",
+													"Upload Wallpapers [Boat 547 HMR]",
+												),
+								);
+								const headingReply = await send({
 									...request,
 									id: `heading-${state}`,
 									source: "heading",
 									expected: state,
-								}) + "\n",
-							);
-							const observed = await wait(
-								path.join(
-									f.config.evidence,
-									`startup/source-heading-${state}/result.json`,
-								),
-								(r) => ["PASS", "FAIL"].includes(r.status),
-							);
-							assert.equal(observed.status, "PASS", JSON.stringify(observed));
-							assert.equal(
-								observed.outcome.runtime.sha256,
-								state === "A"
-									? "d3f4063d7b34435ba0e1a913c3975cfffe5c9ae7d2bc69b9416868966b876170"
-									: "d66f5a18bc16b5ca7282fb67a4dee9ccb547545f6195f5bfcc7a37808cd03ab5",
-							);
+								});
+								assert.equal(headingReply.status, "PASS");
+								assert.equal(headingReply.phase, `source-heading-${state}`);
+								const observed = await wait(
+									path.join(
+										f.config.evidence,
+										`startup/source-heading-${state}/result.json`,
+									),
+									(r) => ["PASS", "FAIL"].includes(r.status),
+								);
+								assert.equal(observed.status, "PASS", JSON.stringify(observed));
+								assert.equal(
+									observed.outcome.runtime.sha256,
+									state === "A"
+										? "d3f4063d7b34435ba0e1a913c3975cfffe5c9ae7d2bc69b9416868966b876170"
+										: "d66f5a18bc16b5ca7282fb67a4dee9ccb547545f6195f5bfcc7a37808cd03ab5",
+								);
+							}
+						} finally {
+							fs.writeFileSync(heading, original);
 						}
-					} finally {
-						fs.writeFileSync(heading, original);
 					}
-				}
-				const native = path.join(f.root, "native-source-invocations.jsonl");
-				const calls = fs.existsSync(native) ? jsonLines(native) : [];
-				assert.equal(
-					calls.length,
-					fault === "unrelated-source" ? 0 : fault === "runtime-hash" ? 1 : 4,
-				);
-				assert.ok(
-					calls.every(
-						(c) =>
-							c.project === "wallpaperdb-control" &&
-							["presence", "heading"].includes(c.source),
-					),
-				);
-				if (fault !== "unrelated-source")
+					const native = path.join(f.root, "native-source-invocations.jsonl");
+					const calls = fs.existsSync(native) ? jsonLines(native) : [];
+					assert.equal(
+						calls.length,
+						fault === "unrelated-source" ? 0 : fault === "runtime-hash" ? 1 : 4,
+					);
 					assert.ok(
-						jsonLines(path.join(f.root, "commands.jsonl")).some(
+						calls.every(
 							(c) =>
-								c[1] === "docker-run" &&
-								c[2] ===
-									"ARGS=node scripts/boat-workloads/547-runtime.cjs source-observe wallpaperdb-control presence",
+								c.project === "wallpaperdb-control" &&
+								["presence", "heading"].includes(c.source),
 						),
 					);
+					if (fault !== "unrelated-source")
+						assert.ok(
+							jsonLines(path.join(f.root, "commands.jsonl")).some(
+								(c) =>
+									c[1] === "docker-run" &&
+									c[2] ===
+										"ARGS=node scripts/boat-workloads/547-runtime.cjs source-observe wallpaperdb-control presence",
+							),
+						);
+				}
 			} finally {
 				await capture.stop();
 			}

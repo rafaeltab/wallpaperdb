@@ -15797,11 +15797,42 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
+const expectedAppBuildServices = [
+	"asset",
+	"color-extractor",
+	"gateway",
+	"ingestor",
+	"tags",
+	"user",
+	"variant-generator",
+	"wallpaper",
+	"web",
+];
+const completedAppBuilds = () =>
+	expectedAppBuildServices.flatMap((service) => [
+		{ service, stage: "entered" },
+		{ service, stage: "completed" },
+	]);
 async function appImagesCheckout(t, fresh = false) {
 	const f = await toolchainCheckout(t, fresh);
 	f.local(
 		".worktree",
 		"INGRESS_PORT=9120\nCOMPOSE_PROJECT_NAME=fixture-app-images\n",
+	);
+	f.local(
+		"infra/docker-compose.apps.yml",
+		JSON.stringify({
+			name: "fixture-app-images",
+			services: {
+				...Object.fromEntries(
+					[...expectedAppBuildServices]
+						.reverse()
+						.map((name) => [name, { build: { context: "." } }]),
+				),
+				caddy: { image: "fixture/caddy:1" },
+				admin: { build: { context: "." }, profiles: ["admin"] },
+			},
+		}),
 	);
 	const docker = path.join(f.directory, "home/.local/bin/docker");
 	fs.renameSync(docker, `${docker}-ordinary`);
@@ -15809,9 +15840,12 @@ async function appImagesCheckout(t, fresh = false) {
 		docker,
 		`#!${process.execPath}
 const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
+const model=()=>JSON.parse(fs.readFileSync('infra/docker-compose.apps.yml','utf8'));
+if(a[0]==='compose'&&a.includes('config')){if(process.env.COMPOSE_PROFILES!=='')throw Error('default profiles required');console.log(JSON.stringify(model()));process.exit(0);}
 if(a[0]==='compose'&&a.includes('build')){
- const asset=a.at(-1)==='asset';
- const record=stage=>fs.appendFileSync(path.join(c,'app-build-log'),JSON.stringify({service:asset?'asset':'all',stage})+'\\n');
+ const service=a.at(-1),asset=service==='asset';
+ if(!model().services[service]?.build||model().services[service].profiles?.length)throw Error('Exactly one default build service must be requested');
+ const record=stage=>fs.appendFileSync(path.join(c,'app-build-log'),JSON.stringify({service,stage})+'\\n');
  record('entered');
  if(asset){
   console.log('Asset image printed success before completion');fs.writeFileSync(path.join(c,'asset-build-entered'),'yes');
@@ -15819,6 +15853,7 @@ if(a[0]==='compose'&&a.includes('build')){
   if(fs.existsSync(path.join(c,'fail-asset-build'))){console.error('native Asset image build failed');process.exit(23);}
   fs.writeFileSync(path.join(c,'asset-image-built'),'yes');record('completed');process.exit(0);
  }
+ if(service!=='web'){record('completed');process.exit(0);}
  fs.writeFileSync(path.join(c,'app-build-argv'),JSON.stringify(a));
  console.log('Application build printed success before completion');fs.writeFileSync(path.join(c,'app-build-entered'),'yes');
  while(fs.existsSync(path.join(c,'hold-app-build'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
@@ -15840,7 +15875,7 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
-test("app image phase completes Asset before the full ordinary build", async (t) => {
+test("app image phase serially builds the complete default graph through ordinary Make", async (t) => {
 	const f = await appImagesCheckout(t, true);
 	f.local(
 		".boat/state.json",
@@ -15854,7 +15889,7 @@ test("app image phase completes Asset before the full ordinary build", async (t)
 			assert.equal(
 				fs.existsSync(path.join(f.control, "app-build-entered")),
 				false,
-				"The full application build must wait for the Asset image",
+				"No later build may start before Asset completes",
 			);
 			assert.equal(command.closed, false, command.output());
 			return fs.existsSync(path.join(f.control, "asset-build-entered"));
@@ -15865,11 +15900,10 @@ test("app image phase completes Asset before the full ordinary build", async (t)
 		await f.readiness.wait(() => {
 			assert.equal(command.closed, false, command.output());
 			return fs.existsSync(path.join(f.control, "app-build-entered"));
-		}, "full application build after Asset completion");
+		}, "final application build after its predecessors");
 		assert.deepEqual(f.appBuilds(), [
-			{ service: "asset", stage: "entered" },
-			{ service: "asset", stage: "completed" },
-			{ service: "all", stage: "entered" },
+			...completedAppBuilds().slice(0, -2),
+			{ service: "web", stage: "entered" },
 		]);
 		assert.equal(
 			fs.existsSync(path.join(f.control, "app-images-built")),
@@ -15883,17 +15917,12 @@ test("app image phase completes Asset before the full ordinary build", async (t)
 	}
 	const result = await command.done;
 	assert.equal(result.status, 0, result.output);
-	assert.deepEqual(f.appBuilds(), [
-		{ service: "asset", stage: "entered" },
-		{ service: "asset", stage: "completed" },
-		{ service: "all", stage: "entered" },
-		{ service: "all", stage: "completed" },
-	]);
+	assert.deepEqual(f.appBuilds(), completedAppBuilds());
 	assertPreparationDefersDevelopment(f);
 	await preparedNextOrdinaryUser(t, f);
 });
 
-test("app image phase refuses the full build after Asset image failure", async (t) => {
+test("app image phase refuses later services after Asset image failure", async (t) => {
 	const f = await appImagesCheckout(t);
 	f.local(
 		".boat/state.json",
@@ -15913,7 +15942,7 @@ test("app image phase refuses the full build after Asset image failure", async (
 	await preparedNextOrdinaryUser(t, f);
 });
 
-test("app image phase refuses the full build after generation changes during Asset build", async (t) => {
+test("app image phase refuses later services after generation changes during Asset build", async (t) => {
 	const f = await appImagesCheckout(t);
 	f.local(
 		".boat/state.json",
@@ -15999,6 +16028,7 @@ test("app image phase awaits the ordinary build before deferring fresh wanted re
 			"-f",
 			"infra/docker-compose.apps.yml",
 			"build",
+			"web",
 		],
 	);
 	assert.match(result.output, /native application image build stderr drained/);
@@ -16080,6 +16110,46 @@ test("app image phase refuses a selected generation change before completion", a
 		.map(JSON.parse)
 		.findLast((e) => e.kind === "app-image-preparation");
 	assert.equal(event.completed, false);
+});
+
+test("app image phase refuses completion when default build selection changes", async (t) => {
+	const f = await appImagesCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "hold-app-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "app-build-entered"));
+		}, "final service before selection drift");
+		const model = f.json("infra/docker-compose.apps.yml");
+		model.services.newapp = { build: { context: "." } };
+		f.local("infra/docker-compose.apps.yml", JSON.stringify(model));
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Application build selection changed/);
+	assert.deepEqual(f.appBuilds(), completedAppBuilds());
+	assertPreparationDefersDevelopment(f);
+	const events = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(
+		events.findLast((e) => e.kind === "app-image-preparation").completed,
+		false,
+	);
 });
 
 function assertPreparationDefersDevelopment(f) {

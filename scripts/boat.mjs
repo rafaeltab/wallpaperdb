@@ -1545,6 +1545,60 @@ function prepareInfraImages() {
 	console.log(`BOAT_INFRA_IMAGES ${JSON.stringify({ project, images })}`);
 }
 
+function applicationImageCommands() {
+	const project = process.env.COMPOSE_PROJECT_NAME;
+	if (!project) throw new Error("Missing application Compose project");
+	// Resolve locally from the same synchronized configuration. Keep the resolved
+	// environment private; only service names become worker Make arguments.
+	const model = JSON.parse(
+		execFileSync(
+			"docker",
+			[
+				"compose",
+				"-p",
+				project,
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"config",
+				"--format",
+				"json",
+			],
+			{
+				env: { ...process.env, COMPOSE_PROFILES: "" },
+				encoding: "utf8",
+				maxBuffer: 8 * 1024 * 1024,
+			},
+		),
+	);
+	if (
+		model.name !== project ||
+		!model.services ||
+		typeof model.services !== "object" ||
+		Array.isArray(model.services)
+	)
+		throw new Error("Invalid application Compose project");
+	const services = Object.entries(model.services)
+		.filter(([, service]) => {
+			if (
+				!service ||
+				(service.profiles !== undefined && !Array.isArray(service.profiles))
+			)
+				throw new Error("Invalid application Compose profiles");
+			return !service.profiles?.length && service.build != null;
+		})
+		.map(([name]) => {
+			if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name))
+				throw new Error("Invalid application build service");
+			return name;
+		})
+		.sort((a, b) =>
+			a === b ? 0 : a === "asset" ? -1 : b === "asset" ? 1 : a.localeCompare(b),
+		);
+	if (!services.length)
+		throw new Error("No default application builds selected");
+	return services.map((name) => ["apps-build", `SERVICE=${name}`]);
+}
+
 async function command() {
 	const entered = Date.now();
 	owned();
@@ -1631,24 +1685,26 @@ async function command() {
 			[
 				"boat-prepare-infra-images",
 				{
-					commands: [["boat-prepare-infra-images"]],
+					commands: () => [["boat-prepare-infra-images"]],
 					event: "infra-image-preparation",
 				},
 			],
 			[
 				"boat-prepare-app-images",
 				{
-					// Build Asset first so its layers are available to the default application build.
-					commands: [["apps-build", "SERVICE=asset"], ["apps-build"]],
+					commands: applicationImageCommands,
 					event: "app-image-preparation",
 				},
 			],
 		]).get(targets[0]);
 		if (imagePreparation) {
 			let completed = false;
+			let commands;
 			try {
 				await lock(async () => {
-					for (const command of imagePreparation.commands) {
+					startupWorker(id);
+					commands = imagePreparation.commands();
+					for (const command of commands) {
 						startupWorker(id);
 						await ssh(
 							id,
@@ -1656,6 +1712,13 @@ async function command() {
 						);
 					}
 					startupWorker(id);
+					if (
+						JSON.stringify(imagePreparation.commands()) !==
+						JSON.stringify(commands)
+					)
+						throw new Error(
+							"Application build selection changed during preparation",
+						);
 					completed = true;
 				});
 			} finally {
@@ -1663,6 +1726,7 @@ async function command() {
 					workerId: id,
 					ms: Date.now() - entered,
 					completed,
+					commands,
 				});
 			}
 			// Image acquisition never consumes still-wanted process restoration.

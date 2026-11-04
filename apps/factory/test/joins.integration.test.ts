@@ -13,7 +13,15 @@ import type { Status } from '../src/capabilities/job/index.js';
 import { readFile, writeFile, readdir, rename, unlink, chmod, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';
+import {
+  Job,
+  JobLive,
+  JobStore,
+  Issues,
+  Execution,
+  Time,
+  ContinuationAdmission,
+} from '../src/capabilities/job/index.js';
 import { controlledStore } from './fixtures/store.js';
 import { fileStore } from '../src/adapters/store/index.js';
 import { t3Execution, t3Restacker } from '../src/adapters/t3/index.js';
@@ -3612,6 +3620,9 @@ process.exit(result.status ?? 1);
       JobLive.pipe(
         Layer.provide(
           Layer.mergeAll(
+            Layer.succeed(ContinuationAdmission, {
+              authorize: (issue, receipt) => admissionPolicy(issue, receipt),
+            }),
             Layer.succeed(JobStore, jobStore),
             Layer.succeed(Issues, issues),
             Layer.succeed(Execution, execution),

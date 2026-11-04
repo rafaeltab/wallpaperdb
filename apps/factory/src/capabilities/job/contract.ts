@@ -7,6 +7,19 @@ export interface Time {
   now(): Effect.Effect<number, Unavailable>;
 }
 export const Time = Context.Service<Time>('wallpaperdb.factory.Time');
+export interface ContinuationReceipt {
+  readonly threadId: string;
+  readonly index: number;
+  readonly run: { readonly id: string; readonly ordinal: number };
+}
+/** Reserve capacity for the successor of an accepted, completed replay stage.
+ * Configured scheduling retains the claim before any successor delivery. */
+export interface ContinuationAdmission {
+  authorize(issue: number, receipt: ContinuationReceipt): Effect.Effect<boolean, Unavailable>;
+}
+export const ContinuationAdmission = Context.Service<ContinuationAdmission>(
+  'wallpaperdb.factory.ContinuationAdmission'
+);
 export interface Intent {
   readonly id: string;
   readonly issue: number;
@@ -91,8 +104,13 @@ export interface RecoveryStatus {
   readonly threadId?: string;
   readonly question?: string;
 }
-/** Scheduler authorization to resume recovery work without a new issue admission. */
-export type RecoveryAdmission = (issue: number) => Effect.Effect<boolean, Unavailable>;
+/** Scheduler authorization without a new issue admission. Recovery callers retain
+ * their journal reservation; a validated completed-stage receipt instead asks
+ * the scheduler to reserve that job's continuation before successor delivery. */
+export type RecoveryAdmission = (
+  issue: number,
+  continuation?: ContinuationReceipt
+) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
   /** Coordinate a known replay repair with the publication journal. Review/publication
    * authority is supplied only after validating the current clean owning-stage receipt.

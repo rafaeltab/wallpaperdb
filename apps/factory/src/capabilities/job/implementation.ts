@@ -1,4 +1,4 @@
-import { Effect, Layer, Random } from 'effect';
+import { Effect, Layer, Random, Option } from 'effect';
 import { reconcileStages, currentStage, hasAnsweredQuestion } from './stages.js';
 import {
   Execution,
@@ -9,6 +9,7 @@ import {
   type Intent,
   type Delivery,
   Time,
+  ContinuationAdmission,
 } from './contract.js';
 export const JobLive = Layer.effect(
   Job,
@@ -17,6 +18,7 @@ export const JobLive = Layer.effect(
     const time = yield* Time;
     const issues = yield* Issues;
     const execution = yield* Execution;
+    const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const observation = yield* execution.observe(
@@ -31,7 +33,8 @@ export const JobLive = Layer.effect(
           issues,
           intent,
           observation,
-          time
+          time,
+          continuation
         );
         yield* retainPrerequisite(store, delivery);
         const control = yield* store.readControl();

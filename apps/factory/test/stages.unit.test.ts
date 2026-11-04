@@ -1,6 +1,16 @@
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { Execution, Issues, Job, JobLive, JobStore, Time } from '../src/capabilities/job/index.js';
+import { ContinuationAdmission } from '../src/capabilities/job/index.js';
+import {
+  Scheduler,
+  SchedulerLive,
+  ScheduleStore,
+  JobPool,
+  Plan,
+  PlanningSource,
+} from '../src/capabilities/plan/index.js';
+import { controlledScheduleStore } from './fixtures/schedule-store.js';
 import { controlledStore } from './fixtures/store.js';
 
 it('requires fresh accepted stages and matching current CI before reporting readiness', async () => {
@@ -108,7 +118,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   expect(sent).toEqual([1, 2]);
 });
 
-async function stagesFixture() {
+async function stagesFixture(admission?: ContinuationAdmission) {
   const store = controlledStore();
   let ordinal = 1;
   let runId = 'run-1';
@@ -131,9 +141,10 @@ async function stagesFixture() {
   let progress = 'run-1:failed';
   let waiting = false;
   let status = 'completed';
+  let runningAfterSend = false;
   let stageIndex: number | undefined;
   let question: { id: string; text: string } | undefined;
-  const deps = Layer.mergeAll(
+  const baseDeps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
@@ -204,9 +215,13 @@ async function stagesFixture() {
           ordinal = request.ordinal ?? request.index + 1;
           runId = `run-${ordinal}`;
           sends++;
+          if (runningAfterSend) status = 'running';
         }),
     })
   );
+  const deps = admission
+    ? Layer.merge(baseDeps, Layer.succeed(ContinuationAdmission, admission))
+    : baseDeps;
   const run = (
     operation: (
       job: import('../src/capabilities/job/index.js').Job
@@ -226,6 +241,7 @@ async function stagesFixture() {
     resume: (command: { jobId: string; index: number; questionId: string }) =>
       run((job) => job.resume(command)),
     change: (value: {
+      runningAfterSend?: boolean;
       ordinal?: number;
       runId?: string;
       commit?: string;
@@ -247,6 +263,7 @@ async function stagesFixture() {
       question?: { id: string; text: string };
       answeredQuestions?: readonly string[];
     }) => {
+      runningAfterSend = value.runningAfterSend ?? runningAfterSend;
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
       commit = value.commit ?? commit;
@@ -995,4 +1012,192 @@ it('retains review and publication authority after a replay repair correction', 
   expect(await job.status()).toMatchObject({
     delivery: { ready: true, reviewedCommit: 'b'.repeat(40) },
   });
+});
+
+it.each(['status', 'tick'] as const)(
+  'reacquires a deferred replay continuation slot through scheduler %s',
+  async (method) => {
+    let authorize: ContinuationAdmission['authorize'] = () => Effect.succeed(false);
+    const job = await stagesFixture({ authorize: (issue, receipt) => authorize(issue, receipt) });
+    await job.start();
+    await job.status();
+    await job.status();
+    job.change({
+      prCommit: 'c'.repeat(40),
+      reviewedCommit: 'b'.repeat(40),
+      maintenancePending: true,
+      failed: true,
+    });
+    await job.status();
+    job.change({
+      commit: 'd'.repeat(40),
+      prCommit: 'd'.repeat(40),
+      failed: false,
+      repairAllowed: false,
+    });
+    expect(await job.status()).toMatchObject({ delivery: { active: false, stage: 'babysitting' } });
+    const schedule = controlledScheduleStore();
+    await Effect.runPromise(
+      schedule.save({
+        revision: 0,
+        concurrency: 1,
+        allowance: 2,
+        paused: true,
+        admissions: [
+          { issue: 577, base: 'a'.repeat(40), context: '' },
+          { issue: 99, base: 'a'.repeat(40), context: '' },
+        ],
+      })
+    );
+    const own = await job.status();
+    if (own.kind !== 'job') throw new Error('Missing job');
+    let occupied = true;
+    const runtime = ManagedRuntime.make(
+      SchedulerLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(ScheduleStore, schedule),
+            Layer.succeed(JobPool, {
+              job: (issue) =>
+                Effect.succeed(
+                  issue === 577
+                    ? {
+                        status: () =>
+                          Effect.promise(async () => {
+                            const value = await job.status();
+                            if (value.kind !== 'job' && value.kind !== 'empty')
+                              throw new Error('Unexpected status');
+                            return value;
+                          }),
+                        start: () => Effect.die('No new admission'),
+                        resume: () => Effect.succeed({ kind: 'rejected' as const }),
+                        cancel: () => Effect.succeed({ kind: 'rejected' as const }),
+                      }
+                    : {
+                        status: () =>
+                          Effect.succeed({
+                            ...own,
+                            intent: { ...own.intent, issue: 99, id: 'other' },
+                            delivery: {
+                              stage: 'implementation' as const,
+                              commit: 'a'.repeat(40),
+                              ready: !occupied,
+                              landed: false,
+                              active: occupied,
+                            },
+                          }),
+                        start: () => Effect.die('No launch'),
+                        resume: () => Effect.succeed({ kind: 'rejected' as const }),
+                        cancel: () => Effect.succeed({ kind: 'rejected' as const }),
+                      }
+                ),
+            }),
+            Layer.succeed(Issues, {
+              inspect: () => Effect.die('No issue admission'),
+              pullRequest: () => Effect.die('No PR admission'),
+            }),
+            Layer.succeed(Plan, { preview: () => Effect.die('Paused: no planning') }),
+            Layer.succeed(PlanningSource, { read: () => Effect.die('Paused: no discovery') })
+          )
+        )
+      )
+    );
+    try {
+      const scheduler = await runtime.runPromise(Scheduler);
+      authorize = (issue, receipt) =>
+        scheduler.authorizeRecovery(issue, receipt).pipe(
+          Effect.tap((allowed) =>
+            Effect.gen(function* () {
+              if (!allowed) return;
+              const state = yield* schedule.read();
+              expect(state.resuming).toContainEqual(
+                expect.objectContaining({ issue, index: receipt.index, run: receipt.run })
+              );
+            })
+          )
+        );
+      job.change({ repairAllowed: true, runningAfterSend: true });
+      const observe = () =>
+        runtime.runPromise(
+          method === 'status' ? scheduler.status() : scheduler.tick('a'.repeat(40))
+        );
+      await observe();
+      await observe();
+      expect(job.sends()).toBe(3);
+      expect(await Effect.runPromise(job.store.readStage(5))).toBeNull();
+      occupied = false;
+      const configured = authorize;
+      // Keep the observed job deferred while directly testing invalid authority
+      // against otherwise free scheduler capacity.
+      authorize = () => Effect.succeed(false);
+      const receipt = { threadId: 'thread', index: 4, run: { id: 'run-4', ordinal: 4 } };
+      expect(await runtime.runPromise(scheduler.authorizeRecovery(999, receipt))).toBe(false);
+      expect(
+        await runtime.runPromise(
+          scheduler.authorizeRecovery(577, { ...receipt, threadId: 'other' })
+        )
+      ).toBe(false);
+      expect(
+        await runtime.runPromise(
+          scheduler.authorizeRecovery(577, { ...receipt, run: { id: 'stale', ordinal: 4 } })
+        )
+      ).toBe(false);
+      expect(
+        await runtime.runPromise(
+          scheduler.authorizeRecovery(577, { ...receipt, run: { id: 'run-4', ordinal: 3 } })
+        )
+      ).toBe(false);
+      expect((await Effect.runPromise(schedule.read())).resuming ?? []).toEqual([]);
+      expect(job.sends()).toBe(3);
+      authorize = configured;
+      await observe();
+      expect(job.sends()).toBe(4);
+      expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+        stage: 'review',
+        commit: 'd'.repeat(40),
+        previousRunId: 'run-4',
+      });
+      job.change({ accepted: false });
+      await observe();
+      await observe();
+      expect(job.sends()).toBe(4);
+      expect((await Effect.runPromise(schedule.read())).admissions).toHaveLength(2);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
+
+it('keeps a questioned replay receipt inactive without requesting continuation capacity', async () => {
+  let requests = 0;
+  const job = await stagesFixture({
+    authorize: () =>
+      Effect.sync(() => {
+        requests++;
+        return true;
+      }),
+  });
+  await job.start();
+  await job.status();
+  await job.status();
+  job.change({
+    prCommit: 'c'.repeat(40),
+    reviewedCommit: 'b'.repeat(40),
+    maintenancePending: true,
+    failed: true,
+  });
+  await job.status();
+  job.change({
+    commit: 'd'.repeat(40),
+    prCommit: 'd'.repeat(40),
+    failed: false,
+    repairAllowed: false,
+  });
+  await job.status();
+  job.change({ repairAllowed: true, question: { id: 'hold', text: 'Operator answer required' } });
+  expect(await job.status()).toMatchObject({
+    delivery: { active: false, activity: 'awaiting-answer', stage: 'babysitting' },
+  });
+  expect(requests).toBe(0);
+  expect(job.sends()).toBe(3);
 });

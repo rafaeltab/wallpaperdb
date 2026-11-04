@@ -84,9 +84,13 @@ export const SchedulerLive = Layer.effect(
           admissions: [...state.admissions, command],
         });
       });
-    const admitRecovery = (issue: number) =>
+    const admitRecovery = (
+      issue: number,
+      continuation?: import('../job/index.js').ContinuationReceipt
+    ) =>
       Effect.gen(function* () {
         const snapshot = yield* status();
+        if (continuation) return yield* reserveContinuation(issue, continuation, snapshot);
         const recoveries = snapshot.recoveries ?? [];
         if (recoveries.some((item) => item.issue === issue && item.active !== false)) return true;
         return (
@@ -100,6 +104,31 @@ export const SchedulerLive = Layer.effect(
         recoveryObservations.withPermitsIfAvailable(1),
         Effect.map(Option.getOrElse(() => false))
       );
+    const reserveContinuation = (
+      issue: number,
+      receipt: import('../job/index.js').ContinuationReceipt,
+      snapshot: ScheduleStatus
+    ) =>
+      Effect.gen(function* () {
+        const target = snapshot.jobs.find(
+          (job) => job.kind === 'job' && job.intent.issue === issue
+        );
+        if (!continuationMatches(target, receipt)) return false;
+        const claim: ResumeClaim = {
+          issue,
+          index: receipt.index,
+          questionId: `continuation:${JSON.stringify(receipt)}`,
+          run: receipt.run,
+        };
+        const prior = snapshot.state.resuming?.find((value) => value.issue === issue);
+        if (prior) return sameResume(prior, claim);
+        if (!continuationCapacity(snapshot)) return false;
+        return yield* store.save({
+          ...snapshot.state,
+          revision: snapshot.state.revision + 1,
+          resuming: [...(snapshot.state.resuming ?? []), claim],
+        });
+      });
     const reconcile = () =>
       Effect.gen(function* () {
         yield* issues.reconcile?.(admitRecovery) ?? Effect.void;
@@ -389,4 +418,22 @@ function joinPreview(preview: Preview) {
   )
     ? preview
     : undefined;
+}
+
+function continuationMatches(
+  target: Status | undefined,
+  receipt: import('../job/index.js').ContinuationReceipt
+) {
+  if (target?.kind !== 'job' || target.execution.kind !== 'found') return false;
+  return (
+    target.execution.threadId === receipt.threadId &&
+    target.execution.run?.id === receipt.run.id &&
+    target.execution.run.ordinal === receipt.run.ordinal
+  );
+}
+function continuationCapacity(snapshot: ScheduleStatus) {
+  return (
+    snapshot.state.concurrency === -1 ||
+    slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) < snapshot.state.concurrency
+  );
 }

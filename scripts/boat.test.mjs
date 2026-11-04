@@ -6402,6 +6402,227 @@ function shutdownDisposed(f, phase) {
 	);
 }
 
+async function stopObservationCheckout(t) {
+	const f = await shutdownCheckout(t);
+	const config = f.json(".boat/enrollment.json");
+	const state = f.json(".boat/state.json");
+	state.developmentWanted = true;
+	state.reconciliationPending = true;
+	state.admission = {
+		status: "published",
+		token: "fixture-admission",
+		name: "fixture-owned-worker",
+		owner: { root: f.root, key: config.key },
+		candidate: { id: state.id },
+	};
+	state.shutdownAttempt = {
+		id: "original-attempt",
+		workerId: state.id,
+		status: "stopping-observed",
+		startedAt: "2026-11-03T00:00:00.000Z",
+		submittedAt: "2026-11-03T00:00:01.000Z",
+		errors: ["original observation deadline exceeded"],
+	};
+	f.local(".boat/state.json", JSON.stringify(state));
+	const proof = {
+		sandbox: {
+			id: state.id,
+			name: state.admission.name,
+			type: config.size,
+			state: "stopped",
+			stop: {
+				id: "stop-observed",
+				status: "completed",
+				forced: false,
+				error: null,
+				endedAt: "2026-11-03T00:00:02.000Z",
+			},
+		},
+	};
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify(proof),
+	);
+	f.env.BOAT_EXPECTED_WORKER_ID = state.id;
+	f.env.BOAT_EXPECTED_ADMISSION = state.admission.token;
+	f.env.BOAT_EXPECTED_STOP_ID = proof.sandbox.stop.id;
+	return { ...f, proof };
+}
+
+test("stop observation settles exact completed proof once without any stop or wake effect", async (t) => {
+	const f = await stopObservationCheckout(t),
+		before = f.json(".boat/state.json");
+	const first = await shutdownResult(t, f, f.run("boat-observe-stop"));
+	assert.equal(first.status, 0, first.output);
+	const after = shutdownLedger(f);
+	assert.equal(after.runningSince, null);
+	assert.ok(after.shutdownAttempt.accountingAppliedAt);
+	assert.ok(after.cost > before.cost);
+	assert.equal(after.shutdownAttempt.id, before.shutdownAttempt.id);
+	assert.equal(
+		after.shutdownAttempt.startedAt,
+		before.shutdownAttempt.startedAt,
+	);
+	assert.equal(
+		after.shutdownAttempt.submittedAt,
+		before.shutdownAttempt.submittedAt,
+	);
+	assert.deepEqual(after.shutdownAttempt.errors, before.shutdownAttempt.errors);
+	assert.deepEqual(
+		after.shutdownAttempt.completion.provider.stop,
+		f.proof.sandbox.stop,
+	);
+	assert.equal(after.developmentWanted, true);
+	assert.equal(after.reconciliationPending, true);
+	const repeated = await shutdownResult(t, f, f.run("boat-observe-stop"));
+	assert.equal(repeated.status, 0, repeated.output);
+	const again = shutdownLedger(f);
+	assert.equal(again.cost, after.cost);
+	assert.equal(
+		again.shutdownAttempt.accountingAppliedAt,
+		after.shutdownAttempt.accountingAppliedAt,
+	);
+	assert.deepEqual(
+		shutdownCalls(f).map((a) => a.slice(-2)),
+		[
+			["info", before.id],
+			["info", before.id],
+		],
+	);
+});
+
+for (const missing of [
+	"BOAT_EXPECTED_WORKER_ID",
+	"BOAT_EXPECTED_ADMISSION",
+	"BOAT_EXPECTED_STOP_ID",
+])
+	test(`stop observation refuses missing ${missing} before provider effects`, async (t) => {
+		const f = await stopObservationCheckout(t),
+			before = f.json(".boat/state.json");
+		delete f.env[missing];
+		const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(shutdownCalls(f), []);
+	});
+
+test("stop observation refuses stale admission before provider effects", async (t) => {
+	const f = await stopObservationCheckout(t),
+		before = f.json(".boat/state.json");
+	f.env.BOAT_EXPECTED_ADMISSION = "stale-admission";
+	const stale = await shutdownResult(t, f, f.run("boat-observe-stop"));
+	assert.notEqual(stale.status, 0, stale.output);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.deepEqual(shutdownCalls(f), []);
+});
+
+test("stop observation refuses unsubmitted authority before provider effects", async (t) => {
+	const f = await stopObservationCheckout(t),
+		before = f.json(".boat/state.json");
+	delete before.shutdownAttempt.submittedAt;
+	f.local(".boat/state.json", JSON.stringify(before));
+	const unsubmitted = await shutdownResult(t, f, f.run("boat-observe-stop"));
+	assert.notEqual(unsubmitted.status, 0, unsubmitted.output);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.deepEqual(shutdownCalls(f), []);
+});
+
+for (const [name, patch] of [
+	[
+		"different prior operation",
+		{ completion: { provider: { stop: { id: "different-stop" } } } },
+	],
+	[
+		"accounted attempt with live accounting",
+		{ accountingAppliedAt: "2026-11-03T00:00:03.000Z" },
+	],
+])
+	test(`stop observation refuses ${name} before provider effects`, async (t) => {
+		const f = await stopObservationCheckout(t),
+			before = f.json(".boat/state.json");
+		Object.assign(before.shutdownAttempt, patch);
+		f.local(".boat/state.json", JSON.stringify(before));
+		const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(shutdownCalls(f), []);
+	});
+
+for (const failure of ["info-error", "shutdown-hang-initial"])
+	test(`stop observation preserves accounting after ${failure}`, async (t) => {
+		const f = await stopObservationCheckout(t),
+			before = f.json(".boat/state.json");
+		fs.writeFileSync(
+			path.join(f.control, failure),
+			failure === "info-error" ? "inspection_failed" : "yes",
+		);
+		const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(
+			shutdownCalls(f).map((a) => a.slice(-2)),
+			[["info", before.id]],
+		);
+		if (failure === "shutdown-hang-initial") {
+			const p = JSON.parse(
+				fs.readFileSync(
+					path.join(f.control, "shutdown-entered-initial"),
+					"utf8",
+				),
+			);
+			assert.notEqual(fixtureProcess(p.pid)?.startTicks, p.startTicks);
+			const receipts = fs
+				.readFileSync(
+					path.join(f.root, ".boat/shutdown-processes.jsonl"),
+					"utf8",
+				)
+				.trim()
+				.split("\n")
+				.map(JSON.parse);
+			assert.ok(
+				receipts.some(
+					(r) =>
+						r.observed?.some((o) => o.pid === p.pid) &&
+						r.pipesClosed &&
+						r.unresolved.length === 0,
+				),
+			);
+		}
+	});
+
+for (const [name, patch, stop] of [
+	["still stopping", { state: "stopping" }, {}],
+	["wrong worker", { id: "another-worker" }, {}],
+	["wrong owner name", { name: "another-owner" }, {}],
+	["wrong size", { type: "another-size" }, {}],
+	["wrong operation", {}, { id: "another-stop" }],
+	["forced completion", {}, { forced: true }],
+	["pending operation", {}, { status: "pending" }],
+	["failed operation", {}, { error: "provider error" }],
+	["missing end time", {}, { endedAt: null }],
+	["non-string end time", {}, { endedAt: 2026 }],
+])
+	test(`stop observation refuses ${name} without accounting or new side effects`, async (t) => {
+		const f = await stopObservationCheckout(t),
+			before = f.json(".boat/state.json");
+		f.proof.sandbox = {
+			...f.proof.sandbox,
+			...patch,
+			stop: { ...f.proof.sandbox.stop, ...stop },
+		};
+		fs.writeFileSync(
+			path.join(f.control, "provider-info"),
+			JSON.stringify(f.proof),
+		);
+		const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(
+			shutdownCalls(f).map((a) => a.slice(-2)),
+			[["info", before.id]],
+		);
+	});
+
 test("shutdown wall clock initial info hang preserves single stop admission", async (t) => {
 	const f = await shutdownCheckout(t);
 	flag(f, "shutdown-hang-initial");

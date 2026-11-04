@@ -10,7 +10,7 @@ const active = (worker) =>
 const stopped = (worker) =>
 	["stopped", "archived"].includes(workerState(worker));
 
-function completedStop(worker, id) {
+export function completedStop(worker, id) {
 	const stop = worker?.stop;
 	return (
 		worker?.id === id &&

@@ -24,7 +24,11 @@ import {
 	retireShutdownTunnel,
 } from "./lib/boat-shutdown.mjs";
 import { runPreview } from "./lib/boat-preview.mjs";
-import { freshWorker, assertAdmission } from "./lib/boat-reconstruction.mjs";
+import {
+	freshWorker,
+	assertAdmission,
+	completedStop,
+} from "./lib/boat-reconstruction.mjs";
 import { snapshotLifecycle, snapshotExpired } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -1113,7 +1117,13 @@ async function stopAdmission(budget) {
 async function stop(
 	remove = false,
 	targets,
-	{ preserveIntent = false, expectedWorkerId, expectedAdmissionToken } = {},
+	{
+		preserveIntent = false,
+		expectedWorkerId,
+		expectedAdmissionToken,
+		observeOnly = false,
+		expectedStopId,
+	} = {},
 ) {
 	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
 		fs.appendFileSync(
@@ -1152,6 +1162,56 @@ async function stop(
 									current.id !== admission.candidate?.id)))
 					)
 						return false;
+				}
+				if (observeOnly) {
+					const current = read(stateFile),
+						attempt = current.shutdownAttempt;
+					if (
+						!current.id ||
+						attempt?.workerId !== current.id ||
+						typeof attempt.submittedAt !== "string" ||
+						!Number.isFinite(Date.parse(attempt.submittedAt)) ||
+						(attempt.completion &&
+							attempt.completion.provider?.stop?.id !== expectedStopId) ||
+						(attempt.accountingAppliedAt && current.runningSince != null) ||
+						![
+							"submission-uncertain",
+							"stopping-observed",
+							"completed-observed",
+						].includes(attempt.status)
+					)
+						throw new Error(
+							"Stop observation requires an existing submitted owning attempt",
+						);
+					const info = await json(["info", current.id], {
+						shutdown: budget.phase("initial"),
+					});
+					const worker = info?.sandbox ?? info,
+						operation = worker?.stop;
+					if (
+						!completedStop(worker, current.id) ||
+						worker.name !== current.admission.name ||
+						worker.type !== config.size ||
+						operation?.id !== expectedStopId ||
+						typeof operation.endedAt !== "string"
+					)
+						throw new Error(
+							"Stop observation requires exact completed nonforced proof",
+						);
+					// No request, retirement or cleanup hook can run on this read-only path.
+					const result = await snapshots.stopCompute({
+						budget,
+						inspect: async () => info,
+					});
+					if (result.error) throw new Error(result.error);
+					event("stop-observed", {
+						id: current.id,
+						completion: result.completion,
+					});
+					console.log(
+						"Observed existing completed stop; accounting reconciled, no stop submitted.",
+					);
+					return;
 				}
 				const errors = [];
 				try {
@@ -2178,12 +2238,23 @@ try {
 	else if (action === "daemon") {
 		owned();
 		await runDaemon();
-	} else if (action === "stop" || action === "delete") {
+	} else if (["stop", "delete", "observe-stop"].includes(action)) {
 		owned();
+		const observeOnly = action === "observe-stop";
 		const expectedWorkerId =
-			action === "stop" ? process.env.BOAT_EXPECTED_WORKER_ID : undefined;
+			action !== "delete" ? process.env.BOAT_EXPECTED_WORKER_ID : undefined;
 		const expectedAdmissionToken =
-			action === "stop" ? process.env.BOAT_EXPECTED_ADMISSION : undefined;
+			action !== "delete" ? process.env.BOAT_EXPECTED_ADMISSION : undefined;
+		const expectedStopId = observeOnly
+			? process.env.BOAT_EXPECTED_STOP_ID
+			: undefined;
+		if (
+			observeOnly &&
+			(!expectedWorkerId || !expectedAdmissionToken || !expectedStopId)
+		)
+			throw new Error(
+				"Stop observation requires exact worker, admission and stop identities",
+			);
 		if (expectedWorkerId && !/^[A-Za-z0-9_-]+$/.test(expectedWorkerId))
 			throw new Error("Invalid expected stop worker identity");
 		if (
@@ -2191,9 +2262,13 @@ try {
 			!/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken)
 		)
 			throw new Error("Invalid expected stop admission identity");
+		if (expectedStopId && !/^[A-Za-z0-9_-]+$/.test(expectedStopId))
+			throw new Error("Invalid expected stop operation identity");
 		const stopped = await stop(action === "delete", undefined, {
 			expectedWorkerId,
 			expectedAdmissionToken,
+			observeOnly,
+			expectedStopId,
 		});
 		if (stopped === false)
 			throw new Error("Expected stop ownership changed; no stop executed");

@@ -22,7 +22,7 @@ endif
 endif
 endif
 
-.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-infra-images boat-prepare-app-images boat-status boat-stop boat-delete boat-preview boat-settle boat-test boat-cache
+.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-infra-images boat-prepare-app-images boat-status boat-stop boat-observe-stop boat-delete boat-preview boat-settle boat-test boat-cache
 boat-enroll: boat-bootstrap ## Enroll this isolated worktree (MODE=validation/development; SIZE=large; COHORT=smoke; LIFECYCLE=snapshot/fresh-after-stop)
 	@node scripts/boat.mjs enroll "$(or $(MODE),validation)" "$(or $(SIZE),large)" "$(or $(COHORT),smoke)" "$(or $(LIFECYCLE),snapshot)"
 boat-prepare-toolchain: ## Prepare only this enrolled worker's locked tools, without dependencies or applications
@@ -41,6 +41,8 @@ boat-status: ## Show this enrolled worker and experiment accounting
 	@node scripts/boat.mjs status
 boat-stop: ## Stop only this enrolled worker (optional BOAT_EXPECTED_WORKER_ID and BOAT_EXPECTED_ADMISSION guards)
 	@node scripts/boat.mjs stop
+boat-observe-stop: ## Reconcile an existing completed stop with exact worker/admission/stop IDs; never submit a stop
+	@node scripts/boat.mjs observe-stop
 boat-delete: ## Delete only this enrolled worker at worktree teardown
 	@node scripts/boat.mjs delete
 boat-preview: ## Open a private localhost proxy to healthy remote ingress

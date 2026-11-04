@@ -182,7 +182,16 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 				cwd: project.root,
 				encoding: "utf8",
 				timeout: 30_000,
-				env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
+				// The fixture has no observability configuration. Turbo injects these
+				// variables into task environments when the real repository enables it.
+				env: {
+					...Object.fromEntries(
+						Object.entries(process.env).filter(
+							([key]) => !key.startsWith("TURBO_EXPERIMENTAL_OTEL_"),
+						),
+					),
+					TURBO_TELEMETRY_DISABLED: "1",
+				},
 			},
 		);
 	const first = run();

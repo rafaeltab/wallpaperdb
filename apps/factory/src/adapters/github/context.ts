@@ -15,15 +15,22 @@ export function contextualPromise<A>(options: {
   catch: (cause: unknown) => Unavailable;
 }): Effect.Effect<A, Unavailable> {
   return Effect.contextWith((context) =>
-    Effect.tryPromise({
-      try: (signal) =>
+    Effect.callback<A, Unavailable>((resume, signal) => {
+      const pending = Promise.resolve().then(() =>
         execution.run(context, () =>
           admission.run(
             options.admitRecovery ?? admission.getStore() ?? options.defaultRecoveryAdmission,
             () => options.try(signal)
           )
-        ),
-      catch: options.catch,
+        )
+      );
+      const settled = pending.then(
+        (value) => resume(Effect.succeed(value)),
+        (cause) => resume(Effect.fail(options.catch(cause)))
+      );
+      // Abort is cooperative: native filesystem work may still be settling.
+      // Keep ownership until the underlying operation has actually finished.
+      return Effect.promise(() => settled);
     })
   );
 }

@@ -78,7 +78,8 @@ export interface ScheduleState {
   readonly concurrency: number;
   readonly allowance: number;
   readonly paused: boolean;
-  /** Durable active-slot claims for uncertain resumption, without another distinct admission. */
+  /** Durable active-slot claims for resumption or completed-stage continuation,
+   * including uncertain sends, without another distinct admission. */
   readonly resuming?: readonly ResumeClaim[];
   /** Distinct reservations are permanent, including uncertain starts. */
   readonly admissions: readonly import('../job/index.js').Start[];
@@ -101,9 +102,13 @@ export interface ScheduleStatus {
   readonly jobs: readonly Status[];
 }
 export interface Scheduler {
-  /** Check current continuation capacity without another issue admission.
-   * The recovery journal must retain its active reservation before delivery. */
-  authorizeRecovery(issue: number): Effect.Effect<boolean, Unavailable>;
+  /** Check recovery capacity without another issue admission. Recovery journals
+   * retain their active reservation. A validated completed-stage receipt reserves
+   * a durable job slot here before its successor stage can be sent. */
+  authorizeRecovery(
+    issue: number,
+    continuation?: import('../job/index.js').ContinuationReceipt
+  ): Effect.Effect<boolean, Unavailable>;
   status(): Effect.Effect<ScheduleStatus, Unavailable>;
   configure(command: {
     revision: number;

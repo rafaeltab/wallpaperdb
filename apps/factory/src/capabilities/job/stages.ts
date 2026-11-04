@@ -11,6 +11,7 @@ import {
   type StageRequest,
   type Time,
   Unavailable,
+  ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
 
@@ -20,7 +21,8 @@ export function reconcileStages(
   issues: Issues,
   intent: Intent,
   observation: Observation,
-  time: Time
+  time: Time,
+  continuation?: ContinuationAdmission
 ) {
   return Effect.gen(function* () {
     if (observation.kind !== 'found') return undefined;
@@ -33,7 +35,16 @@ export function reconcileStages(
     });
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
-    return yield* reconcileStage(store, execution, issues, intent, waiting, observation, time);
+    return yield* reconcileStage(
+      store,
+      execution,
+      issues,
+      intent,
+      waiting,
+      observation,
+      time,
+      continuation
+    );
   }).pipe(Effect.withSpan('factory.job.stages'));
 }
 function accepted(
@@ -190,7 +201,8 @@ function reconcileStage(
   intent: Intent,
   waiting: StageRequest,
   observation: Extract<Observation, { kind: 'found' }>,
-  time: Time
+  time: Time,
+  continuation?: ContinuationAdmission
 ) {
   return Effect.gen(function* () {
     const suspended = yield* suspension(store, waiting, observation);
@@ -225,6 +237,8 @@ function reconcileStage(
     // This run has conclusively finished. A pending journal or descendant
     // recovery keeps the receipt unaccepted, without occupying another worker slot.
     if (!(yield* acceptReplayRepair(issues, intent, waiting, verified)))
+      return { ...delivery, active: false };
+    if (!(yield* continuationAllowed(intent, waiting, verified, continuation)))
       return { ...delivery, active: false };
     return yield* advance(store, execution, issues, intent, waiting, verified);
   });
@@ -598,4 +612,20 @@ function predecessorOrdinal(accepted: StageRequest, evidence: StageEvidence | nu
 function nextComparison(waiting: StageRequest): StageRequest['comparison'] {
   if (waiting.stage !== 'review' || !waiting.comparison) return waiting.comparison;
   return { ...waiting.comparison, previousHead: waiting.commit };
+}
+
+function continuationAllowed(
+  intent: Intent,
+  request: StageRequest,
+  evidence: StageEvidence,
+  admission?: ContinuationAdmission
+) {
+  return Effect.gen(function* () {
+    if (!request.comparison || !admission) return true;
+    return yield* admission.authorize(intent.issue, {
+      threadId: request.threadId,
+      index: request.index,
+      run: { id: evidence.runId, ordinal: evidence.ordinal },
+    });
+  });
 }

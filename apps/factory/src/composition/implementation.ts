@@ -3,6 +3,7 @@ import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
 import {
   Execution,
+  ContinuationAdmission,
   Issues,
   Job,
   JobLive,
@@ -128,6 +129,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           },
         })
       ),
+      Layer.succeed(ContinuationAdmission, {
+        authorize: (issue, receipt) => recoveryAdmission(issue, receipt),
+      }),
       Layer.succeed(
         Execution,
         t3Execution({

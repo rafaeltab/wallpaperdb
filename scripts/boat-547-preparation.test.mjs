@@ -135,7 +135,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -207,6 +207,7 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 	const wanted = [
 		"enroll",
 		"prepare-toolchain",
+		"chromium-install",
 		"red-user",
 		"red-wallpaper",
 		"red-asset",
@@ -223,7 +224,6 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 		"check-wallpaper",
 		"check-asset",
 		"metadata",
-		"chromium-install",
 		"chromium-launch",
 		"prepare-infra-images",
 	];
@@ -339,6 +339,7 @@ test("547 reused wanted development prepares workspace and images before its fir
 			[
 				"boat-prepare-toolchain",
 				"boat-prepare-workspace",
+				"boat-prepare-chromium",
 				"boat-prepare-infra-images",
 				"boat-prepare-app-images",
 			],
@@ -353,6 +354,32 @@ test("547 reused wanted development prepares workspace and images before its fir
 	} finally {
 		if (outcome.value) await outcome.value.serving.stop();
 	}
+});
+
+test("547 failed early Chromium preparation stops before images and ordinary restoration", async (t) => {
+	const f = preparationFixture(t);
+	await stoppedWantedDevelopment(f);
+	f.env.CONTROL_FAIL = "chromium-install";
+	await assert.rejects(f.run());
+	const result = json(path.join(f.config.evidence, "preparation-result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+	const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+	assert.equal(commands.filter((a) => a[1] === "boat-stop").length, 1);
+	assert.equal(
+		commands.some((a) =>
+			[
+				"boat-prepare-infra-images",
+				"boat-prepare-app-images",
+				"test-focused",
+			].includes(a[1]),
+		),
+		false,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, "patches/nats-2.29.3.patch")),
+		false,
+	);
 });
 
 test("547 failed wanted app-image preparation stops its worker before any ordinary baseline", async (t) => {
@@ -1679,7 +1706,7 @@ test("547 explicit cold provisioning shares one aggregate without extending work
 			p.phase,
 		);
 	}
-	assert.equal(result.scheduleVersion, "547-cold-v5-staged-build-context");
+	assert.equal(result.scheduleVersion, "547-cold-v6-early-chromium");
 });
 
 test("547 Chromium provisioning accepted after its old private cap retains the original cold clock", async (t) => {
@@ -1689,7 +1716,7 @@ test("547 Chromium provisioning accepted after its old private cap retains the o
 		clock: () => mono() + offset,
 		make: async (argv, options) => {
 			const receipt = await f.make(argv, options);
-			if (argv.includes("SCRIPT=test:browser:install")) offset = 181;
+			if (argv[1] === "boat-prepare-chromium") offset = 181;
 			return receipt;
 		},
 	});
@@ -1715,7 +1742,7 @@ test("547 Chromium provisioning cannot accept after the original aggregate or la
 			clock: () => mono() + offset,
 			make: async (argv, options) => {
 				const receipt = await f.make(argv, options);
-				if (argv.includes("SCRIPT=test:browser:install")) offset = 1201;
+				if (argv[1] === "boat-prepare-chromium") offset = 1201;
 				return receipt;
 			},
 		}),

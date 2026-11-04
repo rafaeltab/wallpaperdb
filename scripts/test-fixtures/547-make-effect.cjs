@@ -226,6 +226,12 @@ if (target === "infra-start") {
 } else if (target === "boat-prepare-workspace") {
 	save("workspace-prepared.json", { completed: true });
 	event("workspace-preparation");
+} else if (target === "boat-prepare-chromium") {
+	phase = "chromium-install";
+	assert.equal(fs.existsSync("infra-images-prepared.json"), false);
+	assert.equal(fs.existsSync("restoration-app-images-prepared.json"), false);
+	save("chromium-prepared.json", { completed: true });
+	event("chromium-preparation");
 } else if (target === "boat-prepare-app-images") {
 	assert.equal(fs.existsSync("infra-images-prepared.json"), true);
 	save("source-at-app-image-preparation.json", preparationSources());
@@ -238,6 +244,11 @@ if (target === "infra-start") {
 		phase === "red-user" &&
 		process.env.CONTROL_REQUIRE_RECONCILIATION_PREPARATION
 	) {
+		assert.equal(
+			fs.existsSync("chromium-prepared.json"),
+			true,
+			"Chromium acquisition must precede wanted restoration",
+		);
 		save("source-at-first-ordinary.json", preparationSources());
 		assert.equal(
 			fs.existsSync("workspace-prepared.json"),

@@ -14088,6 +14088,14 @@ if(argv[0]==='install'){
  if(fs.readFileSync('pnpm-lock.yaml','utf8')!=='fixture valid lock\\n'){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}
  process.exit(0);
 }
+if(argv[2]==='run'&&argv[3]==='test:browser:install'){
+ if(JSON.stringify(argv)!==JSON.stringify(['--filter','@wallpaperdb/web','run','test:browser:install']))throw Error('Chromium installer selectors changed');
+ fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'chromium',argv})+'\\n');
+ fs.writeFileSync(path.join(control,'chromium-entered'),'yes');console.log('Chromium installer printed success before completion');
+ while(fs.existsSync(path.join(control,'hold-chromium'))&&!fs.existsSync(path.join(control,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ if(fs.existsSync(path.join(control,'fail-chromium'))){console.error('native Chromium acquisition failed');process.exit(23);}
+ fs.writeFileSync(path.join(control,'chromium-completed'),'yes');console.error('native Chromium installer stderr drained');process.exit(0);
+}
 if(argv[2]==='exec'){
  fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'native',argv})+'\\n');
  console.log('selected User stdout');console.error('selected User stderr');process.exit(7);
@@ -14136,6 +14144,163 @@ process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-original`)},argv,{stdio:'inh
 			return result;
 		},
 	};
+}
+
+async function chromiumCheckout(t, fresh = false) {
+	const f = await toolchainCheckout(t, fresh);
+	f.local(
+		"apps/web/package.json",
+		JSON.stringify({
+			name: "@wallpaperdb/web",
+			scripts: {
+				"test:browser:install": "playwright install --with-deps chromium",
+			},
+		}),
+	);
+	return f;
+}
+
+test("explicit Chromium preparation awaits the ordinary installer before returning without development effects", async (t) => {
+	const f = await chromiumCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
+	);
+	flag(f, "hold-chromium");
+	const command = f.run("boat-prepare-chromium");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "chromium-entered"));
+		}, "held Chromium installer");
+		assert.equal(
+			fs.existsSync(path.join(f.control, "chromium-completed")),
+			false,
+		);
+		assert.ok(f.json(".boat/prepared.json").dependencies);
+		assertPreparationDefersDevelopment(f);
+		const stages = f.log().map((x) => x.stage);
+		assert.ok(stages.indexOf("frozen") < stages.indexOf("chromium"));
+		assert.equal(
+			fs
+				.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+				.includes('"kind":"chromium-preparation"'),
+			false,
+		);
+	} finally {
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(fs.existsSync(path.join(f.control, "chromium-completed")), true);
+	assert.deepEqual(f.log().find((x) => x.stage === "chromium").argv, [
+		"--filter",
+		"@wallpaperdb/web",
+		"run",
+		"test:browser:install",
+	]);
+	assertPreparationDefersDevelopment(f);
+	const event = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "chromium-preparation");
+	assert.equal(event.workerId, "fake-new-worker");
+	assert.equal(event.completed, true);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("explicit Chromium preparation preserves restoration after installer failure", async (t) => {
+	const f = await chromiumCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "fail-chromium");
+	const result = await f.observe(f.run("boat-prepare-chromium"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /native Chromium acquisition failed/);
+	assert.equal(
+		fs.existsSync(path.join(f.control, "chromium-completed")),
+		false,
+	);
+	assertPreparationDefersDevelopment(f);
+	const events = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.filter((e) => e.kind === "chromium-preparation");
+	assert.equal(events.length, 1);
+	assert.equal(events[0].completed, false);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("explicit Chromium preparation rejects stale frozen inputs before acquisition", async (t) => {
+	const f = await chromiumCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	f.local("pnpm-lock.yaml", "stale dependency lock\n");
+	const result = await f.observe(f.run("boat-prepare-chromium"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.equal(fs.existsSync(path.join(f.control, "chromium-entered")), false);
+	assertPreparationDefersDevelopment(f);
+	f.local("pnpm-lock.yaml", "fixture valid lock\n");
+	await preparedNextOrdinaryUser(t, f);
+});
+
+for (const timing of ["before", "after"]) {
+	test(`explicit Chromium preparation refuses generation changes ${timing} installer execution`, async (t) => {
+		const f = await chromiumCheckout(t);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				developmentWanted: true,
+				reconciliationPending: true,
+			}),
+		);
+		const gate = timing === "before" ? "frozen" : "chromium";
+		flag(f, `hold-${gate}`);
+		const command = f.run("boat-prepare-chromium");
+		try {
+			await f.readiness.wait(() => {
+				assert.equal(command.closed, false, command.output());
+				return fs.existsSync(path.join(f.control, `${gate}-entered`));
+			}, `held ${gate} before generation drift`);
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					id: "replacement-worker",
+				}),
+			);
+		} finally {
+			flag(f, "release");
+			await f.observe(command);
+		}
+		const result = await command.done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /Worker generation changed/);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "chromium-entered")),
+			timing === "after",
+		);
+		assertPreparationDefersDevelopment(f);
+	});
 }
 
 test("explicit workspace preparation awaits frozen dependencies and defers fresh development restoration", async (t) => {
@@ -16138,7 +16303,7 @@ test("app image phase refuses completion when default build selection changes", 
 	}
 	const result = await command.done;
 	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /Application build selection changed/);
+	assert.match(result.output, /Preparation command selection changed/);
 	assert.deepEqual(f.appBuilds(), completedAppBuilds());
 	assertPreparationDefersDevelopment(f);
 	const events = fs

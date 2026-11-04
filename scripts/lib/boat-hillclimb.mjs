@@ -491,7 +491,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-cold-v5-staged-build-context",
+		scheduleVersion: "547-cold-v6-early-chromium",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -682,6 +682,13 @@ export async function execute547Preparation(config, dependencies = {}) {
 					event: event("workspace-preparation", receipt),
 				}),
 			});
+		}
+		await run("chromium-install", ["make", "boat-prepare-chromium"], {
+			assess: (_raw, { receipt }) => ({
+				event: event("chromium-preparation", receipt),
+			}),
+		});
+		if (previous.developmentWanted) {
 			await prepareImages("prepare-images-before-restoration");
 			await run(
 				"prepare-app-images-before-restoration",
@@ -744,12 +751,6 @@ export async function execute547Preparation(config, dependencies = {}) {
 			],
 			{ assess: workload.acceptMetadata },
 		);
-		await run("chromium-install", [
-			"make",
-			"run",
-			"PACKAGE=web",
-			"SCRIPT=test:browser:install",
-		]);
 		await run(
 			"chromium-launch",
 			[

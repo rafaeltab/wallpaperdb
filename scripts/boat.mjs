@@ -1681,7 +1681,16 @@ async function command() {
 			});
 			return;
 		}
-		const imagePreparation = new Map([
+		const preparation = new Map([
+			[
+				"boat-prepare-chromium",
+				{
+					commands: () => [
+						["run", "PACKAGE=web", "SCRIPT=test:browser:install"],
+					],
+					event: "chromium-preparation",
+				},
+			],
 			[
 				"boat-prepare-infra-images",
 				{
@@ -1697,13 +1706,13 @@ async function command() {
 				},
 			],
 		]).get(targets[0]);
-		if (imagePreparation) {
+		if (preparation) {
 			let completed = false;
 			let commands;
 			try {
 				await lock(async () => {
 					startupWorker(id);
-					commands = imagePreparation.commands();
+					commands = preparation.commands();
 					for (const command of commands) {
 						startupWorker(id);
 						await ssh(
@@ -1713,23 +1722,22 @@ async function command() {
 					}
 					startupWorker(id);
 					if (
-						JSON.stringify(imagePreparation.commands()) !==
-						JSON.stringify(commands)
+						JSON.stringify(preparation.commands()) !== JSON.stringify(commands)
 					)
 						throw new Error(
-							"Application build selection changed during preparation",
+							"Preparation command selection changed during preparation",
 						);
 					completed = true;
 				});
 			} finally {
-				event(imagePreparation.event, {
+				event(preparation.event, {
 					workerId: id,
 					ms: Date.now() - entered,
 					completed,
 					commands,
 				});
 			}
-			// Image acquisition never consumes still-wanted process restoration.
+			// Acquisition never consumes still-wanted process restoration.
 			return;
 		}
 		await cache(id);

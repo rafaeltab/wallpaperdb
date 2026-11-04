@@ -10,6 +10,7 @@ describe('User service configuration', () => {
     process.env.NATS_URL = 'nats://localhost:4222';
     process.env.PROFILE_HANDLE_MIN_LENGTH = '1';
     delete process.env.CLERK_SECRET_KEY;
+    delete process.env.USER_ASSET_WORKFLOW_FILE;
   });
 
   afterEach(() => {

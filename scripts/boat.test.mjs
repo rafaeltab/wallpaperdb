@@ -16063,6 +16063,163 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
+for (const held of [false, true])
+	test(`preparation maintenance renews the selected worker with image build ${held ? "held" : "completed"}`, {
+		timeout: 20000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t);
+		const sibling = f.json(".boat/state.json").daemon;
+		if (held) flag(f, "hold-asset-build");
+		const command = f.run("boat-prepare-app-images");
+		try {
+			await f.readiness.wait(() => {
+				if (held) assert.equal(command.terminal, null, command.output());
+				return fs.existsSync(path.join(f.control, "asset-build-entered"));
+			}, "ordinary image build launch");
+			if (!held) {
+				await f.readiness.wait(
+					() => command.closed,
+					"ordinary image completion",
+				);
+				assert.equal((await f.observe(command)).status, 0);
+			}
+			const daemon = f.daemon();
+			await f.readiness.wait(() => {
+				assert.equal(daemon.terminal, null, daemon.output());
+				return freshCalls(f).some(
+					(a) => a.includes("extend") && a.includes("fake-worker"),
+				);
+			}, "lease renewal while ordinary preparation is active");
+			assert.equal(liveOwnedProcess(f.root, sibling), true);
+			assert.equal(f.json(".boat/state.json").id, "fake-worker");
+			if (held) {
+				assert.equal(command.terminal, null, command.output());
+				assert.deepEqual(f.appBuilds(), [
+					{ service: "asset", stage: "entered" },
+				]);
+				assert.equal(
+					fs.existsSync(path.join(f.control, "app-images-built")),
+					false,
+				);
+			}
+		} finally {
+			flag(f, "release-asset-build");
+			await lockFixtureReadiness().wait(
+				() => command.closed,
+				"released image command drains",
+			);
+			await f.observe(command);
+		}
+		assert.deepEqual(f.appBuilds(), completedAppBuilds());
+	});
+
+test("preparation maintenance renews without writing changed source into the held build", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t);
+	flag(f, "hold-asset-build");
+	const command = f.run("boat-prepare-app-images");
+	let daemon;
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.terminal, null, command.output());
+			return fs.existsSync(path.join(f.control, "asset-build-entered"));
+		}, "held build before local edit");
+		f.local("notes.txt", "changed while image build owns source\n");
+		daemon = f.daemon();
+		await f.readiness.wait(() => {
+			assert.equal(daemon.terminal, null, daemon.output());
+			return freshCalls(f).some(
+				(a) => a.includes("extend") && a.includes("fake-worker"),
+			);
+		}, "renewal independent of source publication");
+		assert.equal(
+			fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+			"original unrelated source\n",
+		);
+		assert.deepEqual(f.appBuilds(), [{ service: "asset", stage: "entered" }]);
+	} finally {
+		flag(f, "release-asset-build");
+		await lockFixtureReadiness().wait(
+			() => command.closed,
+			"changed-source image command drains",
+		);
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Preparation source changed/);
+	const events = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(
+		events.findLast((e) => e.kind === "app-image-preparation").completed,
+		false,
+	);
+	await observed(() => {
+		assert.equal(daemon.terminal, null, daemon.output());
+		return (
+			fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8") ===
+			"changed while image build owns source\n"
+		);
+	}, "automatic source resumes after preparation releases ownership");
+});
+
+for (const change of ["admission", "stopped"])
+	test(`preparation maintenance refuses stale ${change} completion`, {
+		timeout: 20000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t);
+		flag(f, "hold-asset-build");
+		const command = f.run("boat-prepare-app-images");
+		try {
+			await f.readiness.wait(() => {
+				assert.equal(command.terminal, null, command.output());
+				return fs.existsSync(path.join(f.control, "asset-build-entered"));
+			}, "held build before ownership change");
+			const state = f.json(".boat/state.json");
+			if (change === "admission")
+				state.admission = { token: "replacement-admission" };
+			else {
+				state.runningSince = null;
+				state.snapshotRecovery.status = "DIRTY";
+			}
+			f.local(".boat/state.json", JSON.stringify(state));
+		} finally {
+			flag(f, "release-asset-build");
+			await lockFixtureReadiness().wait(
+				() => command.closed,
+				"stale image command drains",
+			);
+			await f.observe(command);
+		}
+		const result = await command.done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			change === "admission"
+				? /Preparation worker admission changed/
+				: /DIRTY snapshot/,
+		);
+		assert.deepEqual(f.appBuilds(), [
+			{ service: "asset", stage: "entered" },
+			{ service: "asset", stage: "completed" },
+		]);
+		const events = fs
+			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(
+			events.findLast((e) => e.kind === "app-image-preparation").completed,
+			false,
+		);
+		if (change === "stopped")
+			assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+	});
+
 test("app image phase serially builds the complete default graph through ordinary Make", async (t) => {
 	const f = await appImagesCheckout(t, true);
 	f.local(

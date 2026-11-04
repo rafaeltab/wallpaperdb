@@ -411,7 +411,13 @@ function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
+async function lock(
+	fn,
+	name = "lifecycle",
+	deadline = Infinity,
+	shutdown,
+	contended,
+) {
 	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
 		if (shutdown && performance.now() >= shutdown.deadline)
@@ -452,6 +458,8 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 				fs.rmSync(lockDir, { recursive: true, force: true });
 				continue;
 			}
+			const selection = contended?.(pid);
+			if (selection !== undefined) return selection;
 			if (attempt > 600) throw new Error("Lifecycle lock timed out");
 			await wait(
 				Math.max(
@@ -470,6 +478,34 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 	} finally {
 		fs.rmSync(lockDir, { recursive: true, force: true });
 	}
+}
+
+// Only the live command holding both locks can lend its selected identity to
+// TTL maintenance. This does not grant permission to synchronize source.
+function preparationOwner(pid) {
+	const lease = read(path.join(dir, `command-${pid}.json`));
+	const state = read(stateFile);
+	if (
+		lease.pid !== pid ||
+		!liveOwnedProcess(root, lease) ||
+		lease.preparation?.worker !== state.id ||
+		lease.preparation?.admission !== state.admission?.token ||
+		!state.runningSince ||
+		state.snapshotRecovery?.status !== "ACTIVE"
+	)
+		return;
+	try {
+		for (const name of ["lifecycle", "source"])
+			if (
+				Number(fs.readFileSync(path.join(dir, `${name}.lock/pid`), "utf8")) !==
+				pid
+			)
+				return;
+	} catch (error) {
+		if (error.code !== "ENOENT") throw error;
+		return;
+	}
+	return { worker: state.id, preparationPid: pid };
 }
 function accounting() {
 	let dollars = 0;
@@ -1732,25 +1768,56 @@ async function command() {
 			let completed = false;
 			let commands;
 			try {
-				await lock(async () => {
-					startupWorker(id);
-					commands = preparation.commands();
-					for (const command of commands) {
+				await lock(() =>
+					lock(async () => {
 						startupWorker(id);
-						await ssh(
-							id,
-							`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
-						);
-					}
-					startupWorker(id);
-					if (
-						JSON.stringify(preparation.commands()) !== JSON.stringify(commands)
-					)
-						throw new Error(
-							"Preparation command selection changed during preparation",
-						);
-					completed = true;
-				});
+						const admission = read(stateFile).admission?.token;
+						const selected = () => {
+							startupWorker(id);
+							const state = read(stateFile);
+							if (!state.runningSince || state.admission?.token !== admission)
+								throw new Error("Preparation worker admission changed");
+						};
+						await syncOwned(id);
+						const source = manifest();
+						if (
+							fingerprint(root, installationInputs(Object.keys(source))) !==
+							dependencies
+						)
+							throw new Error("Preparation dependencies changed before launch");
+						commands = preparation.commands();
+						write(lease, {
+							...read(lease),
+							preparation: { worker: id, admission },
+						});
+						try {
+							for (const command of commands) {
+								selected();
+								await ssh(
+									id,
+									`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
+								);
+							}
+							selected();
+							if (
+								JSON.stringify(preparation.commands()) !==
+								JSON.stringify(commands)
+							)
+								throw new Error(
+									"Preparation command selection changed during preparation",
+								);
+							if (JSON.stringify(manifest()) !== JSON.stringify(source))
+								throw new Error(
+									"Preparation source changed during preparation",
+								);
+							completed = true;
+						} finally {
+							const record = read(lease);
+							delete record.preparation;
+							write(lease, record);
+						}
+					}, "source"),
+				);
 			} finally {
 				event(preparation.event, {
 					workerId: id,
@@ -1871,6 +1938,19 @@ function resourceSample() {
 }
 async function runDaemon() {
 	let extended = 0;
+	const renew = async (selected, active) => {
+		const fresh = read(stateFile);
+		if (
+			fresh.id === selected &&
+			fresh.runningSince &&
+			fresh.snapshotRecovery?.status === "ACTIVE" &&
+			Date.now() - extended > 60000 &&
+			(active || Date.now() - fresh.lastActivity < 60000)
+		) {
+			await boat(["extend", selected, "--ttl", "2100"]);
+			extended = Date.now();
+		}
+	};
 	while (true) {
 		const s = read(stateFile);
 		if (!s.id || !s.runningSince) return;
@@ -1897,29 +1977,31 @@ async function runDaemon() {
 		// Selection waits for lifecycle/bootstrap, then releases it before waiting
 		// for source. Source ownership prevents publication from splitting sync and
 		// renewal; a changed selection explicitly supersedes only this daemon cycle.
-		const selected = await lock(() => {
-			const current = read(stateFile);
-			return current.id && current.runningSince ? current.id : null;
-		});
+		const selected = await lock(
+			() => {
+				const current = read(stateFile);
+				return current.id && current.runningSince ? current.id : null;
+			},
+			"lifecycle",
+			Infinity,
+			undefined,
+			preparationOwner,
+		);
 		if (!selected) return;
+		if (selected.preparationPid) {
+			if (preparationOwner(selected.preparationPid)?.worker === selected.worker)
+				await renew(selected.worker, active);
+			await wait(2000);
+			continue;
+		}
 		const running = await lock(async () => {
 			const current = read(stateFile);
 			if (current.id !== selected) return "superseded";
 			if (!current.runningSince) return false;
 			await syncOwned(selected);
-			const fresh = read(stateFile);
 			// Stop may run while source is owned, as before. Never renew its stopped or
 			// DIRTY generation after an in-flight flush completes.
-			if (
-				fresh.id === selected &&
-				fresh.runningSince &&
-				fresh.snapshotRecovery?.status === "ACTIVE" &&
-				Date.now() - extended > 60000 &&
-				(active || Date.now() - fresh.lastActivity < 60000)
-			) {
-				await boat(["extend", selected, "--ttl", "2100"]);
-				extended = Date.now();
-			}
+			await renew(selected, active);
 			return true;
 		}, "source");
 		if (running === "superseded") continue;

@@ -55,6 +55,8 @@ test("Compose image plans and prebuilt startup are explicit opt-ins", () => {
 		/ up -d --no-build\s*$/,
 	);
 	assert.match(output("apps-start"), / up -d --build\s*$/);
+	assert.match(output("dev", "ARGS=--no-up"), / watch --no-up\s*$/);
+	assert.match(output("dev"), / watch\s*$/);
 });
 
 test("workspace actions support optional package scoping", () => {

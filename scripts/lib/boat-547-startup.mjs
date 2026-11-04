@@ -124,6 +124,7 @@ export async function start547Application(context) {
 		version: 1,
 		round: config.round,
 		phase: "startup",
+		sequenceVersion: "547-startup-v8-prebuilt-start-watch",
 		owner: binding,
 		started,
 		deadline,
@@ -766,7 +767,8 @@ export async function start547Application(context) {
 			workload.stageSdk,
 		);
 		await run("apps-build", ["make", "boat-prepare-app-images"]);
-		dev = await launch("dev", ["make", "dev"]);
+		await run("apps-start", ["make", "apps-start", "ARGS=--no-build"]);
+		dev = await launch("dev", ["make", "dev", "ARGS=--no-up"]);
 		await wait(
 			() =>
 				fs

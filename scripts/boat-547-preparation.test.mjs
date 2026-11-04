@@ -8,12 +8,14 @@ import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as runner from "./lib/boat-hillclimb.mjs";
 import { captureServingCommand } from "./lib/boat-capture.mjs";
-import { preparationFixture } from "./test-fixtures/547-preparation.mjs";
+import {
+	preparationFixture,
+	publicPreparationFixture,
+} from "./test-fixtures/547-preparation.mjs";
 
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
-
 
 test("547 complete preparation reuses Make capture and publishes each phase before returning", async (t) => {
 	const f = preparationFixture(t);
@@ -467,47 +469,48 @@ test("547 startup image provisioning refuses completion after the original600 wi
 	);
 });
 
-test("547 startup app image failure never launches Watch and stops its owner once", async (t) => {
-	const f = preparationFixture(t);
-	f.config.until = "ready";
-	f.env.CONTROL_FAIL = "apps-build";
-	const outcome = await f.run().then(
-		(value) => ({ value }),
-		(error) => ({ error }),
-	);
-	try {
-		assert.match(
-			outcome.error?.message ?? "",
-			/Native Make terminal or drainage failed/,
+for (const phase of ["apps-build", "apps-start"])
+	test(`547 startup ${phase} failure never launches Watch and stops its owner once`, async (t) => {
+		const f = preparationFixture(t);
+		f.config.until = "ready";
+		f.env.CONTROL_FAIL = phase;
+		const outcome = await f.run().then(
+			(value) => ({ value }),
+			(error) => ({ error }),
 		);
-		assert.equal(
-			fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
-			false,
-		);
-		for (const name of ["dev", "preview"])
+		try {
+			assert.match(
+				outcome.error?.message ?? "",
+				/Native Make terminal or drainage failed/,
+			);
 			assert.equal(
-				fs.existsSync(
-					path.join(f.config.evidence, "startup", name, "invocation.json"),
-				),
+				fs.existsSync(path.join(f.root, "serving-commands.jsonl")),
 				false,
 			);
-		const result = json(path.join(f.config.evidence, "startup/result.json"));
-		assert.equal(result.status, "FAIL");
-		assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
-		assert.equal(
-			json(path.join(f.root, ".boat/state.json")).runningSince,
-			null,
-		);
-		assert.equal(
-			jsonLines(path.join(f.root, "commands.jsonl")).filter(
-				(argv) => argv[1] === "boat-stop",
-			).length,
-			1,
-		);
-	} finally {
-		if (outcome.value) await outcome.value.serving.stop();
-	}
-});
+			for (const name of ["dev", "preview"])
+				assert.equal(
+					fs.existsSync(
+						path.join(f.config.evidence, "startup", name, "invocation.json"),
+					),
+					false,
+				);
+			const result = json(path.join(f.config.evidence, "startup/result.json"));
+			assert.equal(result.status, "FAIL");
+			assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+			assert.equal(
+				json(path.join(f.root, ".boat/state.json")).runningSince,
+				null,
+			);
+			assert.equal(
+				jsonLines(path.join(f.root, "commands.jsonl")).filter(
+					(argv) => argv[1] === "boat-stop",
+				).length,
+				1,
+			);
+		} finally {
+			if (outcome.value) await outcome.value.serving.stop();
+		}
+	});
 
 test("547 replacement hands the owned serving lifetime to one new ordinary preview", async (t) => {
 	const f = preparationFixture(t);
@@ -1104,6 +1107,155 @@ function publicEntry(f) {
 }
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
+	test("547 public startup starts prepared apps through real Make before Watch without implicit builds", {
+		timeout: 30000,
+	}, async (t) => {
+		const f = await publicPreparationFixture(
+			t,
+			process.env.BOAT_547_QUALIFIED_CLI,
+		);
+		f.env.CONTROL_NATIVE_STARTUP = "1";
+		f.env.CONTROL_REQUIRE_APP_IMAGES = "1";
+		f.env.CONTROL_APP_IMAGE_GATE = path.join(f.root, "release-images");
+		f.env.CONTROL_APP_START_GATE = path.join(f.root, "release-start");
+		const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
+		// Run the actual repository apps-start/dev recipes. Other worker effects
+		// use the existing preparation adapter; Docker alone controls these two.
+		fs.writeFileSync(
+			path.join(f.root, "bin/make"),
+			`#!/usr/bin/env node
+const cp=require('node:child_process');const args=process.argv.slice(2);
+const native=['apps-start','dev'].includes(args[0]);
+const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled.mk',...args,...(native?['BOAT_EXEC=worker']:[])],{stdio:'inherit',env:{...process.env,CONTROL_MAKE_ARGV:JSON.stringify(['make',...args])}});process.exitCode=r.status??1;
+`,
+			{ mode: 0o700 },
+		);
+		const config = path.join(f.root, "current-inputs.json");
+		fs.writeFileSync(config, JSON.stringify(f.config));
+		const capture = captureServingCommand({
+			argv: [make, "boat-hillclimb-547", `BOAT_HILLCLIMB_CONFIG=${config}`],
+			cwd: f.root,
+			env: f.env,
+			directory: path.join(f.root, "native-startup-capture"),
+			input: true,
+		});
+		const until = mono() + 20;
+		const wait = async (predicate) => {
+			while (!predicate()) {
+				try {
+					capture.assertRunning();
+				} catch (error) {
+					const files = [
+						path.join(f.root, "native-startup-capture/stderr.raw"),
+						path.join(f.config.evidence, "startup/dev/stderr.raw"),
+					];
+					throw new Error(
+						files
+							.filter(fs.existsSync)
+							.map((file) => fs.readFileSync(file, "utf8"))
+							.join("\n"),
+						{ cause: error },
+					);
+				}
+				assert.ok(mono() < until, "Public prebuilt startup did not complete");
+				await new Promise((resolve) => setTimeout(resolve, 20));
+			}
+		};
+		try {
+			await wait(() => fs.existsSync(path.join(f.root, "app-build-entered")));
+			assert.equal(
+				fs.existsSync(
+					path.join(
+						f.config.evidence,
+						"startup/apps-start/command/invocation.json",
+					),
+				),
+				false,
+			);
+			fs.writeFileSync(f.env.CONTROL_APP_IMAGE_GATE, "release");
+			await wait(() =>
+				fs.existsSync(path.join(f.root, "native-start-entered.json")),
+			);
+			assert.equal(
+				json(path.join(f.config.evidence, "startup/apps-build/result.json"))
+					.status,
+				"PASS",
+			);
+			assert.equal(
+				fs.existsSync(
+					path.join(f.config.evidence, "startup/apps-start/result.json"),
+				),
+				false,
+			);
+			assert.equal(
+				fs.existsSync(
+					path.join(f.config.evidence, "startup/dev/invocation.json"),
+				),
+				false,
+			);
+			fs.writeFileSync(f.env.CONTROL_APP_START_GATE, "release");
+			await wait(() =>
+				fs
+					.readFileSync(
+						path.join(f.root, "native-startup-capture/stdout.raw"),
+						"utf8",
+					)
+					.includes('"status":"PASS_STARTUP_READY"'),
+			);
+			const ready = json(path.join(f.config.evidence, "startup/result.json"));
+			assert.equal(ready.status, "PASS_STARTUP_READY");
+			assert.equal(ready.deadline - ready.started, 600);
+			assert.equal(ready.containers.length, 10);
+			assert.equal(ready.routes.length, 8);
+			assert.deepEqual(json(path.join(f.root, "native-app-start.json")), [
+				"compose",
+				"-p",
+				"wallpaperdb-control",
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"up",
+				"-d",
+				"--no-build",
+			]);
+			assert.deepEqual(json(path.join(f.root, "native-watch.json")), [
+				"compose",
+				"-p",
+				"wallpaperdb-control",
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"watch",
+				"--no-up",
+			]);
+			const start = json(
+				path.join(f.config.evidence, "startup/apps-start/result.json"),
+			);
+			assert.equal(
+				start.deadline,
+				Math.min(start.started + 180, ready.deadline),
+			);
+			assert.ok(start.acceptedAt < start.deadline);
+		} finally {
+			fs.writeFileSync(f.env.CONTROL_APP_IMAGE_GATE, "release");
+			fs.writeFileSync(f.env.CONTROL_APP_START_GATE, "release");
+			await capture.stop();
+		}
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(argv) => argv[1] === "boat-stop",
+			).length,
+			1,
+		);
+		assert.deepEqual(
+			json(path.join(f.root, "native-startup-capture/disposal.json"))
+				.unresolved,
+			[],
+		);
+	});
+
 	for (const fault of [
 		"none",
 		"runtime-hash",
@@ -1114,22 +1266,9 @@ if (process.env.BOAT_547_QUALIFIED_CLI) {
 		test(`547 public source observation uses the current runtime adapter and owns cleanup, fault=${fault}`, {
 			timeout: 30000,
 		}, async (t) => {
-			const f = preparationFixture(t, true);
-			f.config.until = "ready";
-			await (await f.servingPorts()).release();
-			fs.symlinkSync(
-				path.join(repository, "scripts"),
-				path.join(f.root, "scripts"),
-			);
-			fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
-			fs.copyFileSync(
+			const f = await publicPreparationFixture(
+				t,
 				process.env.BOAT_547_QUALIFIED_CLI,
-				path.join(f.root, ".mise/boat/boat"),
-			);
-			fs.writeFileSync(
-				path.join(f.root, "bin/docker"),
-				`#!/bin/sh\nexec node ${repository}/scripts/test-fixtures/547-docker-effect.cjs "$@"\n`,
-				{ mode: 0o700 },
 			);
 			if (fault === "runtime-hash") f.env.CONTROL_SOURCE_HASH_DRIFT = "1";
 			const config = path.join(f.root, "current-inputs.json");

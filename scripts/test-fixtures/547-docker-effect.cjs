@@ -17,6 +17,62 @@ const args = process.argv.slice(2);
 if (args[0] === "compose") {
 	if (args[1] !== "-p" || args[2] !== "wallpaperdb-control")
 		throw new Error("Wrong project transport");
+	if (process.env.CONTROL_NATIVE_STARTUP) {
+		const assert = require("node:assert/strict");
+		const path = require("node:path");
+		if (args[4] === "infra/docker-compose.yml") {
+			assert.deepEqual(args.slice(5), [
+				"ps",
+				"--status",
+				"running",
+				"--format",
+				"{{.Service}}",
+			]);
+			console.log("postgres");
+			process.exit(0);
+		}
+		if (args[5] === "up") {
+			assert.deepEqual(args.slice(3), [
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"up",
+				"-d",
+				"--no-build",
+			]);
+			assert.ok(fs.existsSync("application-images-prepared.json"));
+			fs.writeFileSync("native-start-entered.json", JSON.stringify(args));
+			const gate = process.env.CONTROL_APP_START_GATE;
+			const until = Date.now() + 10000;
+			while (gate && !fs.existsSync(gate)) {
+				assert.ok(Date.now() < until, "Controlled app start gate expired");
+				Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+			}
+			fs.writeFileSync("native-app-start.json", JSON.stringify(args));
+			process.exit(0);
+		}
+		if (args[5] === "watch") {
+			assert.deepEqual(args.slice(3), [
+				"-f",
+				"infra/docker-compose.apps.yml",
+				"watch",
+				"--no-up",
+			]);
+			assert.ok(fs.existsSync("native-app-start.json"));
+			fs.writeFileSync("native-watch.json", JSON.stringify(args));
+			const child = require("node:child_process").spawnSync(
+				process.execPath,
+				[
+					path.join(
+						process.env.CONTROL_REPOSITORY,
+						"scripts/test-fixtures/547-serving-effect.mjs",
+					),
+					"dev",
+				],
+				{ stdio: "inherit" },
+			);
+			process.exit(child.status ?? 1);
+		}
+	}
 	if (args[5] === "exec") {
 		const assert = require("node:assert/strict");
 		const path = require("node:path");

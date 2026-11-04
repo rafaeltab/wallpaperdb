@@ -132,7 +132,7 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 	);
 	fs.writeFileSync(
 		path.join(root, "controlled.mk"),
-		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
+		`.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build apps-start dev boat-preview\nboat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-app-images test-focused toolchain run build check docker-run boat-prepare-infra-images boat-stop infra-start apps-build apps-start:\n\t@node ${repository}/scripts/test-fixtures/547-make-effect.cjs\ndev boat-preview:\n\t@node ${repository}/scripts/test-fixtures/547-serving-effect.mjs $(if $(filter dev,$@),dev,preview)\n`,
 	);
 	const env = {
 		...process.env,
@@ -142,6 +142,10 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 		CONTROL_REPOSITORY: repository,
 		CONTROL_PROJECT: "wallpaperdb-control",
 	};
+	// These belong to the Make invocation running the test, not its isolated
+	// repository-wide controlled worker commands.
+	for (const name of ["PACKAGE", "SERVICE", "SCRIPT", "ARGS", "BOAT_EXEC"])
+		delete env[name];
 	const config = {
 		worktree: root,
 		round: "fresh-stable",
@@ -188,5 +192,25 @@ const {spawnSync}=require('node:child_process');const args=process.argv.slice(2)
 			...extra,
 		});
 	};
+	return f;
+}
+
+// Public CLI controls share actual product Git objects and the same qualified
+// bootstrap artifact. Only the Make/Docker external effects are controlled.
+export async function publicPreparationFixture(t, cli) {
+	const f = preparationFixture(t, true);
+	f.config.until = "ready";
+	await (await f.servingPorts()).release();
+	fs.symlinkSync(
+		path.join(repository, "scripts"),
+		path.join(f.root, "scripts"),
+	);
+	fs.mkdirSync(path.join(f.root, ".mise/boat"), { recursive: true });
+	fs.copyFileSync(cli, path.join(f.root, ".mise/boat/boat"));
+	fs.writeFileSync(
+		path.join(f.root, "bin/docker"),
+		`#!/bin/sh\nexec node ${repository}/scripts/test-fixtures/547-docker-effect.cjs "$@"\n`,
+		{ mode: 0o700 },
+	);
 	return f;
 }

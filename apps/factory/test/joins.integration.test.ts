@@ -2063,6 +2063,56 @@ done
     await f.close();
   }
 });
+it('bounds landing facts to the affected family despite retained unrelated landings', async () => {
+  const f = await landedFixture();
+  try {
+    const history = f.git('rev-parse', 'main^');
+    f.git('branch', 'history', history);
+    f.git('push', 'origin', 'history');
+    const prerequisites = [...f.config.prerequisites];
+    const prs = { ...f.joinState.prs };
+    const merges: Record<number, { merge: string; head: string }> = {};
+    for (let index = 0; index < 101; index++) {
+      const issue = 200 + index;
+      const pr = 100 + issue;
+      prerequisites.push({ issue, pr, commit: history, parent: f.host.base });
+      prs[pr] = { branch: 'history', base: 'main', state: 'MERGED' };
+      merges[pr] = { merge: history, head: history };
+    }
+    await saveLanding(f, {
+      join: { ...f.joinState, prs },
+      landing: { merge: f.merged, head: f.a, merges },
+    });
+    const config = { ...f.config, prerequisites };
+    for (let i = 0; i < 2; i++) {
+      const issues = githubIssues(config);
+      await Effect.runPromise(issues.reconcile!());
+      expect(
+        await Effect.runPromise(
+          issues.pullRequest({
+            id: 'C-history',
+            issue: 4,
+            issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+            base: f.host.base,
+            branch: 'C',
+            context: '',
+            createdAt: 0,
+            expectedStage: 'implementation',
+          })
+        )
+      ).toMatchObject({ ready: true, reviewedCommit: f.c });
+    }
+    const root = join(f.host.directory, 'joins');
+    const key = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
+    if (!key) throw new Error('Missing maintenance boundary');
+    const boundary = JSON.parse(await readFile(join(root, key, 'boundary.json'), 'utf8'));
+    expect(boundary.pin).toBe(f.host.base);
+    expect(boundary.landed.map((fact: { issue: number }) => fact.issue)).toEqual([1]);
+  } finally {
+    await f.close();
+  }
+});
+
 it('parks an oversized affected family without blocking reconciliation of retained publications', async () => {
   const f = await landedFixture();
   try {

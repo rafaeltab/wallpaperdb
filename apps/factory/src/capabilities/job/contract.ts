@@ -99,6 +99,8 @@ export interface RecoveryStatus {
   readonly issue: number;
   readonly pr: string;
   readonly progress: string;
+  /** Observation of the expected recovery worker; omitted for unlaunched/manual work. */
+  readonly bindingAvailable?: boolean;
   readonly active?: boolean;
   readonly classification?: 'SIMPLE' | 'COMPLEX';
   readonly threadId?: string;

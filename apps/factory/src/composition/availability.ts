@@ -18,6 +18,7 @@ export function availabilityObservation(healthy: boolean) {
 export function retainedWorkAvailable(snapshot: ScheduleStatus): boolean {
   return (
     snapshot.jobs.length === snapshot.state.admissions.length &&
-    snapshot.jobs.every((job) => job.kind === 'job' && job.execution.kind === 'found')
+    snapshot.jobs.every((job) => job.kind === 'job' && job.execution.kind === 'found') &&
+    (snapshot.recoveries ?? []).every((recovery) => recovery.bindingAvailable !== false)
   );
 }

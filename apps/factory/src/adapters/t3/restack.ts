@@ -192,6 +192,7 @@ export function t3Restacker(
     ).question?.text;
   };
   const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => ({
+    bindingAvailable: true,
     progress: `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`,
     threadId: observed.thread.threadId,
     active: observed.thread.pendingRequestCount === 0,
@@ -228,7 +229,8 @@ export function t3Restacker(
   const execution = {
     resolve: async (signal?: AbortSignal) => {
       const observed = await ensureLaunch(signal);
-      if (!observed) return { progress: 'Recovery launch pending reconciliation' };
+      if (!observed)
+        return { progress: 'Recovery launch pending reconciliation', bindingAvailable: false };
       const display = await presentation(observed, signal);
       const saved = await journal.read('resolution.json');
       if (observed.thread.status !== 'completed' || observed.thread.pendingRequestCount) {

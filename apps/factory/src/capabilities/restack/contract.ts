@@ -4,6 +4,8 @@ export interface Resolution {
   readonly classification?: 'SIMPLE' | 'COMPLEX';
   readonly commit?: string;
   readonly progress: string;
+  /** Observation of the expected recovery worker; omitted when none is required. */
+  readonly bindingAvailable?: boolean;
   readonly active?: boolean;
   readonly threadId?: string;
   readonly question?: string;

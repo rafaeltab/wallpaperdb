@@ -138,7 +138,7 @@ export const JobLive = Layer.effect(
             id,
             createdAt,
             issueUrl: issue.url,
-            ...(issue.title ? { issueTitle: issue.title } : {}),
+            issueTitle: issue.title,
             branch: `factory/job-${id}`,
             expectedStage: 'implementation',
           };

@@ -491,7 +491,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-cold-v4-shared-provisioning",
+		scheduleVersion: "547-cold-v5-staged-build-context",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -664,6 +664,8 @@ export async function execute547Preparation(config, dependencies = {}) {
 		summary.coldDeadline = coldDeadline;
 		creationMayHaveStarted = true;
 		await run("prepare-toolchain", ["make", "boat-prepare-toolchain"], {
+			// Keep the prepared image context identical to the first ordinary test.
+			prepare: workload.stageTests,
 			assess: (_raw, { receipt }) => ({
 				owner: owner(root, identity),
 				event: event("toolchain-preparation", receipt),
@@ -700,7 +702,6 @@ export async function execute547Preparation(config, dependencies = {}) {
 		for (const name of ["user", "wallpaper", "asset", "auth"])
 			await run(`red-${name}`, tests(name), {
 				code: 2,
-				prepare: name === "user" ? workload.stageTests : undefined,
 				assess: (raw, { directory }) => {
 					const outcome = workload.assessTests(raw, `red-${name}`);
 					if (name === "user")

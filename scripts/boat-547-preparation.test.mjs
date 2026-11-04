@@ -288,6 +288,21 @@ test("547 reused wanted development prepares workspace and images before its fir
 	const f = preparationFixture(t);
 	f.config.until = "ready";
 	await stoppedWantedDevelopment(f);
+	const inputs = json(
+		path.join(repository, "scripts/boat-workloads/547.json"),
+	).inputs;
+	const expectedSources = Object.fromEntries([
+		...inputs.tests.map((input) => [input.path, input.sha256]),
+		...inputs.repair.map((input) => {
+			const file = path.join(f.root, input.path);
+			return [
+				input.path,
+				fs.existsSync(file)
+					? createHash("sha256").update(fs.readFileSync(file)).digest("hex")
+					: null,
+			];
+		}),
+	]);
 	const outcome = await f.run().then(
 		(value) => ({ value }),
 		(error) => ({ error }),
@@ -301,6 +316,16 @@ test("547 reused wanted development prepares workspace and images before its fir
 			);
 		}
 		assert.equal(outcome.value.status, "PASS_STARTUP_READY");
+		assert.deepEqual(
+			json(path.join(f.root, "source-at-app-image-preparation.json")),
+			expectedSources,
+			"Prepare images with all exact baseline tests and unrepaired product inputs",
+		);
+		assert.deepEqual(
+			json(path.join(f.root, "source-at-first-ordinary.json")),
+			expectedSources,
+			"First ordinary command must reuse the prepared source inputs",
+		);
 		assert.deepEqual(json(path.join(f.root, "intent-at-first-ordinary.json")), {
 			wanted: true,
 			pending: true,
@@ -1654,7 +1679,7 @@ test("547 explicit cold provisioning shares one aggregate without extending work
 			p.phase,
 		);
 	}
-	assert.equal(result.scheduleVersion, "547-cold-v4-shared-provisioning");
+	assert.equal(result.scheduleVersion, "547-cold-v5-staged-build-context");
 });
 
 test("547 Chromium provisioning accepted after its old private cap retains the original cold clock", async (t) => {

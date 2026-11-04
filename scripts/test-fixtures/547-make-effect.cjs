@@ -13,6 +13,21 @@ const data = read(
 	path.join(repository, "scripts/test-fixtures/547-preparation.json"),
 );
 const root = process.cwd();
+const preparationSources = () => {
+	const workload = read(
+		path.join(repository, "scripts/boat-workloads/547.json"),
+	);
+	return Object.fromEntries(
+		[...workload.inputs.tests, ...workload.inputs.repair].map(
+			({ path: file }) => [
+				file,
+				fs.existsSync(file)
+					? createHash("sha256").update(fs.readFileSync(file)).digest("hex")
+					: null,
+			],
+		),
+	);
+};
 const key = createHash("sha256").update(root).digest("hex").slice(0, 12);
 const target = args[1];
 const services = [
@@ -213,6 +228,7 @@ if (target === "infra-start") {
 	event("workspace-preparation");
 } else if (target === "boat-prepare-app-images") {
 	assert.equal(fs.existsSync("infra-images-prepared.json"), true);
+	save("source-at-app-image-preparation.json", preparationSources());
 	save("restoration-app-images-prepared.json", { completed: true });
 	event("app-image-preparation");
 } else if (target === "test-focused") {
@@ -222,6 +238,7 @@ if (target === "infra-start") {
 		phase === "red-user" &&
 		process.env.CONTROL_REQUIRE_RECONCILIATION_PREPARATION
 	) {
+		save("source-at-first-ordinary.json", preparationSources());
 		assert.equal(
 			fs.existsSync("workspace-prepared.json"),
 			true,

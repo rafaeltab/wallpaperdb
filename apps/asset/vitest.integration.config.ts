@@ -6,6 +6,10 @@ export default defineBaseConfig({
   test: {
     ...configuration.test,
     name: 'asset-integration',
+    coverage: {
+      ...configuration.test.coverage,
+      autoAttachSubprocess: true,
+    },
     include: ['test/**/*.integration.test.ts'],
   },
 });

@@ -16063,12 +16063,37 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 	};
 }
 
-for (const held of [false, true])
-	test(`preparation maintenance renews the selected worker with image build ${held ? "held" : "completed"}`, {
+for (const ordering of ["completed", "held", "selected-before-build"])
+	test(`preparation maintenance renews the selected worker with image build ${ordering}`, {
 		timeout: 20000,
 	}, async (t) => {
 		const f = await appImagesCheckout(t);
 		const sibling = f.json(".boat/state.json").daemon;
+		const held = ordering !== "completed";
+		let daemon;
+		if (ordering === "selected-before-build") {
+			const hook = path.join(f.directory, "pause-daemon-source.cjs");
+			fs.writeFileSync(
+				hook,
+				`const fs=require('fs'),path=require('path');
+if(process.argv[2]==='daemon'){
+ const mkdir=fs.mkdirSync;let paused=false;
+ fs.mkdirSync=function(name,...args){
+  if(!paused&&path.basename(name)==='source.lock'){
+   paused=true;fs.writeFileSync(path.join(process.env.FAKE_CONTROL,'daemon-selected'),'yes');
+   while(!fs.existsSync(path.join(process.env.FAKE_CONTROL,'release-daemon-source')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+  }
+  return mkdir.call(this,name,...args);
+ };
+}`,
+			);
+			f.env.NODE_OPTIONS = `--require=${hook}`;
+			daemon = f.daemon();
+			await f.readiness.wait(() => {
+				assert.equal(daemon.terminal, null, daemon.output());
+				return fs.existsSync(path.join(f.control, "daemon-selected"));
+			}, "daemon completes lifecycle selection before preparation");
+		}
 		if (held) flag(f, "hold-asset-build");
 		const command = f.run("boat-prepare-app-images");
 		try {
@@ -16083,7 +16108,8 @@ for (const held of [false, true])
 				);
 				assert.equal((await f.observe(command)).status, 0);
 			}
-			const daemon = f.daemon();
+			daemon ??= f.daemon();
+			flag(f, "release-daemon-source");
 			await f.readiness.wait(() => {
 				assert.equal(daemon.terminal, null, daemon.output());
 				return freshCalls(f).some(
@@ -16103,6 +16129,7 @@ for (const held of [false, true])
 				);
 			}
 		} finally {
+			flag(f, "release-daemon-source");
 			flag(f, "release-asset-build");
 			await lockFixtureReadiness().wait(
 				() => command.closed,
@@ -16167,7 +16194,7 @@ test("preparation maintenance renews without writing changed source into the hel
 	}, "automatic source resumes after preparation releases ownership");
 });
 
-for (const change of ["admission", "stopped"])
+for (const change of ["admission", "stopped", "dependency-mode"])
 	test(`preparation maintenance refuses stale ${change} completion`, {
 		timeout: 20000,
 	}, async (t) => {
@@ -16182,9 +16209,12 @@ for (const change of ["admission", "stopped"])
 			const state = f.json(".boat/state.json");
 			if (change === "admission")
 				state.admission = { token: "replacement-admission" };
-			else {
+			else if (change === "stopped") {
 				state.runningSince = null;
 				state.snapshotRecovery.status = "DIRTY";
+			} else {
+				const file = path.join(f.root, "pnpm-lock.yaml");
+				fs.chmodSync(file, (fs.statSync(file).mode & 0o777) ^ 0o100);
 			}
 			f.local(".boat/state.json", JSON.stringify(state));
 		} finally {
@@ -16201,12 +16231,19 @@ for (const change of ["admission", "stopped"])
 			result.output,
 			change === "admission"
 				? /Preparation worker admission changed/
-				: /DIRTY snapshot/,
+				: change === "stopped"
+					? /DIRTY snapshot/
+					: /Preparation dependencies changed/,
 		);
-		assert.deepEqual(f.appBuilds(), [
-			{ service: "asset", stage: "entered" },
-			{ service: "asset", stage: "completed" },
-		]);
+		assert.deepEqual(
+			f.appBuilds(),
+			change === "dependency-mode"
+				? completedAppBuilds()
+				: [
+						{ service: "asset", stage: "entered" },
+						{ service: "asset", stage: "completed" },
+					],
+		);
 		const events = fs
 			.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
 			.trim()
@@ -16219,6 +16256,68 @@ for (const change of ["admission", "stopped"])
 		if (change === "stopped")
 			assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
 	});
+
+test("preparation maintenance refuses source edited during authoritative upload", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t);
+	const transport = path.join(f.root, ".mise/boat/boat");
+	const anchor = "const pause=command.includes('tar -xzf -')?";
+	const source = fs.readFileSync(transport, "utf8");
+	assert.equal(source.split(anchor).length, 2);
+	fs.writeFileSync(
+		transport,
+		source.replace(
+			anchor,
+			`
+if(argv.includes('ssh')&&command.includes('tar -xzf - --same-permissions')){
+ const owner=n=>{try{return fs.readFileSync(path.join(process.env.FAKE_SOURCE,'.boat',n+'.lock/pid'),'utf8')}catch(e){if(e.code==='ENOENT')return null;throw e}};
+ const lifecycle=owner('lifecycle'),source=owner('source');
+ if(lifecycle&&lifecycle===source){
+  fs.writeFileSync(path.join(control,'prep-upload-entered'),'yes');
+  while(!fs.existsSync(path.join(control,'release-prep-upload')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+ }
+}
+${anchor}`,
+		),
+	);
+	flag(f, "hold-frozen");
+	const file = "apps/user/src/preparation-race.ts";
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.terminal, null, command.output());
+			return fs.existsSync(path.join(f.control, "frozen-entered"));
+		}, "frozen installation before authoritative preparation upload");
+		f.local(file, "export const uploaded = true;\n");
+		flag(f, "release");
+		await f.readiness.wait(() => {
+			assert.equal(command.terminal, null, command.output());
+			return fs.existsSync(path.join(f.control, "prep-upload-entered"));
+		}, "actual tar captured before local edit");
+		f.local(file, "export const uploaded = false;\n");
+	} finally {
+		flag(f, "release");
+		flag(f, "release-prep-upload");
+		await lockFixtureReadiness().wait(
+			() => command.closed,
+			"upload-race command drains",
+		);
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /source changed during authoritative flush/i);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, file), "utf8"),
+		"export const uploaded = true;\n",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, file), "utf8"),
+		"export const uploaded = false;\n",
+	);
+	assert.deepEqual(f.appBuilds(), []);
+});
 
 test("app image phase serially builds the complete default graph through ordinary Make", async (t) => {
 	const f = await appImagesCheckout(t, true);

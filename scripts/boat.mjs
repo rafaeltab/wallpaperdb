@@ -1778,8 +1778,7 @@ async function command() {
 							if (!state.runningSince || state.admission?.token !== admission)
 								throw new Error("Preparation worker admission changed");
 						};
-						await syncOwned(id);
-						const source = manifest();
+						const source = await syncOwned(id, (source) => source);
 						if (
 							fingerprint(root, installationInputs(Object.keys(source))) !==
 							dependencies
@@ -1809,6 +1808,13 @@ async function command() {
 							if (JSON.stringify(manifest()) !== JSON.stringify(source))
 								throw new Error(
 									"Preparation source changed during preparation",
+								);
+							if (
+								fingerprint(root, installationInputs(Object.keys(source))) !==
+								dependencies
+							)
+								throw new Error(
+									"Preparation dependencies changed during preparation",
 								);
 							completed = true;
 						} finally {
@@ -1988,28 +1994,37 @@ async function runDaemon() {
 			preparationOwner,
 		);
 		if (!selected) return;
-		if (selected.preparationPid) {
-			if (preparationOwner(selected.preparationPid)?.worker === selected.worker)
-				await renew(selected.worker, active);
-			await wait(2000);
-			continue;
+		const worker = selected.preparationPid ? selected.worker : selected;
+		const running = selected.preparationPid
+			? selected
+			: await lock(
+					async () => {
+						const current = read(stateFile);
+						if (current.id !== worker) return "superseded";
+						if (!current.runningSince) return false;
+						await syncOwned(worker);
+						// Stop may run while source is owned, as before. Never renew its stopped or
+						// DIRTY generation after an in-flight flush completes.
+						await renew(worker, active);
+						return true;
+					},
+					"source",
+					Infinity,
+					undefined,
+					preparationOwner,
+				);
+		if (running?.preparationPid) {
+			if (running.worker !== worker) continue;
+			if (preparationOwner(running.preparationPid)?.worker === worker)
+				await renew(worker, active);
+		} else {
+			if (running === "superseded") continue;
+			if (running === false) return;
+			event("resources", {
+				local: resourceSample(),
+				estimatedExperimentCost: accounting(),
+			});
 		}
-		const running = await lock(async () => {
-			const current = read(stateFile);
-			if (current.id !== selected) return "superseded";
-			if (!current.runningSince) return false;
-			await syncOwned(selected);
-			// Stop may run while source is owned, as before. Never renew its stopped or
-			// DIRTY generation after an in-flight flush completes.
-			await renew(selected, active);
-			return true;
-		}, "source");
-		if (running === "superseded") continue;
-		if (running === false) return;
-		event("resources", {
-			local: resourceSample(),
-			estimatedExperimentCost: accounting(),
-		});
 		await wait(2000);
 	}
 }

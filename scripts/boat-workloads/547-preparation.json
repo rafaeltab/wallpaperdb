@@ -115,12 +115,14 @@
 		}
 	},
 	"lock": {
+		"version": 2,
 		"counts": {
 			"native-deprecation": 17,
 			"nats-consumer": 13,
 			"nats-snapshot": 1,
 			"patch-declaration": 1,
-			"peer-context": 3
+			"peer-context": 3,
+			"registry-deprecation-v2": 1
 		},
 		"edits": [
 			{
@@ -455,6 +457,19 @@
 				"section": "snapshots:\n",
 				"owner": "  nats@2.29.3:\n",
 				"kind": "nats-snapshot"
+			},
+			{
+				"before": [],
+				"after": [
+					"    deprecated: 'Package moved. Use @nats-io/nkeys instead: https://www.npmjs.com/package/@nats-io/nkeys'\n"
+				],
+				"section": "packages:\n",
+				"owner": "  nkeys.js@1.1.0:\n",
+				"kind": "registry-deprecation-v2",
+				"anchorBefore": "    engines: {node: '>=10.0.0'}\n",
+				"anchorAfter": "\n",
+				"authority": "https://registry.npmjs.org/nkeys.js/1.1.0",
+				"observedAt": "2026-11-04T20:49:15.415Z"
 			}
 		]
 	},

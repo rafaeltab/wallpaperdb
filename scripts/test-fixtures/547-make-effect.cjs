@@ -344,8 +344,28 @@ if (target === "infra-start") {
 		});
 		if (patched.status !== 0)
 			throw new Error("Native lock fixture could not be applied");
+		if (process.env.CONTROL_LOCK_METADATA_VERSION !== "1") {
+			const metadata = read(
+				path.join(
+					repository,
+					"scripts/test-fixtures/547-nkeys-metadata-v2.json",
+				),
+			);
+			const anchor = `  ${metadata.name}@${metadata.version}:\n    resolution: {integrity: ${metadata.dist.integrity}}\n    engines: {node: '${metadata.engines.node}'}\n`;
+			const lock = fs.readFileSync("pnpm-lock.yaml", "utf8");
+			assert.equal(lock.split(anchor).length, 2);
+			fs.writeFileSync(
+				"pnpm-lock.yaml",
+				lock.replace(
+					anchor,
+					`${anchor}    deprecated: '${metadata.deprecated}'\n`,
+				),
+			);
+		}
 		if (process.env.CONTROL_LOCK_DRIFT)
 			fs.appendFileSync("pnpm-lock.yaml", "\n# unrelated native output\n");
+	} else if (process.env.CONTROL_LOCK_NOOP_DRIFT) {
+		fs.appendFileSync("pnpm-lock.yaml", "\n# changed during noop\n");
 	}
 } else if (target === "docker-run") {
 	phase = value("ARGS").endsWith(" metadata") ? "metadata" : "chromium-launch";

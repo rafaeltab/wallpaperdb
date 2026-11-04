@@ -442,6 +442,7 @@ export function create547Preparation(root, objects = nativeObjects) {
 			});
 			expected.set("pnpm-lock.yaml", sha(generated));
 			return {
+				lockVersion: data.lock.version,
 				approvedChanges: data.lock.counts,
 				bytes: generated.length,
 				sha256: sha(generated),

@@ -32,7 +32,13 @@ else if (mode === "dev") {
 		throw new Error("Application image build must finish before Watch");
 	console.log("Watch enabled");
 	if (!process.env.CONTROL_DEV_EXIT_BEFORE_READY) {
-		const timer = setInterval(() => {}, 1000);
+		const timer = setInterval(() => {
+			if (
+				process.env.CONTROL_DEV_EXIT_FILE &&
+				fs.existsSync(process.env.CONTROL_DEV_EXIT_FILE)
+			)
+				clearInterval(timer);
+		}, 1000);
 		process.on("SIGTERM", () => clearInterval(timer));
 	}
 } else {

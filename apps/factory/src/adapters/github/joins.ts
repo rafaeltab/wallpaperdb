@@ -2057,18 +2057,35 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     await git(['fetch', 'origin', found.branch], signal);
     const tip = await git(['rev-parse', 'FETCH_HEAD'], signal);
     if (!(await isAncestor(found.commit, tip, signal))) return;
+    const required = await affectedLandings(anchor, descendants, landed, signal);
     await maintainDescendants(
       {
         anchor,
         commit: tip,
         branch: found.branch,
-        covered: landed.map((item) => item.commit),
-        removed: landed.map((item) => item.pr),
+        covered: required.map((item) => item.commit),
+        removed: required.map((item) => item.pr),
       },
       descendants,
       signal,
-      landed.map((item) => item.issue)
+      required.map((item) => item.issue)
     );
+  };
+  const affectedLandings = async (
+    anchor: Layer,
+    descendants: readonly Layer[],
+    landed: readonly CurrentLayer[],
+    signal?: AbortSignal
+  ) => {
+    const required = [];
+    for (const item of landed) {
+      for (const child of [anchor, ...descendants]) {
+        if (!(await isAncestor(item.commit, child.commit, signal))) continue;
+        required.push(item);
+        break;
+      }
+    }
+    return required;
   };
   const oversizedMaintenance = async (
     landed: z.infer<typeof landing>,

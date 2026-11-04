@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { command } from '../../platform/index.js';
-import { type JoinBoundary, containsRequired, boundaryStillValid } from './join-boundary.js';
+import {
+  type JoinBoundary,
+  joinBoundary,
+  containsRequired,
+  boundaryStillValid,
+} from './join-boundary.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
 type Gh = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 type Candidate = { base: string; prBase: string };
@@ -16,7 +21,9 @@ export async function refreshBoundary(
   if (previous && previous.pin !== pin) return null;
   const landed = await closedFacts(project, previous, numbers, gh, signal);
   if (!landed) return null;
-  const boundary = { base: pin, prBase: 'main', pin, landed };
+  const parsed = joinBoundary.safeParse({ base: pin, prBase: 'main', pin, landed });
+  if (!parsed.success) return null;
+  const boundary = parsed.data;
   const prior = previous ? await currentCandidate(project, previous.prBase, signal) : null;
   const choices = [
     ...landed.map((fact) => ({ base: fact.tip, prBase: fact.branch })),

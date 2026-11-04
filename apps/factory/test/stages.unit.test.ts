@@ -1286,6 +1286,102 @@ it('keeps a questioned replay receipt inactive without requesting continuation c
   expect(job.sends()).toBe(3);
 });
 
+it.each(['interrupted', 'failed'])(
+  'explicitly retries a verified %s implementation without accepting it',
+  async (status) => {
+    const job = await stagesFixture();
+    job.change({ status, accepted: false });
+    const before = await job.start();
+    if (before.kind !== 'job') throw new Error('Expected job');
+    expect(before.resume).toMatchObject({ index: 0, runId: 'run-1', revision: -1 });
+    if (!before.resume) throw new Error('Expected retry command');
+    const command = { jobId: before.intent.id, ...before.resume };
+    await job.resume(command);
+    const after = await job.status();
+    expect(after).toMatchObject({
+      intent: before.intent,
+      delivery: { stage: 'implementation', ready: false },
+      execution: { run: { id: 'run-2', ordinal: 2 } },
+    });
+    expect(job.sends()).toBe(1);
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(1);
+    job.change({ accepted: true, status: 'completed' });
+    expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+    expect(job.sends()).toBe(2);
+  }
+);
+
+it('retries a failed review in the existing stage without reopening implementation', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  job.change({ accepted: false, status: 'failed' });
+  const before = await job.status();
+  if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+  expect(before.resume).toMatchObject({ index: 1, runId: 'run-2' });
+  await job.resume({ jobId: before.intent.id, ...before.resume });
+  expect(await job.status()).toMatchObject({
+    intent: before.intent,
+    delivery: { stage: 'review', ready: false },
+    execution: { run: { id: 'run-3', ordinal: 3 } },
+  });
+  expect(job.sends()).toBe(2);
+});
+it.each(['running', 'waiting-for-input', 'cancelled', 'completed'])(
+  'rejects stale retry after status changes to %s',
+  async (status) => {
+    const job = await stagesFixture();
+    job.change({ status: 'interrupted', accepted: false });
+    const before = await job.start();
+    if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+    job.change({ status });
+    expect(await job.resume({ jobId: before.intent.id, ...before.resume })).toEqual({
+      kind: 'rejected',
+    });
+    expect(job.sends()).toBe(0);
+  }
+);
+it('rejects stale job, stage, run and control revisions and unanswered questions', async () => {
+  const job = await stagesFixture();
+  job.change({ status: 'failed', accepted: false });
+  const before = await job.start();
+  if (before.kind !== 'job' || !before.resume || !('runId' in before.resume))
+    throw new Error('Expected retry');
+  const command = { jobId: before.intent.id, ...before.resume };
+  for (const patch of [{ jobId: 'other' }, { index: 1 }, { runId: 'old' }, { revision: 42 }]) {
+    expect(await job.resume({ ...command, ...patch })).toEqual({ kind: 'rejected' });
+  }
+  job.change({ question: { id: 'unanswered', text: 'Answer?' } });
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  expect(job.sends()).toBe(0);
+  await job.cancel(before.intent.id);
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+});
+
+it('keeps uncertain retry delivery pending across fresh runtimes and rejects unverified runs', async () => {
+  const job = await stagesFixture();
+  job.change({ accepted: false, status: 'interrupted' });
+  const before = await job.start();
+  if (before.kind !== 'job' || !before.resume) throw new Error('Expected retry');
+  const command = { jobId: before.intent.id, ...before.resume };
+  job.change({ ambiguous: true });
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  job.change({ ambiguous: false, missingEvidence: true });
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  job.change({ missingEvidence: false, loseSend: true });
+  await expect(job.resume(command)).rejects.toMatchObject({
+    _tag: 'Unavailable',
+    operation: 'lost-send',
+  });
+  job.change({ loseSend: false });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'implementation', ready: false },
+    resume: undefined,
+  });
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  expect(job.sends()).toBe(1);
+});
+
 async function terminalDeliveryFixture(stage: 'publication' | 'babysitting', status = 'failed') {
   const job = await stagesFixture();
   await job.start();

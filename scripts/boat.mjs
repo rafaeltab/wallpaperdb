@@ -1631,24 +1631,30 @@ async function command() {
 			[
 				"boat-prepare-infra-images",
 				{
-					target: "boat-prepare-infra-images",
+					commands: [["boat-prepare-infra-images"]],
 					event: "infra-image-preparation",
 				},
 			],
 			[
 				"boat-prepare-app-images",
-				{ target: "apps-build", event: "app-image-preparation" },
+				{
+					// Build Asset first so its layers are available to the default application build.
+					commands: [["apps-build", "SERVICE=asset"], ["apps-build"]],
+					event: "app-image-preparation",
+				},
 			],
 		]).get(targets[0]);
 		if (imagePreparation) {
 			let completed = false;
 			try {
 				await lock(async () => {
-					startupWorker(id);
-					await ssh(
-						id,
-						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make ${imagePreparation.target} BOAT_EXEC=worker`,
-					);
+					for (const command of imagePreparation.commands) {
+						startupWorker(id);
+						await ssh(
+							id,
+							`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
+						);
+					}
 					startupWorker(id);
 					completed = true;
 				});

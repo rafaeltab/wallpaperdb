@@ -15810,18 +15810,148 @@ async function appImagesCheckout(t, fresh = false) {
 		`#!${process.execPath}
 const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
 if(a[0]==='compose'&&a.includes('build')){
+ const asset=a.at(-1)==='asset';
+ const record=stage=>fs.appendFileSync(path.join(c,'app-build-log'),JSON.stringify({service:asset?'asset':'all',stage})+'\\n');
+ record('entered');
+ if(asset){
+  console.log('Asset image printed success before completion');fs.writeFileSync(path.join(c,'asset-build-entered'),'yes');
+  while(fs.existsSync(path.join(c,'hold-asset-build'))&&!fs.existsSync(path.join(c,'release-asset-build')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+  if(fs.existsSync(path.join(c,'fail-asset-build'))){console.error('native Asset image build failed');process.exit(23);}
+  fs.writeFileSync(path.join(c,'asset-image-built'),'yes');record('completed');process.exit(0);
+ }
  fs.writeFileSync(path.join(c,'app-build-argv'),JSON.stringify(a));
  console.log('Application build printed success before completion');fs.writeFileSync(path.join(c,'app-build-entered'),'yes');
  while(fs.existsSync(path.join(c,'hold-app-build'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  if(fs.existsSync(path.join(c,'fail-app-build'))){console.error('native application image build failed');process.exit(23);}
- fs.writeFileSync(path.join(c,'app-images-built'),'yes');console.error('native application image build stderr drained');process.exit(0);
+ fs.writeFileSync(path.join(c,'app-images-built'),'yes');record('completed');console.error('native application image build stderr drained');process.exit(0);
 }
 process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process.env,stdio:'inherit'}).status??1);
 `,
 		{ mode: 0o755 },
 	);
-	return f;
+	return {
+		...f,
+		appBuilds: () => {
+			const file = path.join(f.control, "app-build-log");
+			return fs.existsSync(file)
+				? fs.readFileSync(file, "utf8").trim().split("\n").map(JSON.parse)
+				: [];
+		},
+	};
 }
+
+test("app image phase completes Asset before the full ordinary build", async (t) => {
+	const f = await appImagesCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
+	);
+	flag(f, "hold-asset-build");
+	flag(f, "hold-app-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(
+				fs.existsSync(path.join(f.control, "app-build-entered")),
+				false,
+				"The full application build must wait for the Asset image",
+			);
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "asset-build-entered"));
+		}, "held Asset image build");
+		assert.deepEqual(f.appBuilds(), [{ service: "asset", stage: "entered" }]);
+		assertPreparationDefersDevelopment(f);
+		flag(f, "release-asset-build");
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "app-build-entered"));
+		}, "full application build after Asset completion");
+		assert.deepEqual(f.appBuilds(), [
+			{ service: "asset", stage: "entered" },
+			{ service: "asset", stage: "completed" },
+			{ service: "all", stage: "entered" },
+		]);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "app-images-built")),
+			false,
+		);
+		assertPreparationDefersDevelopment(f);
+	} finally {
+		flag(f, "release-asset-build");
+		flag(f, "release");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.equal(result.status, 0, result.output);
+	assert.deepEqual(f.appBuilds(), [
+		{ service: "asset", stage: "entered" },
+		{ service: "asset", stage: "completed" },
+		{ service: "all", stage: "entered" },
+		{ service: "all", stage: "completed" },
+	]);
+	assertPreparationDefersDevelopment(f);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("app image phase refuses the full build after Asset image failure", async (t) => {
+	const f = await appImagesCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "fail-asset-build");
+	const result = await f.observe(f.run("boat-prepare-app-images"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /native Asset image build failed/);
+	assert.deepEqual(f.appBuilds(), [{ service: "asset", stage: "entered" }]);
+	assert.equal(fs.existsSync(path.join(f.control, "app-build-entered")), false);
+	assertPreparationDefersDevelopment(f);
+	await preparedNextOrdinaryUser(t, f);
+});
+
+test("app image phase refuses the full build after generation changes during Asset build", async (t) => {
+	const f = await appImagesCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	flag(f, "hold-asset-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "asset-build-entered"));
+		}, "Asset build before generation change");
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				id: "replacement-worker",
+			}),
+		);
+	} finally {
+		flag(f, "release-asset-build");
+		await f.observe(command);
+	}
+	const result = await command.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation changed/);
+	assert.deepEqual(f.appBuilds(), [
+		{ service: "asset", stage: "entered" },
+		{ service: "asset", stage: "completed" },
+	]);
+	assert.equal(fs.existsSync(path.join(f.control, "app-build-entered")), false);
+	assertPreparationDefersDevelopment(f);
+	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
+});
 
 test("app image phase awaits the ordinary build before deferring fresh wanted restoration", async (t) => {
 	const f = await appImagesCheckout(t, true);

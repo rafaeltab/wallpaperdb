@@ -360,7 +360,7 @@ test("547 startup awaits serial owned image preparation before launching Watch",
 			);
 		assert.equal(
 			fs.existsSync(
-				path.join(f.config.evidence, "startup/apps-build/result.json"),
+				path.join(f.config.evidence, "prepare-startup-app-images/result.json"),
 			),
 			false,
 		);
@@ -370,8 +370,9 @@ test("547 startup awaits serial owned image preparation before launching Watch",
 		assert.equal(completed.value.status, "PASS_STARTUP_READY");
 		assert.equal(completed.value.deadline - completed.value.started, 600);
 		assert.equal(
-			json(path.join(f.config.evidence, "startup/apps-build/result.json"))
-				.status,
+			json(
+				path.join(f.config.evidence, "prepare-startup-app-images/result.json"),
+			).status,
 			"PASS",
 		);
 		assert.equal(
@@ -394,7 +395,7 @@ test("547 startup awaits serial owned image preparation before launching Watch",
 	}
 });
 
-test("547 startup image provisioning can exceed180 while retaining the original600 deadline", async (t) => {
+test("547 ready image provisioning can exceed600 inside the original cold1200 deadline", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";
 	let offset = 0;
@@ -404,28 +405,34 @@ test("547 startup image provisioning can exceed180 while retaining the original6
 			clock: () => mono() + offset,
 			make: async (argv, options) => {
 				const receipt = await f.make(argv, options);
-				if (options.directory.includes("/startup/apps-build/")) offset = 181;
+				if (options.directory.includes("/prepare-startup-app-images/"))
+					offset = 601;
 				return receipt;
 			},
 		});
 		assert.equal(result.status, "PASS_STARTUP_READY");
 		assert.equal(result.deadline - result.started, 600);
 		const image = json(
-			path.join(f.config.evidence, "startup/apps-build/result.json"),
+			path.join(f.config.evidence, "prepare-startup-app-images/result.json"),
 		);
-		assert.equal(image.deadline, result.deadline);
+		const preparation = json(
+			path.join(f.config.evidence, "preparation-result.json"),
+		);
+		assert.equal(preparation.coldDeadline - preparation.coldStarted, 1200);
+		assert.equal(image.deadline, preparation.coldDeadline);
+		assert.ok(result.started >= image.acceptedAt);
 		assert.equal(
 			json(
 				path.join(
 					f.config.evidence,
-					"startup/apps-build/command/invocation.json",
+					"prepare-startup-app-images/command/invocation.json",
 				),
 			).deadline,
-			result.deadline,
-			"Native capture must use the same original startup deadline",
+			preparation.coldDeadline,
+			"Native capture must use the same original cold deadline",
 		);
-		assert.ok(image.acceptedAt - image.started > 180);
-		assert.ok(image.acceptedAt < result.deadline);
+		assert.ok(image.acceptedAt - image.started > 600);
+		assert.ok(image.acceptedAt < preparation.coldDeadline);
 		const infra = json(
 			path.join(f.config.evidence, "startup/infra-start/result.json"),
 		);
@@ -438,35 +445,51 @@ test("547 startup image provisioning can exceed180 while retaining the original6
 	}
 });
 
-test("547 startup image provisioning refuses completion after the original600 without starting Watch", async (t) => {
+test("547 cold image provisioning refuses completion after original1200 before startup", async (t) => {
 	const f = preparationFixture(t);
 	f.config.until = "ready";
 	let offset = 0;
-	await assert.rejects(
-		f.run({
-			clock: () => mono() + offset,
-			make: async (argv, options) => {
-				const receipt = await f.make(argv, options);
-				if (options.directory.includes("/startup/apps-build/")) offset = 601;
-				return receipt;
-			},
-		}),
-		/deadline/,
-	);
-	const result = json(path.join(f.config.evidence, "startup/result.json"));
-	assert.equal(result.status, "FAIL");
-	assert.equal(result.deadline - result.started, 600);
-	assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
-	assert.equal(
-		fs.existsSync(path.join(f.config.evidence, "startup/dev/invocation.json")),
-		false,
-	);
-	assert.equal(
-		jsonLines(path.join(f.root, "commands.jsonl")).filter(
-			(argv) => argv[1] === "boat-stop",
-		).length,
-		1,
-	);
+	let unexpected;
+	try {
+		await assert.rejects(
+			f
+				.run({
+					clock: () => mono() + offset,
+					make: async (argv, options) => {
+						const receipt = await f.make(argv, options);
+						if (options.directory.includes("/prepare-startup-app-images/"))
+							offset = 1201;
+						return receipt;
+					},
+				})
+				.then((value) => {
+					unexpected = value;
+					return value;
+				}),
+			/deadline/,
+		);
+		const result = json(
+			path.join(f.config.evidence, "preparation-result.json"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.equal(result.coldDeadline - result.coldStarted, 1200);
+		assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+		assert.equal(fs.existsSync(path.join(f.config.evidence, "startup")), false);
+		assert.equal(
+			fs.existsSync(
+				path.join(f.config.evidence, "startup/dev/invocation.json"),
+			),
+			false,
+		);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(argv) => argv[1] === "boat-stop",
+			).length,
+			1,
+		);
+	} finally {
+		if (unexpected) await unexpected.serving.stop();
+	}
 });
 
 for (const phase of ["apps-build", "apps-start"])
@@ -494,9 +517,19 @@ for (const phase of ["apps-build", "apps-start"])
 					),
 					false,
 				);
-			const result = json(path.join(f.config.evidence, "startup/result.json"));
+			const result = json(
+				path.join(
+					f.config.evidence,
+					phase === "apps-build"
+						? "preparation-result.json"
+						: "startup/result.json",
+				),
+			);
 			assert.equal(result.status, "FAIL");
-			assert.equal(result.cleanup.compute.status, "STOPPED_ACCOUNTED");
+			assert.equal(
+				(result.cleanup.compute ?? result.cleanup).status,
+				"STOPPED_ACCOUNTED",
+			);
 			assert.equal(
 				json(path.join(f.root, ".boat/state.json")).runningSince,
 				null,
@@ -1164,6 +1197,11 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 		try {
 			await wait(() => fs.existsSync(path.join(f.root, "app-build-entered")));
 			assert.equal(
+				fs.existsSync(path.join(f.config.evidence, "startup")),
+				false,
+				"Final image provisioning must finish inside cold preparation before startup begins",
+			);
+			assert.equal(
 				fs.existsSync(
 					path.join(
 						f.config.evidence,
@@ -1177,8 +1215,12 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 				fs.existsSync(path.join(f.root, "native-start-entered.json")),
 			);
 			assert.equal(
-				json(path.join(f.config.evidence, "startup/apps-build/result.json"))
-					.status,
+				json(
+					path.join(
+						f.config.evidence,
+						"prepare-startup-app-images/result.json",
+					),
+				).status,
 				"PASS",
 			);
 			assert.equal(
@@ -1204,6 +1246,14 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 			);
 			const ready = json(path.join(f.config.evidence, "startup/result.json"));
 			assert.equal(ready.status, "PASS_STARTUP_READY");
+			assert.ok(Array.isArray(ready.inputs));
+			assert.equal(
+				ready.inputs.find(
+					(input) =>
+						input.path === path.join(f.root, "apps/user/src/boat-live-547.ts"),
+				)?.sha256,
+				"0b3163257ffa0f393227470c98cf157d2dc0d394c2c9f6fe9b49651172b0f877",
+			);
 			assert.equal(ready.deadline - ready.started, 600);
 			assert.equal(ready.containers.length, 10);
 			assert.equal(ready.routes.length, 8);
@@ -2020,7 +2070,7 @@ test("547 a new label and generated identity use unchanged preparation code", as
 	assert.equal(result.phases.at(-1).outcome.project, result.owner.project);
 });
 
-test("547 explicit cold provisioning shares one aggregate without extending workload commands", async (t) => {
+test("547 v9 cold provisioning shares one aggregate without extending workload commands", async (t) => {
 	const f = preparationFixture(t);
 	await stoppedWantedDevelopment(f);
 	const captures = new Map();
@@ -2057,7 +2107,57 @@ test("547 explicit cold provisioning shares one aggregate without extending work
 			p.phase,
 		);
 	}
-	assert.equal(result.scheduleVersion, "547-v7-early-chromium-serial-startup");
+	assert.equal(result.scheduleVersion, "547-v9-final-images-in-cold");
+});
+
+test("547 v9 startup refuses another owner image proof before runtime work", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const outcome = await f
+		.run({
+			publication(file, value) {
+				if (
+					file.endsWith("prepare-startup-app-images/result.json") &&
+					value.status === "PASS"
+				)
+					value.owner = { ...value.owner, worker: "other-worker" };
+				fs.writeFileSync(file, JSON.stringify(value));
+			},
+		})
+		.then(
+			(value) => ({ value }),
+			(error) => ({ error }),
+		);
+	try {
+		assert.match(
+			outcome.error?.message ?? "",
+			/completed cold image preparation for its owner/,
+		);
+		const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+		assert.equal(
+			commands.some(
+				(argv) => argv[1] === "infra-start" || argv[1] === "apps-start",
+			),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(
+				path.join(f.config.evidence, "startup/dev/invocation.json"),
+			),
+			false,
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "startup/result.json")).status,
+			"FAIL",
+		);
+		assert.equal(commands.filter((argv) => argv[1] === "boat-stop").length, 1);
+		assert.equal(
+			json(path.join(f.root, ".boat/state.json")).runningSince,
+			null,
+		);
+	} finally {
+		if (outcome.value) await outcome.value.serving.stop();
+	}
 });
 
 test("547 Chromium provisioning accepted after its old private cap retains the original cold clock", async (t) => {
@@ -2067,7 +2167,7 @@ test("547 Chromium provisioning accepted after its old private cap retains the o
 		clock: () => mono() + offset,
 		make: async (argv, options) => {
 			const receipt = await f.make(argv, options);
-			if (argv[1] === "boat-prepare-chromium") offset = 181;
+			if (argv[1] === "boat-prepare-chromium") offset = 601;
 			return receipt;
 		},
 	});

@@ -464,7 +464,8 @@ export async function execute547Preparation(config, dependencies = {}) {
 		coldStarted,
 		coldDeadline;
 	let creationMayHaveStarted = false,
-		cleanupResult;
+		cleanupResult,
+		imagePreparation;
 	const results = [];
 	const immutablePaths = [
 		...new Set([
@@ -491,7 +492,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-v7-early-chromium-serial-startup",
+		scheduleVersion: "547-v9-final-images-in-cold",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -560,6 +561,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 		"prepare-app-images-before-restoration",
 		"chromium-install",
 		"prepare-infra-images",
+		"prepare-startup-app-images",
 	]);
 	const run = async (id, argv, options = {}) => {
 		const internal = { ...config, coldDeadline: coldDeadline ?? clock() + 180 };
@@ -761,6 +763,17 @@ export async function execute547Preparation(config, dependencies = {}) {
 			{ assess: workload.acceptChromium },
 		);
 		await prepareImages("prepare-infra-images");
+		if (config.until === "ready")
+			imagePreparation = await run(
+				"prepare-startup-app-images",
+				["make", "boat-prepare-app-images"],
+				{
+					prepare: workload.stageSdk,
+					assess: (_raw, { receipt }) => ({
+						event: event("app-image-preparation", receipt),
+					}),
+				},
+			);
 		workload.verify(true);
 		preservedImplementation();
 		Object.assign(summary, {
@@ -798,6 +811,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 		config,
 		binding,
 		workload,
+		imagePreparation,
 		preservedImplementation,
 		cleanup,
 		make,

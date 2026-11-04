@@ -106,6 +106,7 @@ export async function start547Application(context) {
 		config,
 		binding,
 		workload,
+		imagePreparation,
 		preservedImplementation,
 		cleanup,
 		make,
@@ -124,7 +125,7 @@ export async function start547Application(context) {
 		version: 1,
 		round: config.round,
 		phase: "startup",
-		sequenceVersion: "547-startup-v8-prebuilt-start-watch",
+		sequenceVersion: "547-startup-v9-after-cold-images",
 		owner: binding,
 		started,
 		deadline,
@@ -276,12 +277,7 @@ export async function start547Application(context) {
 			state.admission.candidate?.id ===
 				binding.worker, "Startup worker/admission ownership changed");
 	};
-	const run = async (
-		id,
-		argv,
-		assess = () => ({ completed: true }),
-		prepare,
-	) => {
+	const run = async (id, argv, assess = () => ({ completed: true })) => {
 		within();
 		const phase = await runPhase(
 			{
@@ -289,9 +285,6 @@ export async function start547Application(context) {
 				argv,
 				inputs,
 				assess,
-				prepare,
-				// Owned image provisioning shares the original startup enclosure.
-				allowanceSeconds: id === "apps-build" ? deadline - started : undefined,
 			},
 			activeDeadline,
 			retire,
@@ -754,19 +747,25 @@ export async function start547Application(context) {
 		fixed = fixedPaths.map(fileIdentity);
 		preserved();
 		within();
+		require(imagePreparation?.status === "PASS" &&
+			imagePreparation.phase === "prepare-startup-app-images" &&
+			isDeepStrictEqual(
+				imagePreparation.owner,
+				binding,
+			), "Startup requires completed cold image preparation for its owner");
+		result.imagePreparation = {
+			phase: imagePreparation.phase,
+			started: imagePreparation.started,
+			acceptedAt: imagePreparation.acceptedAt,
+			deadline: imagePreparation.deadline,
+		};
 		require(/^[A-Za-z0-9_-]+$/.test(
 			binding.project,
 		), "Invalid generated Compose project");
 		require(!fs.existsSync(
 			path.join(root, ".boat/preview-process.json"),
 		), "Startup found an existing preview owner; no replacement authorized");
-		await run(
-			"infra-start",
-			["make", "infra-start", "ARGS=--pull=never"],
-			undefined,
-			workload.stageSdk,
-		);
-		await run("apps-build", ["make", "boat-prepare-app-images"]);
+		await run("infra-start", ["make", "infra-start", "ARGS=--pull=never"]);
 		await run("apps-start", ["make", "apps-start", "ARGS=--no-build"]);
 		dev = await launch("dev", ["make", "dev", "ARGS=--no-up"]);
 		await wait(
@@ -794,6 +793,7 @@ export async function start547Application(context) {
 				), "Preview identity changed during readiness acceptance");
 		Object.assign(result, {
 			status: "PASS_STARTUP_READY",
+			inputs: inputs().map(fileIdentity),
 			url: `http://localhost:${binding.ingress}/web/`,
 			preview: current,
 			dev: dev.checkpoint(),

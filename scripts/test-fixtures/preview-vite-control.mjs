@@ -649,20 +649,51 @@ export async function previewViteControl(t, helpers) {
 		assert.equal(active.length, 1);
 		assert.notEqual(active[0].pid, old.pid);
 		assert.notEqual(active[0].pid, current.pid);
-		// Stop uses this exact guarded retirement function before its provider effect.
-		const { retirePreviewConnections } = await import(
-			pathToFileURL(repository + "/scripts/lib/boat-preview.mjs")
+		// Managed cleanup retires the HTTP capture, then ordinary guarded stop owns
+		// the remaining development connections before the controlled stop request.
+		await bound(newHandle.stop(), 10, "Current preview capture retirement");
+		const stopped = await makeCommand(
+			[
+				"make",
+				"boat-stop",
+				"BOAT_EXEC=local",
+				"SHELL=/bin/sh",
+				"boat_routed_goals=",
+			],
+			{
+				cwd: f.root,
+				env: f.env,
+				directory: path.join(evidenceDirectory, "owning-stop"),
+				deadline: Math.min(origin + 110, mono() + 20),
+			},
 		);
-		const stopping = f.json(".boat/state.json");
-		stopping.shutdownAttempt = {
-			workerId: "fake-worker",
-			status: "not-submitted",
-			phase: "retirement",
-		};
-		f.local(".boat/state.json", JSON.stringify(stopping));
-		await retirePreviewConnections(f.root, "fake-worker", {
-			deadline: performance.now() + 5000,
+		assert.deepEqual(stopped.terminal, { code: 0, signal: null });
+		assert.ok(stopped.captureComplete);
+		const stopDisposal = JSON.parse(
+			fs.readFileSync(
+				path.join(evidenceDirectory, "owning-stop/disposal.json"),
+			),
+		);
+		assert.equal(stopDisposal.pipesClosed, true);
+		assert.deepEqual(stopDisposal.unresolved, []);
+		const stopEvents = fs
+			.readFileSync(path.join(f.control, "offline-transport.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse)
+			.filter((e) => e.kind === "controlled-stop");
+		assert.equal(stopEvents.length, 1);
+		assert.deepEqual(stopEvents[0].live, []);
+		const settled = f.json(".boat/state.json");
+		assert.equal(settled.runningSince, null);
+		assert.ok(settled.shutdownAttempt.accountingAppliedAt);
+		save("ordinary-stop-result.json", {
+			stopped,
+			stopDisposal,
+			stopEvents,
+			accounting: settled.shutdownAttempt,
 		});
+
 		assert.ok(roles().every((r) => helpers.fixtureProcess(r.pid) === null));
 		const retiredRoles = roles().map((role) => {
 			const raw = fs.readFileSync(

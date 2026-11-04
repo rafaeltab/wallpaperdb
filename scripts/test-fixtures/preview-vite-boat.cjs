@@ -19,7 +19,61 @@ log("argv", { argv });
 if (!argv.includes("fake-worker"))
 	throw Error("Only synthetic fixture identity allowed");
 if (argv.includes("info")) {
-	console.log(JSON.stringify({ state: "ready" }));
+	const stopped = fs.existsSync(path.join(control, "offline-stopped.json"));
+	console.log(
+		JSON.stringify({
+			id: "fake-worker",
+			state: stopped ? "stopped" : "ready",
+			...(stopped
+				? JSON.parse(
+						fs.readFileSync(path.join(control, "offline-stopped.json")),
+					)
+				: {}),
+		}),
+	);
+} else if (argv.includes("stop")) {
+	// This is the controlled external seam, never the real provider CLI. Its
+	// observable request records whether any connection still owns live compute.
+	const directory = path.join(process.cwd(), ".boat/preview-connections");
+	const records = fs.existsSync(directory)
+		? fs
+				.readdirSync(directory)
+				.map((n) =>
+					JSON.parse(
+						fs.readFileSync(path.join(directory, n, "connection.json")),
+					),
+				)
+		: [];
+	const live = records.filter((r) => {
+		try {
+			const text = fs.readFileSync(`/proc/${r.pid}/stat`, "utf8");
+			const fields = text.slice(text.lastIndexOf(")") + 2).split(" ");
+			return fields[0] !== "Z" && fields[19] === r.startTicks;
+		} catch (error) {
+			if (error.code === "ENOENT" || error.code === "ESRCH") return false;
+			throw error;
+		}
+	});
+	log("controlled-stop", { live });
+	if (live.length)
+		throw Error("Stop request preceded development connection retirement");
+	if (fs.existsSync(path.join(control, "offline-stopped.json")))
+		throw Error("Second controlled stop refused");
+	const stop = {
+		id: "stop-controlled",
+		status: "completed",
+		forced: false,
+		error: null,
+		endedAt: new Date().toISOString(),
+	};
+	fs.writeFileSync(
+		path.join(control, "offline-stopped.json"),
+		JSON.stringify({ stop }),
+		{ mode: 0o600 },
+	);
+	console.log(JSON.stringify({ stop }));
+} else if (argv.includes("usage")) {
+	console.log("{}");
 } else if (argv.includes("--status")) {
 	console.log(JSON.stringify({ running: true, stdout: "Watch enabled" }));
 } else if (argv.includes("--detach")) {

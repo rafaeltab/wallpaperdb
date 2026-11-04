@@ -16552,7 +16552,7 @@ if (process.env.BOAT_PREVIEW_BROWSER_CONTROL === "1") {
 	});
 }
 
-test("preview connection retirement refuses foreign, drifted and expired authority while preserving a closed historical neighbor", async (t) => {
+test("preview connection retirement isolates workers and refuses drifted or expired authority while preserving a closed historical neighbor", async (t) => {
 	const { retirePreviewConnections } = await import("./lib/boat-preview.mjs");
 	const f = await lockGenerationCheckout(t);
 	const canary = f.writer();
@@ -16569,12 +16569,9 @@ test("preview connection retirement refuses foreign, drifted and expired authori
 	const survives = () =>
 		assert.equal(fixtureProcess(original.pid)?.startTicks, original.startTicks);
 	save();
-	await assert.rejects(
-		retirePreviewConnections(f.root, "fake-worker", {
-			deadline: performance.now() + 1000,
-		}),
-		/worker ownership/,
-	);
+	await retirePreviewConnections(f.root, "fake-worker", {
+		deadline: performance.now() + 1000,
+	});
 	survives();
 	record.workerId = "fake-worker";
 	record.startTicks = String(BigInt(original.startTicks) + 1n);

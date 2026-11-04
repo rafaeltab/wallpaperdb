@@ -584,6 +584,7 @@ function connectionAllowed(root, workerId) {
 	return (
 		state?.id === workerId &&
 		state.runningSince != null &&
+		state.developmentWanted !== false &&
 		!(
 			state.shutdownAttempt?.workerId === workerId &&
 			!state.shutdownAttempt.accountingAppliedAt
@@ -824,6 +825,9 @@ export async function retirePreviewConnections(
 				throw Error(
 					"Preview connection ownership unavailable; record retained",
 				);
+			// Candidate cleanup and the published worker have distinct obligations.
+			// A record for another worker grants this retirement no signal authority.
+			if (connection.workerId !== workerId) continue;
 			ownedSession(connection, root);
 			const current = identity(connection.pid);
 			if (
@@ -831,10 +835,6 @@ export async function retirePreviewConnections(
 				(!current || current.startTicks !== connection.startTicks)
 			)
 				continue;
-			if (connection.workerId !== workerId)
-				throw Error(
-					"Preview connection worker ownership unavailable; record retained",
-				);
 			if (current && !same(current, connection))
 				throw Error("Preview connection ownership changed; record retained");
 			if (now() >= phase.deadline)

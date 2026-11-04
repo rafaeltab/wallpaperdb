@@ -14090,14 +14090,17 @@ if(argv[0]==='install'){
 }
 if(argv[2]==='run'&&argv[3]==='test:browser:install'){
  if(JSON.stringify(argv)!==JSON.stringify(['--filter','@wallpaperdb/web','run','test:browser:install']))throw Error('Chromium installer selectors changed');
- fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'chromium',argv})+'\\n');
+ const browserPath=process.env.PLAYWRIGHT_BROWSERS_PATH||path.join(process.env.HOME,'.cache/ms-playwright');
+ fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'chromium',argv,browserPath})+'\\n');
  fs.writeFileSync(path.join(control,'chromium-entered'),'yes');console.log('Chromium installer printed success before completion');
  while(fs.existsSync(path.join(control,'hold-chromium'))&&!fs.existsSync(path.join(control,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  if(fs.existsSync(path.join(control,'fail-chromium'))){console.error('native Chromium acquisition failed');process.exit(23);}
+ fs.mkdirSync(browserPath,{recursive:true});fs.writeFileSync(path.join(browserPath,'controlled-chromium'),'installed');
  fs.writeFileSync(path.join(control,'chromium-completed'),'yes');console.error('native Chromium installer stderr drained');process.exit(0);
 }
 if(argv[2]==='exec'){
  fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'native',argv})+'\\n');
+ fs.writeFileSync(path.join(control,'ordinary-browser-path.json'),JSON.stringify({browserPath:process.env.PLAYWRIGHT_BROWSERS_PATH,installed:fs.existsSync(path.join(process.env.PLAYWRIGHT_BROWSERS_PATH||path.join(process.env.HOME,'.cache/ms-playwright'),'controlled-chromium'))}));
  console.log('selected User stdout');console.error('selected User stderr');process.exit(7);
 }
 process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-original`)},argv,{stdio:'inherit',env:process.env}).status??1);
@@ -14200,6 +14203,12 @@ test("explicit Chromium preparation awaits the ordinary installer before returni
 		"run",
 		"test:browser:install",
 	]);
+	const installedPath = f.log().find((x) => x.stage === "chromium").browserPath;
+	assert.equal(
+		installedPath,
+		path.join(f.directory, "home/.local/share/ms-playwright"),
+		"Installer must use the ordinary runtime browser directory",
+	);
 	assertPreparationDefersDevelopment(f);
 	const event = fs
 		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
@@ -14210,6 +14219,12 @@ test("explicit Chromium preparation awaits the ordinary installer before returni
 	assert.equal(event.workerId, "fake-new-worker");
 	assert.equal(event.completed, true);
 	await preparedNextOrdinaryUser(t, f);
+	assert.deepEqual(
+		JSON.parse(
+			fs.readFileSync(path.join(f.control, "ordinary-browser-path.json")),
+		),
+		{ browserPath: installedPath, installed: true },
+	);
 });
 
 test("explicit Chromium preparation preserves restoration after installer failure", async (t) => {

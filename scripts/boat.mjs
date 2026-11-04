@@ -60,6 +60,8 @@ const stateFile = path.join(dir, "state.json");
 const runDir = path.join(os.homedir(), ".local/state/wallpaperdb-boat/557");
 const cli = path.join(root, ".mise/boat/boat");
 const remote = "/home/user/wallpaperdb";
+const workerEnvironment =
+	'export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1 PLAYWRIGHT_BROWSERS_PATH="$HOME/.local/share/ms-playwright"';
 const [action, ...args] = process.argv.slice(2);
 const read = (p, fallback = {}) =>
 	fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : fallback;
@@ -1717,7 +1719,7 @@ async function command() {
 						startupWorker(id);
 						await ssh(
 							id,
-							`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
+							`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
 						);
 					}
 					startupWorker(id);
@@ -1781,7 +1783,7 @@ async function command() {
 				"--",
 				"bash",
 				"-lc",
-				`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1 PLAYWRIGHT_BROWSERS_PATH="$HOME/.local/share/ms-playwright"; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+				`${workerEnvironment}; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
 			],
 			{
 				allowFailure: true,

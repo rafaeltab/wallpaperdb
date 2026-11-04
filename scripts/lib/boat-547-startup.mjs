@@ -127,6 +127,7 @@ export async function start547Application(context) {
 		phase: "startup",
 		sequenceVersion: "547-startup-v9-after-cold-images",
 		owner: binding,
+		infrastructure: workload.infrastructure,
 		started,
 		deadline,
 		compute: "OPEN",

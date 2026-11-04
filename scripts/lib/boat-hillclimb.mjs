@@ -642,6 +642,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 		});
 	try {
 		workload = create547Preparation(root, dependencies.objects);
+		summary.infrastructure = workload.infrastructure;
 		if (fs.existsSync(enrollmentFile)) summary.enrollment = enrollment();
 		else
 			summary.enrollment = (

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import * as runner from "./lib/boat-hillclimb.mjs";
 import { captureServingCommand } from "./lib/boat-capture.mjs";
+import { create547Preparation } from "./lib/boat-547-preparation.mjs";
 import {
 	preparationFixture,
 	publicPreparationFixture,
@@ -1131,13 +1132,144 @@ function publicEntry(f) {
 	const file = path.join(f.root, "config.json");
 	fs.writeFileSync(file, JSON.stringify(f.config));
 	const make = execFileSync("which", ["make"], { encoding: "utf8" }).trim();
-	return spawnSync(make, ["boat-hillclimb-547"], {
-		cwd: f.root,
-		env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
-		encoding: "utf8",
-		timeout: 15000,
+	return spawnSync(
+		make,
+		["boat-hillclimb-547", `BOAT_HILLCLIMB_CONFIG=${file}`],
+		{
+			cwd: f.root,
+			env: { ...f.env, BOAT_HILLCLIMB_CONFIG: file },
+			encoding: "utf8",
+			timeout: 15000,
+		},
+	);
+}
+
+test("547 public preflight accepts selected infrastructure recipes with frozen product sources", (t) => {
+	const f = preparationFixture(t, true);
+	// Git owns the executable bit, not a required 0644 filesystem permission.
+	fs.chmodSync(path.join(f.root, "apps/asset/Dockerfile.dev"), 0o600);
+	f.env.CONTROL_FAIL = "boat-enroll";
+	const r = publicEntry(f);
+	assert.equal(r.status, 2);
+	assert.equal(
+		fs.existsSync(
+			path.join(f.config.evidence, "enroll/command/invocation.json"),
+		),
+		true,
+		r.stderr,
+	);
+	assert.deepEqual(
+		jsonLines(path.join(f.root, "commands.jsonl")).map((a) => a[1]),
+		["boat-enroll"],
+	);
+	const result = json(path.join(f.config.evidence, "preparation-result.json"));
+	assert.equal(result.cleanup.status, "NOT_NEEDED_LOCAL_CONTROL");
+	assert.equal(result.owner.worker, null);
+	assert.equal(result.coldStarted, undefined);
+	assert.equal(
+		result.infrastructure.revision,
+		execFileSync("git", ["rev-parse", "HEAD"], {
+			cwd: repository,
+			encoding: "utf8",
+		}).trim(),
+	);
+});
+
+for (const fault of [
+	"product",
+	"other-recipe",
+	"selected-recipe",
+	"missing",
+	"symlink",
+	"executable",
+]) {
+	test(`547 public preflight refuses authority drift before effects, fault=${fault}`, (t) => {
+		const f = preparationFixture(t, true);
+		const relative =
+			fault === "product"
+				? "apps/web/src/routes/upload.tsx"
+				: fault === "other-recipe"
+					? "apps/asset/Dockerfile"
+					: "apps/asset/Dockerfile.dev";
+		const file = path.join(f.root, relative);
+		if (fault === "missing") fs.unlinkSync(file);
+		else if (fault === "symlink") {
+			const target = path.join(f.root, "same-recipe-bytes");
+			fs.copyFileSync(file, target);
+			fs.unlinkSync(file);
+			fs.symlinkSync(target, file);
+		} else if (fault === "executable") fs.chmodSync(file, 0o755);
+		else fs.appendFileSync(file, "\n# unauthorized input\n");
+		const r = publicEntry(f);
+		assert.equal(r.status, 2);
+		const result = json(
+			path.join(f.config.evidence, "preparation-result.json"),
+		);
+		assert.match(result.error, new RegExp(relative.replaceAll(".", "\\.")));
+		assert.deepEqual(result.phases, []);
+		assert.equal(result.owner.worker, null);
+		assert.equal(result.cleanup.status, "NOT_NEEDED_LOCAL_CONTROL");
+		assert.equal(fs.existsSync(path.join(f.root, "commands.jsonl")), false);
 	});
 }
+
+for (const mutation of [
+	"recipe-bytes",
+	"recipe-permissions",
+	"product-source",
+]) {
+	test(`547 captured authority rejects later mutation before phase publication, mutation=${mutation}`, async (t) => {
+		const f = preparationFixture(t, true);
+		const relative =
+			mutation === "product-source"
+				? "apps/user/src/adapters/picture-attachments/index.ts"
+				: "apps/asset/Dockerfile.dev";
+		await assert.rejects(
+			f.run({
+				make: async (argv, options) => {
+					const result = await f.make(argv, options);
+					if (argv[1] === "boat-enroll") {
+						if (mutation === "recipe-permissions")
+							fs.chmodSync(path.join(f.root, relative), 0o640);
+						else
+							fs.appendFileSync(
+								path.join(f.root, relative),
+								"\n# later mutation\n",
+							);
+					}
+					return result;
+				},
+			}),
+			/Phase source or owner changed/,
+		);
+		assert.deepEqual(
+			jsonLines(path.join(f.root, "commands.jsonl")).map((a) => a[1]),
+			["boat-enroll"],
+		);
+		assert.equal(
+			json(path.join(f.config.evidence, "enroll/result.json")).status,
+			"FAIL",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.config.evidence, "prepare-toolchain")),
+			false,
+		);
+	});
+}
+
+test("547 full verification retains frozen product source and captured recipe modes", (t) => {
+	const f = preparationFixture(t, true);
+	const workload = create547Preparation(f.root);
+	workload.verify(true);
+	fs.appendFileSync(
+		path.join(f.root, "apps/web/src/routes/upload.tsx"),
+		"\n// unexpected product change\n",
+	);
+	assert.throws(
+		() => workload.verify(true),
+		/Frozen workload changed: apps\/web\/src\/routes\/upload.tsx/,
+	);
+});
 
 if (process.env.BOAT_547_QUALIFIED_CLI) {
 	test("547 public startup starts prepared apps through real Make before Watch without implicit builds", {
@@ -1281,6 +1413,15 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 				"apps/asset/test/fixtures/remediation-sdk-proof.ts",
 				".worktree",
 				"Makefile",
+				"apps/asset/Dockerfile.dev",
+				"apps/color-extractor/Dockerfile.dev",
+				"apps/gateway/Dockerfile.dev",
+				"apps/ingestor/Dockerfile.dev",
+				"apps/tags/Dockerfile.dev",
+				"apps/user/Dockerfile.dev",
+				"apps/variant-generator/Dockerfile.dev",
+				"apps/wallpaper/Dockerfile.dev",
+				"apps/web/Dockerfile.dev",
 			].map((file) => path.join(f.root, file));
 			required.push(
 				path.join(repository, "scripts/lib/boat-547-startup.mjs"),

@@ -115,6 +115,17 @@ export function preparationFixture(t, nativeObjects = false) {
 			objects547.readBlob(workload.resolutionDiagnostic.baselineWorkspaceBlob),
 		);
 	}
+	// The worker effects may be controlled; recipe authority remains actual Git.
+	for (const recipe of objects547.infrastructure().recipes) {
+		fs.writeFileSync(
+			path.join(root, recipe.path),
+			objects547.readBlob(recipe.blob),
+		);
+		fs.chmodSync(
+			path.join(root, recipe.path),
+			recipe.mode === "100755" ? 0o755 : 0o644,
+		);
+	}
 	fs.writeFileSync(
 		path.join(root, ".worktree"),
 		"WORKTREE_SLOT=276\nCOMPOSE_PROJECT_NAME=wallpaperdb-control\nINGRESS_PORT=10760\n",

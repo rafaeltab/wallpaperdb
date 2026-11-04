@@ -83,6 +83,8 @@ Choose tests using the [testing guidelines](docs/coding-standards/project-organi
 
 Development images keep pnpm's build store in a builder-local cache mount at `/pnpm/store`. The cache is shared only among mutually trusted WallpaperDB builds on that builder. It may be empty or evicted; each image still performs the full frozen install and contains its installed dependencies. The [shared entrypoint](scripts/entrypoint.sh) retains ordinary frozen reinstallation when the lockfile changes, using the same default store path without a runtime cache mount. See the [pnpm 10 Docker recipe](https://pnpm.io/10.x/docker) and [BuildKit cache-mount contract](https://docs.docker.com/reference/dockerfile/#run---mounttypecache).
 
+The #547 replay keeps product sources and replay blobs at its frozen product base. Its nine existing development Dockerfiles are environment inputs, selected from the infrastructure Git revision captured at preparation entry. The [preparation contract](scripts/lib/boat-547-preparation.mjs) validates their Git bytes and executable mode, then freezes their content and filesystem permissions with the round's other inputs. They remain in phase, ready and later source checks; other product files and recipes retain the frozen product authority.
+
 Local CI's [task concurrency](Makefile) defaults to four to balance turnaround and resource headroom. Override it with `make ci CI_CONCURRENCY=1` on smaller hosts. The shared Docker queue still admits one validation run at a time.
 
 GitHub Actions is the default place for complete browser and container E2E. Both jobs in the [E2E workflow](.github/workflows/e2e.yml) enforce failures on pull requests and main. Use explicit local E2E for diagnosis or deliberate validation:

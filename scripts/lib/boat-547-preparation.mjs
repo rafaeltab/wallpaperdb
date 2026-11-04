@@ -169,16 +169,37 @@ function approvedLock(initial) {
 	return Buffer.from(lines.join(""));
 }
 
+const environmentRecipes = [
+	"asset",
+	"color-extractor",
+	"gateway",
+	"ingestor",
+	"tags",
+	"user",
+	"variant-generator",
+	"wallpaper",
+	"web",
+].map((application) => `apps/${application}/Dockerfile.dev`);
+
+const gitTree = (revision, ...paths) =>
+	git("ls-tree", "-r", revision, "--", ...paths)
+		.toString("utf8")
+		.trim()
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => {
+			const [mode, , blob, file] = line.split(/\s+/);
+			return { mode, blob, path: file };
+		});
+
 const nativeObjects = {
-	baselineApps: () =>
-		git("ls-tree", "-r", workload.productBase, "--", "apps")
+	baselineApps: () => gitTree(workload.productBase, "apps"),
+	infrastructure: () => {
+		const revision = git("rev-parse", "--verify", "HEAD^{commit}")
 			.toString("utf8")
-			.trim()
-			.split("\n")
-			.map((line) => {
-				const [mode, , blob, file] = line.split(/\s+/);
-				return { mode, blob, path: file };
-			}),
+			.trim();
+		return { revision, recipes: gitTree(revision, ...environmentRecipes) };
+	},
 	baselineBlob: (file) => {
 		const result = git("ls-tree", workload.productBase, "--", file)
 			.toString("utf8")
@@ -194,10 +215,24 @@ export function create547Preparation(root, objects = nativeObjects) {
 	);
 	require(sha(initialLock) ===
 		workload.inputs.initialLock.sha256, "Frozen initial lock changed");
-	const tree = objects.baselineApps();
+	const productTree = objects.baselineApps();
+	const infrastructure = objects.infrastructure();
+	require(/^[a-f0-9]{40}$/.test(infrastructure.revision) &&
+		same(
+			infrastructure.recipes.map((item) => item.path).sort(),
+			[...environmentRecipes].sort(),
+		), "Selected infrastructure recipe authority differs");
+	const tree = new Map(productTree.map((item) => [item.path, item]));
+	for (const recipe of infrastructure.recipes) {
+		require(tree.has(recipe.path) &&
+			["100644", "100755"].includes(
+				recipe.mode,
+			), "Infrastructure recipe is not an existing regular Git file");
+		tree.set(recipe.path, recipe);
+	}
 	const expected = new Map();
 	const modes = new Map();
-	for (const item of tree) {
+	for (const item of tree.values()) {
 		const stat = fs.lstatSync(path.join(root, item.path));
 		require(stat.isFile(), `Product baseline is not a regular file: ${item.path}`);
 		const bytes = fs.readFileSync(path.join(root, item.path));
@@ -205,7 +240,7 @@ export function create547Preparation(root, objects = nativeObjects) {
 			.update(`blob ${bytes.length}\0`)
 			.update(bytes)
 			.digest("hex") === item.blob, `Product baseline changed: ${item.path}`);
-		require(((fs.statSync(path.join(root, item.path)).mode & 0o111) !== 0) ===
+		require(((stat.mode & 0o111) !== 0) ===
 			(item.mode ===
 				"100755"), `Product executable mode changed: ${item.path}`);
 		expected.set(item.path, sha(bytes));
@@ -220,6 +255,7 @@ export function create547Preparation(root, objects = nativeObjects) {
 	const selected = new Set([
 		workload.inputs.initialLock.path,
 		workload.inputs.unchangedProtectedControl.path,
+		...environmentRecipes,
 	]);
 	for (const file of [
 		"apps/web/src/boat-547-presence.txt",
@@ -234,7 +270,7 @@ export function create547Preparation(root, objects = nativeObjects) {
 		expected.set(file, null);
 		selected.add(file);
 	}
-	const baseline = new Map(tree.map((item) => [item.path, item.blob]));
+	const baseline = new Map(productTree.map((item) => [item.path, item.blob]));
 	for (const input of [...workload.inputs.tests, ...workload.inputs.repair]) {
 		const blob = baseline.get(input.path) ?? objects.baselineBlob(input.path);
 		const before = blob ? objects.readBlob(blob) : null;
@@ -314,6 +350,7 @@ export function create547Preparation(root, objects = nativeObjects) {
 	let generated;
 	let metadata;
 	return {
+		infrastructure,
 		browserSourceInputs(kind) {
 			const files = {
 				heading: "apps/web/src/routes/upload.tsx",

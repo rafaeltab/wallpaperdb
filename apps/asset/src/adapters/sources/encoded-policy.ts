@@ -38,11 +38,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
           data.subarray(0, isoGainMapHeader.length).equals(isoGainMapHeader))
       )
         unsupported();
-      if (
-        marker === 0xe1 &&
-        /(?:hdr-gain-map|hdrgainmap|hdrgm:|21496)/i.test(data.toString('utf8'))
-      )
-        unsupported();
+      if (marker === 0xe1 && hasGainMapXmpDeclaration(data)) unsupported();
       offset += length;
     }
     invalid();
@@ -116,4 +112,15 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
     };
     chunks(12, bytes.length, false);
   }
+}
+
+/** Ordinary EXIF text is not a model declaration. Inspect only identified XMP packets. */
+function hasGainMapXmpDeclaration(payload: Buffer): boolean {
+  const xmp = ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/xmp/extension/\0'].some(
+    (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
+  );
+  if (!xmp) return false;
+  return /xmlns(?::[\w.-]+)?\s*=\s*(['"])(?:http:\/\/ns\.adobe\.com\/hdr-gain-map\/1\.0\/|http:\/\/ns\.apple\.com\/HDRGainMap\/1\.0\/|urn:com:apple:photo:2020:aux:hdrgainmap)\1/.test(
+    payload.toString('utf8')
+  );
 }

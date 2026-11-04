@@ -1462,7 +1462,7 @@ test("547 a new label and generated identity use unchanged preparation code", as
 	assert.equal(result.phases.at(-1).outcome.project, result.owner.project);
 });
 
-test("547 versioned image allocation reaches actual Make without extending ordinary commands", async (t) => {
+test("547 explicit cold provisioning shares one aggregate without extending workload commands", async (t) => {
 	const f = preparationFixture(t);
 	await stoppedWantedDevelopment(f);
 	const captures = new Map();
@@ -1477,13 +1477,16 @@ test("547 versioned image allocation reaches actual Make without extending ordin
 		},
 	});
 	assert.equal(result.coldDeadline - result.coldStarted, 1200);
-	const images = new Set([
+	const provisioning = new Set([
+		"prepare-toolchain",
+		"prepare-workspace",
 		"prepare-images-before-restoration",
 		"prepare-app-images-before-restoration",
+		"chromium-install",
 		"prepare-infra-images",
 	]);
 	for (const p of result.phases) {
-		const expectedDeadline = images.has(p.phase)
+		const expectedDeadline = provisioning.has(p.phase)
 			? result.coldStarted + 1200
 			: p.started + 180;
 		assert.equal(p.deadline, expectedDeadline, p.phase);
@@ -1496,7 +1499,59 @@ test("547 versioned image allocation reaches actual Make without extending ordin
 			p.phase,
 		);
 	}
-	assert.equal(result.scheduleVersion, "547-cold-v3-shared-images");
+	assert.equal(result.scheduleVersion, "547-cold-v4-shared-provisioning");
+});
+
+test("547 Chromium provisioning accepted after its old private cap retains the original cold clock", async (t) => {
+	const f = preparationFixture(t);
+	let offset = 0;
+	const result = await f.run({
+		clock: () => mono() + offset,
+		make: async (argv, options) => {
+			const receipt = await f.make(argv, options);
+			if (argv.includes("SCRIPT=test:browser:install")) offset = 181;
+			return receipt;
+		},
+	});
+	const install = result.phases.find((p) => p.phase === "chromium-install");
+	const launch = result.phases.find((p) => p.phase === "chromium-launch");
+	assert.equal(result.status, "PASS_PREDEV_THROUGH_IMAGES");
+	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(install.deadline, result.coldDeadline);
+	assert.ok(install.acceptedAt - install.started > 180);
+	assert.ok(install.acceptedAt < result.coldDeadline);
+	assert.equal(
+		launch.deadline,
+		Math.min(launch.started + 180, result.coldDeadline),
+	);
+	assert.equal(launch.status, "PASS");
+});
+
+test("547 Chromium provisioning cannot accept after the original aggregate or launch later work", async (t) => {
+	const f = preparationFixture(t);
+	let offset = 0;
+	await assert.rejects(
+		f.run({
+			clock: () => mono() + offset,
+			make: async (argv, options) => {
+				const receipt = await f.make(argv, options);
+				if (argv.includes("SCRIPT=test:browser:install")) offset = 1201;
+				return receipt;
+			},
+		}),
+		/deadline/,
+	);
+	const result = json(path.join(f.config.evidence, "preparation-result.json"));
+	assert.equal(result.status, "FAIL");
+	assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+	const commands = jsonLines(path.join(f.root, "commands.jsonl"));
+	assert.equal(commands.filter((a) => a[1] === "boat-stop").length, 1);
+	assert.equal(
+		commands.some((a) =>
+			a.includes("ARGS=node scripts/boat-workloads/547-runtime.cjs chromium"),
+		),
+		false,
+	);
 });
 
 test("547 image allocation is clamped to the original remaining cold budget", async (t) => {

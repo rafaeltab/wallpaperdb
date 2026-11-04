@@ -487,7 +487,7 @@ export async function execute547Preparation(config, dependencies = {}) {
 	};
 	const summary = {
 		version: 1,
-		scheduleVersion: "547-cold-v3-shared-images",
+		scheduleVersion: "547-cold-v4-shared-provisioning",
 		round: config.round,
 		phase: "preparation",
 		owner: binding,
@@ -547,6 +547,16 @@ export async function execute547Preparation(config, dependencies = {}) {
 		}
 	};
 	let prepared;
+	// Only cold acquisition shares the aggregate. Workload execution and proof
+	// retain their ordinary bounds, including the actual Chromium launch.
+	const provisioning = new Set([
+		"prepare-toolchain",
+		"prepare-workspace",
+		"prepare-images-before-restoration",
+		"prepare-app-images-before-restoration",
+		"chromium-install",
+		"prepare-infra-images",
+	]);
 	const run = async (id, argv, options = {}) => {
 		const internal = { ...config, coldDeadline: coldDeadline ?? clock() + 180 };
 		const result = await execute547Phase(
@@ -555,7 +565,9 @@ export async function execute547Preparation(config, dependencies = {}) {
 			{
 				id,
 				argv,
-				allowanceSeconds: options.allowanceSeconds,
+				allowanceSeconds: provisioning.has(id)
+					? coldDeadline - coldStarted
+					: undefined,
 				code: options.code,
 				prepare: options.prepare,
 				inputs: () => {
@@ -615,11 +627,8 @@ export async function execute547Preparation(config, dependencies = {}) {
 			throw new Error(`Missing current ${kind} completion event`);
 		return matches[0];
 	};
-	// Preparation images share the original aggregate; the phase executor clamps
-	// their deadline to its remaining time, without resetting the cold origin.
 	const prepareImages = (id) =>
 		run(id, ["make", "boat-prepare-infra-images"], {
-			allowanceSeconds: coldDeadline - coldStarted,
 			assess: (raw, { receipt }) => ({
 				...workload.acceptImages(raw, identity.project),
 				event: event("infra-image-preparation", receipt),
@@ -672,7 +681,6 @@ export async function execute547Preparation(config, dependencies = {}) {
 				"prepare-app-images-before-restoration",
 				["make", "boat-prepare-app-images"],
 				{
-					allowanceSeconds: coldDeadline - coldStarted,
 					assess: (_raw, { receipt }) => ({
 						event: event("app-image-preparation", receipt),
 					}),

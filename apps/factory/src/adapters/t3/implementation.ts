@@ -38,7 +38,11 @@ const detail = z.object({
     runCount: z.number().int().nonnegative(),
   }),
 });
-const title = (intent: Intent) => `Factory ${intent.id}`;
+const identity = (intent: Intent) => `[factory:${intent.id}]`;
+const title = (intent: Intent) =>
+  `Factory #${intent.issue}${intent.issueTitle ? `: ${intent.issueTitle.replace(/\s+/g, ' ').trim().slice(0, 180)}` : ''} ${identity(intent)}`;
+const matchesTitle = (value: string, intent: Intent) =>
+  value === `Factory ${intent.id}` || value.endsWith(` ${identity(intent)}`);
 export function t3Execution(config: {
   binary: string;
   project: string;
@@ -96,7 +100,7 @@ ${receiptInstructions(intent, 'implementation')}`,
         try: async (signal): Promise<Observation> => {
           const matches = listing
             .parse(await call(['list', '--project', config.projectId], signal))
-            .filter((item) => item.title === title(intent));
+            .filter((item) => matchesTitle(item.title, intent));
           if (matches.length === 0) return { kind: 'absent' };
           if (matches.length !== 1) return { kind: 'ambiguous' };
           const match = matches[0];
@@ -107,7 +111,7 @@ ${receiptInstructions(intent, 'implementation')}`,
           const binding = z
             .object({
               projectId: z.literal(config.projectId),
-              title: z.literal(title(intent)),
+              title: z.string().refine((value) => matchesTitle(value, intent)),
               threadId: z.literal(match.threadId),
               providerInstanceId: z.literal('codex'),
               model: z.literal('gpt-6.1-sol'),

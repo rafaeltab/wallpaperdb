@@ -15,6 +15,7 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
     });
     const intent: Intent = {
       id: 'job-1',
+      issueTitle: 'Implement a factory worker',
       issue: 576,
       issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
       base: host.base,
@@ -31,6 +32,9 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       (call) => call.args[1] === 'start' && call.args.includes('--worktree')
     );
     expect(starts).toHaveLength(1);
+    expect(starts[0].args[starts[0].args.indexOf('--title') + 1]).toBe(
+      'Factory #576: Implement a factory worker [factory:job-1]'
+    );
     expect(starts[0].args[3]).toContain(
       `Read only\nVerified prerequisite evidence: ${intent.prerequisiteEvidence}\n`
     );
@@ -41,6 +45,12 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       branch: 'factory/job-1',
       worktree: host.directory + '/worker',
     });
+    await host.save({ overrides: { title: 'Renamed worker [factory:job-1]' } });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({ kind: 'found' });
+    await host.save({ overrides: { title: 'Factory job-1' } });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({ kind: 'found' });
+    await host.save({ overrides: { title: 'Factory #576 [factory:another-job]' } });
+    expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'ambiguous' });
     await host.save({ duplicate: true });
     expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'ambiguous' });
     for (const overrides of [

@@ -534,6 +534,7 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   else
     reply({
       number: Number(args[2]),
+      title: config.issueTitle ?? 'Controlled issue',
       state: config.issueStates?.[args[2]] ?? 'OPEN',
       author: { login: 'rafaeltab' },
       url: `https://github.com/rafaeltab/wallpaperdb/issues/${args[2]}`,
@@ -681,9 +682,9 @@ else if (args[1] === 'start') {
                 runId: resource.latestRunId,
                 text: JSON.stringify({
                   ...(resource.stage === 'babysitting'
-                    ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                    ? { delivery: `${(resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8))}:${resource.stageIndex}` }
                     : {}),
-                  jobId: resource.title.slice(8),
+                  jobId: (resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)),
                   stage: 'babysitting',
                   base: config.base,
                   outcome: 'WAITING_FOR_GITHUB',
@@ -701,9 +702,9 @@ else if (args[1] === 'start') {
                     runId: resource.latestRunId,
                     text: JSON.stringify({
                       ...(resource.stage === 'babysitting'
-                        ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                        ? { delivery: `${(resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8))}:${resource.stageIndex}` }
                         : {}),
-                      jobId: resource.title.slice(8),
+                      jobId: (resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)),
                       stage:
                         resource.stage ??
                         ['implementation', 'review', 'publication'][resource.runCount - 1],

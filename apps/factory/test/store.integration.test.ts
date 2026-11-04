@@ -13,6 +13,7 @@ it('reserves once across independent instances and retains launch claim after re
       b = fileStore(directory);
     const intent: Intent = {
       id: 'job-1',
+      issueTitle: 'Implement a factory worker',
       issue: 576,
       issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
       base: '4d545298010b8f13883aa6f7cff5d16da808fb91',
@@ -35,6 +36,7 @@ it('reserves once across independent instances and retains launch claim after re
     expect(await Effect.runPromise(reopened.read())).toMatchObject({
       issue: 576,
       expectedStage: 'implementation',
+      issueTitle: 'Implement a factory worker',
     });
     await writeFile(join(directory, 'intent.json'), '{broken');
     await expect(Effect.runPromise(reopened.read())).rejects.toMatchObject({ _tag: 'Unavailable' });

@@ -13,6 +13,7 @@ const issueSchema = z.object({
   author: z.object({ login: z.string() }),
   url: z.string().url(),
   body: z.string(),
+  title: z.string().optional(),
   labels: z.array(z.object({ name: z.string() })),
 });
 const blockersSchema = z.array(
@@ -157,7 +158,7 @@ export function githubIssues(config: {
           '--repo',
           'rafaeltab/wallpaperdb',
           '--json',
-          'number,state,author,url,body,labels',
+          'number,state,author,url,body,labels,title',
         ],
         signal
       )
@@ -188,6 +189,7 @@ export function githubIssues(config: {
       author: issue.author.login,
       labels: issue.labels.map((label) => label.name),
       url: issue.url,
+      title: issue.title,
       blockers: numbers,
       ...readiness,
     };

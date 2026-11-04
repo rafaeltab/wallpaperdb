@@ -226,10 +226,13 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       number,
       state:
         config.issueStates?.[number] ?? (state.closedIssues?.includes(number) ? 'CLOSED' : 'OPEN'),
-      author: { login: 'rafaeltab' },
+      author:
+        state.issueAuthors?.[number] === undefined
+          ? { login: 'rafaeltab' }
+          : state.issueAuthors[number],
       url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
       labels: [{ name: 'ready-for-agent' }],
-      body: state.evidence,
+      body: state.evidence + (state.issueBodyContext?.[number] ?? ''),
       comments: state.issueComments?.[number] ?? [],
     };
   else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');

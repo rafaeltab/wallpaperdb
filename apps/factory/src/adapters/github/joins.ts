@@ -20,7 +20,7 @@ import {
   readRecord,
   recordNames,
   replaceProgress,
-  initializeState,
+  initializeNamespace,
 } from '../../platform/index.js';
 import { t3Restacker } from '../t3/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
@@ -71,7 +71,7 @@ const id = (numbers: readonly number[]) =>
     .digest('hex');
 
 export function prerequisiteJoin(project: string, base: string, config: JoinConfiguration, gh: Gh) {
-  initializeState(config.directory);
+  initializeNamespace(config.directory);
   const git = (args: string[], signal?: AbortSignal) =>
     command('git', args, project, signal).then((text) => text.trim());
   const directory = (numbers: readonly number[]) => join(config.directory, id(numbers));

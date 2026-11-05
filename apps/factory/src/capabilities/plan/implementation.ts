@@ -139,7 +139,7 @@ export const PlanLive = Layer.effect(
   })
 );
 
-function comparable(input: PlanningInput) {
+export function comparable(input: PlanningInput) {
   const normalize = (job: PlanningInput['job']) =>
     job.kind === 'job' ? { ...job, elapsedMs: 0 } : job;
   return { ...input, job: normalize(input.job), jobs: input.jobs?.map(normalize) };
@@ -159,4 +159,8 @@ export function locallyBlocked(blockers: readonly number[], jobs: readonly Statu
         !job.delivery?.landed
     )
   );
+}
+
+export function planningInputIdentity(input: PlanningInput) {
+  return JSON.stringify(comparable(input));
 }

@@ -1,5 +1,5 @@
 import Fastify, { type FastifyRequest } from 'fastify';
-import { Effect } from 'effect';
+import { Effect, type Tracer } from 'effect';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
@@ -20,8 +20,10 @@ export function operationsServer(config: {
   plan?: Plan;
   scheduler?: Scheduler;
   attempts?: {
-    submit(): Promise<import('../capabilities/plan/index.js').AttemptSubmission>;
-    observe(id: string): Promise<unknown | undefined>;
+    submit(
+      parent?: Tracer.Span
+    ): Promise<import('../capabilities/plan/index.js').AttemptSubmission>;
+    observe(id: string, parent?: Tracer.Span): Promise<unknown | undefined>;
   };
   relationships?: (
     issues: readonly number[]
@@ -107,7 +109,34 @@ export function operationsServer(config: {
         .type('application/problem+json')
         .send(problem(400, 'factory-request', 'Preview accepts no overrides'));
     if (config.attempts) {
-      const result = await config.attempts.submit();
+      const attempts = config.attempts;
+      const result = await execute(
+        request,
+        'factory.http.plan.submit',
+        Effect.gen(function* () {
+          const parent = yield* Effect.currentSpan.pipe(
+            Effect.catch(() => Effect.succeed(undefined))
+          );
+          return yield* Effect.tryPromise({
+            try: () => attempts.submit(parent),
+            catch: (cause) =>
+              cause instanceof Unavailable
+                ? cause
+                : new Unavailable({ operation: 'planning-submission', cause }),
+          });
+        })
+      );
+      if (result.kind === 'conflict')
+        return reply
+          .code(409)
+          .type('application/problem+json')
+          .send(
+            problem(
+              409,
+              'factory-plan-conflict',
+              'Planner ownership changed during submission. Refresh before retrying.'
+            )
+          );
       if (result.kind === 'blocked')
         return reply
           .code(409)
@@ -145,7 +174,26 @@ export function operationsServer(config: {
   });
   app.get('/api/plan/:id', async (request, reply) => {
     const parsed = z.object({ id: z.string().uuid() }).safeParse(request.params);
-    const result = parsed.success ? await config.attempts?.observe(parsed.data.id) : undefined;
+    const attempts = config.attempts;
+    const result =
+      parsed.success && attempts
+        ? await execute(
+            request,
+            'factory.http.plan.observe',
+            Effect.gen(function* () {
+              const parent = yield* Effect.currentSpan.pipe(
+                Effect.catch(() => Effect.succeed(undefined))
+              );
+              return yield* Effect.tryPromise({
+                try: () => attempts.observe(parsed.data.id, parent),
+                catch: (cause) =>
+                  cause instanceof Unavailable
+                    ? cause
+                    : new Unavailable({ operation: 'planning-observation', cause }),
+              });
+            })
+          )
+        : undefined;
     if (!result)
       return reply
         .code(404)

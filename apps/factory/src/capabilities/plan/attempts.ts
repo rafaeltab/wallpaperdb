@@ -50,9 +50,10 @@ export const AttemptsLive = Layer.effect(
             phase: 'discovery',
           };
           const created = yield* store.create(attempt);
-          return created
-            ? { kind: 'accepted' as const, id: attempt.id }
-            : { kind: 'busy' as const, id: (yield* store.pending())?.id ?? id };
+          if (created) return { kind: 'accepted' as const, id: attempt.id };
+          const winner = yield* store.pending();
+          const same = winner ?? (yield* store.get(id));
+          return same ? { kind: 'busy' as const, id: same.id } : { kind: 'conflict' as const };
         }),
       observe: (id) =>
         Effect.gen(function* () {
@@ -64,7 +65,10 @@ export const AttemptsLive = Layer.effect(
           return {
             ...attempt,
             phase:
-              attempt.phase === 'discovery' && launch
+              attempt.phase === 'discovery' &&
+              launch &&
+              launch.phase !== 'succeeded' &&
+              launch.phase !== 'failed'
                 ? (launch.phase ?? (launch.run ? 'running' : 'uncertain'))
                 : attempt.phase,
             elapsedMs: Math.max(0, (attempt.finishedAt ?? now) - attempt.startedAt),

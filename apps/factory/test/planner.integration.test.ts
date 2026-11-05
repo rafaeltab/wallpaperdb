@@ -503,3 +503,49 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
     await host.cleanup();
   }
 });
+
+it('reattaches an exact bound attempt when only incidental job elapsed time advanced', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const job = {
+      kind: 'job' as const,
+      intent: {
+        id: 'parked',
+        issue: 579,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/579',
+        base: 'a'.repeat(40),
+        context: 'Existing scope',
+        branch: 'factory/579',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      },
+      execution: { kind: 'absent' as const },
+      elapsedMs: 100,
+    };
+    const input = { issues: [], job, jobs: [job], capacity: { concurrency: 1, admission: 1 } };
+    const attempt = { requestId: 'same-attempt', deadline: Date.now() + 60000 };
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    await Effect.runPromise(t3Planner(config).propose(input, attempt));
+    expect(
+      await Effect.runPromise(
+        t3Planner(config).propose(
+          { ...input, job: { ...job, elapsedMs: 900 }, jobs: [{ ...job, elapsedMs: 900 }] },
+          attempt
+        )
+      )
+    ).toEqual({ selected: [], deferred: [] });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

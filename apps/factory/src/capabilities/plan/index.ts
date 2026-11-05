@@ -9,3 +9,4 @@ export { Attempts, AttemptStore } from './contract.js';
 export type { PlanningAttempt, AttemptResult, PlannerOwnership } from './contract.js';
 export { AttemptsLive } from './attempts.js';
 export type { AttemptSubmission } from './contract.js';
+export { planningInputIdentity } from './implementation.js';

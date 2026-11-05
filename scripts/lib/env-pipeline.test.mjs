@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { expect, test } from "vitest";
 import { applyOverrides, extractKeys, filterApplicableSecrets, parseEnvValues } from "./env-pipeline.mjs";
 
 const templatePaths = [
@@ -22,8 +21,8 @@ for (const path of templatePaths) {
     const applicable = filterApplicableSecrets(credentials, extractKeys(template), path, () => {});
     const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
-    assert.equal(generated.S3_ACCESS_KEY_ID, credentials.S3_ACCESS_KEY_ID);
-    assert.equal(generated.S3_SECRET_ACCESS_KEY, credentials.S3_SECRET_ACCESS_KEY);
+    expect(generated.S3_ACCESS_KEY_ID).toBe(credentials.S3_ACCESS_KEY_ID);
+    expect(generated.S3_SECRET_ACCESS_KEY).toBe(credentials.S3_SECRET_ACCESS_KEY);
   });
 }
 
@@ -34,8 +33,8 @@ test("storage host port overrides the worktree slot without leaking unrelated se
   const applicable = filterApplicableSecrets(secrets, extractKeys(template), "infra", () => {});
   const generated = parseEnvValues(applyOverrides(worktreeContent, applicable, {}));
 
-  assert.equal(generated.S3_API_HOST_PORT, "8122");
-  assert.equal(generated.UNRELATED_API_SECRET, undefined);
+  expect(generated.S3_API_HOST_PORT).toBe("8122");
+  expect(generated.UNRELATED_API_SECRET).toBe(undefined);
 });
 
 test("empty storage secrets preserve development credentials from the template", () => {
@@ -44,8 +43,8 @@ test("empty storage secrets preserve development credentials from the template",
     extractKeys(template), "infra", () => {});
   const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
-  assert.equal(generated.S3_ACCESS_KEY_ID, "storageadmin");
-  assert.equal(generated.S3_SECRET_ACCESS_KEY, "storageadmin");
+  expect(generated.S3_ACCESS_KEY_ID).toBe("storageadmin");
+  expect(generated.S3_SECRET_ACCESS_KEY).toBe("storageadmin");
 });
 
 test("ingestor environment generation preserves a custom S3 cleanup interval", () => {
@@ -54,12 +53,12 @@ test("ingestor environment generation preserves a custom S3 cleanup interval", (
     extractKeys(template), "apps/ingestor", () => {});
   const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
-  assert.equal(generated.S3_CLEANUP_INTERVAL_MS, "60000");
+  expect(generated.S3_CLEANUP_INTERVAL_MS).toBe("60000");
 });
 
 test("User picture storage and infrastructure share default S3 credentials", () => {
   const infrastructure = parseEnvValues(readFileSync(new URL("../../infra/.env.example", import.meta.url), "utf8"));
   const user = parseEnvValues(readFileSync(new URL("../../apps/user/.env.example", import.meta.url), "utf8"));
-  assert.equal(user.S3_ACCESS_KEY_ID, infrastructure.S3_ACCESS_KEY_ID);
-  assert.equal(user.S3_SECRET_ACCESS_KEY, infrastructure.S3_SECRET_ACCESS_KEY);
+  expect(user.S3_ACCESS_KEY_ID).toBe(infrastructure.S3_ACCESS_KEY_ID);
+  expect(user.S3_SECRET_ACCESS_KEY).toBe(infrastructure.S3_SECRET_ACCESS_KEY);
 });

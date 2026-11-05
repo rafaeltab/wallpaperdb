@@ -77,3 +77,53 @@ for (const ambientProfiles of ["", "admin", "*"]) {
 		);
 	});
 }
+
+test("default application selection omits unused Tags without blocking ingress", () => {
+	const result = spawnSync(
+		"docker",
+		[
+			"compose",
+			"-f",
+			"infra/docker-compose.apps.yml",
+			"config",
+			"--format",
+			"json",
+		],
+		{ encoding: "utf8", env: { ...process.env, COMPOSE_PROFILES: "" } },
+	);
+	assert.equal(result.status, 0, result.stderr);
+	const { services } = JSON.parse(result.stdout);
+	assert.deepEqual(Object.keys(services).sort(), [
+		"asset",
+		"caddy",
+		"color-extractor",
+		"gateway",
+		"ingestor",
+		"user",
+		"variant-generator",
+		"wallpaper",
+		"web",
+	]);
+	assert.equal(Object.hasOwn(services.caddy.depends_on, "tags"), false);
+});
+
+test("opting into Tags retains the service without making ingress wait for it", () => {
+	const result = spawnSync(
+		"docker",
+		[
+			"compose",
+			"-f",
+			"infra/docker-compose.apps.yml",
+			"--profile",
+			"tags",
+			"config",
+			"--format",
+			"json",
+		],
+		{ encoding: "utf8", env: { ...process.env, COMPOSE_PROFILES: "" } },
+	);
+	assert.equal(result.status, 0, result.stderr);
+	const { services } = JSON.parse(result.stdout);
+	assert.ok(services.tags);
+	assert.equal(Object.hasOwn(services.caddy.depends_on, "tags"), false);
+});

@@ -131,12 +131,14 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 		"lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n  apps/example: {}\n  packages/other: {}\n",
 	);
 	project.write(".gitignore", "node_modules/\n.turbo/\n");
-	const productionTasks = JSON.parse(
+	const productionConfiguration = JSON.parse(
 		fs.readFileSync(path.join(repository, "turbo.json"), "utf8"),
-	).tasks;
+	);
+	const productionTasks = productionConfiguration.tasks;
 	project.write(
 		"turbo.json",
 		JSON.stringify({
+			futureFlags: productionConfiguration.futureFlags,
 			tasks: {
 				"//#architecture:workspaces":
 					productionTasks["//#architecture:workspaces"],

@@ -1,0 +1,9 @@
+body { font: 18px system-ui; max-width: 760px; margin: 4rem auto; padding: 1rem; background: #101820; color: #e8eef1; }
+a { color: #8bd8ff; }
+input, textarea, button { font: inherit; padding: .6rem; margin: .5rem 0; display: block; }
+textarea { width: 95%; min-height: 8rem; }
+small { color: #b9c8d0; }
+article { padding: 1rem; border: 1px solid #506773; border-radius: 8px; margin-block: 1rem; }
+pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
+progress { display: block; width: 100%; }
+button:disabled { opacity: .6; }

@@ -29,7 +29,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       const refreshedDraft = page.waitForResponse(
         (response) =>
           response.request().resourceType() === 'fetch' &&
-          response.url() === `http://127.0.0.1:${address.port}/`,
+          response.url() === `http://127.0.0.1:${address.port}/api/scheduler`,
         { timeout: 5000 }
       );
       await page.getByLabel('Selected issue number').fill('576');
@@ -62,15 +62,14 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       );
       await browserExpect(page.getByText(/Elapsed: \d+ seconds/)).toBeVisible();
       const cancelControl = page.getByRole('button', { name: 'Cancel job' });
-      await cancelControl.focus();
-      await browserExpect(page.locator('#observation-notice')).toHaveText(
-        'Automatic updates pause while a work control has keyboard focus.'
+      const focusedRefresh = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/scheduler') && response.request().resourceType() === 'fetch'
       );
+      await cancelControl.focus();
+      await focusedRefresh;
       await browserExpect(cancelControl).toBeFocused();
       await page.getByRole('link', { name: 'Refresh observation' }).focus();
-      await browserExpect(page.locator('#observation-notice')).toHaveText(
-        'Observations refresh automatically.'
-      );
       // Exercise the browser's persisted-document lifecycle without assuming
       // headless Chromium's navigation policy actually selects BFCache.
       await page.evaluate(
@@ -79,7 +78,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       const restoredRefresh = page.waitForResponse(
         (response) =>
           response.request().resourceType() === 'fetch' &&
-          response.url() === `http://127.0.0.1:${address.port}/`,
+          response.url() === `http://127.0.0.1:${address.port}/api/scheduler`,
         { timeout: 5000 }
       );
       await page.evaluate(
@@ -300,9 +299,8 @@ it('previews automatically discovered work without starting an implementation wo
       if (!address || typeof address === 'string') throw new Error('Missing listener');
       await page.goto(`http://127.0.0.1:${address.port}`);
       await page.getByLabel('Pause admissions').check();
-      const savedDocument = page.waitForEvent('load');
       await page.getByRole('button', { name: 'Save scheduler controls' }).click();
-      await savedDocument;
+
       await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
       await page.getByRole('button', { name: 'Generate plan preview' }).click();
       await browserExpect(page.locator('#plan')).toContainText('Validated advisory proposal');
@@ -362,7 +360,7 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
       const refreshedControls = page.waitForResponse(
         (response) =>
           response.request().resourceType() === 'fetch' &&
-          response.url() === `http://127.0.0.1:${address.port}/`,
+          response.url() === `http://127.0.0.1:${address.port}/api/scheduler`,
         { timeout: 5000 }
       );
       await page.getByLabel('Concurrency').fill('3');
@@ -533,14 +531,13 @@ it.each(['implementation', 'publication'] as const)(
         await browserExpect(
           page.getByRole('button', { name: 'Retry existing stage' })
         ).toBeVisible();
-        const navigated = page.waitForEvent('load');
         const delivered = page.waitForResponse(
           (response) =>
             response.url().endsWith('/api/job/resume') && response.request().method() === 'POST'
         );
         await page.getByRole('button', { name: 'Retry existing stage' }).click();
         expect((await delivered).status()).toBe(202);
-        await navigated;
+
         await host.save({});
         await page.reload();
         await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(

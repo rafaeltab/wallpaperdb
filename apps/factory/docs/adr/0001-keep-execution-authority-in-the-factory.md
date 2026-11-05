@@ -1,0 +1,7 @@
+# Keep execution authority in the factory
+
+Maintainer-supervised agent threads did not reliably pick up new work while the maintainer was unavailable. The factory therefore owns durable admission, stage progression and external-result reconciliation in code, while T3 agents implement, review and publish work in dedicated threads and worktrees. This keeps progress independent of an interactive conversation without turning the service into an implementation agent.
+
+The planner is advisory behind an application-owned interface. Semantic planning can recognize dependencies and likely conflicts, but factory policy validates the proposal and enforces authorization, explicit blockers and capacity before dispatch. Letting the planner directly launch work would make these guarantees depend on prompt compliance. Previewing a plan must not consume an admission.
+
+Agent completion is a claim bound to the expected job, run and comparison, not permission inferred from arbitrary text. PR readiness remains distinct from verified landing; merging is the maintainer's responsibility. See the [planning contract](../../src/capabilities/plan/contract.ts), [validation](../../src/capabilities/plan/implementation.ts), [scheduler](../../src/capabilities/plan/scheduler.ts) and [stage receipt verification](../../src/adapters/t3/stages.ts). The originating scope and trade-offs are recorded in [spec #571](https://github.com/rafaeltab/wallpaperdb/issues/571).

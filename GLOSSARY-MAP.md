@@ -17,6 +17,10 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Tagging](./apps/tags/GLOSSARY.md) - reserved for wallpaper classification; domain language remains undefined
 
+## Operational contexts
+
+- [Software Factory](./apps/factory/GLOSSARY.md) - owns issue admission, execution progress and verified PR readiness for repository development. It is separate from the WallpaperDB product contexts. Its [local ADRs](./apps/factory/docs/adr/) record orchestration authority, recovery trade-offs and dependency-stack policy.
+
 ## Existing implementation relationships
 
 - **User -> Gateway**: User publishes Profile events; Gateway projects public Profile reads and search into GraphQL.

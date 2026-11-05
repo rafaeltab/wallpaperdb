@@ -1,0 +1,9 @@
+# Preserve claims across uncertain external outcomes
+
+The host can lose power during thread creation, stage delivery or stack publication. Local state and external T3, Git and GitHub effects cannot share an atomic transaction. The factory records responsibility before acting, then reconciles observed outcomes; restarting does not establish that an interrupted operation failed.
+
+The chosen state model uses immutable records and atomic publication on a local Linux filesystem. Claims and revision checks protect competing admissions and deliveries, and the state directory survives replacement of an installed release. This accepts a host/filesystem constraint in exchange for durable local coordination without a separate database service. See the [durable publisher](../../src/platform/durable.ts), [job and schedule store](../../src/adapters/store/implementation.ts) and [state compatibility check](../../src/composition/state.ts).
+
+Avoiding duplicate workers takes precedence over automatic retry when an external outcome cannot be established. In particular, an uncertain non-idempotent launch or send can remain pending for operator reconciliation; deleting its claim or blindly retrying sacrifices that guarantee. Supported idempotency identities help reconcile delivery but do not establish universal exactly-once execution. The [T3 execution adapter](../../src/adapters/t3/implementation.ts), [stage delivery](../../src/adapters/t3/stages.ts) and [planner state](../../src/adapters/t3/planner-state.ts) own those associations.
+
+Explicit upgrades retain the same state and reconcile existing external workers rather than requiring every job to drain or assuming graceful shutdown. Installation and recovery procedures belong in the [host operations guide](../../OPERATIONS.md); incompatible state must remain intact for a compatible release or operator recovery.

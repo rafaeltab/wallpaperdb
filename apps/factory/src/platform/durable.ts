@@ -158,7 +158,7 @@ function connection<A>(
 ): A {
   const root = rootFor(directory);
   mkdirSync(root, { recursive: true, mode: 0o700 });
-  if (existsSync(join(root, filename)) && lstatSync(join(root, filename)).isSymbolicLink())
+  if (lstatSync(join(root, filename), { throwIfNoEntry: false })?.isSymbolicLink())
     throw new Error('SQLite database symlinks are not supported');
   const client = new Database(join(root, filename));
   try {

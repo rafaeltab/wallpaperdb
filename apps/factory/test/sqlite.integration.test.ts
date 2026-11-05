@@ -378,20 +378,26 @@ it('rejects declared namespace symlinks after parent initialization', async () =
   }
 });
 
-it('rejects a database-file symlink before adopting another states authority', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
-  const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
-  try {
-    initializeState(source);
-    await publisher(source)('launch-claimed.json', { version: 1 });
-    await symlink(join(source, 'factory.sqlite'), join(root, 'factory.sqlite'));
-    expect(() => initializeState(root)).toThrow(/symlink/i);
-    await expect(publisher(root)('launch-claimed.json', { version: 1 })).rejects.toThrow(
-      /symlink/i
-    );
-    expect(await publisher(source)('launch-claimed.json', { version: 1 })).toBe(false);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-    await rm(source, { recursive: true, force: true });
+it.each(['existing', 'dangling'])(
+  'rejects a %s database-file symlink before adopting another states authority',
+  async (mode) => {
+    const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+    const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
+    try {
+      initializeState(source);
+      await publisher(source)('launch-claimed.json', { version: 1 });
+      await symlink(
+        join(source, mode === 'existing' ? 'factory.sqlite' : 'missing.sqlite'),
+        join(root, 'factory.sqlite')
+      );
+      expect(() => initializeState(root)).toThrow(/symlink/i);
+      await expect(publisher(root)('launch-claimed.json', { version: 1 })).rejects.toThrow(
+        /symlink/i
+      );
+      expect(await publisher(source)('launch-claimed.json', { version: 1 })).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(source, { recursive: true, force: true });
+    }
   }
-});
+);

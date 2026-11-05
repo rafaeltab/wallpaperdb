@@ -17,6 +17,13 @@ export function operationsServer(config: {
     effect: import('effect').Effect.Effect<A, import('../capabilities/job/index.js').Unavailable>
   ) => Promise<A>;
   job: Job;
+  snapshot?: () => Effect.Effect<
+    import('../capabilities/plan/index.js').ScheduleStatus & {
+      relationships?: readonly WorkRelationship[];
+      observations?: import('../capabilities/observe/index.js').ObservationState;
+    },
+    Unavailable
+  >;
   plan?: Plan;
   scheduler?: Scheduler;
   attempts?: {
@@ -76,6 +83,7 @@ export function operationsServer(config: {
     return config.run(parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed);
   };
   const schedulerStatus = async (request: FastifyRequest) => {
+    if (config.snapshot) return execute(request, 'factory.http.snapshot', config.snapshot());
     if (!config.scheduler) return undefined;
     const snapshot = await execute(
       request,
@@ -252,14 +260,30 @@ export function operationsServer(config: {
     });
   }
   app.get('/health', () => ({ status: 'ok' }));
-  app.get('/api/job', (request) => execute(request, 'factory.http.status', config.job.status()));
+  app.get('/api/observations', (request) =>
+    config.snapshot
+      ? execute(
+          request,
+          'factory.http.observations',
+          Effect.map(config.snapshot(), (s) => s.observations)
+        )
+      : {}
+  );
+  app.get('/api/job', async (request) =>
+    config.snapshot
+      ? ((await schedulerStatus(request))?.jobs[0] ?? { kind: 'empty' })
+      : execute(request, 'factory.http.status', config.job.status())
+  );
   app.get('/', async (request, reply) => {
     const schedule = await schedulerStatus(request);
     return reply
       .type('text/html')
       .send(
         page(
-          await execute(request, 'factory.http.page', config.job.status()),
+          schedule?.jobs[0] ??
+            (config.snapshot
+              ? { kind: 'empty' }
+              : await execute(request, 'factory.http.page', config.job.status())),
           schedule,
           schedule?.relationships
         )

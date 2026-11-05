@@ -1,3 +1,10 @@
+import {
+  Observations,
+  ObservationsLive,
+  ObservationStore,
+  ObservationSource,
+  LocalSnapshot,
+} from '../capabilities/observe/index.js';
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
@@ -14,7 +21,12 @@ import {
   type RecoveryAdmission,
 } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
-import { fileStore, fileScheduleStore, sqliteAttemptStore } from '../adapters/store/index.js';
+import {
+  fileStore,
+  fileScheduleStore,
+  sqliteAttemptStore,
+  sqliteObservations,
+} from '../adapters/store/index.js';
 import {
   Attempts,
   AttemptsLive,
@@ -30,6 +42,7 @@ import {
 import {
   githubIssues,
   githubPlanning,
+  githubObservations,
   type VerifiedPrerequisite,
 } from '../adapters/github/index.js';
 import { t3Execution, t3Planner } from '../adapters/t3/index.js';
@@ -240,6 +253,37 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       })
     )
   ).pipe(Layer.provideMerge(jobLayer));
+  const observationStore = sqliteObservations(configuration.FACTORY_STATE);
+  const observationLayer = ObservationsLive.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(Time, systemTime),
+        Layer.succeed(ObservationStore, observationStore),
+        Layer.succeed(LocalSnapshot, {
+          read: () =>
+            Effect.gen(function* () {
+              const state = yield* scheduleStore.read();
+              const entries = [];
+              for (const admission of state.admissions) {
+                const directory =
+                  rootIssue === admission.issue
+                    ? configuration.FACTORY_STATE
+                    : resolve(configuration.FACTORY_STATE, `issue-${admission.issue}`);
+                const store = fileStore(directory);
+                entries.push({ intent: yield* store.read(), control: yield* store.readControl() });
+              }
+              return { state, entries };
+            }),
+        }),
+        Layer.succeed(
+          ObservationSource,
+          githubObservations(project, () =>
+            Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue))
+          )
+        )
+      )
+    )
+  );
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
       Layer.provideMerge(
@@ -251,6 +295,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         )
       ),
       Layer.provideMerge(schedulerDeps),
+      Layer.provideMerge(observationLayer),
       Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
     )
   );
@@ -268,20 +313,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     attempts: await runtime.runPromise(Attempts),
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
-  const relationshipSource = await runtime.runPromise(Issues);
+  const observations = await runtime.runPromise(Observations);
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
     job,
     scheduler,
-    relationships: (numbers) =>
-      Effect.gen(function* () {
-        return yield* Effect.forEach(numbers, (issue) =>
-          Effect.map(relationshipSource.inspect(issue), (context) => ({
-            issue,
-            blockers: context.blockers,
-          }))
-        );
-      }),
+    snapshot: observations.schedule,
     attempts,
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
@@ -309,6 +346,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       .runPromise(
         scheduler.tick(configuration.FACTORY_BASE).pipe(
           Effect.tap((snapshot) =>
+            observationStore.jobs(snapshot.jobs, Date.now(), snapshot.recoveries)
+          ),
+          Effect.tap((snapshot) =>
             configuration.FACTORY_OTEL_ENDPOINT
               ? availabilityObservation(retainedWorkAvailable(snapshot))
               : Effect.void
@@ -329,10 +369,25 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       });
     void observing.catch(() => undefined);
   }, 1000);
+  let refreshing: Promise<unknown> | undefined;
+  const refresh = () => {
+    if (refreshing) return;
+    refreshing = runtime
+      .runPromise(observations.refresh().pipe(Effect.catch(Effect.logError)), {
+        signal: requests.signal,
+      })
+      .finally(() => {
+        refreshing = undefined;
+      });
+    void refreshing.catch(() => undefined);
+  };
+  refresh();
+  const refreshTimer = setInterval(refresh, 30000);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
       clearInterval(observationTimer);
+      clearInterval(refreshTimer);
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
@@ -344,6 +399,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         requests.abort();
         await attempts.close();
         await observing?.catch(() => undefined);
+        await refreshing?.catch(() => undefined);
         await runtime.dispose();
         await Promise.all([...workers.values()].map((worker) => worker.dispose()));
       }

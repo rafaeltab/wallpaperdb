@@ -188,3 +188,73 @@ process.exit(result.status ?? 1);
     }
   }
 );
+
+it('deduplicates converging parents, blockers and cycles and retains PRs without an issue', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const issue = (number: number, body: string) => ({
+      number,
+      url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+      title: `Issue ${number}`,
+      body,
+      state: 'OPEN',
+      author: { login: 'rafaeltab' },
+      labels: [{ name: 'ready-for-agent' }],
+      comments: [],
+    });
+    await host.save({
+      planning: {
+        candidates: [1, 2],
+        issues: [
+          issue(1, 'Parent: #3\nBlocked by: #3'),
+          issue(2, 'Parent: #3\nBlocked by: #3'),
+          issue(3, 'Parent: #1'),
+        ],
+        openPulls: [
+          {
+            __typename: 'PullRequest',
+            number: 42,
+            url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+            state: 'OPEN',
+            headRefOid: 'a'.repeat(40),
+            baseRefOid: 'b'.repeat(40),
+            headRefName: 'independent',
+            baseRefName: 'main',
+            reviewDecision: 'APPROVED',
+            reviews: {
+              nodes: [{ state: 'APPROVED', commit: { oid: 'c'.repeat(40) } }],
+              pageInfo: { hasNextPage: false },
+            },
+            closingIssuesReferences: { nodes: [], pageInfo: { hasNextPage: false } },
+            commits: {
+              nodes: [{ commit: { oid: 'c'.repeat(40), statusCheckRollup: { state: 'SUCCESS' } } }],
+            },
+          },
+        ],
+      },
+    });
+    const { githubObservations } = await import('../src/adapters/github/index.js');
+    const result = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(result.issues.map((i) => i.number)).toEqual([1, 2, 3]);
+    expect(result.pullRequests).toMatchObject([
+      {
+        number: 42,
+        linkedIssues: [],
+        crossReferencedIssues: [],
+        review: 'UNKNOWN',
+        ci: 'UNKNOWN',
+        evidenceHead: 'a'.repeat(40),
+      },
+    ]);
+  } finally {
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

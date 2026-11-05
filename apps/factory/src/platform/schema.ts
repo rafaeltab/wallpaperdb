@@ -46,3 +46,51 @@ export const planningAttempts = sqliteTable(
       .where(sql`${table.phase} in ('discovery', 'freshness')`),
   ]
 );
+
+// Replaceable external observations are separate from immutable workflow records.
+export const githubIssues = sqliteTable('github_issues', {
+  number: integer('number').primaryKey(),
+  url: text('url').notNull(),
+  title: text('title').notNull(),
+  open: integer('open', { mode: 'boolean' }).notNull(),
+  candidate: integer('candidate', { mode: 'boolean' }).notNull(),
+  labels: text('labels', { mode: 'json' }).$type<readonly string[]>().notNull(),
+  assignees: text('assignees', { mode: 'json' }).$type<readonly string[]>().notNull(),
+  projectStatus: text('project_status'),
+  commentCount: integer('comment_count').notNull(),
+  blockers: text('blockers', { mode: 'json' }).$type<readonly number[]>().notNull(),
+  parents: text('parents', { mode: 'json' }).$type<readonly number[]>().notNull(),
+  pullRequests: text('pull_requests', { mode: 'json' }).$type<readonly number[]>().notNull(),
+});
+export const githubPulls = sqliteTable('github_pulls', {
+  number: integer('number').primaryKey(),
+  url: text('url').notNull(),
+  state: text('state', { enum: ['OPEN', 'CLOSED', 'MERGED'] }).notNull(),
+  head: text('head').notNull(),
+  headBranch: text('head_branch').notNull(),
+  base: text('base').notNull(),
+  baseBranch: text('base_branch').notNull(),
+  crossReferencedIssues: text('cross_referenced_issues', { mode: 'json' })
+    .$type<readonly number[]>()
+    .notNull(),
+  linkedIssues: text('linked_issues', { mode: 'json' }).$type<readonly number[]>().notNull(),
+  review: text('review', {
+    enum: ['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED', 'UNKNOWN'],
+  }).notNull(),
+  ci: text('ci', { enum: ['SUCCESS', 'FAILURE', 'PENDING', 'UNKNOWN'] }).notNull(),
+  evidenceHead: text('evidence_head').notNull(),
+});
+export const observationRefresh = sqliteTable('observation_refresh', {
+  id: integer('id').primaryKey(),
+  startedAt: integer('started_at'),
+  observedAt: integer('observed_at'),
+  failedAt: integer('failed_at'),
+  error: text('error'),
+  recoveries: text('recoveries', { mode: 'json' }).$type<
+    readonly import('../capabilities/job/index.js').RecoveryStatus[]
+  >(),
+  jobs: text('jobs', { mode: 'json' }).$type<
+    readonly import('../capabilities/job/index.js').Status[]
+  >(),
+  jobsObservedAt: integer('jobs_observed_at'),
+});

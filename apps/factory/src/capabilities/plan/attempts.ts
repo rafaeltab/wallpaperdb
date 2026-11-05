@@ -1,6 +1,13 @@
 import { Effect, Layer } from 'effect';
 import { Time, Unavailable } from '../job/index.js';
-import { Attempts, AttemptStore, Plan, IPlanner, type PlanningAttempt } from './contract.js';
+import {
+  Attempts,
+  AttemptStore,
+  Plan,
+  IPlanner,
+  type PlanningAttempt,
+  type PlannerOwnership,
+} from './contract.js';
 export const AttemptsLive = Layer.effect(
   Attempts,
   Effect.gen(function* () {
@@ -141,10 +148,13 @@ export const AttemptsLive = Layer.effect(
                   phase: 'failed',
                   finishedAt: yield* time.now(),
                   detail:
-                    ownership?.requestId === id && ownership.detail
-                      ? ownership.detail
-                      : error.operation === 'planning-deadline'
-                        ? 'Overall planning deadline exceeded. Launch ownership is retained until observation or reconciliation.'
+                    error.operation === 'planning-deadline'
+                      ? deadlineDetail(
+                          current.phase,
+                          ownership?.requestId === id ? ownership : undefined
+                        )
+                      : ownership?.requestId === id && ownership.detail
+                        ? ownership.detail
                         : 'Planning dependency failed. No implementation dispatched.',
                 });
               })
@@ -154,3 +164,18 @@ export const AttemptsLive = Layer.effect(
     };
   })
 );
+
+function deadlineDetail(phase: PlanningAttempt['phase'], ownership?: PlannerOwnership) {
+  if (ownership && !ownership.retired) {
+    return ownership.run
+      ? 'Overall planning deadline exceeded. This attempt has a bound advisory run whose launch ownership remains outstanding; observe the run before retrying.'
+      : 'Overall planning deadline exceeded after launch intent. This attempt has an uncertain launch outcome; operator reconciliation is required before retrying.';
+  }
+  if (phase === 'freshness')
+    return 'Overall planning deadline exceeded during freshness validation. The advisory proposal is not validated; no implementation was dispatched.';
+  if (ownership?.run)
+    return 'Overall planning deadline exceeded after the advisory run. Its launch ownership is retired; no validated preview is available.';
+  if (ownership)
+    return "Overall planning deadline exceeded before a planner run was bound. This attempt's launch ownership is retired; no launch reconciliation is required.";
+  return 'Overall planning deadline exceeded during discovery before planner launch. No planner launch was recorded for this attempt; no launch reconciliation is required.';
+}

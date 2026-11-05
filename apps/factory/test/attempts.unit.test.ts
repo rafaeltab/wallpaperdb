@@ -217,3 +217,117 @@ it('keeps an unfinished attempt observable until freshness/result persist even w
     await runtime.dispose();
   }
 });
+
+it.each([
+  {
+    name: 'discovery with only an unrelated retired legacy claim',
+    phase: 'discovery' as const,
+    ownership: { requestId: 'legacy', revision: 1, deadline: 0, retired: true },
+    detail:
+      'Overall planning deadline exceeded during discovery before planner launch. No planner launch was recorded for this attempt; no launch reconciliation is required.',
+  },
+  {
+    name: 'a matching outstanding bound advisory run',
+    phase: 'discovery' as const,
+    ownership: {
+      requestId: 'attempt',
+      revision: 2,
+      deadline: 121000,
+      run: { threadId: 'thread', runId: 'run' },
+      phase: 'running' as const,
+    },
+    detail:
+      'Overall planning deadline exceeded. This attempt has a bound advisory run whose launch ownership remains outstanding; observe the run before retrying.',
+  },
+  {
+    name: 'a matching unbound uncertain launch',
+    phase: 'discovery' as const,
+    ownership: { requestId: 'attempt', revision: 1, deadline: 121000, phase: 'uncertain' as const },
+    detail:
+      'Overall planning deadline exceeded after launch intent. This attempt has an uncertain launch outcome; operator reconciliation is required before retrying.',
+  },
+  {
+    name: 'freshness after a retired advisory run',
+    phase: 'freshness' as const,
+    ownership: {
+      requestId: 'attempt',
+      revision: 3,
+      deadline: 121000,
+      retired: true,
+      phase: 'succeeded' as const,
+      run: { threadId: 'thread', runId: 'run' },
+    },
+    detail:
+      'Overall planning deadline exceeded during freshness validation. The advisory proposal is not validated; no implementation was dispatched.',
+  },
+  {
+    name: 'restart discovery after a retired advisory run',
+    phase: 'discovery' as const,
+    ownership: {
+      requestId: 'attempt',
+      revision: 3,
+      deadline: 121000,
+      retired: true,
+      phase: 'succeeded' as const,
+      run: { threadId: 'thread', runId: 'run' },
+    },
+    detail:
+      'Overall planning deadline exceeded after the advisory run. Its launch ownership is retired; no validated preview is available.',
+  },
+  {
+    name: 'a matching retired non-launch claim',
+    phase: 'discovery' as const,
+    ownership: {
+      requestId: 'attempt',
+      revision: 2,
+      deadline: 121000,
+      retired: true,
+      phase: 'failed' as const,
+    },
+    detail:
+      "Overall planning deadline exceeded before a planner run was bound. This attempt's launch ownership is retired; no launch reconciliation is required.",
+  },
+])('reports a truthful deadline outcome for $name', async ({ phase, ownership, detail }) => {
+  const store = controlledAttemptStore();
+  const original = {
+    id: 'attempt',
+    revision: 0,
+    startedAt: 1000,
+    deadline: 121000,
+    phase: 'discovery' as const,
+  };
+  await Effect.runPromise(store.create(original));
+  if (phase === 'freshness')
+    await Effect.runPromise(store.save({ ...original, revision: 1, phase }));
+  const runtime = ManagedRuntime.make(
+    AttemptsLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(AttemptStore, store),
+          Layer.succeed(IPlanner, {
+            ownership: () => Effect.succeed(ownership),
+            propose: () => Effect.die('Expired attempt must not launch'),
+          }),
+          Layer.succeed(Plan, {
+            preview: () => Effect.die('Expired attempt must not restart planning'),
+          }),
+          Layer.succeed(Time, { now: () => Effect.succeed(121009) })
+        )
+      )
+    )
+  );
+  try {
+    const attempts = await runtime.runPromise(Attempts);
+    await runtime.runPromise(attempts.execute('attempt'));
+    expect(await Effect.runPromise(store.get('attempt'))).toMatchObject({
+      id: original.id,
+      startedAt: original.startedAt,
+      deadline: original.deadline,
+      finishedAt: 121009,
+      phase: 'failed',
+      detail,
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});

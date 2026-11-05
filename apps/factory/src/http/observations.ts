@@ -2,20 +2,22 @@
 export const observationPresentation = String.raw`
 const observationNotice=document.querySelector('#observation-notice');
 let observationStopped=false;
+let observationLifetime=0;
 let observationVersion=0;
 document.addEventListener('submit',()=>{observationVersion++;},true);
 document.addEventListener('click',event=>{if(event.target instanceof Element && event.target.closest('[data-action]'))observationVersion++;},true);
 let observationTimer;
 let observationRequest;
 async function refreshObservation(){
+  const lifetime=observationLifetime;
+  const version=observationVersion;
   try{
     if(pending)return;
-    const version=observationVersion;
     observationRequest=new AbortController();
     const response=await fetch('/',{signal:observationRequest.signal,cache:'no-store'});
     if(!response.ok)throw new Error('Observation unavailable');
     const next=new DOMParser().parseFromString(await response.text(),'text/html');
-    if(observationStopped || pending || version!==observationVersion)return;
+    if(observationStopped || lifetime!==observationLifetime || pending || version!==observationVersion)return;
     let focusedWork=false;
     for(const id of ['work-observation','schedule-summary']){
       const current=document.getElementById(id);
@@ -29,12 +31,15 @@ async function refreshObservation(){
     if(!next.querySelector('form[data-start]'))document.querySelector('#start-observation')?.replaceChildren();
     observationNotice.textContent=focusedWork?'Automatic updates pause while a work control has keyboard focus.':'Observations refresh automatically.';
   }catch{
-    if(!observationStopped)observationNotice.textContent='Observation unavailable. Last displayed facts retained. Refresh observation to retry.';
+    if(!observationStopped && lifetime===observationLifetime && version===observationVersion && !pending)observationNotice.textContent='Observation unavailable. Last displayed facts retained. Refresh observation to retry.';
   }finally{
-    observationRequest=undefined;
-    if(!observationStopped)observationTimer=setTimeout(refreshObservation,1000);
+    if(lifetime===observationLifetime){
+      observationRequest=undefined;
+      if(!observationStopped)observationTimer=setTimeout(refreshObservation,1000);
+    }
   }
 }
 observationTimer=setTimeout(refreshObservation,1000);
-window.addEventListener('pagehide',()=>{observationStopped=true;clearTimeout(observationTimer);observationRequest?.abort();});
+window.addEventListener('pagehide',()=>{observationStopped=true;observationLifetime++;clearTimeout(observationTimer);observationRequest?.abort();});
+window.addEventListener('pageshow',event=>{if(event.persisted && observationStopped){observationStopped=false;observationTimer=setTimeout(refreshObservation,1000);}});
 `;

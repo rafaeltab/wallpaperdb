@@ -1,5 +1,6 @@
+import { initializeState } from '../src/platform/index.js';
 import { execFileSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { expect, it } from 'vitest';
@@ -49,6 +50,53 @@ it('rejects duplicate state assignments before changing the installed unit or co
       expect(await readFile(unit, 'utf8')).toBe(original);
       await expect(readFile(called)).rejects.toMatchObject({ code: 'ENOENT' });
     }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('checks physical state compatibility before activating through a directory alias', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-activation-'));
+  const release = join(directory, 'release');
+  const state = join(directory, 'physical', 'state');
+  const nested = join(directory, 'physical', 'nested');
+  const bin = join(directory, 'bin');
+  const called = join(directory, 'called');
+  const config = join(directory, 'factory.env');
+  for (const path of [release, state, nested, bin]) await mkdir(path, { recursive: true });
+  await symlink(nested, join(directory, 'link'));
+  const selected = `${directory}/link/../state`;
+  await writeFile(join(state, 'format.json'), '{"format":1}');
+  initializeState(state);
+  await writeFile(config, `FACTORY_STATE=${selected}\n`);
+  await writeFile(join(bin, 'systemctl'), '#!/bin/sh\ntouch "$HOME/called"\n');
+  await chmod(join(bin, 'systemctl'), 0o700);
+  const unitName = 'wallpaperdb-factory-physical-control';
+  const activate = () =>
+    execFileSync(
+      process.execPath,
+      [resolve('scripts/activate.mjs'), release, config, selected, unitName],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, HOME: directory, PATH: `${bin}:${process.env.PATH}` },
+      }
+    );
+  try {
+    await writeFile(
+      join(release, 'installation.json'),
+      JSON.stringify({ commit: 'b'.repeat(40), node: process.execPath, stateFormat: 1 })
+    );
+    expect(activate).toThrow(/Incompatible state format/);
+    await expect(readFile(called)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(
+      readFile(join(directory, '.config/systemd/user', `${unitName}.service`))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await writeFile(
+      join(release, 'installation.json'),
+      JSON.stringify({ commit: 'c'.repeat(40), node: process.execPath, stateFormat: 2 })
+    );
+    expect(activate()).toContain('Activated wallpaperdb-factory-physical-control');
+    expect(await readFile(called, 'utf8')).toBe('');
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

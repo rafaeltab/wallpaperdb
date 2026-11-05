@@ -153,7 +153,7 @@ function makeLint(directory: string, workspace: string, force = true) {
 		[
 			"lint",
 			`PACKAGE=${workspace}`,
-			`TURBO_FLAGS=--filter=${filter} --only${force ? " --force" : ""}`,
+			`TURBO_FLAGS=--filter=${filter} --only${force ? " --force" : ""} -- --max-diagnostics=200`,
 		],
 		{
 			cwd: directory,

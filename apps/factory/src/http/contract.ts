@@ -19,7 +19,11 @@ export interface WorkRelationship {
  * authoritative for persisted controls. An unobserved worker is ambiguous.
  * POST commands retain their existing request/results and revision CAS. A saved
  * scheduler command returns a fresh local control revision. Reads do no external
- * reconciliation. Planning-attempt submission/observation contracts remain in
+ * reconciliation. The existing page fetches local HTML snapshots periodically,
+ * preserves selection/control drafts and preview output, and defers work-region
+ * replacement while a work link/button has keyboard focus. Pending commands and
+ * superseded responses cannot replace that originating page view.
+ * Planning-attempt submission/observation contracts remain in
  * capabilities/plan; this layer adds no deadline or phase changes.
  */
 export type OperationsObservation = import('../capabilities/observe/index.js').ObservationSnapshot;

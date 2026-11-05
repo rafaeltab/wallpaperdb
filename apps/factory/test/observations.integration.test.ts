@@ -65,3 +65,43 @@ observationStoreContract('SQLite observations', async () => {
     close: () => rm(directory, { recursive: true, force: true }),
   };
 });
+
+it('reads a root intent retained after reader construction without a job runtime binding', async () => {
+  const { sqliteLocalSnapshot, fileStore, fileScheduleStore } = await import(
+    '../src/adapters/store/index.js'
+  );
+  const directory = await mkdtemp(join(tmpdir(), 'factory-local-snapshot-'));
+  try {
+    initializeState(directory);
+    const reader = sqliteLocalSnapshot(directory);
+    expect((await Effect.runPromise(reader.read())).entries).toEqual([]);
+    const intent = {
+      id: 'newly-retained',
+      issue: 1,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/1',
+      base: 'a'.repeat(40),
+      context: '',
+      branch: 'worker',
+      createdAt: 1,
+      expectedStage: 'implementation' as const,
+    };
+    expect(await Effect.runPromise(fileStore(directory).reserve(intent))).toBe(true);
+    expect(
+      await Effect.runPromise(
+        fileScheduleStore(directory).save({
+          revision: 0,
+          concurrency: 1,
+          allowance: 1,
+          paused: true,
+          admissions: [{ issue: 1, base: intent.base, context: '' }],
+        })
+      )
+    ).toBe(true);
+    expect(await Effect.runPromise(reader.read())).toMatchObject({
+      state: { admissions: [{ issue: 1 }] },
+      entries: [{ intent, control: { cancelled: false } }],
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

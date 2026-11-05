@@ -134,9 +134,13 @@ it.each(['absent', 'ambiguous'] as const)(
           });
           await retain();
         }
-        expect((await running.app.inject('/api/job')).json()).toMatchObject({
-          execution: { kind },
-        });
+        await vi.waitFor(
+          async () =>
+            expect((await running.app.inject('/api/job')).json()).toMatchObject({
+              execution: { kind },
+            }),
+          { timeout: 15000, interval: 50 }
+        );
         expect((await running.app.inject('/health')).json()).toEqual({ status: 'ok' });
         await vi.waitFor(
           () => expect(observations.at(-1)?.healthy, JSON.stringify(observations)).toBe(0),
@@ -147,10 +151,14 @@ it.each(['absent', 'ambiguous'] as const)(
         expect(await Effect.runPromise(store.read())).toEqual(intent);
         await writeFile(`${host.directory}/resource.json`, JSON.stringify(resource));
         await host.save({});
-        expect((await running.app.inject('/api/job')).json()).toMatchObject({
-          execution: { kind: 'found', status: 'failed' },
-          resume: { runId: 'run-1' },
-        });
+        await vi.waitFor(
+          async () =>
+            expect((await running.app.inject('/api/job')).json()).toMatchObject({
+              execution: { kind: 'found', status: 'failed' },
+              resume: { runId: 'run-1' },
+            }),
+          { timeout: 15000, interval: 50 }
+        );
         await vi.waitFor(
           () =>
             expect(

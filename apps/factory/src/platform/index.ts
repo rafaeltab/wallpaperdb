@@ -4,6 +4,7 @@ export {
   initializeState,
   initializeNamespace,
   durabilitySettings,
+  stateDirectory,
   readRecord,
   requiredRecord,
   recordNames,

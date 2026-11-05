@@ -10,7 +10,7 @@ import {
   realpathSync,
   lstatSync,
 } from 'node:fs';
-import { dirname, basename, join, relative, resolve } from 'node:path';
+import { dirname, basename, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { z } from 'zod';
@@ -31,21 +31,21 @@ import {
 } from './record-schemas.js';
 
 const filename = 'factory.sqlite';
-function canonicalDirectory(directory: string) {
-  let existing = resolve(directory);
+export function stateDirectory(directory: string) {
+  let existing = directory.startsWith('/') ? directory : process.cwd() + '/' + directory;
   const suffix: string[] = [];
   while (!existsSync(existing)) {
     suffix.unshift(basename(existing));
     existing = dirname(existing);
   }
-  return join(realpathSync(existing), ...suffix);
+  return join(realpathSync.native(existing), ...suffix);
 }
 function rootFor(directory: string) {
-  let current = canonicalDirectory(directory);
+  let current = stateDirectory(directory);
   for (;;) {
     if (existsSync(join(current, filename))) return current;
     const parent = dirname(current);
-    if (parent === current) return canonicalDirectory(directory);
+    if (parent === current) return stateDirectory(directory);
     current = parent;
   }
 }
@@ -210,14 +210,14 @@ function connection<A>(
         },
         { behavior: 'immediate' }
       );
-    return work(db, relative(root, canonicalDirectory(directory)), client);
+    return work(db, relative(root, stateDirectory(directory)), client);
   } finally {
     client.close();
   }
 }
 /** Open, migrate and import only. No external reconciliation or worker launch. */
 export function initializeState(directory: string, migrateSchema = true) {
-  const explicitRoot = canonicalDirectory(directory);
+  const explicitRoot = stateDirectory(directory);
   for (
     let ancestor = dirname(explicitRoot);
     ancestor !== explicitRoot;

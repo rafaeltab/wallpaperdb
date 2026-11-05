@@ -2,13 +2,14 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { startFactory } from './composition/index.js';
-import { initializeState } from './platform/index.js';
+import { initializeState, stateDirectory } from './platform/index.js';
 
 const mode = process.argv[2];
 if (mode === '--migrate-only') {
-  const directory = process.argv[3];
-  if (!directory?.startsWith('/'))
+  const selected = process.argv[3];
+  if (!selected?.startsWith('/'))
     throw new Error('Migration requires an explicit absolute state directory');
+  const directory = stateDirectory(selected);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   execFileSync(
     '/usr/bin/flock',

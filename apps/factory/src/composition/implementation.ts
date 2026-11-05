@@ -32,7 +32,7 @@ import {
 } from '../adapters/github/index.js';
 import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
-import { command } from '../platform/index.js';
+import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
@@ -90,6 +90,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         ),
     })
     .parse(environment);
+  configuration.FACTORY_STATE = stateDirectory(configuration.FACTORY_STATE);
   await compatibleState(configuration.FACTORY_STATE);
   const project = resolve(configuration.FACTORY_PROJECT);
   await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);

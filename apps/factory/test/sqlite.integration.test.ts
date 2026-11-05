@@ -401,3 +401,55 @@ it.each(['existing', 'dangling'])(
     }
   }
 );
+
+it('preserves physical symlink parent traversal for import and migration locking', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  try {
+    await mkdir(join(root, 'physical', 'nested'), { recursive: true });
+    const physicalState = join(root, 'physical', 'state');
+    initializeState(physicalState);
+    await publisher(physicalState)('launch-claimed.json', { version: 1 });
+    await symlink(join(root, 'physical', 'nested'), join(root, 'link'));
+    const selected = `${root}/link/../state`;
+    expect(initializeState(selected)).toEqual({ format: 2, records: 1 });
+    const result = await promisify(execFile)(process.execPath, [
+      '--import',
+      'tsx',
+      'src/main.ts',
+      '--migrate-only',
+      selected,
+    ]);
+    expect(JSON.parse(result.stdout)).toEqual({ format: 2, records: 1 });
+    await expect(readFile(join(root, 'state', 'factory.sqlite'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    const lock = spawn(
+      '/usr/bin/flock',
+      [
+        '--nonblock',
+        join(physicalState, 'service.lock'),
+        process.execPath,
+        '-e',
+        "console.log('locked');process.stdin.resume()",
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    try {
+      await once(lock.stdout, 'data');
+      await expect(
+        promisify(execFile)(process.execPath, [
+          '--import',
+          'tsx',
+          'src/main.ts',
+          '--migrate-only',
+          selected,
+        ])
+      ).rejects.toMatchObject({ code: 1 });
+    } finally {
+      lock.stdin.end();
+      await once(lock, 'exit');
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

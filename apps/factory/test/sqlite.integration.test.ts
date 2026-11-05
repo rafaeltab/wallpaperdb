@@ -293,3 +293,29 @@ it('uses EXTRA synchronization with DELETE journaling on production connections'
     await rm(root, { recursive: true, force: true });
   }
 });
+
+it('rejects explicit migration of an existing child database beneath another authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
+  const child = join(root, 'issue-42');
+  try {
+    initializeState(root);
+    initializeState(source);
+    await publisher(source)('launch-claimed.json', { version: 1 });
+    await mkdir(child);
+    await cp(join(source, 'factory.sqlite'), join(child, 'factory.sqlite'));
+    expect(() => initializeState(child)).toThrow(/ancestor/);
+    await expect(
+      promisify(execFile)(process.execPath, [
+        '--import',
+        'tsx',
+        'src/main.ts',
+        '--migrate-only',
+        child,
+      ])
+    ).rejects.toMatchObject({ code: 1 });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(source, { recursive: true, force: true });
+  }
+});

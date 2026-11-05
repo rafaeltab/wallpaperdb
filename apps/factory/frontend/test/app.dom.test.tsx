@@ -104,7 +104,7 @@ it('reports rejected commands and unavailable observations, retains facts, and r
   let offline = false;
   let reads = 0;
   let hold: (() => void) | undefined;
-  const snapshot = base();
+  let snapshot = base();
   vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) => {
     if (options?.method) return json({ title: 'Controls changed. Refresh observation.' }, 409);
     reads++;
@@ -141,9 +141,21 @@ it('reports rejected commands and unavailable observations, retains facts, and r
   await user.click(screen.getByRole('link', { name: 'Refresh observation' }));
   await waitFor(() => expect(reads).toBeGreaterThan(before + 1));
   act(() => window.dispatchEvent(new Event('pagehide')));
+  snapshot = {
+    ...snapshot,
+    observations: {
+      state: 'error',
+      stale: true,
+      observedAt: 9000,
+      error: 'Superseded observation',
+    },
+  };
   await act(async () => {
     hold?.();
   });
+  expect(screen.queryByText(/Superseded observation/)).toBeNull();
+  expect(screen.getByText('GitHub: current.')).toBeTruthy();
+  expect(screen.getByText('Last GitHub observation: 1970-01-01T00:00:00.000Z')).toBeTruthy();
 });
 
 it('keeps stage progress visible through freshness validation, renders advisory results and reports terminal and transport failures', async () => {

@@ -119,6 +119,10 @@ function makeEnvironment(directory) {
 		MAKEFLAGS: "",
 		MFLAGS: "",
 		MAKELEVEL: "0",
+		// Cache assertions require execution in this fixture, never a result from
+		// another temporary repository or CI's shared remote cache.
+		TURBO_CACHE: "local:rw",
+		TURBO_CACHE_DIR: join(directory, ".turbo/cache"),
 		// This is the reviewed configuration copied into our own temporary fixture.
 		MISE_TRUSTED_CONFIG_PATHS: [
 			process.env.MISE_TRUSTED_CONFIG_PATHS,

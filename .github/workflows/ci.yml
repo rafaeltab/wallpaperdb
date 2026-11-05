@@ -71,9 +71,6 @@ jobs:
         run: |
           make test-unit
           make test-integration
-        env:
-          TURBO_TOKEN: ''
-          TURBO_TEAM: ''
 
       - name: Merge coverage reports
         run: pnpm coverage:merge

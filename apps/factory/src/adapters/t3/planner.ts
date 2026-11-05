@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { Effect } from 'effect';
 import { z } from 'zod';
-import type { IPlanner } from '../../capabilities/plan/index.js';
+import { planningInputIdentity, type IPlanner } from '../../capabilities/plan/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { plannerState } from './planner-state.js';
 import { command } from '../../platform/index.js';
@@ -71,7 +71,10 @@ export function t3Planner(config: {
   ) => {
     const previous = await journal.read();
     if (previous && requestId === previous.requestId && previous.run) {
-      if (previous.input !== JSON.stringify(input))
+      if (
+        (previous.inputIdentity ?? previous.input) !==
+        (previous.inputIdentity ? planningInputIdentity(input) : JSON.stringify(input))
+      )
         throw new Error(
           'Original planner inputs changed; request a fresh preview after reconciliation'
         );
@@ -133,15 +136,18 @@ export function t3Planner(config: {
                   ? 'succeeded'
                   : 'failed',
               });
-              const { input: _input, ...ownership } = next;
+              const { input: _input, inputIdentity: _identity, ...ownership } = next;
               return ownership;
             }
           }
-          const { input: _input, ...ownership } = previous;
+          const { input: _input, inputIdentity: _identity, ...ownership } = previous;
           return ownership;
         },
         catch: (cause) => new Unavailable({ operation: 'planner-observation', cause }),
-      }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.t3.planner.ownership')
+      ),
     propose: (input, attempt) =>
       Effect.tryPromise({
         try: async (signal) => {
@@ -159,6 +165,7 @@ export function t3Planner(config: {
                 revision: (current?.revision ?? -1) + 1,
                 requestId,
                 input: JSON.stringify(input),
+                inputIdentity: planningInputIdentity(input),
                 deadline: attempt?.deadline ?? Date.now() + 120000,
                 retired: true,
                 phase: 'failed',
@@ -172,6 +179,7 @@ export function t3Planner(config: {
               revision: (current?.revision ?? -1) + 1,
               requestId,
               input: JSON.stringify(input),
+              inputIdentity: planningInputIdentity(input),
               deadline: attempt?.deadline ?? Date.now() + 120000,
               phase: 'launch-intent',
             });

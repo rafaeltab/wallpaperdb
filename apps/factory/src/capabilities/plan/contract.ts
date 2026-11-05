@@ -202,4 +202,5 @@ export const Attempts = Context.Service<Attempts>('wallpaperdb.factory.Attempts'
 export type AttemptSubmission =
   | { kind: 'accepted'; id: string }
   | { kind: 'busy'; id: string }
+  | { kind: 'conflict' }
   | { kind: 'blocked'; requestId: string; reason: 'outstanding' | 'reconciliation-required' };

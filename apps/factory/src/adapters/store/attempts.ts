@@ -64,7 +64,10 @@ export function sqliteAttemptStore(directory: string): AttemptStore {
     Effect.try({
       try: work,
       catch: (cause) => new Unavailable({ operation: 'attempt-store', cause }),
-    });
+    }).pipe(
+      Effect.tapError((error) => Effect.logError(error)),
+      Effect.withSpan('factory.attempt-store')
+    );
   const translate = (row: typeof table.$inferSelect | undefined) =>
     row
       ? schema.parse({

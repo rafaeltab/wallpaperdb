@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, chmodSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  chmodSync,
+  openSync,
+  fsyncSync,
+  closeSync,
+} from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
@@ -59,6 +68,7 @@ function validate(namespace: string, name: string, value: unknown) {
       throw new Error('Invalid stage index');
   } else if (/^stage-\d+-run(?:-\d+)?\.json$/.test(name))
     stageSchema.extend({ runId: z.string().min(1) }).parse(value);
+  else if (/^writer-\d+\.json$/.test(name)) z.object({ key: z.string().min(1) }).parse(value);
   else if (value === null || typeof value !== 'object')
     throw new Error(`Invalid legacy record: ${name}`);
 }
@@ -67,9 +77,19 @@ function stateNamespace(namespace: string, name: string) {
   if (parts.includes('recovery')) return /^[a-f0-9]{64}$/.test(name);
   if (name === 'recovery') return true;
   if (parts.includes('manual')) return /^(?:[1-9]\d*|[a-f0-9]{40})$/.test(name);
-  return /^(?:issue-[1-9]\d*|planner|joins|manual|[a-f0-9]{64}|repair-(?:replay|owner)-[a-f0-9]{64}-(?:(?:[a-f0-9]{40}|initial)-)?[a-f0-9]{40})$/.test(
+  return /^(?:issue-[1-9]\d*|planner|joins|manual|writers|[a-f0-9]{64}|repair-(?:replay|owner)-[a-f0-9]{64}-(?:(?:[a-f0-9]{40}|initial)-)?[a-f0-9]{40})$/.test(
     name
   );
+}
+function rejectNestedDatabases(root: string, namespace = ''): void {
+  const directory = join(root, namespace);
+  if (!existsSync(directory)) return;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === filename && namespace)
+      throw new Error('Nested SQLite database requires explicit state-root reconciliation');
+    if (entry.isDirectory() && stateNamespace(namespace, entry.name))
+      rejectNestedDatabases(root, join(namespace, entry.name));
+  }
 }
 function legacy(
   root: string,
@@ -102,7 +122,13 @@ function legacy(
       result.push({ namespace, name: entry.name, value });
     }
   }
-  for (const kind of ['control', 'wait', 'schedule', 'planner']) {
+  for (const kind of [
+    'control',
+    'wait',
+    'schedule',
+    'planner',
+    ...(namespace.split('/').includes('writers') ? ['writer'] : []),
+  ]) {
     const revisions = result
       .filter((r) => r.namespace === namespace && new RegExp(`^${kind}-\\d+\\.json$`).test(r.name))
       .map((r) => Number(r.name.slice(kind.length + 1, -5)))
@@ -114,7 +140,7 @@ function legacy(
 }
 function connection<A>(
   directory: string,
-  work: (db: ReturnType<typeof drizzle>, namespace: string) => A,
+  work: (db: ReturnType<typeof drizzle>, namespace: string, client: Database.Database) => A,
   migrateSchema = false
 ): A {
   const root = rootFor(directory);
@@ -123,7 +149,9 @@ function connection<A>(
   try {
     chmodSync(join(root, filename), 0o600);
     client.pragma('busy_timeout = 10000');
-    client.pragma('synchronous = FULL');
+    client.pragma('synchronous = EXTRA');
+    if (client.pragma('journal_mode', { simple: true }) !== 'delete')
+      throw new Error('Factory requires SQLite DELETE journal mode');
     const db = drizzle(client);
     const hasMetadata = client
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'metadata'")
@@ -132,6 +160,18 @@ function connection<A>(
       ? db.select().from(metadata).where(eq(metadata.key, 'format')).get()?.value
       : undefined;
     if (format !== undefined && format !== '2') throw new Error('Unsupported SQLite state format');
+    if (format === undefined || migrateSchema) {
+      // Persist the database name and any newly created state-directory ancestors.
+      for (let current = root; ; current = dirname(current)) {
+        const descriptor = openSync(current, 'r');
+        try {
+          fsyncSync(descriptor);
+        } finally {
+          closeSync(descriptor);
+        }
+        if (dirname(current) === current) break;
+      }
+    }
     if (!hasMetadata || migrateSchema)
       migrate(db, {
         migrationsFolder:
@@ -155,13 +195,16 @@ function connection<A>(
         },
         { behavior: 'immediate' }
       );
-    return work(db, relative(root, resolve(directory)));
+    return work(db, relative(root, resolve(directory)), client);
   } finally {
     client.close();
   }
 }
 /** Open, migrate and import only. No external reconciliation or worker launch. */
-export function initializeState(directory: string, migrateSchema = false) {
+export function initializeState(directory: string, migrateSchema = true) {
+  if (rootFor(directory) !== resolve(directory))
+    throw new Error('Explicit state root cannot inherit an ancestor SQLite database');
+  rejectNestedDatabases(resolve(directory));
   return connection(
     directory,
     (db) => ({
@@ -170,6 +213,16 @@ export function initializeState(directory: string, migrateSchema = false) {
     }),
     migrateSchema
   );
+}
+export function durabilitySettings(directory: string) {
+  return connection(directory, (_db, _namespace, client) => ({
+    journalMode: client.pragma('journal_mode', { simple: true }),
+    synchronous: client.pragma('synchronous', { simple: true }),
+  }));
+}
+/** Adapter namespace binding may discover the already initialized shared root. */
+export function initializeNamespace(directory: string) {
+  connection(directory, () => undefined);
 }
 export function publisher(directory: string) {
   return async (name: string, value: unknown) =>

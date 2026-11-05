@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { startFactory } from '../src/composition/index.js';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
@@ -6,7 +7,13 @@ import { mkdtemp, mkdir, readFile, readdir, readlink, rm, writeFile, cp } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { publisher, readRecord, recordNames, initializeState } from '../src/platform/index.js';
+import {
+  publisher,
+  readRecord,
+  recordNames,
+  initializeState,
+  durabilitySettings,
+} from '../src/platform/index.js';
 
 it('imports all legacy namespaces atomically, retains originals and reopens claims', async () => {
   const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
@@ -204,17 +211,85 @@ it.each(['issue-42', 'planner', 'joins'])(
       await publisher(child)('launch-claimed.json', { version: 1 });
       expect(() => initializeState(root)).toThrow('Nested SQLite database');
       expect(await publisher(child)('launch-claimed.json', { version: 1 })).toBe(false);
-      const parent = new Database(join(root, 'factory.sqlite'));
-      try {
-        expect(parent.prepare('SELECT count(*) AS count FROM metadata').get()).toEqual({
-          count: 0,
-        });
-        expect(parent.prepare('SELECT count(*) AS count FROM records').get()).toEqual({ count: 0 });
-      } finally {
-        parent.close();
-      }
+      await expect(readFile(join(root, 'factory.sqlite'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
     } finally {
       await rm(root, { recursive: true, force: true });
     }
   }
 );
+
+it('rejects an explicit state root nested beneath existing SQLite authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const child = join(root, 'issue-42');
+  try {
+    initializeState(root);
+    await mkdir(child);
+    await writeFile(join(child, 'launch-claimed.json'), '{"version":1}');
+    expect(() => initializeState(child, true)).toThrow();
+    await expect(
+      startFactory({
+        FACTORY_PROJECT: root,
+        FACTORY_T3_PROJECT_ID: 'controlled',
+        FACTORY_BASE: 'a'.repeat(40),
+        FACTORY_T3_BINARY: '/missing/t3',
+        FACTORY_STATE: child,
+        FACTORY_PORT: '0',
+      })
+    ).rejects.toThrow(/state format/);
+    await expect(
+      promisify(execFile)(process.execPath, [
+        '--import',
+        'tsx',
+        'src/main.ts',
+        '--migrate-only',
+        child,
+      ])
+    ).rejects.toMatchObject({ code: 1 });
+    expect(await readFile(join(child, 'launch-claimed.json'), 'utf8')).toBe('{"version":1}');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('rejects a nested database introduced after parent initialization', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
+  try {
+    initializeState(root);
+    initializeState(source);
+    await publisher(source)('launch-claimed.json', { version: 1 });
+    await mkdir(join(root, 'issue-42'));
+    await cp(join(source, 'factory.sqlite'), join(root, 'issue-42', 'factory.sqlite'));
+    expect(() => initializeState(root, true)).toThrow('Nested SQLite database');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(source, { recursive: true, force: true });
+  }
+});
+
+it('imports legacy competing-writer ownership under the shared joins namespace', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const writers = join(root, 'joins', 'writers', 'a'.repeat(64));
+  try {
+    await mkdir(writers, { recursive: true });
+    await writeFile(join(writers, 'writer-0.json'), '{"key":"retained-owner"}');
+    expect(initializeState(root)).toEqual({ format: 2, records: 1 });
+    expect(await readRecord(writers, 'writer-0.json')).toEqual({ key: 'retained-owner' });
+    expect(await publisher(writers)('writer-0.json', { key: 'competing-owner' })).toBe(false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('uses EXTRA synchronization with DELETE journaling on production connections', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  try {
+    expect(durabilitySettings(root)).toEqual({ journalMode: 'delete', synchronous: 3 });
+    await publisher(root)('launch-claimed.json', { version: 1 });
+    expect(durabilitySettings(root)).toEqual({ journalMode: 'delete', synchronous: 3 });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

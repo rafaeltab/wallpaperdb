@@ -2,6 +2,8 @@ export { command } from './process.js';
 export { publisher } from './durable.js';
 export {
   initializeState,
+  initializeNamespace,
+  durabilitySettings,
   readRecord,
   requiredRecord,
   recordNames,

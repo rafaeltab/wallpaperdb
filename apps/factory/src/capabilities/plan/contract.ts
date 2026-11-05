@@ -131,6 +131,16 @@ export interface ScheduleStatus {
   readonly state: ScheduleState;
   readonly jobs: readonly Status[];
 }
+/** Persist each completed external observation before downstream planning can block or fail.
+ * Snapshot reads never invoke this port. It publishes no admission authority.
+ * A technical publication failure aborts the current operation before downstream
+ * planning/admission; it must not be represented as successfully published facts. */
+export interface ScheduleObservations {
+  publish(snapshot: ScheduleStatus): Effect.Effect<void, Unavailable>;
+}
+export const ScheduleObservations = Context.Service<ScheduleObservations>(
+  'wallpaperdb.factory.ScheduleObservations'
+);
 export interface Scheduler {
   /** Check recovery capacity without another issue admission. Recovery journals
    * retain their active reservation. A validated completed-stage receipt reserves

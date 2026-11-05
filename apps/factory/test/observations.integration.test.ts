@@ -105,3 +105,42 @@ it('reads a root intent retained after reader construction without a job runtime
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('publishes completed scheduler facts at their observation time without refreshing GitHub metadata', async () => {
+  const { sqliteScheduleObservations } = await import('../src/adapters/store/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'factory-schedule-observation-'));
+  try {
+    initializeState(directory);
+    const store = sqliteObservations(directory);
+    await Effect.runPromise(
+      store.refresh({ startedAt: 10, failedAt: 20, error: 'github-offline' })
+    );
+    const publisher = sqliteScheduleObservations(directory, { now: () => Effect.succeed(30) });
+    await Effect.runPromise(
+      publisher.publish({
+        state: { revision: 1, concurrency: 1, allowance: 1, paused: false, admissions: [] },
+        jobs: [],
+        recoveries: [
+          {
+            issue: 4,
+            pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+            progress: 'Awaiting answer',
+            active: false,
+            question: 'Approved scope?',
+          },
+        ],
+      })
+    );
+    expect(await Effect.runPromise(store.read())).toMatchObject({
+      failedAt: 20,
+      error: 'github-offline',
+      observedAt: undefined,
+      facts: undefined,
+      jobs: [],
+      jobsObservedAt: 30,
+      recoveries: [{ issue: 4, question: 'Approved scope?', active: false }],
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

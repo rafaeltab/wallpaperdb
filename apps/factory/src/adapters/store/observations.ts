@@ -74,3 +74,15 @@ export function sqliteObservations(directory: string): ObservationStore {
       ),
   };
 }
+
+/** The scheduler publishes only facts it has completely observed, independent of later planning. */
+export function sqliteScheduleObservations(
+  directory: string,
+  time: import('../../capabilities/job/index.js').Time
+): import('../../capabilities/plan/index.js').ScheduleObservations {
+  const store = sqliteObservations(directory);
+  return {
+    publish: (snapshot) =>
+      Effect.flatMap(time.now(), (now) => store.jobs(snapshot.jobs, now, snapshot.recoveries)),
+  };
+}

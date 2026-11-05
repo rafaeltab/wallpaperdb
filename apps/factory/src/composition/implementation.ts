@@ -28,6 +28,7 @@ import {
   sqliteAttemptStore,
   sqliteObservations,
   sqliteLocalSnapshot,
+  sqliteScheduleObservations,
 } from '../adapters/store/index.js';
 import {
   Attempts,
@@ -40,6 +41,7 @@ import {
   SchedulerLive,
   JobPool,
   ScheduleStore,
+  ScheduleObservations,
 } from '../capabilities/plan/index.js';
 import {
   githubIssues,
@@ -201,6 +203,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const schedulerDeps = Layer.mergeAll(
     deps,
     Layer.succeed(ScheduleStore, scheduleStore),
+    Layer.succeed(
+      ScheduleObservations,
+      sqliteScheduleObservations(configuration.FACTORY_STATE, systemTime)
+    ),
     Layer.succeed(JobPool, pool)
   );
   const planningDeps = Layer.mergeAll(
@@ -332,9 +338,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     observing = runtime
       .runPromise(
         scheduler.tick(configuration.FACTORY_BASE).pipe(
-          Effect.tap((snapshot) =>
-            observationStore.jobs(snapshot.jobs, Date.now(), snapshot.recoveries)
-          ),
           Effect.tap((snapshot) =>
             configuration.FACTORY_OTEL_ENDPOINT
               ? availabilityObservation(retainedWorkAvailable(snapshot))

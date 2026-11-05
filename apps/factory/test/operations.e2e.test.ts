@@ -26,12 +26,31 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
       await page.goto(`http://127.0.0.1:${address.port}`);
+      const refreshedDraft = page.waitForResponse(
+        (response) =>
+          response.request().resourceType() === 'fetch' &&
+          response.url() === `http://127.0.0.1:${address.port}/`,
+        { timeout: 5000 }
+      );
       await page.getByLabel('Selected issue number').fill('576');
       await page.getByLabel('Maintainer execution context').fill('Inspect only. No writes.');
+      await refreshedDraft;
+      await browserExpect(page.getByLabel('Selected issue number')).toHaveValue('576');
+      await browserExpect(page.getByLabel('Maintainer execution context')).toHaveValue(
+        'Inspect only. No writes.'
+      );
       await page.getByRole('button', { name: 'Start selected issue' }).click();
       await browserExpect(
         page.getByRole('heading', { name: 'Implementation', exact: true })
       ).toBeVisible();
+      await browserExpect
+        .poll(async () => {
+          const observed = await (
+            await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+          ).json();
+          return observed.execution?.status;
+        })
+        .toBe('running');
       await browserExpect(page.getByText('Status: running')).toBeVisible();
       await browserExpect(page.getByRole('link', { name: 'Issue #576' })).toHaveAttribute(
         'href',
@@ -42,6 +61,17 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         't3-thread://v1/thread-live'
       );
       await browserExpect(page.getByText(/Elapsed: \d+ seconds/)).toBeVisible();
+      const cancelControl = page.getByRole('button', { name: 'Cancel job' });
+      await cancelControl.focus();
+      await browserExpect(page.locator('#observation-notice')).toHaveText(
+        'Automatic updates pause while a work control has keyboard focus.'
+      );
+      await browserExpect(cancelControl).toBeFocused();
+      await page.getByRole('link', { name: 'Refresh observation' }).focus();
+      await browserExpect(page.locator('#observation-notice')).toHaveText(
+        'Observations refresh automatically.'
+      );
+
       await page.getByRole('link', { name: 'Refresh observation' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
       await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
@@ -313,9 +343,19 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
       await page.getByLabel('Selected issue number').fill('581');
       await page.getByRole('button', { name: 'Start selected issue' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
+      const refreshedControls = page.waitForResponse(
+        (response) =>
+          response.request().resourceType() === 'fetch' &&
+          response.url() === `http://127.0.0.1:${address.port}/`,
+        { timeout: 5000 }
+      );
       await page.getByLabel('Concurrency').fill('3');
       await page.getByLabel('Distinct issue allowance').fill('-1');
       await page.getByLabel('Pause admissions').check();
+      await refreshedControls;
+      await browserExpect(page.getByLabel('Concurrency')).toHaveValue('3');
+      await browserExpect(page.getByLabel('Distinct issue allowance')).toHaveValue('-1');
+      await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
       await page.getByRole('button', { name: 'Save scheduler controls' }).click();
       await browserExpect(page.getByText('Admissions: 1. Admissions paused.')).toBeVisible();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
@@ -393,6 +433,14 @@ it('shows conflict classification and pending questions with a recovery-thread l
     await writeFile(resourcePath, JSON.stringify(resource));
     await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
     await page.reload();
+    await browserExpect
+      .poll(async () => {
+        const snapshot = await (
+          await page.request.get(`http://127.0.0.1:${address.port}/api/scheduler`)
+        ).json();
+        return snapshot.recoveries?.map((r: { question?: string }) => r.question);
+      })
+      .toContain('Open recovery thread to answer the pending question');
     await browserExpect(
       page.getByText('Question: Open recovery thread to answer the pending question')
     ).toBeVisible();
@@ -482,6 +530,7 @@ it.each(['implementation', 'publication'] as const)(
         await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(
           0
         );
+        await browserExpect(page.getByText('Status: running')).toBeVisible();
         const resumed = await (
           await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
         ).json();

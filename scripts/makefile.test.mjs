@@ -441,7 +441,7 @@ test("dev defaults to Compose and scopes workspace dev through Turbo", () => {
 test("stop tears down apps before infrastructure for the selected Compose project", () => {
 	const commands = output("stop", "COMPOSE_PROJECT_NAME=isolated");
 	const apps = commands.indexOf(
-		"docker compose -p isolated -f infra/docker-compose.apps.yml down",
+		"docker compose -p isolated -f infra/docker-compose.apps.yml --profile '*' down",
 	);
 	const infra = commands.indexOf(
 		"docker compose -p isolated -f infra/docker-compose.yml --profile '*' down",
@@ -459,6 +459,8 @@ test("database and Compose commands use explicit selectors", () => {
 	);
 	assert.match(output("apps-stop", "SERVICE=ingestor"), /stop ingestor/);
 	assert.doesNotMatch(output("apps-stop", "SERVICE=ingestor"), / down/);
+	assert.match(output("apps-stop", "SERVICE=tags"), /stop tags/);
+	assert.match(output("apps-stop"), /--profile '\*' down/);
 	assert.match(output("apps-stop"), / down/);
 });
 

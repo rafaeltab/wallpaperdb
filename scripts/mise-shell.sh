@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 if ! command -v mise >/dev/null 2>&1; then
-  echo 'mise is required. See CONTRIBUTING.md for setup, then run make install.' >&2
+  echo 'Install mise: https://mise.jdx.dev/getting-started.html, then run make install.' >&2
   exit 127
 fi
 export MISE_AUTO_INSTALL=false

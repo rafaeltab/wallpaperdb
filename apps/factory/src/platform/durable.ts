@@ -12,7 +12,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, count } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { records, metadata } from './schema.js';
@@ -189,7 +189,7 @@ function connection<A>(
             throw new Error('Unsupported legacy format');
           const imported = legacy(root);
           for (const record of imported) tx.insert(records).values(record).run();
-          if (tx.select().from(records).all().length !== imported.length)
+          if ((tx.select({ value: count() }).from(records).get()?.value ?? 0) !== imported.length)
             throw new Error('Incomplete import');
           tx.insert(metadata).values({ key: 'format', value: '2' }).run();
         },
@@ -209,7 +209,7 @@ export function initializeState(directory: string, migrateSchema = true) {
     directory,
     (db) => ({
       format: 2,
-      records: db.select().from(records).all().length,
+      records: db.select({ value: count() }).from(records).get()?.value ?? 0,
     }),
     migrateSchema
   );
@@ -277,7 +277,7 @@ export async function recordNames(directory: string): Promise<string[]> {
     return [
       ...new Set(
         db
-          .select()
+          .select({ namespace: records.namespace, name: records.name })
           .from(records)
           .all()
           .flatMap((row) =>

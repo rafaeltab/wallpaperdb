@@ -657,7 +657,6 @@ export async function start547Application(context) {
 				path.join(directory, "preview-replacement.json"),
 				replacement,
 			);
-			manifest(directory, liveRaw());
 			preserved();
 			within();
 			preview = next;
@@ -666,7 +665,10 @@ export async function start547Application(context) {
 			result.status = "PASS_PREVIEW_REPLACEMENT";
 			result.acceptedAt = replacement.acceptedAt;
 			result.next = replacement.next;
-			record();
+			publication(path.join(directory, "result.json"), result);
+			manifest(directory, liveRaw());
+			preserved();
+			within();
 			transitioning = false;
 			return replacement;
 		} catch (error) {

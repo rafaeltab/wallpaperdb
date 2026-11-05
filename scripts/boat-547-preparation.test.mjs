@@ -18,6 +18,23 @@ const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
 
+function assertManifestIntegrity(directory) {
+	const files = json(path.join(directory, "manifest.json")).files;
+	assert.ok(files.some((file) => file.path === path.join(directory, "result.json")));
+	for (const file of files) {
+		const stat = fs.lstatSync(file.path);
+		assert.equal(stat.isFile(), true, file.path);
+		const bytes = fs.readFileSync(file.path);
+		assert.equal(bytes.length, file.bytes, file.path);
+		assert.equal(
+			createHash("sha256").update(bytes).digest("hex"),
+			file.sha256,
+			file.path,
+		);
+		assert.equal(stat.mode & 0o777, file.mode, file.path);
+	}
+}
+
 test("547 image diagnostics distinguish native exit from complete capture and drainage", async (t) => {
 	const f = preparationFixture(t);
 	f.env.CONTROL_FAIL = "chromium-install";
@@ -887,6 +904,46 @@ for (const fault of ["source", "containers-before", "containers", "late"]) {
 		}
 	});
 }
+
+test("547 replacement refuses a failed final result publication before acknowledgement", async (t) => {
+	const f = preparationFixture(t);
+	f.config.until = "ready";
+	const result = await f.run({
+		publication(file, value) {
+			if (
+				file === path.join(f.config.evidence, "startup/result.json") &&
+				value.status === "PASS_PREVIEW_REPLACEMENT"
+			)
+				throw new Error("Final result publication refused");
+			fs.writeFileSync(file, JSON.stringify(value));
+		},
+	});
+	try {
+		await assert.rejects(
+			result.serving.replacePreview({
+				action: "replace-preview",
+				worker: result.owner.worker,
+				admission: result.owner.admission,
+				generation: result.preview.generation,
+			}),
+			/Final result publication refused/,
+		);
+		const failed = json(
+			path.join(f.config.evidence, "startup/preview-replacement.json"),
+		);
+		assert.equal(failed.status, "FAIL");
+		assert.equal(failed.acceptedAt, undefined);
+		assert.equal(json(path.join(f.root, ".boat/state.json")).runningSince, null);
+		assert.equal(
+			jsonLines(path.join(f.root, "commands.jsonl")).filter(
+				(argv) => argv[1] === "boat-stop",
+			).length,
+			1,
+		);
+	} finally {
+		await result.serving.stop();
+	}
+});
 
 test("547 serving receipt I/O rejection retires the other capture and stops once", async (t) => {
 	const f = preparationFixture(t);
@@ -2047,6 +2104,25 @@ const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.s
 			});
 			try {
 				const deadline = mono() + 15;
+				const acknowledgement = async (status) => {
+					for (;;) {
+						const text = fs.readFileSync(
+							path.join(f.root, "entry-capture/stdout.raw"),
+							"utf8",
+						);
+						const reply = text
+							.slice(0, text.lastIndexOf("\n") + 1)
+							.split("\n")
+							.filter((line) => line.startsWith("{"))
+							.map(JSON.parse)
+							.find((value) => value.status === status);
+						if (reply) return reply;
+						capture.assertRunning();
+						assert.ok(mono() < deadline, "Public CLI acknowledgement deadline");
+						await new Promise((resolve) => setTimeout(resolve, 25));
+					}
+				};
+				await acknowledgement("PASS_STARTUP_READY");
 				const resultFile = path.join(f.config.evidence, "startup/result.json");
 				while (!fs.existsSync(resultFile)) {
 					capture.assertRunning();
@@ -2065,6 +2141,7 @@ const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.s
 				assert.equal(result.containers.length, 10);
 				assert.equal(result.routes.length, 8);
 				assert.ok(result.acceptedAt < result.deadline);
+				assertManifestIntegrity(path.dirname(resultFile));
 				if (wanted) {
 					assert.deepEqual(
 						json(path.join(f.root, "intent-at-first-ordinary.json")),
@@ -2087,6 +2164,7 @@ const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.s
 				capture.writeInput(
 					`${JSON.stringify({ action: "replace-preview", worker: result.owner.worker, admission: result.owner.admission, generation: result.preview.generation })}\n`,
 				);
+				const changedAck = await acknowledgement("PASS_PREVIEW_REPLACEMENT");
 				const changedFile = path.join(
 					f.config.evidence,
 					"startup/preview-replacement.json",
@@ -2110,6 +2188,29 @@ const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.s
 				);
 				assert.notEqual(changed.preview.generation, result.preview.generation);
 				assert.equal(changed.next, "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST");
+				assert.deepEqual(changedAck, {
+					status: "PASS_PREVIEW_REPLACEMENT",
+					phase: "preview-replacement",
+					round: f.config.round,
+					url: changed.url,
+					worker: result.owner.worker,
+					admission: result.owner.admission,
+					generation: changed.preview.generation,
+					next: "ROOT_ORIGINAL_DOCUMENT_CHECK_FIRST",
+				});
+				assert.equal(json(resultFile).status, "PASS_PREVIEW_REPLACEMENT");
+				assertManifestIntegrity(path.dirname(resultFile));
+				const original = fs.readFileSync(resultFile);
+				try {
+					fs.appendFileSync(resultFile, "\n");
+					assert.throws(
+						() => assertManifestIntegrity(path.dirname(resultFile)),
+						/result\.json/,
+					);
+				} finally {
+					fs.writeFileSync(resultFile, original);
+				}
+				assertManifestIntegrity(path.dirname(resultFile));
 			} finally {
 				await capture.stop();
 			}

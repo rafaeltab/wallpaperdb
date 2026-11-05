@@ -295,3 +295,106 @@ it('dates last-known facts consistently with the conservative refresh cadence an
     await runtime.dispose();
   }
 });
+
+const resumeCases: readonly {
+  name: string;
+  action: import('../src/capabilities/job/index.js').ResumeAction;
+  parked?: import('../src/capabilities/job/index.js').Control['parked'];
+  cancelled?: boolean;
+  expected: boolean;
+}[] = [
+  {
+    name: 'current retry revision',
+    action: { index: 2, runId: 'run', revision: 4 },
+    expected: true,
+  },
+  {
+    name: 'stale retry revision',
+    action: { index: 2, runId: 'run', revision: 3 },
+    expected: false,
+  },
+  {
+    name: 'matching parked question',
+    action: { index: 2, questionId: 'q' },
+    parked: { index: 2, question: { id: 'q', text: 'Scope?' } },
+    expected: true,
+  },
+  {
+    name: 'different parked question',
+    action: { index: 2, questionId: 'old' },
+    parked: { index: 2, question: { id: 'q', text: 'Scope?' } },
+    expected: false,
+  },
+  {
+    name: 'different parked stage',
+    action: { index: 1, questionId: 'q' },
+    parked: { index: 2, question: { id: 'q', text: 'Scope?' } },
+    expected: false,
+  },
+  { name: 'cleared parked question', action: { index: 2, questionId: 'q' }, expected: false },
+  {
+    name: 'cancelled current retry',
+    action: { index: 2, runId: 'run', revision: 4 },
+    cancelled: true,
+    expected: false,
+  },
+];
+it.each(resumeCases)(
+  'projects resume eligibility for $name from current local controls',
+  async ({ action, parked, cancelled, expected }) => {
+    const intent = {
+      id: 'current',
+      issue: 1,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/1',
+      base: 'a'.repeat(40),
+      context: '',
+      branch: 'worker',
+      createdAt: 10,
+      expectedStage: 'implementation' as const,
+    };
+    const store = controlledObservations({
+      jobs: [
+        { kind: 'job', intent, execution: { kind: 'ambiguous' }, elapsedMs: 0, resume: action },
+      ],
+    });
+    const runtime = ManagedRuntime.make(
+      ObservationsLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Time, { now: () => Effect.succeed(20) }),
+            Layer.succeed(ObservationStore, store),
+            Layer.succeed(ObservationSource, {
+              read: () => Effect.die('Snapshot does not refresh'),
+            }),
+            Layer.succeed(LocalSnapshot, {
+              read: () =>
+                Effect.succeed({
+                  state: {
+                    revision: 0,
+                    concurrency: 1,
+                    allowance: 1,
+                    paused: true,
+                    admissions: [{ issue: 1, base: intent.base, context: '' }],
+                  },
+                  entries: [
+                    {
+                      intent,
+                      control: { revision: 4, cancelled: cancelled ?? false, claimed: [], parked },
+                    },
+                  ],
+                }),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const observer = await runtime.runPromise(Observations);
+      expect((await runtime.runPromise(observer.schedule())).jobs).toMatchObject([
+        { resume: expected ? action : undefined },
+      ]);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

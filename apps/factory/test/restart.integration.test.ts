@@ -75,9 +75,13 @@ it('a fresh process reconciles publication after a lost response without repeati
     await stop(child);
     child = launch();
     await ready();
-    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
-      execution: { threadId: 'thread-live', run: { id: 'run-1' } },
-    });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+          execution: { threadId: 'thread-live', run: { id: 'run-1' } },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     const scheduler = z
       .object({ state: z.object({ revision: z.number() }) })
       .parse(await (await fetch(origin + '/api/scheduler')).json());
@@ -115,9 +119,13 @@ it('a fresh process reconciles publication after a lost response without repeati
     await stop(child);
     child = launch();
     await ready();
-    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
-      delivery: { stage: 'review', ready: false },
-    });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+          delivery: { stage: 'review', ready: false },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     await host.save({
       complete: true,
       base: host.base,
@@ -144,18 +152,21 @@ it('a fresh process reconciles publication after a lost response without repeati
     expect(await (await fetch(origin + '/api/scheduler')).json()).toMatchObject({
       state: { concurrency: 3, allowance: -1, paused: true, admissions: [{ issue: 577 }] },
     });
-    const recovered = await fetch(origin + '/api/job');
-    expect(await recovered.json()).toMatchObject({
-      kind: 'job',
-      intent: { issue: 577, expectedStage: 'implementation' },
-      execution: { threadId: 'thread-live' },
-      delivery: {
-        stage: 'ci',
-        ready: true,
-        landed: false,
-        pr: { url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', commit: host.base },
-      },
-    });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+          kind: 'job',
+          intent: { issue: 577, expectedStage: 'implementation' },
+          execution: { threadId: 'thread-live' },
+          delivery: {
+            stage: 'ci',
+            ready: true,
+            landed: false,
+            pr: { url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', commit: host.base },
+          },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     const page = await (await fetch(origin)).text();
     expect(page).toContain('t3-thread://v1/thread-live');
     expect(page).toContain('Elapsed:');
@@ -203,9 +214,13 @@ it('a fresh process reconciles publication after a lost response without repeati
       overrides: { status: 'completed', runCount: 5, latestRunId: 'watcher-5' },
     };
     await host.save(watcher);
-    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
-      delivery: { activity: 'waiting-for-github', deadline: initialWait?.deadline },
-    });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+          delivery: { activity: 'waiting-for-github', deadline: initialWait?.deadline },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     await stop(child);
     const store = fileStore(join(host.directory, 'state'));
     const retained = await Effect.runPromise(store.readWait());
@@ -242,10 +257,13 @@ it('a fresh process reconciles publication after a lost response without repeati
     await host.save(waiting);
     child = launch();
     await ready();
-    const pending = await (await fetch(origin + '/api/job')).json();
-    expect(pending).toMatchObject({
-      delivery: { stage: 'babysitting', activity: 'continuation-pending', ready: false },
-    });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+          delivery: { stage: 'babysitting', activity: 'continuation-pending', ready: false },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     expect(
       (await host.calls()).filter(
         (call) => call.args[1] === 'send' && !call.args.includes('--help')

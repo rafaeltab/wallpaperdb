@@ -1,8 +1,8 @@
-import validExpectRule from "./ported/valid-expect.js";
-import validExpectInPromiseRule from "./ported/valid-expect-in-promise.js";
-import requireAwaitedExpectPollRule from "./ported/require-awaited-expect-poll.js";
-import retryRule from "./retry.js";
-import { port } from "./port.js";
+import validExpectRule from "./ported/valid-expect.ts";
+import validExpectInPromiseRule from "./ported/valid-expect-in-promise.ts";
+import requireAwaitedExpectPollRule from "./ported/require-awaited-expect-poll.ts";
+import retryRule from "./retry.ts";
+import { port } from "./port.ts";
 
 export const validExpect = port(validExpectRule, [
 	{

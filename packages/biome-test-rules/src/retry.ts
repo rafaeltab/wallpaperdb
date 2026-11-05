@@ -1,6 +1,7 @@
+import type { SyntaxNode, AdaptedRule } from "./contracts.ts";
 // Translated from #437 at 7cfe7fc1, scripts/eslint-rules/no-test-retries.mjs.
 // The configured traversal follows declaration initializers, not assignments.
-import { definition } from "./scope.js";
+import { definition } from "./scope.ts";
 
 const registrations = new Set(["it", "test", "describe", "suite"]);
 export default {
@@ -13,7 +14,11 @@ export default {
 	},
 	create(context) {
 		const reported = new WeakSet();
-		function isRegistration(callee, seen = new Set(), members = []) {
+		function isRegistration(
+			callee: SyntaxNode,
+			seen = new Set(),
+			members: (string | number | boolean | SyntaxNode | null)[] = [],
+		) {
 			if (seen.has(callee)) return false;
 			seen.add(callee);
 			while (
@@ -44,12 +49,12 @@ export default {
 			)
 				return false;
 			return binding.node.type === "ImportNamespaceSpecifier"
-				? registrations.has(members.at(-1))
+				? registrations.has(members.at(-1) as string)
 				: registrations.has(
 						binding.node.imported.name ?? binding.node.imported.value,
 					);
 		}
-		function inspectOptions(node, seen = new Set()) {
+		function inspectOptions(node: SyntaxNode, seen = new Set()) {
 			if (seen.has(node)) return;
 			seen.add(node);
 			if (node.type === "Identifier") {
@@ -80,4 +85,4 @@ export default {
 			},
 		};
 	},
-};
+} satisfies AdaptedRule;

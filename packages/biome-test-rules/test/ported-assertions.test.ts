@@ -1,8 +1,18 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
-const fixtures = JSON.parse(
+const fixtures: Record<
+	string,
+	{
+		cases: {
+			source: string;
+			valid: boolean;
+			messages: string[];
+			[key: string]: unknown;
+		}[];
+	}
+> = JSON.parse(
 	readFileSync(new URL("./upstream-fixtures.json", import.meta.url), "utf8"),
 );
 test("pinned valid-expect rejects its default async matcher without awaiting", () => {

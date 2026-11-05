@@ -1,109 +1,118 @@
+import type { SyntaxNode, AdaptedRule, Context } from "../src/contracts.ts";
+import type { NativeNode } from "../src/native-view.ts";
+interface Input {
+	kind: string;
+	text: string;
+	[key: string]: unknown;
+}
 import { expect, test } from "vitest";
-import { syntaxTree, visitSyntax } from "../src/syntax.js";
-import validExpect from "../src/ported/valid-expect.js";
-import validExpectInPromise from "../src/ported/valid-expect-in-promise.js";
-import requireAwaitedExpectPoll from "../src/ported/require-awaited-expect-poll.js";
-import noRetries from "../src/retry.js";
+import { syntaxTree, visitSyntax } from "../src/syntax.ts";
+import validExpect from "../src/ported/valid-expect.ts";
+import validExpectInPromise from "../src/ported/valid-expect-in-promise.ts";
+import requireAwaitedExpectPoll from "../src/ported/require-awaited-expect-poll.ts";
+import noRetries from "../src/retry.ts";
 
 // Finite input records for the syntax adapter's existing boundary. These do not
 // parse source or implement Biome's semantic model. CLI tests own that integration.
-const identifier = (name) => ({
+const identifier = (name: string) => ({
 	kind: "JS_IDENTIFIER_EXPRESSION",
 	text: name,
 	name: { kind: "JS_REFERENCE_IDENTIFIER", text: name },
 });
-const literal = (value) => ({
+const literal = (value: string | number) => ({
 	kind:
 		typeof value === "string"
 			? "JS_STRING_LITERAL_EXPRESSION"
 			: "JS_NUMBER_LITERAL_EXPRESSION",
 	text: JSON.stringify(value),
 });
-const member = (object, name) => ({
+const member = (object: Input, name: string) => ({
 	kind: "JS_STATIC_MEMBER_EXPRESSION",
 	text: `${object.text}.${name}`,
 	object,
 	member: { kind: "JS_NAME", text: name },
 });
-const call = (callee, args = []) => ({
+const call = (callee: Input, args: Input[] = []) => ({
 	kind: "JS_CALL_EXPRESSION",
 	text: `${callee.text}(${args.map((arg) => arg.text).join(",")})`,
 	callee,
 	arguments: { args },
 });
-const statement = (expression) => ({
+const statement = (expression: Input) => ({
 	kind: "JS_EXPRESSION_STATEMENT",
 	text: `${expression.text};`,
 	expression,
 });
-const awaited = (argument) => ({
+const awaited = (argument: Input) => ({
 	kind: "JS_AWAIT_EXPRESSION",
 	text: `await ${argument.text}`,
 	argument,
 });
-const returned = (argument) => ({
+const returned = (argument: Input) => ({
 	kind: "JS_RETURN_STATEMENT",
 	text: `return ${argument.text};`,
 	argument,
 });
-const block = (statements) => ({
+const block = (statements: Input[]) => ({
 	kind: "JS_FUNCTION_BODY",
 	text: `{${statements.map((node) => node.text).join("\n")}}`,
 	statements,
 });
-const arrow = (body) => ({
+const arrow = (body: Input) => ({
 	kind: "JS_ARROW_FUNCTION_EXPRESSION",
 	text: `()=>${body.text}`,
 	body,
 });
-const property = (name, value) => ({
+const property = (name: string, value: Input) => ({
 	kind: "JS_PROPERTY_OBJECT_MEMBER",
 	text: `${name}:${value.text}`,
 	name: { kind: "JS_LITERAL_MEMBER_NAME", text: name },
 	value,
 });
-const object = (members) => ({
+const object = (members: Input[]) => ({
 	kind: "JS_OBJECT_EXPRESSION",
 	text: `{${members.map((node) => node.text).join(",")}}`,
 	members,
 });
-const assertion = (modifiers = [], args = [literal(1)]) => {
-	let expression = call(identifier("expect"), args);
+const assertion = (modifiers: string[] = [], args = [literal(1)]) => {
+	let expression: Input = call(identifier("expect"), args);
 	for (const modifier of modifiers) expression = member(expression, modifier);
 	return call(member(expression, "toBe"), [literal(1)]);
 };
-const registration = (body) =>
+const registration = (body: Input[]) =>
 	call(identifier("test"), [literal("case"), arrow(block(body))]);
 
-function diagnose(rule, statements) {
+function diagnose(rule: AdaptedRule, statements: Input[]) {
 	const tree = syntaxTree({
 		kind: "JS_MODULE",
 		text: statements.map((node) => node.text).join("\n"),
 		items: statements,
-	});
-	const nodes = [];
+	} as unknown as NativeNode);
+	const nodes: SyntaxNode[] = [];
 	visitSyntax(
 		tree,
 		new Proxy(
 			{},
 			{
 				get: (_, key) =>
-					key.endsWith(":exit") ? undefined : (node) => nodes.push(node),
+					String(key).endsWith(":exit")
+						? undefined
+						: (node: SyntaxNode) => nodes.push(node),
 			},
 		),
 	);
-	const reports = [];
-	const context = {
+	const reports: string[] = [];
+	const context: Context = {
 		// These contracts use unbound Vitest globals. Binding/import and native
 		// scope correctness remain covered by actual CLI fixtures.
-		model: { scope: () => null, binding: () => null },
+		model: { scope: () => undefined, binding: () => undefined },
 		nodes,
 		settings: { vitest: {} },
 		report: (report) => reports.push(report.messageId),
 	};
 	const options =
 		rule === validExpect
-			? [{ ...rule.meta.defaultOptions[0], maxArgs: 2 }]
+			? [{ ...rule.meta.defaultOptions![0], maxArgs: 2 }]
 			: (rule.meta.defaultOptions ?? []);
 	visitSyntax(tree, rule.create(context, options));
 	return reports;
@@ -114,12 +123,12 @@ test("syntax locations retain UTF-16 columns and LF-only line boundaries", () =>
 		kind: "JS_MODULE",
 		text: "\ufeff/*😀*/one;\r\n\n  two;\r\u2028one;",
 		items: ["one", "two", "one"].map((name) => statement(identifier(name))),
-	});
+	} as unknown as NativeNode);
 	expect(tree.loc).toStrictEqual({
 		start: { line: 1, column: 0 },
 		end: { line: 3, column: 12 },
 	});
-	expect(tree.body.map((node) => node.loc)).toStrictEqual([
+	expect((tree.body as SyntaxNode[]).map((node) => node.loc)).toStrictEqual([
 		{ start: { line: 1, column: 7 }, end: { line: 1, column: 11 } },
 		{ start: { line: 3, column: 2 }, end: { line: 3, column: 6 } },
 		{ start: { line: 3, column: 8 }, end: { line: 3, column: 12 } },
@@ -133,9 +142,13 @@ test("syntax locations retain UTF-16 columns and LF-only line boundaries", () =>
 		["", { line: 1, column: 0 }],
 		["one;\n", { line: 2, column: 0 }],
 		["one;\r\n\n", { line: 3, column: 0 }],
-	]) {
+	] as const) {
 		expect(
-			syntaxTree({ kind: "JS_MODULE", text, items: [] }).loc,
+			syntaxTree({
+				kind: "JS_MODULE",
+				text,
+				items: [],
+			} as unknown as NativeNode).loc,
 		).toStrictEqual({
 			start: { line: 1, column: 0 },
 			end,

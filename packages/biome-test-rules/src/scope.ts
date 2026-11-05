@@ -1,7 +1,26 @@
-import { identifierValue, stringValue } from "./syntax.js";
+import type { Scope } from "@biomejs/runtime/plugin";
+import type { AnyJsAstNode } from "@biomejs/runtime/plugin";
+import type { AnyJsIdentifierReference } from "@biomejs/runtime/plugin";
+import type { NativeNode } from "./native-view.ts";
+import { nativeView } from "./native-view.ts";
+type Resolution =
+	| "testContext"
+	| "local"
+	| { source: string; imported: string; local: string }
+	| null;
+type Definition =
+	| { type: "Other" }
+	| { type: "Variable"; node: SyntaxNode }
+	| {
+			type: "ImportBinding";
+			parent: { source: { value: string } };
+			node: { type: string; imported: { name: string; value?: string } };
+	  };
+import type { SyntaxNode, Context } from "./contracts.ts";
+import { identifierValue, stringValue } from "./syntax.ts";
 
 // The pinned accessor helpers use raw text for no-substitution templates.
-function staticTemplateValue(node) {
+function staticTemplateValue(node: NativeNode | undefined) {
 	if (
 		node?.kind !== "JS_TEMPLATE_EXPRESSION" ||
 		node.tag ||
@@ -11,7 +30,7 @@ function staticTemplateValue(node) {
 	return node.elements.map((e) => e.text).join("");
 }
 
-function importedName(node) {
+function importedName(node: NativeNode) {
 	return (
 		staticTemplateValue(node) ??
 		(/^["']/.test(node.text)
@@ -20,12 +39,18 @@ function importedName(node) {
 	);
 }
 
-export const getScope = (context, node) => context.model.scope(node.native);
+export const getScope = (context: Context, node: SyntaxNode) =>
+	context.model.scope(node.native as unknown as AnyJsAstNode);
 
-export function definition(context, identifier) {
-	const binding = context.model.binding(identifier.native);
+export function definition(
+	context: Context,
+	identifier: SyntaxNode,
+): Definition | undefined {
+	const binding = context.model.binding(
+		identifier.native as unknown as AnyJsIdentifierReference,
+	);
 	if (!binding) return undefined;
-	const native = binding.syntax();
+	const native = nativeView(binding.syntax());
 	const clause = native
 		.ancestors()
 		.find((n) =>
@@ -38,7 +63,7 @@ export function definition(context, identifier) {
 	if (clause)
 		return {
 			type: "ImportBinding",
-			parent: { source: { value: stringValue(clause.source.text) } },
+			parent: { source: { value: stringValue(clause.source!.text) } },
 			node: {
 				type:
 					native.parent?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER"
@@ -65,23 +90,25 @@ export function definition(context, identifier) {
 
 // Translation of the pinned parser's resolveScope: inspect declaration kind,
 // parameter shape and imports, rather than following arbitrary value aliases.
-export function resolveScope(scope, identifier) {
+export function resolveScope(
+	scope: Scope | undefined,
+	identifier: string,
+): Resolution {
 	for (let current = scope; current; current = current.parent()) {
 		const binding = current.getBinding(identifier);
 		if (!binding) continue;
-		const declaration = binding.syntax();
+		const declaration = nativeView(binding.syntax());
 		const ancestors = declaration.ancestors();
 		const parameter = ancestors.find((n) => n.kind === "JS_FORMAL_PARAMETER");
 		if (
 			parameter ||
 			declaration.parent?.kind === "JS_ARROW_FUNCTION_EXPRESSION"
 		) {
-			const fn = ancestors.find((n) =>
-				[
-					"JS_ARROW_FUNCTION_EXPRESSION",
-					"JS_FUNCTION_EXPRESSION",
-					"JS_FUNCTION_DECLARATION",
-				].includes(n.kind),
+			const fn = ancestors.find(
+				(n) =>
+					n.kind === "JS_ARROW_FUNCTION_EXPRESSION" ||
+					n.kind === "JS_FUNCTION_EXPRESSION" ||
+					n.kind === "JS_FUNCTION_DECLARATION",
 			);
 			const params =
 				fn?.parameters?.items ?? (fn?.parameters ? [fn.parameters] : []);
@@ -132,15 +159,15 @@ export function resolveScope(scope, identifier) {
 			if (clause.typeToken === "type" || /^["']/.test(parent.name?.text ?? ""))
 				return "local";
 			return {
-				source: stringValue(clause.source.text),
-				imported: importedName(parent.name),
+				source: stringValue(clause.source!.text),
+				imported: importedName(parent.name!),
 				local: identifier,
 			};
 		}
 		if (clause && parent?.kind === "JS_SHORTHAND_NAMED_IMPORT_SPECIFIER") {
 			if (clause.typeToken === "type") return "local";
 			return {
-				source: stringValue(clause.source.text),
+				source: stringValue(clause.source!.text),
 				imported: identifier,
 				local: identifier,
 			};
@@ -172,7 +199,7 @@ export function resolveScope(scope, identifier) {
 			[
 				"JS_OBJECT_BINDING_PATTERN_PROPERTY",
 				"JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY",
-			].includes(parent?.kind)
+			].includes(parent?.kind ?? "")
 		) {
 			const declarator = ancestors.find(
 				(n) => n.kind === "JS_VARIABLE_DECLARATOR",
@@ -189,7 +216,7 @@ export function resolveScope(scope, identifier) {
 						: undefined;
 			const source = imported?.arguments?.args[0];
 			const templateSource = staticTemplateValue(source);
-			let key = parent.member ?? parent.identifier;
+			let key = parent!.member ?? parent!.identifier;
 			if (key?.kind === "JS_COMPUTED_MEMBER_NAME") key = key.expression;
 			if (
 				(source?.kind === "JS_STRING_LITERAL_EXPRESSION" ||
@@ -197,7 +224,7 @@ export function resolveScope(scope, identifier) {
 				key
 			)
 				return {
-					source: templateSource ?? stringValue(source.text),
+					source: templateSource ?? stringValue(source!.text),
 					imported: importedName(key),
 					local: identifier,
 				};

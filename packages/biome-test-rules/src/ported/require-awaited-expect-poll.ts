@@ -1,8 +1,9 @@
+import type { SyntaxNode } from "../contracts.ts";
 // Adapted from @vitest/eslint-plugin 1.6.27, commit aad57d121647efe764463c37414a8cd67ec9cf92.
 // MIT; see ../../UPSTREAM-LICENSE.txt. Biome supplies syntax/scope and diagnostics.
-import { AST_NODE_TYPES } from "./utils.js";
-import { createEslintRule, getAccessorValue } from "./utils.js";
-import { parseVitestFnCall } from "./parse-vitest-fn-call.js";
+import { AST_NODE_TYPES } from "./utils.ts";
+import { createEslintRule, getAccessorValue } from "./utils.ts";
+import { parseVitestFnCall } from "./parse-vitest-fn-call.ts";
 const RULE_NAME = "require-awaited-expect-poll";
 export default createEslintRule({
 	name: RULE_NAME,
@@ -44,7 +45,7 @@ export default createEslintRule({
 					return;
 				}
 				context.report({
-					node: nodeToReport,
+					node: nodeToReport!,
 					messageId: "notAwaited",
 					data: {
 						method: `expect.${getAccessorValue(vitestFnCall.members[0])}`,
@@ -56,20 +57,20 @@ export default createEslintRule({
 	},
 });
 const awaitedMembers = ["poll", "element"];
-function memberRequiresAwait(member) {
+function memberRequiresAwait(member: SyntaxNode) {
 	return awaitedMembers.includes(getAccessorValue(member));
 }
-function skipMatchersAndModifiers(node) {
+function skipMatchersAndModifiers(node: SyntaxNode) {
 	let currentNode = node;
 	while (
-		currentNode.parent.type === AST_NODE_TYPES.MemberExpression ||
-		currentNode.parent.type === AST_NODE_TYPES.CallExpression
+		currentNode.parent?.type === AST_NODE_TYPES.MemberExpression ||
+		currentNode.parent?.type === AST_NODE_TYPES.CallExpression
 	) {
 		currentNode = currentNode.parent;
 	}
 	return currentNode;
 }
-function skipSequenceExpressions(node) {
+function skipSequenceExpressions(node: SyntaxNode) {
 	let currentNode = node;
 	while (
 		currentNode.parent?.type === AST_NODE_TYPES.SequenceExpression &&

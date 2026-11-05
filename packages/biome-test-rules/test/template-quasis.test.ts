@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
-const pluginDiagnostics = (source) =>
+const pluginDiagnostics = (source: string) =>
 	lint(source).filter((d) => d.category === "plugin");
 
 test("interpolated template members retain empty boundary quasis", () => {

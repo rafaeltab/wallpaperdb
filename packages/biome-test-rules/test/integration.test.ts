@@ -117,14 +117,14 @@ function isolatedRepository() {
 	return directory;
 }
 
-function gitFixture(directory, args) {
+function gitFixture(directory: string, args: string[]) {
 	const result = spawnSync("git", ["-C", directory, ...args], {
 		encoding: "utf8",
 	});
 	expect(result.status, result.stderr).toBe(0);
 }
 
-function makeEnvironment(directory) {
+function makeEnvironment(directory: string): NodeJS.ProcessEnv {
 	return {
 		...process.env,
 		MAKEFLAGS: "",
@@ -144,7 +144,7 @@ function makeEnvironment(directory) {
 	};
 }
 
-function makeLint(directory, workspace, force = true) {
+function makeLint(directory: string, workspace: string, force = true) {
 	const filter = workspace === "root" ? "//" : `@wallpaperdb/${workspace}`;
 	// The fixture owns configuration and sources, while dependency builds are
 	// validated by repository CI. Run the actual Make/Turbo lint task in isolation.
@@ -166,8 +166,8 @@ function makeLint(directory, workspace, force = true) {
 	return { status: result.status, output: result.stdout + result.stderr };
 }
 
-function makeRuleTests(directory) {
-	const env = makeEnvironment(directory);
+function makeRuleTests(directory: string) {
+	const env: NodeJS.ProcessEnv = makeEnvironment(directory);
 	const result = spawnSync(
 		"make",
 		[
@@ -193,13 +193,13 @@ test("unit coverage combines with the CRAP JavaScript rule inventory", () => {
 		mkdirSync(join(workspace, "src"), { recursive: true });
 		mkdirSync(join(workspace, "test"));
 		writeFileSync(
-			join(workspace, "src/measurement.js"),
+			join(workspace, "src/measurement.ts"),
 			"export function measured() {\n  return 42;\n}\n",
 		);
 		writeFileSync(
-			join(workspace, "test/coverage.test.mjs"),
+			join(workspace, "test/coverage.test.ts"),
 			`import { expect, test } from 'vitest';
-import { measured } from '../src/measurement.js';
+import { measured } from '../src/measurement.ts';
 test('executes measured source', () => expect(measured()).toBe(42));`,
 		);
 		gitFixture(directory, ["add", "--", "."]);
@@ -209,8 +209,11 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 			existsSync(reportPath),
 			"unit task must produce the collector's Istanbul report",
 		).toBeTruthy();
-		const coverage = JSON.parse(readFileSync(reportPath, "utf8"));
-		const measured = coverage[join(workspace, "src/measurement.js")];
+		const coverage: Record<
+			string,
+			{ f: Record<string, number>; s: Record<string, number> }
+		> = JSON.parse(readFileSync(reportPath, "utf8"));
+		const measured = coverage[join(workspace, "src/measurement.ts")];
 		expect(Object.values(measured.f).some((hits) => hits > 0)).toBeTruthy();
 		const unmeasured = coverage[join(workspace, "src/syntax.js")];
 		expect(
@@ -220,11 +223,11 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		expect(
 			Object.values(unmeasured.s).every((hits) => hits === 0),
 		).toBeTruthy();
-		const env = {
+		const env: NodeJS.ProcessEnv = {
 			...makeEnvironment(directory),
 			PACKAGE: "biome-test-rules",
 		};
-		const runCollector = (mode) =>
+		const runCollector = (mode: string) =>
 			spawnSync(
 				join(repository, "scripts/node_modules/.bin/tsx"),
 				[join(directory, "scripts/crap.mts"), mode],
@@ -238,23 +241,23 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		const report = runCollector("report");
 		expect(report.status, report.stdout + report.stderr).toBe(0);
 		for (const file of [
-			"syntax.js",
-			"scope.js",
-			"port.js",
-			"retry.js",
-			"ported/valid-expect.js",
-			"ported/valid-expect-in-promise.js",
-			"ported/require-awaited-expect-poll.js",
+			"syntax.ts",
+			"scope.ts",
+			"port.ts",
+			"retry.ts",
+			"ported/valid-expect.ts",
+			"ported/valid-expect-in-promise.ts",
+			"ported/require-awaited-expect-poll.ts",
 		])
 			expect(
 				report.stdout.includes(`src/${file}`),
 				`missing ${file}: ${report.stdout}`,
 			).toBeTruthy();
 		expect(report.stdout).toMatch(
-			/0\.00%\tpackages\/biome-test-rules\/src\/syntax\.js:/,
+			/0\.00%\tpackages\/biome-test-rules\/src\/syntax\.ts:/,
 		);
 		expect(report.stdout).toMatch(
-			/100\.00%\tpackages\/biome-test-rules\/src\/measurement\.js:/,
+			/100\.00%\tpackages\/biome-test-rules\/src\/measurement\.ts:/,
 		);
 		const check = runCollector("check");
 		expect(
@@ -272,13 +275,13 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 	}
 });
 
-function installRuleTestCounter(directory) {
+function installRuleTestCounter(directory: string) {
 	const workspace = join(directory, "packages/biome-test-rules");
 	mkdirSync(join(workspace, "test"));
 	mkdirSync(join(workspace, ".turbo"));
 	const count = join(workspace, ".turbo/executions");
 	writeFileSync(
-		join(workspace, "test/cache.test.mjs"),
+		join(workspace, "test/cache.test.ts"),
 		`import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 test('records actual execution', () => {
@@ -361,7 +364,7 @@ test("root lint cache changes when the shared rules or configuration changes", (
 	}
 });
 
-function sourceTestDirectory(path) {
+function sourceTestDirectory(path: string): string | undefined {
 	if (!existsSync(path)) return undefined;
 	for (const entry of readdirSync(path, { withFileTypes: true })) {
 		if (entry.isFile() && /\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name))

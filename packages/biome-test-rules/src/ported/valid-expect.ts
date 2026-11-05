@@ -1,15 +1,16 @@
+import type { SyntaxNode, Location, Report, Fix } from "../contracts.ts";
 // Adapted from @vitest/eslint-plugin 1.6.27, commit aad57d121647efe764463c37414a8cd67ec9cf92.
 // MIT; see ../../UPSTREAM-LICENSE.txt. Biome supplies syntax/scope and diagnostics.
-import { AST_NODE_TYPES } from "./utils.js";
+import { AST_NODE_TYPES } from "./utils.ts";
 import {
 	createEslintRule,
 	getAccessorValue,
 	isFunction,
 	isSupportedAccessor,
-} from "./utils.js";
-import { parseVitestFnCallWithReason } from "./parse-vitest-fn-call.js";
-import { ModifierName } from "./types.js";
-import { parsePluginSettings } from "./parse-plugin-settings.js";
+} from "./utils.ts";
+import { parseVitestFnCallWithReason } from "./parse-vitest-fn-call.ts";
+import { ModifierName } from "./types.ts";
+import { parsePluginSettings } from "./parse-plugin-settings.ts";
 const RULE_NAME = "valid-expect";
 const defaultAsyncMatchers = ["toReject", "toResolve"];
 /**
@@ -19,7 +20,7 @@ const defaultAsyncMatchers = ["toReject", "toResolve"];
  *
  * @Returns CallExpressionNode
  */
-const getPromiseCallExpressionNode = (node) => {
+const getPromiseCallExpressionNode = (node: SyntaxNode) => {
 	if (
 		node.type === AST_NODE_TYPES.ArrayExpression &&
 		node.parent &&
@@ -35,18 +36,18 @@ const getPromiseCallExpressionNode = (node) => {
 		return node;
 	return null;
 };
-const promiseArrayExceptionKey = ({ start, end }) =>
+const promiseArrayExceptionKey = ({ start, end }: Location) =>
 	`${start.line}:${start.column}-${end.line}:${end.column}`;
-const getNormalizeFunctionExpression = (functionExpression) => {
+const getNormalizeFunctionExpression = (functionExpression: SyntaxNode) => {
 	if (
-		functionExpression.parent.type === AST_NODE_TYPES.Property &&
+		functionExpression.parent?.type === AST_NODE_TYPES.Property &&
 		functionExpression.type === AST_NODE_TYPES.FunctionExpression
 	)
 		return functionExpression.parent;
 	return functionExpression;
 };
 const promiseChainMethods = new Set(["catch", "finally", "then"]);
-const findTopMostMatcherCallExpression = (node) => {
+const findTopMostMatcherCallExpression = (node: SyntaxNode) => {
 	let currentNode = node;
 	let topMostMatcherCallExpression = node;
 	while (
@@ -67,7 +68,7 @@ const findTopMostMatcherCallExpression = (node) => {
 	}
 	return topMostMatcherCallExpression;
 };
-function getParentIfThenified(node) {
+function getParentIfThenified(node: SyntaxNode) {
 	const grandParentNode = node.parent?.parent;
 	if (
 		grandParentNode &&
@@ -82,18 +83,20 @@ function getParentIfThenified(node) {
 		return getParentIfThenified(grandParentNode);
 	return node;
 }
-const findPromiseCallExpressionNode = (node) =>
+const findPromiseCallExpressionNode = (node: SyntaxNode) =>
 	node.parent?.parent &&
 	[AST_NODE_TYPES.CallExpression, AST_NODE_TYPES.ArrayExpression].includes(
 		node.parent.type,
 	)
 		? getPromiseCallExpressionNode(node.parent)
 		: null;
-const findFirstFunctionExpression = ({ parent }) => {
+const findFirstFunctionExpression = ({
+	parent,
+}: SyntaxNode): SyntaxNode | null => {
 	if (!parent) return null;
 	return isFunction(parent) ? parent : findFirstFunctionExpression(parent);
 };
-const isAcceptableReturnNode = (node, allowReturn) => {
+const isAcceptableReturnNode = (node: SyntaxNode, allowReturn: boolean) => {
 	if (allowReturn && node.type === AST_NODE_TYPES.ReturnStatement) return true;
 	if (node.type === AST_NODE_TYPES.ConditionalExpression && node.parent)
 		return isAcceptableReturnNode(node.parent, allowReturn);
@@ -169,8 +172,8 @@ export default createEslintRule({
 		],
 	) => {
 		const arrayExceptions = new Set();
-		const descriptors = [];
-		const pushPromiseArrayException = (loc) =>
+		const descriptors: Report[] = [];
+		const pushPromiseArrayException = (loc: Location) =>
 			arrayExceptions.add(promiseArrayExceptionKey(loc));
 		/**
 		 * Promise method that accepts an array of promises,
@@ -179,9 +182,9 @@ export default createEslintRule({
 		 * multiple warnings, we check if there is a warning in
 		 * the given location.
 		 */
-		const promiseArrayExceptionExists = (loc) =>
+		const promiseArrayExceptionExists = (loc: Location) =>
 			arrayExceptions.has(promiseArrayExceptionKey(loc));
-		const findTopMostMemberExpression = (node) => {
+		const findTopMostMemberExpression = (node: SyntaxNode) => {
 			let topMostMemberExpression = node;
 			let { parent } = node;
 			while (parent) {
@@ -211,10 +214,7 @@ export default createEslintRule({
 						context.report({
 							messageId:
 								isSupportedAccessor(reportingNode) &&
-								Object.prototype.hasOwnProperty.call(
-									ModifierName,
-									getAccessorValue(reportingNode),
-								)
+								Object.hasOwn(ModifierName, getAccessorValue(reportingNode))
 									? "matcherNotFound"
 									: "matcherNotCalled",
 							node: reportingNode,
@@ -298,15 +298,15 @@ export default createEslintRule({
 						loc,
 					});
 				}
-				const { matcher } = vitestFnCall;
-				const matcherCallExpression = matcher.parent.parent;
+				const matcher = vitestFnCall.matcher!;
+				const matcherCallExpression = matcher.parent!.parent!;
 				if (matcherCallExpression.type !== AST_NODE_TYPES.CallExpression)
 					return;
 				const parentNode = findTopMostMatcherCallExpression(
 					matcherCallExpression,
 				);
 				const shouldBeAwaited =
-					vitestFnCall.modifiers.some((modifier) => {
+					vitestFnCall.modifiers!.some((modifier) => {
 						const value = getAccessorValue(modifier);
 						return (
 							value === ModifierName.resolves || value === ModifierName.rejects
@@ -334,7 +334,7 @@ export default createEslintRule({
 				}
 			},
 			"Program:exit"() {
-				const fixes = [];
+				const fixes: Fix[] = [];
 				descriptors.forEach(({ node, messageId }, index) => {
 					const orReturned = alwaysAwait ? "" : " or returned";
 					context.report({
@@ -350,7 +350,7 @@ export default createEslintRule({
 							);
 							if (!functionExpression.async && !foundAsyncFixer) {
 								const targetFunction =
-									getNormalizeFunctionExpression(functionExpression);
+									getNormalizeFunctionExpression(functionExpression)!;
 								fixes.push(fixer.insertTextBefore(targetFunction, "async "));
 							}
 							const returnStatement =
@@ -359,7 +359,7 @@ export default createEslintRule({
 									: null;
 							if (alwaysAwait && returnStatement) {
 								const sourceCodeText =
-									context.sourceCode.getText(returnStatement);
+									context.sourceCode!.getText(returnStatement);
 								const replacedText = sourceCodeText.replace("return", "await");
 								fixes.push(fixer.replaceText(returnStatement, replacedText));
 							} else {

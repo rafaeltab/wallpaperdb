@@ -1,23 +1,31 @@
+import type { SyntaxNode, AdaptedRule } from "./contracts.ts";
 import {
 	defineRule,
 	registerDiagnostic,
 	semantic,
 } from "@biomejs/runtime/plugin";
-import { syntaxTree, visitSyntax } from "./syntax.js";
+import { nativeView } from "./native-view.ts";
+import type { AnyJsAstNode } from "@biomejs/runtime/plugin";
+import { syntaxTree, visitSyntax } from "./syntax.ts";
 
-export function port(rule, options = rule.meta.defaultOptions ?? []) {
+export function port(
+	rule: AdaptedRule,
+	options = rule.meta.defaultOptions ?? [],
+) {
 	return defineRule({
 		query: semantic("JS_MODULE", "JS_SCRIPT"),
 		run(root, context) {
-			const tree = syntaxTree(root);
-			const nodes = [];
+			const tree = syntaxTree(nativeView(root));
+			const nodes: SyntaxNode[] = [];
 			visitSyntax(
 				tree,
 				new Proxy(
 					{},
 					{
 						get: (_, key) =>
-							key.endsWith(":exit") ? undefined : (node) => nodes.push(node),
+							String(key).endsWith(":exit")
+								? undefined
+								: (node: SyntaxNode) => nodes.push(node),
 					},
 				),
 			);
@@ -33,10 +41,10 @@ export function port(rule, options = rule.meta.defaultOptions ?? []) {
 					report({ node, messageId, data = {} }) {
 						const message = rule.meta.messages[messageId].replace(
 							/{{\s*(\w+)\s*}}/g,
-							(_, key) => String(data[key] ?? ""),
+							(_: string, key: string) => String(data[key] ?? ""),
 						);
 						registerDiagnostic(
-							node.native,
+							node.native as unknown as AnyJsAstNode,
 							"error",
 							`${rule.name}: ${message}`,
 						);

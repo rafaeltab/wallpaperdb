@@ -14,4 +14,6 @@ This workspace adapts pinned Vitest assertion algorithms to Biome's JavaScript p
 
 Keep the CLI and plugin runtime pinned together while JavaScript plugins are in developer preview. Native rule selection belongs in the shared configuration, rather than a second prose inventory.
 
-Vitest runs the rule suites and their generated executable test fixtures. Its [V8 coverage configuration](vitest.config.ts) measures direct algorithm contracts but cannot observe Biome's isolated plugin execution. Unmeasured bridge paths retain zero hits for CRAP reporting. CLI fixture success does not establish measured coverage of those paths. See the [algorithm contracts](test/algorithm-contracts.test.mjs) and [integration checks](test/integration.test.mjs) when changing collection or rule registration.
+The implementation and test tooling use TypeScript. The [package type-check script](package.json) strictly checks source, tests, and Vitest configuration using [tsconfig.json](tsconfig.json), without a separate build.
+
+Vitest runs the rule suites and their generated executable test fixtures. Its [V8 coverage configuration](vitest.config.ts) measures direct algorithm contracts but cannot observe Biome's isolated plugin execution. Unmeasured bridge paths retain zero hits for CRAP reporting. CLI fixture success does not establish measured coverage of those paths. See the [algorithm contracts](test/algorithm-contracts.test.ts) and [integration checks](test/integration.test.ts) when changing collection or rule registration.

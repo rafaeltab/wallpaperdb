@@ -1,6 +1,7 @@
+import type { SyntaxNode, Context } from "../contracts.ts";
 // Adapted from @vitest/eslint-plugin 1.6.27, commit aad57d121647efe764463c37414a8cd67ec9cf92.
 // MIT; see ../../UPSTREAM-LICENSE.txt. Biome supplies syntax/scope and diagnostics.
-import { AST_NODE_TYPES } from "./utils.js";
+import { AST_NODE_TYPES } from "./utils.ts";
 import {
 	createEslintRule,
 	getAccessorValue,
@@ -8,15 +9,15 @@ import {
 	getNodeName,
 	isFunction,
 	isIdentifier,
-} from "./utils.js";
-import { ModifierName } from "./types.js";
+} from "./utils.ts";
+import { ModifierName } from "./types.ts";
 import {
 	findTopMostCallExpression,
 	isTypeOfVitestFnCall,
 	parseVitestFnCall,
-} from "./parse-vitest-fn-call.js";
+} from "./parse-vitest-fn-call.ts";
 const RULE_NAME = "valid-expect-in-promise";
-const isPromiseChainCall = (node) => {
+const isPromiseChainCall = (node: SyntaxNode) => {
 	if (
 		node.type === AST_NODE_TYPES.CallExpression &&
 		node.callee.type === AST_NODE_TYPES.MemberExpression &&
@@ -36,13 +37,13 @@ const isPromiseChainCall = (node) => {
 	}
 	return false;
 };
-const isTestCaseCallWithCallbackArg = (node, context) => {
+const isTestCaseCallWithCallbackArg = (node: SyntaxNode, context: Context) => {
 	const vitestCallFn = parseVitestFnCall(node, context);
 	if (vitestCallFn?.type !== "test") {
 		return false;
 	}
 	const isVitestEach = vitestCallFn.members.some(
-		(s) => getAccessorValue(s) === "each",
+		(s: SyntaxNode) => getAccessorValue(s) === "each",
 	);
 	if (
 		isVitestEach &&
@@ -58,7 +59,10 @@ const isTestCaseCallWithCallbackArg = (node, context) => {
 		callback.params.length === 1 + callbackArgIndex
 	);
 };
-const isPromiseMethodThatUsesValue = (node, identifier) => {
+const isPromiseMethodThatUsesValue = (
+	node: SyntaxNode,
+	identifier: SyntaxNode,
+) => {
 	const { name } = identifier;
 	if (node.argument === null) {
 		return false;
@@ -67,7 +71,7 @@ const isPromiseMethodThatUsesValue = (node, identifier) => {
 		node.argument.type === AST_NODE_TYPES.CallExpression &&
 		node.argument.arguments.length > 0
 	) {
-		const nodeName = getNodeName(node.argument);
+		const nodeName = getNodeName(node.argument)!;
 		if (["Promise.all", "Promise.allSettled"].includes(nodeName)) {
 			const [firstArg] = node.argument.arguments;
 			if (
@@ -90,7 +94,7 @@ const isPromiseMethodThatUsesValue = (node, identifier) => {
  * Attempts to determine if the runtime value represented by the given `identifier`
  * is `await`ed within the given array of elements
  */
-const isValueAwaitedInElements = (name, elements) => {
+const isValueAwaitedInElements = (name: string, elements: SyntaxNode[]) => {
 	for (const element of elements) {
 		if (
 			element?.type === AST_NODE_TYPES.AwaitExpression &&
@@ -111,7 +115,7 @@ const isValueAwaitedInElements = (name, elements) => {
  * Attempts to determine if the runtime value represented by the given `identifier`
  * is `await`ed as an argument along the given call expression
  */
-const isValueAwaitedInArguments = (name, call) => {
+const isValueAwaitedInArguments = (name: string, call: SyntaxNode) => {
 	let node = call;
 	while (node) {
 		if (node.type === AST_NODE_TYPES.CallExpression) {
@@ -127,7 +131,7 @@ const isValueAwaitedInArguments = (name, call) => {
 	}
 	return false;
 };
-const getLeftMostCallExpression = (call) => {
+const getLeftMostCallExpression = (call: SyntaxNode) => {
 	let leftMostCallExpression = call;
 	let node = call;
 	while (node) {
@@ -146,7 +150,11 @@ const getLeftMostCallExpression = (call) => {
  * Attempts to determine if the runtime value represented by the given `identifier`
  * is `await`ed or `return`ed within the given `body` of statements
  */
-const isValueAwaitedOrReturned = (identifier, body, context) => {
+const isValueAwaitedOrReturned = (
+	identifier: SyntaxNode,
+	body: SyntaxNode[],
+	context: Context,
+) => {
 	const { name } = identifier;
 	for (const node of body) {
 		// skip all nodes that are before this identifier, because they'd probably
@@ -203,18 +211,18 @@ const isValueAwaitedOrReturned = (identifier, body, context) => {
 		}
 		if (
 			node.type === AST_NODE_TYPES.BlockStatement &&
-			isValueAwaitedOrReturned(identifier, node.body, context)
+			isValueAwaitedOrReturned(identifier, node.body as SyntaxNode[], context)
 		) {
 			return true;
 		}
 	}
 	return false;
 };
-const findFirstBlockBodyUp = (node) => {
-	let parent = node;
+const findFirstBlockBodyUp = (node: SyntaxNode) => {
+	let parent: SyntaxNode | undefined = node;
 	while (parent) {
 		if (parent.type === AST_NODE_TYPES.BlockStatement) {
-			return parent.body;
+			return parent.body as SyntaxNode[];
 		}
 		parent = parent.parent;
 	}
@@ -223,8 +231,8 @@ const findFirstBlockBodyUp = (node) => {
 		`Could not find BlockStatement - please file a github issue at https://github.com/vitest-dev/eslint-plugin-vitest`,
 	);
 };
-const isDirectlyWithinTestCaseCall = (node, context) => {
-	let parent = node;
+const isDirectlyWithinTestCaseCall = (node: SyntaxNode, context: Context) => {
+	let parent: SyntaxNode | undefined = node;
 	while (parent) {
 		if (isFunction(parent)) {
 			parent = parent.parent;
@@ -237,7 +245,10 @@ const isDirectlyWithinTestCaseCall = (node, context) => {
 	}
 	return false;
 };
-const isVariableAwaitedOrReturned = (variable, context) => {
+const isVariableAwaitedOrReturned = (
+	variable: SyntaxNode,
+	context: Context,
+) => {
 	const body = findFirstBlockBodyUp(variable);
 	// it's pretty much impossible for us to track destructuring assignments,
 	// so we return true to bailout gracefully
@@ -269,7 +280,7 @@ export default createEslintRule({
 		// since we only care about the inner-most chain, we represent the state in
 		// reverse with the inner-most being the first item, as that makes it
 		// slightly less code to assign to by not needing to know the length
-		const chains = [];
+		const chains: boolean[] = [];
 		return {
 			CallExpression(node) {
 				// there are too many ways that the done argument could be used with

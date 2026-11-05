@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
 test("native restricted properties cover the four configured TODO names and message", () => {
 	for (const object of ["it", "test", "describe", "suite"]) {

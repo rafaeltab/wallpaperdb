@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
-const diagnostics = (source, rule) =>
+const diagnostics = (source: string, rule: string) =>
 	lint(source).filter((d) => d.message.startsWith(`${rule}:`));
 
 test("the pinned parser recognizes destructured dynamic and require imports", () => {

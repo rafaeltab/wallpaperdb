@@ -184,11 +184,6 @@
       "reason": "Shared configuration only; invalidate all dependent suites instead of claiming a standalone score.",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
-    "experiments/cosine_color_accuracy": {
-      "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
-    },
     "apps/factory": {
       "decision": "enabled",
       "mechanism": "native-vitest-node",

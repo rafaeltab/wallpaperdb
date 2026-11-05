@@ -111,10 +111,14 @@ it.each(['absent', 'ambiguous'] as const)(
         FACTORY_T3_MCP_AUTHORIZATION_FILE: `${f.host.directory}/mcp-auth`,
       });
       try {
-        expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
-          state: { admissions: [], paused: true },
-          recoveries: [{ issue: 4, threadId: 'restacker' }],
-        });
+        await vi.waitFor(
+          async () =>
+            expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+              state: { admissions: [], paused: true },
+              recoveries: [{ issue: 4, threadId: 'restacker' }],
+            }),
+          { timeout: 15000, interval: 50 }
+        );
         await vi.waitFor(() => expect(observations.at(-1)?.healthy).toBe(1), {
           timeout: 15000,
           interval: 50,

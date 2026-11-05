@@ -27,6 +27,7 @@ import {
   fileScheduleStore,
   sqliteAttemptStore,
   sqliteObservations,
+  sqliteLocalSnapshot,
 } from '../adapters/store/index.js';
 import {
   Attempts,
@@ -260,22 +261,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Layer.mergeAll(
         Layer.succeed(Time, systemTime),
         Layer.succeed(ObservationStore, observationStore),
-        Layer.succeed(LocalSnapshot, {
-          read: () =>
-            Effect.gen(function* () {
-              const state = yield* scheduleStore.read();
-              const entries = [];
-              for (const admission of state.admissions) {
-                const directory =
-                  rootIssue === admission.issue
-                    ? configuration.FACTORY_STATE
-                    : resolve(configuration.FACTORY_STATE, `issue-${admission.issue}`);
-                const store = fileStore(directory);
-                entries.push({ intent: yield* store.read(), control: yield* store.readControl() });
-              }
-              return { state, entries };
-            }),
-        }),
+        Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
         Layer.succeed(
           ObservationSource,
           githubObservations(project, () =>

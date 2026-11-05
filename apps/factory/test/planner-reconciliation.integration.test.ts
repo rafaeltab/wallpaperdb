@@ -63,3 +63,61 @@ it('appends an exact operator non-launch attestation without rewriting the legac
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('allows one competing attestation and retains exact historical request lookup after a newer uncertain claim', async () => {
+  const { reconcileRejectedPlanner } = await import('../src/adapters/t3/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'factory-reconcile-race-'));
+  try {
+    initializeState(directory);
+    const path = join(directory, 'planner');
+    const journal = plannerState(path);
+    const requestId = randomUUID();
+    const original = {
+      revision: 0,
+      requestId,
+      input: 'Synthetic retained context',
+      deadline: 120100,
+    };
+    await journal.save(original);
+    const command = {
+      requestId,
+      revision: 0,
+      operator: 'synthetic-operator',
+      evidence: 'Explicit synthetic -32602 validation rejection',
+      code: -32602 as const,
+    };
+    const outcomes = await Promise.allSettled([
+      reconcileRejectedPlanner(path, command),
+      reconcileRejectedPlanner(path, { ...command, operator: 'competing-operator' }),
+    ]);
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+    const retired = await journal.read(requestId);
+    expect(retired).toMatchObject({
+      requestId,
+      revision: 1,
+      input: original.input,
+      deadline: original.deadline,
+      retired: true,
+      phase: 'failed',
+      reconciliation: { code: -32602, evidence: command.evidence },
+    });
+    expect(await readRecord(path, 'planner-0.json')).toEqual(original);
+    const current = {
+      ...original,
+      revision: 2,
+      requestId: randomUUID(),
+      phase: 'uncertain' as const,
+    };
+    await journal.save(current);
+    expect(await plannerState(path).read(requestId)).toEqual(retired);
+    expect(await plannerState(path).read(current.requestId)).toEqual(current);
+    expect(await plannerState(path).read(randomUUID())).toBeUndefined();
+    await expect(reconcileRejectedPlanner(path, command)).rejects.toThrow(
+      'exact outstanding unbound request and revision'
+    );
+    expect(await journal.read()).toEqual(current);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

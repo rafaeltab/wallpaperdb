@@ -106,14 +106,16 @@ export const PlanLive = Layer.effect(
     const planner = yield* IPlanner;
     let pending = false;
     return {
-      preview: () =>
+      preview: (attempt) =>
         Effect.gen(function* () {
           if (pending)
             return yield* Effect.fail(new Unavailable({ operation: 'plan-busy', cause: null }));
           pending = true;
           return yield* Effect.gen(function* () {
+            if (attempt) yield* attempt.progress('discovery');
             const input = yield* source.read();
-            const proposal = yield* planner.propose(input);
+            const proposal = yield* planner.propose(input, attempt);
+            if (attempt) yield* attempt.progress('freshness');
             const current = yield* source.read();
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
               return {

@@ -51,3 +51,19 @@ With `FACTORY_OTEL_ENDPOINT` absent, the factory exports neither traces nor metr
 ## Local persistence durability
 
 The [SQLite connection setup](src/platform/durable.ts) requires DELETE rollback journaling with `synchronous=EXTRA`. SQLite [documents EXTRA](https://www.sqlite.org/pragma.html#pragma_synchronous) as synchronizing the journal directory after commit, preserving the last committed claim across power loss when the local filesystem and storage honor synchronization. Initialization also fsyncs the database directory and its ancestors before returning responsibility. This retains the local Linux filesystem assumption of the original publisher. Process-kill and reopen tests verify transaction/restart behavior; they do not simulate a power failure or establish storage-device guarantees.
+
+## Planner attempts and confirmed rejection recovery
+
+[Planner attempts](src/capabilities/plan/attempts.ts) are advisory operations. `POST /api/plan` accepts an empty JSON object and returns HTTP 202 with an attempt `id` and `Location`. Observe `GET /api/plan/<id>` for progress, elapsed time, bounded failure details and the validated result. Discovery and freshness share the original two-minute deadline. HTTP disconnect does not cancel the service-owned attempt. Restart resumes the same identity and deadline. A busy response advertises `attemptId` only for an existing attempt resource. Legacy or automatic planner ownership instead exposes `requestId` and an outstanding or reconciliation-required reason.
+
+A bound run that completes after timeout can be reconciled before the next submission. An unbound uncertain launch remains protected. The [T3 adapter](src/adapters/t3/planner.ts) checks the 120000-character transport ceiling before recording launch intent and never truncates context. Current real context can still exceed that ceiling. The normal prompt budget and semantic design remain deferred under #650.
+
+Only an explicit server non-launch rejection authorizes retiring an unbound claim. An empty thread search does not establish rejection. For a legacy claim with confirmed T3 `-32602` validation rejection, the supervisor must stop the service, retain a consistent complete SQLite backup, and run the pinned compatible release's supported command:
+
+```sh
+"$NODE" "$RELEASE/main.js" --reconcile-planner-rejection \
+  "$STATE" "$REQUEST_ID" "$EXPECTED_REVISION" "$OPERATOR" \
+  'Explicit server -32602 validation rejection; retained log reference and timestamp'
+```
+
+`STATE` is the absolute factory state root. `RELEASE` is the installed release directory and `NODE` its pinned Node executable. The [command](src/main.ts) takes the service lock and requires an exact outstanding unbound request and revision. It appends the operator, evidence reference, rejection code and timestamp to a new planner revision. Original input, request, deadline and earlier revisions remain intact. Stale commands and bound claims fail without retiring them. The command neither starts the service nor launches workers. Review its bounded JSON receipt, then restart the compatible release and verify health and observation. Never run the old JSON release against current SQLite state. Deployment and this recovery are supervisor actions.

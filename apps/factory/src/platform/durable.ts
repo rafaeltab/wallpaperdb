@@ -151,7 +151,7 @@ function legacy(
   }
   return result;
 }
-function connection<A>(
+export function stateConnection<A>(
   directory: string,
   work: (db: ReturnType<typeof drizzle>, namespace: string, client: Database.Database) => A,
   migrateSchema = false
@@ -228,7 +228,7 @@ export function initializeState(directory: string, migrateSchema = true) {
     if (dirname(ancestor) === ancestor) break;
   }
   rejectNestedDatabases(explicitRoot);
-  return connection(
+  return stateConnection(
     directory,
     (db) => ({
       format: 2,
@@ -238,18 +238,18 @@ export function initializeState(directory: string, migrateSchema = true) {
   );
 }
 export function durabilitySettings(directory: string) {
-  return connection(directory, (_db, _namespace, client) => ({
+  return stateConnection(directory, (_db, _namespace, client) => ({
     journalMode: client.pragma('journal_mode', { simple: true }),
     synchronous: client.pragma('synchronous', { simple: true }),
   }));
 }
 /** Adapter namespace binding may discover the already initialized shared root. */
 export function initializeNamespace(directory: string) {
-  connection(directory, () => undefined);
+  stateConnection(directory, () => undefined);
 }
 export function publisher(directory: string) {
   return async (name: string, value: unknown) =>
-    connection(directory, (db, namespace) => {
+    stateConnection(directory, (db, namespace) => {
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       const revision = /^(control|wait|schedule|planner)-(\d+)\.json$/.exec(name);
       return db.transaction(
@@ -279,7 +279,7 @@ export function publisher(directory: string) {
     });
 }
 export async function readRecord(directory: string, name: string): Promise<unknown | null> {
-  return connection(
+  return stateConnection(
     directory,
     (db, namespace) =>
       db
@@ -295,7 +295,7 @@ export async function requiredRecord(directory: string, name: string): Promise<u
   return value;
 }
 export async function recordNames(directory: string): Promise<string[]> {
-  return connection(directory, (db, namespace) => {
+  return stateConnection(directory, (db, namespace) => {
     const prefix = namespace ? namespace + '/' : '';
     return [
       ...new Set(
@@ -315,7 +315,7 @@ export async function recordNames(directory: string): Promise<string[]> {
   });
 }
 export async function replaceProgress(directory: string, value: unknown) {
-  connection(directory, (db, namespace) =>
+  stateConnection(directory, (db, namespace) =>
     db
       .insert(records)
       .values({ namespace, name: 'recovery-progress.json', value })

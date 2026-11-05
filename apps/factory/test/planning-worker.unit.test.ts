@@ -43,6 +43,7 @@ it.each(['typed', 'defect'] as const)(
   }
 );
 it('returns existing ownership and observation without queuing an unaccepted request', async () => {
+  const executed: string[] = [];
   const snapshot = {
     ...retained,
     phase: 'failed',
@@ -56,7 +57,10 @@ it('returns existing ownership and observation without queuing an unaccepted req
       submit: () =>
         Effect.succeed({ kind: 'blocked', requestId: 'legacy', reason: 'reconciliation-required' }),
       observe: (id) => Effect.succeed(id === retained.id ? snapshot : undefined),
-      execute: () => Effect.die('Blocked submission must not queue execution'),
+      execute: (id) =>
+        Effect.sync(() => {
+          executed.push(id);
+        }),
     },
     run: Effect.runPromise,
   });
@@ -71,4 +75,5 @@ it('returns existing ownership and observation without queuing an unaccepted req
   } finally {
     await worker.close();
   }
+  expect(executed).toEqual([]);
 });

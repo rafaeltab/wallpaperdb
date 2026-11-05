@@ -130,6 +130,13 @@ for (const when of ["before-intent", "after-intent"])
 			),
 			/Owned source identity changed/,
 		);
+		assert.match(
+			fs.readFileSync(
+				path.join(f.directory, "public-command/stderr.raw"),
+				"utf8",
+			),
+			when === "before-intent" ? /"status":"REFUSED"/ : /"status":"FAIL"/,
+		);
 		assert.equal(fs.existsSync(path.join(f.evidence, "archive")), false);
 		for (let i = 0; i < 28; i++)
 			assert.equal(

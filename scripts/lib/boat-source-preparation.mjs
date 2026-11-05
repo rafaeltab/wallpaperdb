@@ -509,6 +509,7 @@ export async function prepare547Source({ authority: pin, evidence }) {
 	} catch (error) {
 		result.status = "FAIL";
 		result.error = error.message;
+		error.sourcePreparationStarted = true;
 		operationFailure = error;
 	} finally {
 		if (ownedLock) {
@@ -525,6 +526,7 @@ export async function prepare547Source({ authority: pin, evidence }) {
 				fs.rmdirSync(sourceLock);
 			} catch (error) {
 				releaseFailure = error;
+				error.sourcePreparationStarted = true;
 				result.cleanupError = error.message;
 				result.status = "FAIL";
 			}
@@ -533,12 +535,14 @@ export async function prepare547Source({ authority: pin, evidence }) {
 	try {
 		save(path.join(evidence, "result.json"), result);
 	} catch (error) {
-		throw new AggregateError(
+		const failure = new AggregateError(
 			[operationFailure, releaseFailure, error].filter(Boolean),
 			[operationFailure?.message, releaseFailure?.message, error.message]
 				.filter(Boolean)
 				.join("; "),
 		);
+		failure.sourcePreparationStarted = true;
+		throw failure;
 	}
 	if (operationFailure) throw operationFailure;
 	if (releaseFailure) throw releaseFailure;

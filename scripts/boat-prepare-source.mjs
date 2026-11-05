@@ -7,6 +7,11 @@ try {
 		throw new Error("Expected only authority and evidence");
 	console.log(JSON.stringify(await prepare547Source(config)));
 } catch (error) {
-	console.error(JSON.stringify({ status: "REFUSED", error: error.message }));
+	console.error(
+		JSON.stringify({
+			status: error.sourcePreparationStarted ? "FAIL" : "REFUSED",
+			error: error.message,
+		}),
+	);
 	process.exitCode = 1;
 }

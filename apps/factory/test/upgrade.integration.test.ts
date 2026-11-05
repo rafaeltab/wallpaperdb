@@ -56,7 +56,7 @@ it('adopts pre-manifest state without discarding controls or reservations', asyn
       expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
         state: { concurrency: 2, allowance: 1, paused: true, admissions: [] },
       });
-      expect(JSON.parse(await readFile(join(state, 'format.json'), 'utf8'))).toEqual({ format: 1 });
+      await expect(readFile(join(state, 'format.json'))).rejects.toMatchObject({ code: 'ENOENT' });
       expect(await readFile(join(state, 'schedule-0.json'), 'utf8')).toBe(controls);
     } finally {
       await running.close();

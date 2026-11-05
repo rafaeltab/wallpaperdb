@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFile, mkdir, writeFile, rename, realpath } from 'node:fs/promises';
+import { readFile, access, mkdir, writeFile, rename, realpath } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -23,7 +23,14 @@ const format = JSON.parse(
     throw error;
   })
 );
-if (format.format !== installation.stateFormat)
+const sqlite = await access(join(state, 'factory.sqlite')).then(
+  () => true,
+  () => false
+);
+if (
+  (sqlite && installation.stateFormat !== 2) ||
+  ![1, installation.stateFormat].includes(format.format)
+)
   throw new Error(
     'Incompatible state format; keep the current service and choose a compatible installation'
   );

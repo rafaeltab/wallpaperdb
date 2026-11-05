@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, writeFile } from './fixtures/durable-state.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { expect, it, vi } from 'vitest';

@@ -1,6 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { chmod, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from './fixtures/durable-state.js';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { Effect } from 'effect';

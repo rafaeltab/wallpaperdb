@@ -1,9 +1,8 @@
-import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import { createOperatorInbox } from "./operator-inbox.mjs";
 
 const notice = {
@@ -19,13 +18,10 @@ const operator = {
 const application = { authorization: "Bearer test-inbox-token" };
 
 async function assertProblem(response, expected) {
-	assert.equal(response.status, expected.status);
-	assert.equal(
-		response.headers.get("content-type"),
-		"application/problem+json",
-	);
-	assert.equal(response.headers.get("cache-control"), "no-store");
-	assert.deepEqual(await response.json(), expected);
+	expect(response.status).toBe(expected.status);
+	expect(response.headers.get("content-type")).toBe("application/problem+json");
+	expect(response.headers.get("cache-control")).toBe("no-store");
+	expect(await response.json()).toStrictEqual(expected);
 }
 
 for (const kind of [
@@ -76,8 +72,8 @@ for (const kind of [
 		try {
 			let url = await start();
 			const health = await fetch(`${url}/health`);
-			assert.equal(health.status, 200);
-			assert.equal(await health.text(), "ready");
+			expect(health.status).toBe(200);
+			expect(await health.text()).toBe("ready");
 			for (const response of [
 				await fetch(`${url}/`),
 				await fetch(`${url}/receipts`, { headers: application }),
@@ -91,8 +87,7 @@ for (const kind of [
 					body: JSON.stringify(receipt),
 				}),
 			]) {
-				assert.equal(
-					response.headers.get("www-authenticate"),
+				expect(response.headers.get("www-authenticate")).toBe(
 					'Basic realm="WallpaperDB operator inbox"',
 				);
 				await assertProblem(response, {
@@ -111,8 +106,8 @@ for (const kind of [
 							? JSON.stringify(receipt).padEnd(8192, " ")
 							: JSON.stringify(receipt),
 				});
-				assert.equal(response.status, 200);
-				assert.equal(await response.text(), "");
+				expect(response.status).toBe(200);
+				expect(await response.text()).toBe("");
 			}
 			await stop();
 			url = await start();
@@ -121,18 +116,17 @@ for (const kind of [
 				headers: application,
 				body: JSON.stringify(receipt),
 			});
-			assert.equal(replay.status, 200);
-			assert.equal(await replay.text(), "");
+			expect(replay.status).toBe(200);
+			expect(await replay.text()).toBe("");
 			const response = await fetch(`${url}/receipts`, { headers: operator });
-			assert.equal(response.status, 200);
-			assert.equal(response.headers.get("content-type"), "application/json");
+			expect(response.status).toBe(200);
+			expect(response.headers.get("content-type")).toBe("application/json");
 			const receipts = await response.json();
-			assert.equal(receipts.length, 1);
-			assert.deepEqual(receipts[0].notice, receipt);
-			assert.match(
+			expect(receipts.length).toBe(1);
+			expect(receipts[0].notice).toStrictEqual(receipt);
+			expect(
 				await (await fetch(`${url}/`, { headers: operator })).text(),
-				new RegExp(kind),
-			);
+			).toMatch(new RegExp(kind));
 		} finally {
 			await stop();
 			await rm(directory, { recursive: true, force: true });
@@ -141,7 +135,7 @@ for (const kind of [
 
 test("optional recovery targets are validated without rejecting legacy notices", async (t) => {
 	const releases = [];
-	t.after(async () => {
+	t.onTestFinished(async () => {
 		const failures = [];
 		for (const release of releases.reverse()) {
 			try {
@@ -192,8 +186,8 @@ test("optional recovery targets are validated without rejecting legacy notices",
 	];
 	for (const value of valid) {
 		const response = await deliver(value);
-		assert.equal(response.status, 200);
-		assert.equal(await response.text(), "");
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe("");
 	}
 	for (const resultId of [
 		null,
@@ -249,26 +243,27 @@ test("optional recovery targets are validated without rejecting legacy notices",
 	const receipts = await (
 		await fetch(`${url}/receipts`, { headers: operator })
 	).json();
-	assert.deepEqual(
-		receipts.map((receipt) => receipt.notice),
-		valid,
-	);
+	expect(receipts.map((receipt) => receipt.notice)).toStrictEqual(valid);
 });
 
-test("operator HTTP errors disclose only safe Problem Details", async (t) => {
-	const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
-	const server = await createOperatorInbox({
-		directory,
-		token: "test-inbox-token",
+describe("operator HTTP errors disclose only safe Problem Details", () => {
+	let directory;
+	let url;
+	beforeEach(async (t) => {
+		directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
+		const server = await createOperatorInbox({
+			directory,
+			token: "test-inbox-token",
+		});
+		t.onTestFinished(async () => {
+			server.closeAllConnections();
+			await new Promise((resolve) => server.close(resolve));
+			await rm(directory, { recursive: true, force: true });
+		});
+		server.listen(0, "127.0.0.1");
+		await once(server, "listening");
+		url = `http://127.0.0.1:${server.address().port}`;
 	});
-	t.after(async () => {
-		server.closeAllConnections();
-		await new Promise((resolve) => server.close(resolve));
-		await rm(directory, { recursive: true, force: true });
-	});
-	server.listen(0, "127.0.0.1");
-	await once(server, "listening");
-	const url = `http://127.0.0.1:${server.address().port}`;
 	for (const { name, path, options, expected } of [
 		{
 			name: "malformed JSON",
@@ -327,11 +322,11 @@ test("operator HTTP errors disclose only safe Problem Details", async (t) => {
 			},
 		},
 	]) {
-		await t.test(name, async () => {
+		test(name, async () => {
 			await assertProblem(await fetch(`${url}${path}`, options), expected);
 		});
 	}
-	await t.test("receipt storage failure and retry", async () => {
+	test("receipt storage failure and retry", async () => {
 		await rm(directory, { recursive: true });
 		const deliver = () =>
 			fetch(`${url}/events`, {
@@ -346,16 +341,15 @@ test("operator HTTP errors disclose only safe Problem Details", async (t) => {
 			detail:
 				"The operator inbox could not complete the request. Try again later.",
 		});
-		assert.deepEqual(
+		expect(
 			await (await fetch(`${url}/receipts`, { headers: operator })).json(),
-			[],
-		);
+		).toStrictEqual([]);
 		await mkdir(directory, { mode: 0o700 });
-		assert.equal((await deliver()).status, 200);
+		expect((await deliver()).status).toBe(200);
 		const receipts = await (
 			await fetch(`${url}/receipts`, { headers: operator })
 		).json();
-		assert.equal(receipts.length, 1);
-		assert.deepEqual(receipts[0].notice, notice);
+		expect(receipts.length).toBe(1);
+		expect(receipts[0].notice).toStrictEqual(notice);
 	});
 });

@@ -1,13 +1,12 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 
 function services(t, target, ambientProfiles) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-infra-selection-"));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
 	const selected = join(root, "services");
 	// Run the real Make recipe, replacing only container startup with Compose's
 	// daemon-free service selection. Preserve the recipe's environment and flags.
@@ -50,7 +49,7 @@ process.exit(result.status ?? 1);
 			timeout: 15_000,
 		},
 	);
-	assert.equal(result.status, 0, result.stdout + result.stderr);
+	expect(result.status, result.stdout + result.stderr).toBe(0);
 	return readFileSync(selected, "utf8").trim().split("\n").sort();
 }
 
@@ -67,12 +66,11 @@ const required = [
 
 for (const ambientProfiles of ["", "admin", "*"]) {
 	test(`make infra-start retains dependencies and telemetry without admins under COMPOSE_PROFILES=${ambientProfiles}`, (t) => {
-		assert.deepEqual(services(t, "infra-start", ambientProfiles), required);
+		expect(services(t, "infra-start", ambientProfiles)).toStrictEqual(required);
 	});
 
 	test(`make infra-start-admin enables both admin services under COMPOSE_PROFILES=${ambientProfiles}`, (t) => {
-		assert.deepEqual(
-			services(t, "infra-start-admin", ambientProfiles),
+		expect(services(t, "infra-start-admin", ambientProfiles)).toStrictEqual(
 			[...required, "opensearch-dashboards", "pgadmin"].sort(),
 		);
 	});
@@ -91,9 +89,9 @@ test("default application selection omits unused Tags without blocking ingress",
 		],
 		{ encoding: "utf8", env: { ...process.env, COMPOSE_PROFILES: "" } },
 	);
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const { services } = JSON.parse(result.stdout);
-	assert.deepEqual(Object.keys(services).sort(), [
+	expect(Object.keys(services).sort()).toStrictEqual([
 		"asset",
 		"caddy",
 		"color-extractor",
@@ -104,7 +102,7 @@ test("default application selection omits unused Tags without blocking ingress",
 		"wallpaper",
 		"web",
 	]);
-	assert.equal(Object.hasOwn(services.caddy.depends_on, "tags"), false);
+	expect(Object.hasOwn(services.caddy.depends_on, "tags")).toBe(false);
 });
 
 test("opting into Tags retains the service without making ingress wait for it", () => {
@@ -122,8 +120,8 @@ test("opting into Tags retains the service without making ingress wait for it", 
 		],
 		{ encoding: "utf8", env: { ...process.env, COMPOSE_PROFILES: "" } },
 	);
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const { services } = JSON.parse(result.stdout);
-	assert.ok(services.tags);
-	assert.equal(Object.hasOwn(services.caddy.depends_on, "tags"), false);
+	expect(services.tags).toBeTruthy();
+	expect(Object.hasOwn(services.caddy.depends_on, "tags")).toBe(false);
 });

@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
 	copyFileSync,
@@ -11,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, join, resolve } from "node:path";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -28,7 +27,7 @@ const portKeys = [
 
 function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-worktree-"));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
 	const main = join(root, "main");
 	const bin = join(root, "bin");
 	mkdirSync(main);
@@ -109,7 +108,7 @@ function fixture(t) {
 				stdio: ["ignore", "pipe", "pipe"],
 			},
 		);
-		assert.equal(result.status, 0, result.stderr);
+		expect(result.status, result.stderr).toBe(0);
 		return result.stdout + result.stderr;
 	}
 
@@ -131,13 +130,13 @@ function readValues(path) {
 function assertGenerated(cwd, projectName, slot) {
 	const worktree = readValues(join(cwd, ".worktree"));
 	const infra = readValues(join(cwd, "infra/.env"));
-	assert.equal(worktree.COMPOSE_PROJECT_NAME, projectName);
-	assert.equal(infra.COMPOSE_PROJECT_NAME, projectName);
-	assert.equal(worktree.WORKTREE_SLOT, String(slot));
+	expect(worktree.COMPOSE_PROJECT_NAME).toBe(projectName);
+	expect(infra.COMPOSE_PROJECT_NAME).toBe(projectName);
+	expect(worktree.WORKTREE_SLOT).toBe(String(slot));
 	for (const [offset, key] of portKeys.entries()) {
 		const expected = String(8000 + slot * 10 + offset);
-		assert.equal(worktree[key], expected);
-		assert.equal(infra[key], expected);
+		expect(worktree[key]).toBe(expected);
+		expect(infra[key]).toBe(expected);
 	}
 	return readFileSync(join(cwd, ".worktree"), "utf8");
 }
@@ -147,7 +146,7 @@ test("setup keeps the administrative worktree identity and ports across HEAD cha
 	const worktree = addWorktree("t3-3e761aad", "feature/original");
 	prepare(worktree);
 	const gitDir = resolve(worktree, git(worktree, "rev-parse", "--git-dir"));
-	assert.equal(basename(gitDir), "t3-3e761aad");
+	expect(basename(gitDir)).toBe("t3-3e761aad");
 	writeFileSync(join(gitDir, "worktree-slot"), "29");
 	run("setup-worktree.mjs", worktree);
 	const generated = assertGenerated(worktree, "wallpaperdb-t3-3e761aad", 29);
@@ -160,8 +159,7 @@ test("setup keeps the administrative worktree identity and ports across HEAD cha
 	for (const args of changes) {
 		if (args.length) git(worktree, ...args);
 		run("setup-worktree.mjs", worktree);
-		assert.equal(
-			assertGenerated(worktree, "wallpaperdb-t3-3e761aad", 29),
+		expect(assertGenerated(worktree, "wallpaperdb-t3-3e761aad", 29)).toBe(
 			generated,
 		);
 	}
@@ -175,7 +173,7 @@ test("setup allocates distinct projects and slots to detached worktrees at the s
 		prepare(cwd);
 		git(cwd, "switch", "--detach", git(main, "rev-parse", "HEAD"));
 		const output = run("setup-worktree.mjs", cwd);
-		assert.doesNotMatch(output, /Slug collision/);
+		expect(output).not.toMatch(/Slug collision/);
 		assertGenerated(
 			cwd,
 			index === 0 ? "wallpaperdb-shared" : "wallpaperdb-shared1",
@@ -183,7 +181,7 @@ test("setup allocates distinct projects and slots to detached worktrees at the s
 		);
 	}
 	const output = run("setup-worktree.mjs", first);
-	assert.doesNotMatch(output, /Slug collision/);
+	expect(output).not.toMatch(/Slug collision/);
 	assertGenerated(first, "wallpaperdb-shared", 1);
 });
 
@@ -194,7 +192,7 @@ test("setup preserves the main checkout project, slot zero, and ports across bra
 	const generated = assertGenerated(main, "wallpaperdb", 0);
 	git(main, "switch", "-c", "other-branch");
 	run("setup-worktree.mjs", main);
-	assert.equal(assertGenerated(main, "wallpaperdb", 0), generated);
+	expect(assertGenerated(main, "wallpaperdb", 0)).toBe(generated);
 });
 
 test("setup preserves Docker-safe normalization, fallback, and the 63-character limit", (t) => {
@@ -209,8 +207,8 @@ test("setup preserves Docker-safe normalization, fallback, and the 63-character 
 		prepare(cwd);
 		run("setup-worktree.mjs", cwd);
 		assertGenerated(cwd, expected, index + 1);
-		assert.match(expected, /^[a-z0-9][a-z0-9-]*$/);
-		assert.ok(expected.length <= 63);
+		expect(expected).toMatch(/^[a-z0-9][a-z0-9-]*$/);
+		expect(expected.length <= 63).toBeTruthy();
 	}
 });
 
@@ -225,12 +223,12 @@ test("collision diagnostics use administrative identities even when HEAD is miss
 	rmSync(join(gitDir, "HEAD"));
 	const output = run("setup-worktree.mjs", second);
 	assertGenerated(second, "wallpaperdb-featureid", 2);
-	assert.match(output, /Slug collision detected/);
-	assert.match(output, /Project name: wallpaperdb-featureid/);
-	assert.ok(output.includes(first));
-	assert.ok(output.includes(second));
-	assert.match(output, /administrative worktree name/);
-	assert.doesNotMatch(output, /Rename one branch/);
+	expect(output).toMatch(/Slug collision detected/);
+	expect(output).toMatch(/Project name: wallpaperdb-featureid/);
+	expect(output.includes(first)).toBeTruthy();
+	expect(output.includes(second)).toBeTruthy();
+	expect(output).toMatch(/administrative worktree name/);
+	expect(output).not.toMatch(/Rename one branch/);
 });
 
 function assertComposeDown(dockerLog, projectName, removeVolumes) {
@@ -239,16 +237,15 @@ function assertComposeDown(dockerLog, projectName, removeVolumes) {
 		.split("\n")
 		.map((line) => JSON.parse(line))
 		.filter((args) => args.includes("down"));
-	assert.equal(commands.length, 2);
+	expect(commands.length).toBe(2);
 	for (const [index, args] of commands.entries()) {
-		assert.equal(args[args.indexOf("-p") + 1], projectName);
-		assert.equal(
-			basename(args[args.indexOf("-f") + 1]),
+		expect(args[args.indexOf("-p") + 1]).toBe(projectName);
+		expect(basename(args[args.indexOf("-f") + 1])).toBe(
 			index === 0 ? "docker-compose.apps.yml" : "docker-compose.yml",
 		);
-		assert.equal(args.includes("--volumes"), removeVolumes);
-		assert.ok(args.includes("--remove-orphans"));
-		assert.equal(args[args.indexOf("--profile") + 1], "*");
+		expect(args.includes("--volumes")).toBe(removeVolumes);
+		expect(args.includes("--remove-orphans")).toBeTruthy();
+		expect(args[args.indexOf("--profile") + 1]).toBe("*");
 	}
 }
 
@@ -271,7 +268,7 @@ test("normal teardown uses the saved project name and releases the linked-worktr
 	);
 	run("teardown-worktree.mjs", cwd);
 	assertComposeDown(dockerLog, "wallpaperdb-saved-project", true);
-	assert.equal(existsSync(join(gitDir, "worktree-slot")), false);
+	expect(existsSync(join(gitDir, "worktree-slot"))).toBe(false);
 });
 
 test("normal teardown preserves main-checkout volumes", (t) => {
@@ -303,9 +300,9 @@ for (const [headState, name] of [
 		const slotFile = join(gitDir, "worktree-slot");
 		const output = run("teardown-worktree.mjs", main, "--slot-file", slotFile);
 		assertComposeDown(dockerLog, projectName, true);
-		assert.equal(existsSync(slotFile), false);
-		assert.ok(output.includes(`worktree: ${basename(gitDir)}`));
-		assert.doesNotMatch(output, /branch:/);
+		expect(existsSync(slotFile)).toBe(false);
+		expect(output.includes(`worktree: ${basename(gitDir)}`)).toBeTruthy();
+		expect(output).not.toMatch(/branch:/);
 	});
 }
 
@@ -331,15 +328,14 @@ test("setup generates Wallpaper connection addresses and the Bruno ingress URL",
 		"vars {\n  wallpaperBaseUrl: http://localhost:3010\n}\n",
 	);
 	f.run("setup-worktree.mjs", f.main);
-	assert.deepEqual(readValues(join(service, ".env")), {
+	expect(readValues(join(service, ".env"))).toStrictEqual({
 		DATABASE_URL:
 			"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_wallpaper",
 		NATS_URL: "nats://nats:4222",
 		OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
 		OTEL_SERVICE_NAME: "wallpaper",
 	});
-	assert.match(
-		readFileSync(join(api, "local.bru"), "utf8"),
+	expect(readFileSync(join(api, "local.bru"), "utf8")).toMatch(
 		/wallpaperBaseUrl: http:\/\/localhost:8000\/wallpaper/,
 	);
 });

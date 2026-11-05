@@ -9,7 +9,7 @@
     },
     "scripts": {
       "decision": "excluded",
-      "reason": "Most tooling behavioral tests use node:test and subprocesses; no validated mutation activation across them.",
+      "reason": "Tooling behavioral tests use Vitest and subprocesses; no validated mutation activation across them.",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
     "infra": {

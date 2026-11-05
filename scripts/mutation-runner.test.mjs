@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
@@ -11,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+import { expect, test } from "vitest";
 
 // Exercise the installed plugin against real Vitest. A name-filter mismatch can
 // report every covered mutation as a survivor while ordinary tests stay green.
@@ -63,16 +62,15 @@ describe('policy', () => { describe('boundary', () => {
 			],
 			{ cwd: root, encoding: "utf8", timeout: 90_000 },
 		);
-		assert.equal(result.status, 0, result.stdout + result.stderr);
+		expect(result.status, result.stdout + result.stderr).toBe(0);
 		const mutants = Object.values(
 			JSON.parse(readFileSync(join(root, "report.json"))).files,
 		).flatMap((f) => f.mutants);
-		assert.ok(mutants.length >= 5);
-		assert.deepEqual(
+		expect(mutants.length >= 5).toBeTruthy();
+		expect(
 			[...new Set(mutants.map((m) => m.status))],
-			["Killed"],
 			JSON.stringify(mutants),
-		);
+		).toStrictEqual(["Killed"]);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

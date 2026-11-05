@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
@@ -12,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { resolve } from "node:path";
 
 for (const target of ["build", "install"]) {
@@ -42,12 +41,11 @@ for (const target of ["build", "install"]) {
 					MFLAGS: "",
 				},
 			});
-			assert.notEqual(result.status, 0);
-			assert.match(
-				result.stderr,
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).toMatch(
 				/https:\/\/mise\.jdx\.dev\/getting-started\.html/,
 			);
-			assert.match(result.stderr, /make install/);
+			expect(result.stderr).toMatch(/make install/);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}
@@ -71,8 +69,8 @@ test("setup rejects a package-manager pin that disagrees with mise", () => {
 				env: { ...process.env, MISE_TRUSTED_CONFIG_PATHS: directory },
 			},
 		);
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /packageManager.*pnpm@10.18.3/);
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/packageManager.*pnpm@10.18.3/);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -81,19 +79,18 @@ test("setup rejects a package-manager pin that disagrees with mise", () => {
 test("CI installs the locked project tools instead of selecting separate Node and pnpm versions", () => {
 	for (const workflow of ["ci.yml", "e2e.yml"]) {
 		const source = readFileSync(`.github/workflows/${workflow}`, "utf8");
-		assert.doesNotMatch(
-			source,
+		expect(source).not.toMatch(
 			/uses: (?:actions\/setup-node|pnpm\/action-setup)@/,
 		);
 		const jobs = source
 			.slice(source.indexOf("\njobs:\n"))
 			.split(/^  (?=[\w-]+:\n)/m)
 			.filter((job) => job.includes("runs-on:"));
-		assert.ok(jobs.length > 0);
+		expect(jobs.length > 0).toBeTruthy();
 		for (const job of jobs) {
-			assert.match(job, /uses: jdx\/mise-action@/);
-			assert.match(job, /install_args: --locked/);
-			assert.match(job, /run: make toolchain/);
+			expect(job).toMatch(/uses: jdx\/mise-action@/);
+			expect(job).toMatch(/install_args: --locked/);
+			expect(job).toMatch(/run: make toolchain/);
 		}
 	}
 });
@@ -126,8 +123,8 @@ for (const [version, diagnostic] of [
 					},
 				},
 			);
-			assert.notEqual(result.status, 0);
-			assert.match(result.stderr, diagnostic);
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).toMatch(diagnostic);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}
@@ -153,8 +150,8 @@ test("setup rejects a container Node version that disagrees with mise", () => {
 				env: { ...process.env, MISE_TRUSTED_CONFIG_PATHS: directory },
 			},
 		);
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /Dockerfile.*Node.*22.22.3/);
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/Dockerfile.*Node.*22.22.3/);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -188,8 +185,8 @@ test("Make rejects a local override instead of silently changing project tools",
 				MISE_TRUSTED_CONFIG_PATHS: directory,
 			},
 		});
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /node.*this checkout's mise.toml/);
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/node.*this checkout's mise.toml/);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -212,9 +209,9 @@ test("Docker builds discover the managed plugin with an explicit host configurat
 			["--config", directory, "buildx", "version"],
 			{ encoding: "utf8" },
 		);
-		assert.equal(result.status, 0, result.stderr);
-		assert.match(result.stdout, /github.com\/docker\/buildx v0.37.1/);
-		assert.equal(readFileSync(join(directory, "config.json"), "utf8"), config);
+		expect(result.status, result.stderr).toBe(0);
+		expect(result.stdout).toMatch(/github.com\/docker\/buildx v0.37.1/);
+		expect(readFileSync(join(directory, "config.json"), "utf8")).toBe(config);
 		const compose = spawnSync(
 			"docker",
 			["--config", directory, "compose", "-f", "-", "config", "--services"],
@@ -223,8 +220,8 @@ test("Docker builds discover the managed plugin with an explicit host configurat
 				input: "services:\n  command-forwarding:\n    image: alpine:3\n",
 			},
 		);
-		assert.equal(compose.status, 0, compose.stderr);
-		assert.equal(compose.stdout.trim(), "command-forwarding");
+		expect(compose.status, compose.stderr).toBe(0);
+		expect(compose.stdout.trim()).toBe("command-forwarding");
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -343,13 +340,11 @@ console.log('toolchain boundary passed for ' + process.argv[2]);
 				},
 			},
 		);
-		assert.equal(result.status, 0, result.stdout + result.stderr);
-		assert.match(
-			result.stdout,
+		expect(result.status, result.stdout + result.stderr).toBe(0);
+		expect(result.stdout).toMatch(
 			/toolchain boundary passed for @wallpaperdb\/asset/,
 		);
-		assert.match(
-			result.stdout,
+		expect(result.stdout).toMatch(
 			/toolchain boundary passed for @wallpaperdb\/control/,
 		);
 	} finally {

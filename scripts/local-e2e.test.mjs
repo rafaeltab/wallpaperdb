@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import {
@@ -20,7 +19,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 
 const repository = new URL("../", import.meta.url).pathname;
 
@@ -85,15 +84,14 @@ appendFileSync(new URL('./environment.jsonl', import.meta.url), JSON.stringify({
 			timeout: 15_000,
 		},
 	);
-	assert.equal(result.status, 0, result.stdout + result.stderr);
+	expect(result.status, result.stdout + result.stderr).toBe(0);
 	const observed = readFileSync(join(f.root, "environment.jsonl"), "utf8")
 		.trim()
 		.split("\n")
 		.map((line) => JSON.parse(line));
-	assert.equal(observed.length, 3);
+	expect(observed.length).toBe(3);
 	for (const entry of observed)
-		assert.deepEqual(
-			entry.credentials,
+		expect(entry.credentials).toStrictEqual(
 			entry.package === "@wallpaperdb/web-e2e"
 				? credentials
 				: Object.fromEntries(
@@ -104,7 +102,7 @@ appendFileSync(new URL('./environment.jsonl', import.meta.url), JSON.stringify({
 
 function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-local-e2e-"));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
 	mkdirSync(join(root, "scripts"));
 	mkdirSync(join(root, "scripts/lib"));
 	copyFileSync(
@@ -311,17 +309,16 @@ for (const packageName of ["test-utils", "testcontainers"]) {
 			"ARGS=selected.test.ts",
 			"FORCE=1",
 		);
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /phase "Docker preflight" failed, exit 39/);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/phase "Docker preflight" failed, exit 39/);
+		expect(result.stderr).toMatch(
 			new RegExp(
 				`Focused rerun: make test-e2e PACKAGE=${packageName}.*selected.test.ts.*FORCE=1`,
 			),
 		);
-		assert.ok(
+		expect(
 			!f.calls().some((call) => call.includes("build") || call.includes("up")),
-		);
+		).toBeTruthy();
 	});
 }
 
@@ -351,17 +348,14 @@ syncBuiltinESMExports();`,
 		);
 		f.env.NODE_OPTIONS = `--import=${hook}`;
 		const result = f.run("PACKAGE=test-utils");
-		assert.notEqual(result.status, 0);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(
 			new RegExp(`phase "diagnostics cleanup" failed, exit ${status}`),
 		);
-		assert.doesNotMatch(
-			result.stdout,
+		expect(result.stdout).not.toMatch(
 			/All requested E2E phases and cleanup passed/,
 		);
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
 	});
@@ -374,7 +368,7 @@ async function browserFixture(t, ready = true) {
 		res.writeHead(ready ? 200 : 503);
 		res.end(ready ? "ok" : "gateway dependency unavailable");
 	});
-	t.after(() => {
+	t.onTestFinished(() => {
 		server.closeAllConnections();
 		server.close();
 	});
@@ -491,20 +485,20 @@ test("owned browser Compose ignores developer profiles throughout startup and cl
 	f.env.COMPOSE_PROFILES = "admin,*";
 	f.env.TEST_PROFILES_FILE = join(f.root, "profiles.jsonl");
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const observed = readFileSync(f.env.TEST_PROFILES_FILE, "utf8")
 		.trim()
 		.split("\n")
 		.map((line) => JSON.parse(line));
-	assert.ok(observed.some(({ args }) => args.includes("up")));
-	assert.ok(observed.some(({ args }) => args.includes("down")));
-	for (const { profiles } of observed) assert.equal(profiles, "");
+	expect(observed.some(({ args }) => args.includes("up"))).toBeTruthy();
+	expect(observed.some(({ args }) => args.includes("down"))).toBeTruthy();
+	for (const { profiles } of observed) expect(profiles).toBe("");
 });
 
 test("complete explicit E2E builds current images and releases its owned browser stack before container suites", async (t) => {
 	const f = await browserFixture(t);
 	const result = await f.runAsync();
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const calls = f.calls();
 	const build = calls.findIndex(
 		(call) =>
@@ -526,45 +520,45 @@ test("complete explicit E2E builds current images and releases its owned browser
 			!call.includes("--dry=json") &&
 			call.includes("--filter=@wallpaperdb/test-utils"),
 	);
-	assert.ok(
+	expect(
 		build >= 0 && browser > build && cleanup > browser && containers > cleanup,
-	);
+	).toBeTruthy();
 	const compose = calls.filter(
 		(call) =>
 			call.includes("compose") &&
 			call.includes("-p") &&
 			!call.includes("config"),
 	);
-	assert.ok(
+	expect(
 		compose.every((call) =>
 			/^development-e2e-/.test(call[call.indexOf("-p") + 1]),
 		),
-	);
-	assert.ok(
+	).toBeTruthy();
+	expect(
 		compose
 			.filter((call) => call.includes("down"))
 			.every((call) => call.includes("--volumes")),
-	);
-	assert.match(result.stdout, /All requested E2E phases and cleanup passed/);
+	).toBeTruthy();
+	expect(result.stdout).toMatch(/All requested E2E phases and cleanup passed/);
 });
 
 test("browser command fixtures await observable startup even when startup takes over one second", async (t) => {
 	const f = await browserFixture(t);
 	f.env.TEST_UP_DELAY = "1100";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.equal(result.status, 0, result.stderr);
-	assert.ok(
+	expect(result.status, result.stderr).toBe(0);
+	expect(
 		f
 			.calls()
 			.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
-	);
+	).toBeTruthy();
 });
 
 test("cold infrastructure becomes healthy within the startup budget before dependent browser apps start", async (t) => {
 	const f = await browserFixture(t);
 	f.env.TEST_COLD_INFRA = "1";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const calls = f.calls();
 	const infrastructure = calls.findIndex(
 		(call) => call.includes("up") && call.includes("infra/docker-compose.yml"),
@@ -573,11 +567,13 @@ test("cold infrastructure becomes healthy within the startup budget before depen
 		(call) =>
 			call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
 	);
-	assert.ok(infrastructure >= 0 && applications > infrastructure);
+	expect(infrastructure >= 0 && applications > infrastructure).toBeTruthy();
 	const timeout = Number(
 		calls[infrastructure][calls[infrastructure].indexOf("--wait-timeout") + 1],
 	);
-	assert.ok(timeout > 0 && timeout <= Number(f.env.E2E_READY_TIMEOUT));
+	expect(
+		timeout > 0 && timeout <= Number(f.env.E2E_READY_TIMEOUT),
+	).toBeTruthy();
 });
 
 test("unhealthy required infrastructure prevents app and browser execution and releases the owned stack", async (t) => {
@@ -585,50 +581,50 @@ test("unhealthy required infrastructure prevents app and browser execution and r
 	f.env.TEST_COLD_INFRA = "1";
 	f.env.TEST_INFRA_UNHEALTHY = "1";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /phase "infrastructure startup" failed, exit 24/);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(
+		/phase "infrastructure startup" failed, exit 24/,
+	);
 	const calls = f.calls();
-	assert.ok(
+	expect(
 		!calls.some(
 			(call) =>
 				call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
 		),
-	);
-	assert.ok(
+	).toBeTruthy();
+	expect(
 		!calls.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
-	);
-	assert.equal(
+	).toBeTruthy();
+	expect(
 		calls.filter((call) => call.includes("down") && call.includes("--volumes"))
 			.length,
-		2,
-	);
-	assert.equal(
-		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+	).toBe(2);
+	expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 		0,
 	);
 	const directory = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
 });
 
 test("a successfully completed one-shot does not fail long-running infrastructure readiness", async (t) => {
 	const f = await browserFixture(t);
 	f.env.TEST_FAST_ONE_SHOT = "1";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const calls = f.calls();
 	const initialization = calls.filter((call) => call.includes("nats-setup"));
-	assert.equal(initialization.length, 1);
-	assert.ok(
+	expect(initialization.length).toBe(1);
+	expect(
 		initialization[0].includes("run") && initialization[0].includes("--rm"),
-	);
+	).toBeTruthy();
 	const setup = calls.indexOf(initialization[0]);
 	const applications = calls.findIndex(
 		(call) =>
 			call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
 	);
-	assert.ok(applications > setup);
+	expect(applications > setup).toBeTruthy();
 });
 
 test("failed one-shot setup preserves its failure and cleans up without starting browser apps", async (t) => {
@@ -636,31 +632,31 @@ test("failed one-shot setup preserves its failure and cleans up without starting
 	f.env.TEST_FAST_ONE_SHOT = "1";
 	f.env.TEST_NATS_SETUP_EXIT = "28";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /phase "infrastructure startup" failed, exit 28/);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(
+		/phase "infrastructure startup" failed, exit 28/,
+	);
 	const calls = f.calls();
-	assert.ok(
+	expect(
 		!calls.some(
 			(call) =>
 				call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
 		),
-	);
-	assert.ok(
+	).toBeTruthy();
+	expect(
 		!calls.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
-	);
-	assert.equal(
+	).toBeTruthy();
+	expect(
 		calls.filter((call) => call.includes("down") && call.includes("--volumes"))
 			.length,
-		2,
-	);
-	assert.equal(
-		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+	).toBe(2);
+	expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 		0,
 	);
 	const directory = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
 });
 
 function failRunLog(f, line) {
@@ -690,17 +686,17 @@ test("run-log write failure stops the detached child, tears down the owned stack
 		pid = Number(
 			readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
 		);
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /phase "browser tests" failed, exit 1/);
-		assert.match(result.stderr, /run.log.*ENOSPC/);
-		assert.doesNotMatch(
-			result.stdout,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/phase "browser tests" failed, exit 1/);
+		expect(result.stderr).toMatch(/run.log.*ENOSPC/);
+		expect(result.stdout).not.toMatch(
 			/All requested E2E phases and cleanup passed/,
 		);
-		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-		assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+		expect(() => process.kill(pid, 0)).toThrow(
+			expect.objectContaining({ code: "ESRCH" }),
+		);
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
 	} finally {
@@ -719,23 +715,21 @@ for (const browserStatus of [0, 23]) {
 		if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
 		f.env.TEST_HOLD_CLEANUP = "1";
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.notEqual(result.status, 0);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(
 			new RegExp(
 				`phase "${browserStatus ? "browser tests" : "browser cleanup"}" failed, exit ${browserStatus || 1}`,
 			),
 		);
-		assert.match(result.stderr, /run.log.*ENOSPC/);
-		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-		assert.doesNotMatch(
-			result.stdout,
+		expect(result.stderr).toMatch(/run.log.*ENOSPC/);
+		expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+		expect(result.stdout).not.toMatch(
 			/All requested E2E phases and cleanup passed/,
 		);
 		const directory = result.stdout.match(
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
-		assert.ok(existsSync(directory));
+		expect(existsSync(directory)).toBeTruthy();
 	});
 }
 
@@ -744,11 +738,13 @@ for (const value of ["invalid", "0", "-1"]) {
 		const f = await browserFixture(t);
 		f.env.E2E_READY_TIMEOUT = value;
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /E2E_READY_TIMEOUT must be a positive number/);
-		assert.ok(
-			!f.calls().some((call) => call.includes("build") || call.includes("up")),
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(
+			/E2E_READY_TIMEOUT must be a positive number/,
 		);
+		expect(
+			!f.calls().some((call) => call.includes("build") || call.includes("up")),
+		).toBeTruthy();
 	});
 }
 
@@ -758,14 +754,14 @@ for (const browser of [false, true]) {
 		const result = browser
 			? await f.runAsync("PACKAGE=web-e2e")
 			: f.run("PACKAGE=test-utils");
-		assert.equal(result.status, 0, result.stderr);
+		expect(result.status, result.stderr).toBe(0);
 		const directory = result.stdout.match(
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
-		assert.ok(
+		expect(
 			!existsSync(directory),
 			"successful runs must remove private temporary diagnostics",
-		);
+		).toBeTruthy();
 	});
 }
 
@@ -774,47 +770,44 @@ for (const buildFailure of [false, true]) {
 		const f = await browserFixture(t);
 		if (buildFailure) f.env.TEST_BUILD_EXIT = "37";
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.equal(result.status === 0, !buildFailure, result.stderr);
+		expect(result.status === 0, result.stderr).toBe(!buildFailure);
 		const teardown = f.calls().filter((call) => call.includes("down"));
-		assert.equal(teardown.length, 2);
+		expect(teardown.length).toBe(2);
 		const apps = teardown.find((call) =>
 			call.includes("infra/docker-compose.apps.yml"),
 		);
-		assert.equal(apps[apps.indexOf("--rmi") + 1], "local");
-		assert.ok(
+		expect(apps[apps.indexOf("--rmi") + 1]).toBe("local");
+		expect(
 			!teardown
 				.find((call) => call.includes("infra/docker-compose.yml"))
 				.includes("--rmi"),
-		);
+		).toBeTruthy();
 	});
 }
 
 test("readiness failure identifies affected services and endpoints, retains diagnostics, and cleans up without running tests", async (t) => {
 	const f = await browserFixture(t, false);
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /browser readiness.*exit 124/);
-	assert.match(
-		result.stderr,
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(/browser readiness.*exit 124/);
+	expect(result.stderr).toMatch(
 		/gateway readiness: http:\/\/localhost:\d+\/gateway\/ready -> HTTP 503/,
 	);
-	assert.match(result.stderr, /gateway dependency unavailable/);
-	assert.ok(
+	expect(result.stderr).toMatch(/gateway dependency unavailable/);
+	expect(
 		!f
 			.calls()
 			.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
-	);
-	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+	).toBeTruthy();
+	expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
 	const directory = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
-	t.after(() => rmSync(directory, { recursive: true, force: true }));
-	assert.match(
-		readFileSync(join(directory, "run.log"), "utf8"),
+	t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+	expect(readFileSync(join(directory, "run.log"), "utf8")).toMatch(
 		/gateway readiness/,
 	);
-	assert.doesNotMatch(
-		readFileSync(join(directory, "apps.log"), "utf8"),
+	expect(readFileSync(join(directory, "apps.log"), "utf8")).not.toMatch(
 		/private-password|sk_test_private/,
 	);
 });
@@ -823,10 +816,10 @@ test("readiness deadline cancels hanging HTTP probes and still cleans up", async
 	const f = await browserFixture(t, "hang");
 	const start = Date.now();
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /browser readiness.*exit 124/);
-	assert.ok(Date.now() - start < 8000);
-	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(/browser readiness.*exit 124/);
+	expect(Date.now() - start < 8000).toBeTruthy();
+	expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
 });
 
 test("browser task failure before Playwright starts preserves old reports without retaining them as current evidence", async (t) => {
@@ -838,19 +831,18 @@ test("browser task failure before Playwright starts preserves old reports withou
 		writeFileSync(join(directory, "old.txt"), "previous browser run");
 	}
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.match(result.stderr, /browser tests.*exit 41/);
+	expect(result.stderr).toMatch(/browser tests.*exit 41/);
 	const diagnostics = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
 	for (const name of ["test-results", "playwright-report"]) {
-		assert.ok(!existsSync(join(diagnostics, name)));
-		assert.equal(
+		expect(!existsSync(join(diagnostics, name))).toBeTruthy();
+		expect(
 			readFileSync(join(f.root, "apps/web-e2e", name, "old.txt"), "utf8"),
-			"previous browser run",
-		);
+		).toBe("previous browser run");
 	}
-	assert.ok(existsSync(join(diagnostics, "apps.log")));
-	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+	expect(existsSync(join(diagnostics, "apps.log"))).toBeTruthy();
+	expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
 });
 
 test("failures before browser tests preserve old reports without copying them into new diagnostics", async (t) => {
@@ -862,16 +854,15 @@ test("failures before browser tests preserve old reports without copying them in
 		writeFileSync(join(directory, "old.txt"), "previous browser run");
 	}
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.match(result.stderr, /image build.*exit 23/);
+	expect(result.stderr).toMatch(/image build.*exit 23/);
 	const diagnostics = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
 	for (const name of ["test-results", "playwright-report"]) {
-		assert.ok(!existsSync(join(diagnostics, name)));
-		assert.equal(
+		expect(!existsSync(join(diagnostics, name))).toBeTruthy();
+		expect(
 			readFileSync(join(f.root, "apps/web-e2e", name, "old.txt"), "utf8"),
-			"previous browser run",
-		);
+		).toBe("previous browser run");
 	}
 });
 
@@ -897,13 +888,12 @@ for (const [name, settings, expectedPhase, status] of [
 		const f = await browserFixture(t);
 		Object.assign(f.env, settings);
 		const result = await f.runAsync();
-		assert.notEqual(result.status, 0);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(
 			new RegExp(`phase "${expectedPhase}" failed, exit ${status}`),
 		);
-		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-		assert.ok(
+		expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+		expect(
 			!f
 				.calls()
 				.some(
@@ -912,25 +902,22 @@ for (const [name, settings, expectedPhase, status] of [
 						!call.includes("--dry=json") &&
 						call.includes("--filter=@wallpaperdb/test-utils"),
 				),
-		);
-		assert.doesNotMatch(
-			result.stdout + result.stderr,
+		).toBeTruthy();
+		expect(result.stdout + result.stderr).not.toMatch(
 			/All requested E2E phases and cleanup passed|private-password|sk_test_private/,
 		);
 		if (settings.TEST_CLEANUP_EXIT)
-			assert.match(result.stderr, /Cleanup failed for apps, exit 29/);
+			expect(result.stderr).toMatch(/Cleanup failed for apps, exit 29/);
 		const directory = result.stdout.match(
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
-		t.after(() => rmSync(directory, { recursive: true, force: true }));
+		t.onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
 		if (settings.TEST_BROWSER_EXIT)
-			assert.equal(
+			expect(
 				readFileSync(join(directory, "test-results/trace.zip"), "utf8"),
-				"retained browser artifact",
-			);
+			).toBe("retained browser artifact");
 		// The command releases shared ownership even after a failure.
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
 	});
@@ -958,9 +945,9 @@ for (const kind of [
 			chmodSync(join(f.root, "infra/postgres/init/00.sql"), 0o600);
 		if (kind === "existing project") f.env.TEST_EXISTING = "1";
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /browser preflight/);
-		assert.ok(
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/browser preflight/);
+		expect(
 			!f
 				.calls()
 				.some(
@@ -969,7 +956,7 @@ for (const kind of [
 						call.includes("up") ||
 						call.includes("down"),
 				),
-		);
+		).toBeTruthy();
 	});
 }
 
@@ -987,13 +974,12 @@ for (const [service, key, value] of [
 		config.services[service].environment[key] = value;
 		writeFileSync(path, JSON.stringify(config));
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /browser preflight/);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/browser preflight/);
+		expect(result.stderr).toMatch(
 			/development pk_test_|publishable keys must match/,
 		);
-		assert.ok(
+		expect(
 			!f
 				.calls()
 				.some(
@@ -1003,9 +989,8 @@ for (const [service, key, value] of [
 							call.includes("up") ||
 							call.includes("run")),
 				),
-		);
-		assert.doesNotMatch(
-			result.stdout + result.stderr,
+		).toBeTruthy();
+		expect(result.stdout + result.stderr).not.toMatch(
 			/pk_live_other|pk_test_other_instance/,
 		);
 	});
@@ -1024,11 +1009,12 @@ test("terminal hangup cleans its owned stack, stops its detached child, and rele
 		pid = Number(
 			readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
 		);
-		assert.match(result.stderr, /browser tests.*exit 129/);
-		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-		assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(result.stderr).toMatch(/browser tests.*exit 129/);
+		expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+		expect(() => process.kill(pid, 0)).toThrow(
+			expect.objectContaining({ code: "ESRCH" }),
+		);
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
 	} finally {
@@ -1048,11 +1034,10 @@ test("interruption cleans its owned stack and releases the lock", async (t) => {
 			process.kill(-child.pid, "SIGTERM");
 	};
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /browser tests.*exit 143/);
-	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-	assert.equal(
-		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(/browser tests.*exit 143/);
+	expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+	expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 		0,
 	);
 });
@@ -1061,7 +1046,7 @@ test("interruption kills an E2E descendant retaining the lease after its parent 
 	const f = await browserFixture(t);
 	f.env.TEST_STUBBORN_DESCENDANT = "1";
 	let pid;
-	t.after(() => {
+	t.onTestFinished(() => {
 		if (pid) {
 			try {
 				process.kill(pid, "SIGKILL");
@@ -1077,14 +1062,13 @@ test("interruption kills an E2E descendant retaining the lease after its parent 
 		}
 	};
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.equal(
-		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+	expect(result.status).not.toBe(0);
+	expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 		0,
 	);
 	try {
 		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-		assert.match(stat.slice(stat.lastIndexOf(")") + 2), /^Z /);
+		expect(stat.slice(stat.lastIndexOf(")") + 2)).toMatch(/^Z /);
 	} catch (error) {
 		if (error.code !== "ENOENT") throw error;
 	}
@@ -1098,14 +1082,12 @@ test("interruption during successful browser cleanup finishes teardown and repor
 			process.kill(-child.pid, "SIGTERM");
 	};
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.match(result.stderr, /phase "browser cleanup" failed, exit 143/);
-	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-	assert.equal(
-		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+	expect(result.stderr).toMatch(/phase "browser cleanup" failed, exit 143/);
+	expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+	expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 		0,
 	);
-	assert.doesNotMatch(
-		result.stdout,
+	expect(result.stdout).not.toMatch(
 		/All requested E2E phases and cleanup passed/,
 	);
 });
@@ -1123,11 +1105,11 @@ test("concurrent worktrees wait visibly within a deadline and cannot overlap own
 		process.kill(-child.pid, "SIGTERM");
 	};
 	await owner.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(waiting.status, 0);
-	assert.match(waiting.stdout, /Docker host lock busy/);
-	assert.match(waiting.stderr, /lock timed out/);
-	assert.ok(!existsSync(join(contender.root, "calls.jsonl")));
-	assert.equal(contender.run("PACKAGE=test-utils").status, 0);
+	expect(waiting.status).not.toBe(0);
+	expect(waiting.stdout).toMatch(/Docker host lock busy/);
+	expect(waiting.stderr).toMatch(/lock timed out/);
+	expect(!existsSync(join(contender.root, "calls.jsonl"))).toBeTruthy();
+	expect(contender.run("PACKAGE=test-utils").status).toBe(0);
 });
 
 test("test-runner dry flags cannot bypass a lock held by another worktree", async (t) => {
@@ -1143,20 +1125,20 @@ test("test-runner dry flags cannot bypass a lock held by another worktree", asyn
 		process.kill(-child.pid, "SIGTERM");
 	};
 	await owner.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(waiting.status, 0);
-	assert.match(waiting.stderr, /lock timed out/);
-	assert.ok(!existsSync(join(contender.root, "calls.jsonl")));
+	expect(waiting.status).not.toBe(0);
+	expect(waiting.stderr).toMatch(/lock timed out/);
+	expect(!existsSync(join(contender.root, "calls.jsonl"))).toBeTruthy();
 	const inspection = contender.run("TURBO_FLAGS=--dry=json");
-	assert.equal(inspection.status, 0, inspection.stderr);
-	assert.ok(JSON.parse(inspection.stdout).tasks.length > 0);
-	assert.ok(!contender.calls().some((call) => call[0] === "docker"));
+	expect(inspection.status, inspection.stderr).toBe(0);
+	expect(JSON.parse(inspection.stdout).tasks.length > 0).toBeTruthy();
+	expect(!contender.calls().some((call) => call[0] === "docker")).toBeTruthy();
 });
 
 test("occupied worktree ingress fails early without altering the existing listener or any stack", async (t) => {
 	const f = await browserFixture(t);
 	const listener = createServer();
 	await new Promise((resolve) => listener.listen(0, "0.0.0.0", resolve));
-	t.after(() => listener.close());
+	t.onTestFinished(() => listener.close());
 	const worktree = join(f.root, ".worktree");
 	writeFileSync(
 		worktree,
@@ -1166,13 +1148,12 @@ test("occupied worktree ingress fails early without altering the existing listen
 		),
 	);
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.notEqual(result.status, 0);
-	assert.match(
-		result.stderr,
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(
 		/INGRESS_PORT=.*unavailable.*Preserve the existing stack/,
 	);
-	assert.ok(listener.listening);
-	assert.ok(
+	expect(listener.listening).toBeTruthy();
+	expect(
 		!f
 			.calls()
 			.some(
@@ -1181,7 +1162,7 @@ test("occupied worktree ingress fails early without altering the existing listen
 					call.includes("up") ||
 					call.includes("down"),
 			),
-	);
+	).toBeTruthy();
 });
 
 test("hosted browser and container selections enforce failures using their externally managed dependencies", (t) => {
@@ -1191,22 +1172,21 @@ test("hosted browser and container selections enforce failures using their exter
 	f.env.TEST_CONTAINER_EXIT = "27";
 	const browser = f.run("PACKAGE=web-e2e");
 	const containers = f.run("TURBO_FLAGS=--filter=!@wallpaperdb/web-e2e");
-	assert.notEqual(browser.status, 0);
-	assert.notEqual(containers.status, 0);
-	assert.match(browser.stderr, /Error 26/);
-	assert.match(containers.stderr, /Error 27/);
-	assert.ok(!f.calls().some((call) => call[0] === "docker"));
+	expect(browser.status).not.toBe(0);
+	expect(containers.status).not.toBe(0);
+	expect(browser.stderr).toMatch(/Error 26/);
+	expect(containers.stderr).toMatch(/Error 27/);
+	expect(!f.calls().some((call) => call[0] === "docker")).toBeTruthy();
 	const workflow = readFileSync(
 		join(repository, ".github/workflows/e2e.yml"),
 		"utf8",
 	);
-	assert.match(workflow, /pull_request:/);
-	assert.match(workflow, /run: make test-e2e PACKAGE=web-e2e/);
-	assert.match(
-		workflow,
+	expect(workflow).toMatch(/pull_request:/);
+	expect(workflow).toMatch(/run: make test-e2e PACKAGE=web-e2e/);
+	expect(workflow).toMatch(
 		/run: make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb\/web-e2e'/,
 	);
-	assert.doesNotMatch(workflow, /continue-on-error/);
+	expect(workflow).not.toMatch(/continue-on-error/);
 });
 
 test("explicit container-only selection preserves test arguments and FORCE without starting Compose", (t) => {
@@ -1216,19 +1196,21 @@ test("explicit container-only selection preserves test arguments and FORCE witho
 		"ARGS=test/storage.test.ts",
 		"FORCE=1",
 	);
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 	const calls = f.calls();
-	assert.ok(
+	expect(
 		calls.some(
 			(call) =>
 				call.includes("--filter=@wallpaperdb/test-utils") &&
 				call.includes("test/storage.test.ts") &&
 				call.includes("--force"),
 		),
-	);
-	assert.ok(calls.some((call) => call[0] === "docker" && call[1] === "info"));
-	assert.ok(!calls.some((call) => call.includes("compose")));
-	assert.match(result.stdout, /Container E2E/);
+	).toBeTruthy();
+	expect(
+		calls.some((call) => call[0] === "docker" && call[1] === "info"),
+	).toBeTruthy();
+	expect(!calls.some((call) => call.includes("compose"))).toBeTruthy();
+	expect(result.stdout).toMatch(/Container E2E/);
 });
 
 for (const [signal, status] of [
@@ -1239,13 +1221,11 @@ for (const [signal, status] of [
 		const f = fixture(t);
 		f.env.TEST_CHILD_SIGNAL = signal;
 		const result = f.run("PACKAGE=test-utils");
-		assert.notEqual(result.status, 0);
-		assert.match(
-			result.stderr,
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(
 			new RegExp(`phase "container tests" failed, exit ${status}`),
 		);
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
 	});
@@ -1285,22 +1265,23 @@ for (const mode of ["lines", "unterminated", "progress"]) {
 				tail.length,
 				Math.max(0, statSync(join(f.root, "output.log")).size - tail.length),
 			);
-			assert.equal(result.status, 0, result.error?.message ?? tail.toString());
+			expect(result.status, result.error?.message ?? tail.toString()).toBe(0);
 			const directory = header
 				.toString()
 				.match(/E2E diagnostics retained at (\S+)\./)[1];
 			if (mode === "unterminated") {
-				assert.match(tail.toString(), /Omitted output line longer than/);
-				assert.ok(statSync(join(f.root, "output.log")).size < 128 * 1024);
+				expect(tail.toString()).toMatch(/Omitted output line longer than/);
+				expect(
+					statSync(join(f.root, "output.log")).size < 128 * 1024,
+				).toBeTruthy();
 			} else
-				assert.ok(
+				expect(
 					statSync(join(f.root, "output.log")).size >= 64 * 1024 * 1024 - 1024,
-				);
-			assert.ok(!existsSync(directory));
-			assert.equal(
+				).toBeTruthy();
+			expect(!existsSync(directory)).toBeTruthy();
+			expect(
 				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-				0,
-			);
+			).toBe(0);
 		} finally {
 			closeSync(output);
 		}
@@ -1311,23 +1292,21 @@ test("a complete run suggests the container suite that actually failed", async (
 	const f = await browserFixture(t);
 	f.env.TEST_FAILED_PACKAGE = "@wallpaperdb/testcontainers";
 	const result = await f.runAsync();
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /phase "container tests" failed, exit 27/);
-	assert.match(
-		result.stderr,
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(/phase "container tests" failed, exit 27/);
+	expect(result.stderr).toMatch(
 		/Focused rerun: make test-e2e PACKAGE=testcontainers/,
 	);
 	const executions = f
 		.calls()
 		.filter((call) => call[0] === "turbo" && !call.includes("--dry=json"));
-	assert.deepEqual(
+	expect(
 		executions.map((call) => call.filter((arg) => arg.startsWith("--filter="))),
-		[
-			["--filter=@wallpaperdb/web-e2e"],
-			["--filter=@wallpaperdb/test-utils"],
-			["--filter=@wallpaperdb/testcontainers"],
-		],
-	);
+	).toStrictEqual([
+		["--filter=@wallpaperdb/web-e2e"],
+		["--filter=@wallpaperdb/test-utils"],
+		["--filter=@wallpaperdb/testcontainers"],
+	]);
 });
 
 test("overlapping credentials are fully redacted in console and retained diagnostics", async (t) => {
@@ -1340,7 +1319,7 @@ test("overlapping credentials are fully redacted in console and retained diagnos
 	f.env.TEST_LOG_MESSAGE = "fixture-overlap-private-suffix fixture-overlap";
 	f.env.TEST_BROWSER_EXIT = "23";
 	const result = await f.runAsync("PACKAGE=web-e2e");
-	assert.match(result.stderr, /browser tests.*exit 23/);
+	expect(result.stderr).toMatch(/browser tests.*exit 23/);
 	const directory = result.stdout.match(
 		/E2E diagnostics retained at (\S+)\./,
 	)[1];
@@ -1350,7 +1329,7 @@ test("overlapping credentials are fully redacted in console and retained diagnos
 		readFileSync(join(directory, "infra.log"), "utf8"),
 		readFileSync(join(directory, "run.log"), "utf8"),
 	]) {
-		assert.doesNotMatch(text, /fixture-overlap|private-suffix/);
+		expect(text).not.toMatch(/fixture-overlap|private-suffix/);
 	}
 });
 
@@ -1361,24 +1340,22 @@ for (const failed of [false, true]) {
 		f.env.TEST_PACKAGE_CWD = "1";
 		if (failed) f.env.TEST_BROWSER_EXIT = "23";
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.equal(result.status, failed ? 2 : 0, result.stderr);
+		expect(result.status, result.stderr).toBe(failed ? 2 : 0);
 		const directory = result.stdout.match(
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
-		assert.ok(isAbsolute(directory), directory);
-		assert.ok(directory.startsWith(`${f.root}/wallpaperdb-e2e-`));
+		expect(isAbsolute(directory), directory).toBeTruthy();
+		expect(directory.startsWith(`${f.root}/wallpaperdb-e2e-`)).toBeTruthy();
 		if (failed)
-			assert.equal(
+			expect(
 				readFileSync(join(directory, "test-results/trace.zip"), "utf8"),
-				"retained browser artifact",
-			);
-		else assert.ok(!existsSync(directory));
-		assert.deepEqual(
+			).toBe("retained browser artifact");
+		else expect(!existsSync(directory)).toBeTruthy();
+		expect(
 			readdirSync(join(f.root, "apps/web-e2e")).filter((name) =>
 				name.startsWith("wallpaperdb-e2e-"),
 			),
-			[],
-		);
+		).toStrictEqual([]);
 	});
 }
 
@@ -1398,20 +1375,17 @@ for (const [signal, status, browserStatus] of [
 				process.kill(-child.pid, signal);
 		};
 		const result = await f.runAsync("PACKAGE=web-e2e");
-		assert.match(
-			result.stderr,
+		expect(result.stderr).toMatch(
 			new RegExp(
 				`phase "${browserStatus ? "browser tests" : "browser cleanup"}" failed, exit ${browserStatus || status}`,
 			),
 		);
-		assert.match(result.stderr, /Cleanup failed for apps, exit 29/);
-		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		expect(result.stderr).toMatch(/Cleanup failed for apps, exit 29/);
+		expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+		expect(spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status).toBe(
 			0,
 		);
-		assert.doesNotMatch(
-			result.stdout,
+		expect(result.stdout).not.toMatch(
 			/All requested E2E phases and cleanup passed/,
 		);
 	});
@@ -1423,60 +1397,55 @@ for (const [stream, keepOpen] of [
 	["stdout", true],
 	["stderr", true],
 ]) {
-	test(
-		`a closed ${stream} consumer ${keepOpen ? "stops active browser work" : "handles a finite producer"} and completes owned teardown`,
-		{ timeout: 10_000 },
-		async (t) => {
-			const f = await browserFixture(t);
-			f.env.TEST_HOLD = "1";
-			f.env.TEST_PIPE_STREAM = stream;
-			f.env.TEST_PIPE_KEEP_OPEN = keepOpen ? "1" : "";
-			f.onOutput = (output, child) => {
-				if (!output.includes("Browser fixture running")) return;
-				child[stream].once("close", () =>
-					writeFileSync(join(f.root, "pipe-consumer-closed"), "closed"),
-				);
-				child[stream].destroy();
-			};
-			let pid;
-			try {
-				const result = await f.runAsync("PACKAGE=web-e2e");
+	test(`a closed ${stream} consumer ${keepOpen ? "stops active browser work" : "handles a finite producer"} and completes owned teardown`, {
+		timeout: 10_000,
+	}, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_HOLD = "1";
+		f.env.TEST_PIPE_STREAM = stream;
+		f.env.TEST_PIPE_KEEP_OPEN = keepOpen ? "1" : "";
+		f.onOutput = (output, child) => {
+			if (!output.includes("Browser fixture running")) return;
+			child[stream].once("close", () =>
+				writeFileSync(join(f.root, "pipe-consumer-closed"), "closed"),
+			);
+			child[stream].destroy();
+		};
+		let pid;
+		try {
+			const result = await f.runAsync("PACKAGE=web-e2e");
+			pid = Number(
+				readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+			);
+			expect(result.status).not.toBe(0);
+			expect(f.calls().filter((call) => call.includes("down")).length).toBe(2);
+			expect(() => process.kill(pid, 0)).toThrow(
+				expect.objectContaining({ code: "ESRCH" }),
+			);
+			const directory = result.stdout.match(
+				/E2E diagnostics retained at (\S+)\./,
+			)[1];
+			const log = readFileSync(join(directory, "run.log"), "utf8");
+			expect(log).toMatch(/Console output failed.*EPIPE/);
+			expect(log).toMatch(
+				/phase "(?:browser tests|browser cleanup)" failed, exit 1/,
+			);
+			expect(result.stdout + result.stderr).not.toMatch(/Unhandled/);
+			expect(
+				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			).toBe(0);
+		} finally {
+			if (!pid && existsSync(join(f.root, "active-fixture-child.pid")))
 				pid = Number(
 					readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
 				);
-				assert.notEqual(result.status, 0);
-				assert.equal(
-					f.calls().filter((call) => call.includes("down")).length,
-					2,
-				);
-				assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
-				const directory = result.stdout.match(
-					/E2E diagnostics retained at (\S+)\./,
-				)[1];
-				const log = readFileSync(join(directory, "run.log"), "utf8");
-				assert.match(log, /Console output failed.*EPIPE/);
-				assert.match(
-					log,
-					/phase "(?:browser tests|browser cleanup)" failed, exit 1/,
-				);
-				assert.doesNotMatch(result.stdout + result.stderr, /Unhandled/);
-				assert.equal(
-					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-					0,
-				);
-			} finally {
-				if (!pid && existsSync(join(f.root, "active-fixture-child.pid")))
-					pid = Number(
-						readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
-					);
-				if (Number.isInteger(pid) && pid > 0) {
-					try {
-						process.kill(-pid, "SIGKILL");
-					} catch {}
-				}
+			if (Number.isInteger(pid) && pid > 0) {
+				try {
+					process.kill(-pid, "SIGKILL");
+				} catch {}
 			}
-		},
-	);
+		}
+	});
 }
 
 for (const [capture, stream, browserStatus] of [
@@ -1485,71 +1454,62 @@ for (const [capture, stream, browserStatus] of [
 	["logs", "both", 0],
 	["config", "stdout", 0],
 ]) {
-	test(
-		`oversized ${capture} ${stream} capture fails safely${browserStatus ? " without replacing the browser failure" : ""}`,
-		{ timeout: 15_000 },
-		async (t) => {
-			const f = await browserFixture(t);
-			f.env.TEST_LARGE_CAPTURE = capture;
-			f.env.TEST_CAPTURE_STREAM = stream;
-			f.env.NODE_OPTIONS = "--max-old-space-size=32";
-			if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
-			try {
-				const result = await f.runAsync("PACKAGE=web-e2e");
-				assert.notEqual(result.status, 0);
-				assert.doesNotMatch(result.stderr, /heap out of memory|FATAL ERROR/);
-				assert.match(result.stderr, /Capture exceeded 1048576 bytes/);
-				assert.match(
-					result.stderr,
-					new RegExp(
-						`phase "${browserStatus ? "browser tests" : capture === "logs" ? "browser cleanup" : "browser preflight"}" failed, exit ${browserStatus || 1}`,
-					),
-				);
-				const calls = f.calls();
-				assert.equal(
-					calls.filter((call) => call.includes("down")).length,
-					capture === "logs" ? 2 : 0,
-				);
-				if (capture === "logs")
-					assert.equal(calls.filter((call) => call.includes("logs")).length, 2);
-				if (capture === "config")
-					assert.ok(
-						!calls.some(
-							(call) => call.includes("build") || call.includes("up"),
-						),
-					);
-				const directory = result.stdout.match(
-					/E2E diagnostics retained at (\S+)\./,
-				)[1];
-				assert.ok(existsSync(join(directory, "run.log")));
-				assert.doesNotMatch(
-					result.stdout,
-					/All requested E2E phases and cleanup passed/,
-				);
-				for (const name of ["apps", "infra"]) {
-					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
-					if (existsSync(pidFile))
-						assert.throws(
-							() => process.kill(Number(readFileSync(pidFile, "utf8")), 0),
-							{ code: "ESRCH" },
-						);
-				}
-				assert.equal(
-					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-					0,
-				);
-			} finally {
-				for (const name of ["apps", "infra"]) {
-					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
-					if (existsSync(pidFile)) {
-						try {
-							process.kill(-Number(readFileSync(pidFile, "utf8")), "SIGKILL");
-						} catch {}
-					}
+	test(`oversized ${capture} ${stream} capture fails safely${browserStatus ? " without replacing the browser failure" : ""}`, {
+		timeout: 15_000,
+	}, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_LARGE_CAPTURE = capture;
+		f.env.TEST_CAPTURE_STREAM = stream;
+		f.env.NODE_OPTIONS = "--max-old-space-size=32";
+		if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
+		try {
+			const result = await f.runAsync("PACKAGE=web-e2e");
+			expect(result.status).not.toBe(0);
+			expect(result.stderr).not.toMatch(/heap out of memory|FATAL ERROR/);
+			expect(result.stderr).toMatch(/Capture exceeded 1048576 bytes/);
+			expect(result.stderr).toMatch(
+				new RegExp(
+					`phase "${browserStatus ? "browser tests" : capture === "logs" ? "browser cleanup" : "browser preflight"}" failed, exit ${browserStatus || 1}`,
+				),
+			);
+			const calls = f.calls();
+			expect(calls.filter((call) => call.includes("down")).length).toBe(
+				capture === "logs" ? 2 : 0,
+			);
+			if (capture === "logs")
+				expect(calls.filter((call) => call.includes("logs")).length).toBe(2);
+			if (capture === "config")
+				expect(
+					!calls.some((call) => call.includes("build") || call.includes("up")),
+				).toBeTruthy();
+			const directory = result.stdout.match(
+				/E2E diagnostics retained at (\S+)\./,
+			)[1];
+			expect(existsSync(join(directory, "run.log"))).toBeTruthy();
+			expect(result.stdout).not.toMatch(
+				/All requested E2E phases and cleanup passed/,
+			);
+			for (const name of ["apps", "infra"]) {
+				const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+				if (existsSync(pidFile))
+					expect(() =>
+						process.kill(Number(readFileSync(pidFile, "utf8")), 0),
+					).toThrow(expect.objectContaining({ code: "ESRCH" }));
+			}
+			expect(
+				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			).toBe(0);
+		} finally {
+			for (const name of ["apps", "infra"]) {
+				const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+				if (existsSync(pidFile)) {
+					try {
+						process.kill(-Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+					} catch {}
 				}
 			}
-		},
-	);
+		}
+	});
 }
 
 for (const kind of ["existing data", "symbolic link", "hard link"]) {
@@ -1564,32 +1524,30 @@ for (const kind of ["existing data", "symbolic link", "hard link"]) {
 		if (kind === "hard link") linkSync(target, selected);
 		f.env.E2E_LOCK_FILE = selected;
 		const result = f.run("PACKAGE=test-utils");
-		assert.equal(
-			readFileSync(target, "utf8"),
+		expect(readFileSync(target, "utf8")).toBe(
 			"PRIVATE_FIXTURE_VALUE=preserved\n",
 		);
-		assert.equal(statSync(target).mtimeMs, before.mtimeMs);
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /Unsafe Docker host lock target/);
-		assert.match(
-			result.stderr,
+		expect(statSync(target).mtimeMs).toBe(before.mtimeMs);
+		expect(result.status).not.toBe(0);
+		expect(result.stderr).toMatch(/Unsafe Docker host lock target/);
+		expect(result.stderr).toMatch(
 			/Focused rerun: make test-e2e PACKAGE=test-utils/,
 		);
-		assert.ok(!existsSync(join(f.root, "calls.jsonl")));
+		expect(!existsSync(join(f.root, "calls.jsonl"))).toBeTruthy();
 	});
 }
 
 test("a FIFO lock target is rejected without blocking or starting Docker", (t) => {
 	const f = fixture(t);
 	const selected = join(f.root, "unsafe.fifo");
-	assert.equal(spawnSync("mkfifo", [selected]).status, 0);
+	expect(spawnSync("mkfifo", [selected]).status).toBe(0);
 	f.env.E2E_LOCK_FILE = selected;
 	const result = f.run("PACKAGE=test-utils");
-	assert.equal(result.error, undefined);
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /Unsafe Docker host lock target/);
-	assert.ok(statSync(selected).isFIFO());
-	assert.ok(!existsSync(join(f.root, "calls.jsonl")));
+	expect(result.error).toBe(undefined);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toMatch(/Unsafe Docker host lock target/);
+	expect(statSync(selected).isFIFO()).toBeTruthy();
+	expect(!existsSync(join(f.root, "calls.jsonl"))).toBeTruthy();
 });
 
 for (const failure of ["none", "build", "browser"]) {
@@ -1602,7 +1560,7 @@ for (const failure of ["none", "build", "browser"]) {
 		if (failure === "build") f.env.TEST_BUILD_EXIT = "23";
 		if (failure === "browser") f.env.TEST_BROWSER_EXIT = "26";
 		const result = await f.runAsync();
-		assert.equal(result.status, failure === "none" ? 0 : 2, result.stderr);
+		expect(result.status, result.stderr).toBe(failure === "none" ? 0 : 2);
 		const directory = result.stdout.match(
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
@@ -1617,8 +1575,10 @@ for (const failure of ["none", "build", "browser"]) {
 				!entry.args.includes("--dry=json") &&
 				entry.args.includes("--filter=@wallpaperdb/web-e2e");
 			if (browser) browserCalls++;
-			assert.deepEqual(
+			expect(
 				entry.values,
+				JSON.stringify({ kind: entry.kind, args: entry.args }),
+			).toStrictEqual(
 				browser
 					? {
 							CLERK_SECRET_KEY: "sk_test_private",
@@ -1632,14 +1592,13 @@ for (const failure of ["none", "build", "browser"]) {
 							E2E_BASE_TEST_PASSWORD: null,
 							E2E_ARTIFACTS_DIR: null,
 						},
-				JSON.stringify({ kind: entry.kind, args: entry.args }),
 			);
 		}
-		assert.equal(browserCalls, failure === "build" ? 0 : 1);
-		assert.ok(
+		expect(browserCalls).toBe(failure === "build" ? 0 : 1);
+		expect(
 			observed.some(
 				(entry) => entry.kind === "docker" && entry.args.includes("down"),
 			),
-		);
+		).toBeTruthy();
 	});
 }

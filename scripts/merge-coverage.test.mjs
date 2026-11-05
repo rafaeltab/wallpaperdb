@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
@@ -9,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 
 test("local coverage includes unit and integration workspaces but excludes stale E2E reports", () => {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-coverage-"));
@@ -40,12 +39,12 @@ test("local coverage includes unit and integration workspaces but excludes stale
 			[new URL("./merge-coverage.mjs", import.meta.url).pathname, "--local"],
 			{ cwd: root, encoding: "utf8" },
 		);
-		assert.equal(result.status, 0, result.stderr);
+		expect(result.status, result.stderr).toBe(0);
 		const coverage = readFileSync(join(root, "coverage/lcov.info"), "utf8");
-		assert.match(coverage, /ordinary-unit/);
-		assert.match(coverage, /ordinary-integration/);
-		assert.match(coverage, /flat-/);
-		assert.doesNotMatch(coverage, /container/);
+		expect(coverage).toMatch(/ordinary-unit/);
+		expect(coverage).toMatch(/ordinary-integration/);
+		expect(coverage).toMatch(/flat-/);
+		expect(coverage).not.toMatch(/container/);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}

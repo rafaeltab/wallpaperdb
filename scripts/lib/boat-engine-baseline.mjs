@@ -456,7 +456,6 @@ async function workerRead(owner, expectedHelper) {
 	const temporary = fs.mkdtempSync(
 		path.join(privateDirectory, "engine-version-"),
 	);
-	fs.chmodSync(temporary, 0o700);
 	const acquired = fs.lstatSync(temporary);
 	const removeTemporary = () => {
 		const current = fs.lstatSync(temporary);
@@ -468,90 +467,122 @@ async function workerRead(owner, expectedHelper) {
 				acquired.uid, "Engine baseline temporary ownership changed");
 		fs.rmSync(temporary, { recursive: true });
 	};
-	fs.writeFileSync(
-		path.join(temporary, "config.json"),
-		'{"auths":{},"currentContext":"default"}\n',
-		{ mode: 0o600 },
-	);
-	const env = {
-		...process.env,
-		DOCKER_HOST: endpoint,
-		DOCKER_CONFIG: temporary,
-		WALLPAPERDB_DOCKER_SOURCE_CONFIG: temporary,
-	};
-	for (const name of [
-		"DOCKER_CONTEXT",
-		"DOCKER_API_VERSION",
-		"HTTP_PROXY",
-		"HTTPS_PROXY",
-		"ALL_PROXY",
-		"http_proxy",
-		"https_proxy",
-		"all_proxy",
-	])
-		delete env[name];
-	// Earlier worker-local containment only. The coordinator's original two-second
-	// clock includes SSH acquisition and remains the sole acceptance deadline.
-	// No worker monotonic value is compared with that coordinator clock.
-	if (performance.now() >= workerBegan + 750) {
-		removeTemporary();
-		return { owner, closed: true, status: "NO_BUDGET" };
-	}
-	const child = spawn("mise", ["exec", "--", ...makeArgv], {
-		detached: true,
-		env: independentMakeEnvironment(env),
-		stdio: ["ignore", "pipe", "pipe"],
-	});
-	let ownership,
-		cancelled = false;
-	const phase = {
-		phase: "engine-version",
-		deadline: workerBegan + 1000,
-		disposalMs: 250,
-		record: (r) => {
-			ownership = r;
-		},
-	};
-	const cancel = () => {
-		cancelled = true;
-		phase.deadline = Math.min(phase.deadline, performance.now() + 250);
-	};
-	for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
-		process.on(signal, cancel);
-	const streams = { stdout: [], stderr: [] },
-		sizes = { stdout: 0, stderr: 0 };
-	for (const name of ["stdout", "stderr"])
-		child[name].on("data", (b) => {
-			sizes[name] += b.length;
-			if (sizes[name] > 32768) cancel();
-			else streams[name].push(b);
-		});
-	let failure = null;
+	let initiatingError, observation, setupError, cleanupError;
 	try {
-		await finiteShutdownProcess(child, phase);
+		fs.writeFileSync(
+			path.join(temporary, "config.json"),
+			'{"auths":{},"currentContext":"default"}\n',
+			{ mode: 0o600 },
+		);
+		const env = {
+			...process.env,
+			DOCKER_HOST: endpoint,
+			DOCKER_CONFIG: temporary,
+			WALLPAPERDB_DOCKER_SOURCE_CONFIG: temporary,
+		};
+		for (const name of [
+			"DOCKER_CONTEXT",
+			"DOCKER_API_VERSION",
+			"HTTP_PROXY",
+			"HTTPS_PROXY",
+			"ALL_PROXY",
+			"http_proxy",
+			"https_proxy",
+			"all_proxy",
+		])
+			delete env[name];
+		// Earlier worker-local containment only. The coordinator's original two-second
+		// clock includes SSH acquisition and remains the sole acceptance deadline.
+		// No worker monotonic value is compared with that coordinator clock.
+		if (performance.now() >= workerBegan + 750) {
+			observation = { owner, closed: true, status: "NO_BUDGET" };
+		} else {
+			const child = spawn("mise", ["exec", "--", ...makeArgv], {
+				detached: true,
+				env: independentMakeEnvironment(env),
+				stdio: ["ignore", "pipe", "pipe"],
+			});
+			let ownership,
+				cancelled = false;
+			const phase = {
+				phase: "engine-version",
+				deadline: workerBegan + 1000,
+				disposalMs: 250,
+				record: (r) => {
+					ownership = r;
+				},
+			};
+			const cancel = () => {
+				cancelled = true;
+				phase.deadline = Math.min(phase.deadline, performance.now() + 250);
+			};
+			for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
+				process.on(signal, cancel);
+			const streams = { stdout: [], stderr: [] },
+				sizes = { stdout: 0, stderr: 0 };
+			for (const name of ["stdout", "stderr"])
+				child[name].on("data", (b) => {
+					sizes[name] += b.length;
+					if (sizes[name] > 32768) cancel();
+					else streams[name].push(b);
+				});
+			let failure = null;
+			try {
+				await finiteShutdownProcess(child, phase);
+			} catch (error) {
+				failure = error.message;
+				initiatingError = error;
+			} finally {
+				for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
+					process.off(signal, cancel);
+			}
+			observation = {
+				owner,
+				closed: true,
+				status: "OBSERVED",
+				child: ownership,
+				failure,
+				cancelled,
+				overflow: Object.values(sizes).some((size) => size > 32768),
+				workerContainment: {
+					executionMs: 750,
+					disposalMs: 250,
+					elapsedMs: performance.now() - workerBegan,
+				},
+				stdout: Buffer.concat(streams.stdout).toString("base64"),
+				stderr: Buffer.concat(streams.stderr).toString("base64"),
+			};
+		}
 	} catch (error) {
-		failure = error.message;
+		initiatingError ??= error;
+		setupError = error;
 	} finally {
-		for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
-			process.off(signal, cancel);
-		removeTemporary();
+		try {
+			removeTemporary();
+		} catch (error) {
+			cleanupError = error;
+		}
 	}
-	return {
-		owner,
-		closed: true,
-		status: "OBSERVED",
-		child: ownership,
-		failure,
-		cancelled,
-		overflow: Object.values(sizes).some((size) => size > 32768),
-		workerContainment: {
-			executionMs: 750,
-			disposalMs: 250,
-			elapsedMs: performance.now() - workerBegan,
-		},
-		stdout: Buffer.concat(streams.stdout).toString("base64"),
-		stderr: Buffer.concat(streams.stderr).toString("base64"),
-	};
+	if (cleanupError) {
+		const failure = initiatingError
+			? new AggregateError(
+					[initiatingError, cleanupError],
+					`${initiatingError.message}; Engine baseline cleanup failed: ${cleanupError.message}`,
+				)
+			: cleanupError;
+		if (observation)
+			failure.observation = {
+				...observation,
+				closed: false,
+				status: "UNRESOLVED",
+				cleanupFailure: cleanupError.message,
+			};
+		throw failure;
+	}
+	if (setupError) throw setupError;
+	if (observation.workerContainment)
+		observation.workerContainment.elapsedMs = performance.now() - workerBegan;
+	return observation;
 }
 
 if (
@@ -561,6 +592,8 @@ if (
 	workerRead(JSON.parse(process.argv[3]), JSON.parse(process.argv[4])).then(
 		(r) => console.log(frame + JSON.stringify(r)),
 		(error) => {
+			if (error.observation)
+				console.log(frame + JSON.stringify(error.observation));
 			console.error(error.message);
 			process.exitCode = 1;
 		},

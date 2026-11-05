@@ -154,6 +154,7 @@ services:
           path: ../pnpm-lock.yaml
 
   tags:
+    profiles: ["tags"]
     build:
       context: ..
       dockerfile: apps/tags/Dockerfile.dev
@@ -300,8 +301,6 @@ services:
       color-extractor:
         condition: service_healthy
       wallpaper:
-        condition: service_healthy
-      tags:
         condition: service_healthy
       user:
         condition: service_healthy

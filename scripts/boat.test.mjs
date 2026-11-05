@@ -16081,6 +16081,9 @@ function imageCommandEvents(f) {
 
 function managedEngineContext(f, changes = {}) {
 	const state = f.json(".boat/state.json");
+	// Non-API controls must not depend on an ambient client endpoint. The actual
+	// Docker cases replace this with their independently owned listening socket.
+	f.env.DOCKER_HOST = `unix://${path.join(f.directory, "absent-engine.sock")}`;
 	const evidence = path.join(f.directory, "managed-engine-round");
 	fs.mkdirSync(evidence, { mode: 0o700 });
 	const deadline = Number(process.hrtime.bigint()) / 1e9 + 25;
@@ -16240,7 +16243,12 @@ for (const scenario of [
 			state.admission.token = "replacement-admission";
 			f.local(".boat/state.json", JSON.stringify(state));
 		} else {
-			assert.equal((await f.run("boat-prepare-app-images").done).status, 0);
+			const initial = await f.run("boat-prepare-app-images").done;
+			if (initial.status !== 0) {
+				retainEngineBaseline(t, evidence);
+				t.diagnostic(JSON.stringify({ initial }));
+			}
+			assert.equal(initial.status, 0, initial.output);
 			if (scenario === "interrupted intent")
 				fs.unlinkSync(path.join(claim, "result.json"));
 			else if (scenario === "tampered evidence")
@@ -16275,52 +16283,128 @@ for (const scenario of [
 		retainEngineBaseline(t, evidence);
 	});
 
-test("engine baseline unresolved remote child refuses image work despite a closed local transport", {
-	timeout: 20000,
-}, async (t) => {
-	const f = await appImagesCheckout(t, true);
-	assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
-	const { evidence, context } = managedEngineContext(f);
-	const sibling = f.json(".boat/state.json").daemon;
-	const cli = path.join(f.root, ".mise/boat/boat");
-	const owner = {
-		version: context.version,
-		root: context.root,
-		round: context.round,
-		worker: context.worker,
-		admission: context.admission,
-	};
-	const reported = {
-		owner,
-		closed: true,
-		status: "OBSERVED",
-		child: {
-			pipesClosed: true,
-			unresolved: [{ pid: 123456, birth: "controlled-unresolved" }],
-		},
-	};
-	fs.writeFileSync(
-		cli,
-		fs
-			.readFileSync(cli, "utf8")
-			.replace(
-				"const command=argv.at(-1)",
-				`if(argv.includes('ssh')&&argv.at(-1).includes('boat-engine-baseline.mjs --worker')){console.log(${JSON.stringify("BOAT_ENGINE_VERSION_V1 " + JSON.stringify(reported))});process.exit(0);}\nconst command=argv.at(-1)`,
-			),
-	);
-	const result = await f.run("boat-prepare-app-images").done;
-	assert.notEqual(result.status, 0, result.output);
-	assert.match(result.output, /Engine baseline remote ownership differs/);
-	const record = JSON.parse(
-		fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
-	);
-	assert.equal(record.status, "UNRESOLVED");
-	assert.equal(record.native.captureComplete, true);
-	assert.deepEqual(record.native.terminal, { code: 0, signal: null });
-	assert.deepEqual(f.appBuilds(), []);
-	assert.equal(liveOwnedProcess(f.root, sibling), true);
-	retainEngineBaseline(t, evidence);
-});
+for (const scenario of [
+	"unresolved child",
+	"worker inspection",
+	"worker escape",
+	"host fsync",
+	"host timeout",
+	"host timeout fsync",
+])
+	test(`engine baseline integrity ${scenario} ${scenario === "host timeout" ? "stays optional once with intact evidence" : "refuses image work despite a closed local transport"}`, {
+		timeout: 20000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t, true);
+		assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+		const { evidence, context } = managedEngineContext(f);
+		const sibling = f.json(".boat/state.json").daemon;
+		const cli = path.join(f.root, ".mise/boat/boat");
+		const owner = {
+			version: context.version,
+			root: context.root,
+			round: context.round,
+			worker: context.worker,
+			admission: context.admission,
+		};
+		const reported = {
+			owner,
+			closed: true,
+			status: "OBSERVED",
+			child: {
+				pipesClosed: true,
+				unresolved:
+					scenario === "unresolved child"
+						? [{ pid: 123456, birth: "controlled-unresolved" }]
+						: [],
+				terminal: { code: 0, signal: null },
+			},
+			stdout: "",
+			stderr: "",
+		};
+		if (scenario.startsWith("worker")) {
+			const failure =
+				scenario === "worker inspection"
+					? "process ownership inspection failed"
+					: "observed local process escaped session ownership";
+			reported.child.failure = failure;
+			reported.failure = `Shutdown engine-version: ${failure}`;
+		}
+		if (scenario.startsWith("host")) {
+			reported.status = "UNAVAILABLE_ENDPOINT";
+			delete reported.child;
+		}
+		if (scenario.includes("fsync")) {
+			const hook = path.join(f.directory, "capture-fsync-refusal.cjs");
+			fs.writeFileSync(
+				hook,
+				`const fs=require('node:fs');const open=fs.openSync,sync=fs.fsyncSync,close=fs.closeSync,tracked=new Set();fs.openSync=function(file,...args){const fd=open.call(this,file,...args);if(String(file).endsWith('/engine-baseline-v1/transport/stdout.raw'))tracked.add(fd);return fd;};fs.fsyncSync=function(fd){if(tracked.has(fd)){fs.writeFileSync(${JSON.stringify(path.join(f.control, "capture-fsync-refused"))},'refused');throw new Error('CONTROL_CAPTURE_FSYNC');}return sync.call(this,fd);};fs.closeSync=function(fd){tracked.delete(fd);return close.call(this,fd);};`,
+			);
+			f.env.NODE_OPTIONS = `--require=${hook}`;
+		}
+		fs.writeFileSync(
+			cli,
+			fs
+				.readFileSync(cli, "utf8")
+				.replace(
+					"const command=argv.at(-1)",
+					`if(argv.includes('ssh')&&argv.at(-1).includes('boat-engine-baseline.mjs --worker')){console.log(${JSON.stringify("BOAT_ENGINE_VERSION_V1 " + JSON.stringify(reported))});${scenario.includes("timeout") ? "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5000);" : ""}process.exit(0);}\nconst command=argv.at(-1)`,
+				),
+		);
+		const result = await f.run("boat-prepare-app-images").done;
+		retainEngineBaseline(t, evidence);
+		const record = JSON.parse(
+			fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+		);
+		if (scenario === "host timeout") {
+			assert.equal(result.status, 0, result.output);
+			assert.equal(record.status, "UNAVAILABLE_CAPTURE");
+			assert.equal(record.native.captureComplete, false);
+			assert.equal(
+				record.native.failure,
+				"Shutdown 547-command: deadline exceeded",
+			);
+			assert.deepEqual(record.native.integrityFailures, []);
+			assert.deepEqual(f.appBuilds(), completedAppBuilds());
+			assert.equal((await f.run("boat-prepare-app-images").done).status, 0);
+			assert.equal(
+				freshCalls(f).filter((a) =>
+					a.at(-1)?.includes("boat-engine-baseline.mjs --worker"),
+				).length,
+				1,
+			);
+			return;
+		}
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			/Engine baseline (remote ownership differs|remote integrity failed|transport capture integrity failed)/,
+		);
+		assert.equal(record.status, "UNRESOLVED");
+		assert.equal(record.native.captureComplete, !scenario.startsWith("host"));
+		if (scenario.includes("fsync")) {
+			assert.equal(
+				record.native.failure,
+				scenario.includes("timeout")
+					? "Shutdown 547-command: deadline exceeded"
+					: "capture fsync failed",
+			);
+			assert.deepEqual(record.native.integrityFailures, [
+				"capture fsync failed",
+			]);
+			assert.equal(
+				fs.existsSync(path.join(f.control, "capture-fsync-refused")),
+				true,
+			);
+		}
+		assert.deepEqual(
+			record.native.terminal,
+			scenario.includes("timeout")
+				? { code: null, signal: "SIGTERM" }
+				: { code: 0, signal: null },
+		);
+		assert.deepEqual(f.appBuilds(), []);
+		assert.equal(liveOwnedProcess(f.root, sibling), true);
+	});
 
 test("engine baseline transport delay consumes its original allowance and fails closed without remote proof", {
 	timeout: 20000,
@@ -16363,6 +16447,7 @@ for (const [metadataOutcome, buildFailure] of [
 	["denied", false],
 	["denied", true],
 	["hang", false],
+	["context", false],
 ])
 	test(`engine baseline actual Docker ${metadataOutcome} preserves build ${buildFailure ? "failure" : "success"}`, {
 		timeout: 30000,
@@ -16438,7 +16523,7 @@ for (const [metadataOutcome, buildFailure] of [
 			}).trim();
 			fs.writeFileSync(
 				docker,
-				`#!${process.execPath}\nconst cp=require('child_process');const a=process.argv.slice(2);if(a[0]==='version'){const env={...process.env,MISE_DATA_DIR:${JSON.stringify(path.join(os.homedir(), ".local/share/mise"))},MISE_TRUSTED_CONFIG_PATHS:${JSON.stringify(cliWork)},PATH:${JSON.stringify(`${path.dirname(actualMise)}:/usr/local/bin:/usr/bin:/bin`)}};process.exit(cp.spawnSync(${JSON.stringify(actualMise)},['exec','--','docker',...a],{cwd:${JSON.stringify(cliWork)},env,stdio:'inherit'}).status??1);}process.exit(cp.spawnSync(${JSON.stringify(docker + "-app-images")},a,{env:process.env,stdio:'inherit'}).status??1);\n`,
+				`#!${process.execPath}\nconst cp=require('child_process');const a=process.argv.slice(2);if(a[0]==='version'){require('node:fs').writeFileSync(${JSON.stringify(path.join(f.control, "actual-version-called"))},'version');const env={...process.env,MISE_DATA_DIR:${JSON.stringify(path.join(os.homedir(), ".local/share/mise"))},MISE_TRUSTED_CONFIG_PATHS:${JSON.stringify(cliWork)},PATH:${JSON.stringify(`${path.dirname(actualMise)}:/usr/local/bin:/usr/bin:/bin`)}};process.exit(cp.spawnSync(${JSON.stringify(actualMise)},['exec','--','docker',...a],{cwd:${JSON.stringify(cliWork)},env,stdio:'inherit'}).status??1);}process.exit(cp.spawnSync(${JSON.stringify(docker + "-app-images")},a,{env:process.env,stdio:'inherit'}).status??1);\n`,
 				{ mode: 0o755 },
 			);
 			f.env.DOCKER_HOST = `unix://${socket}`;
@@ -16458,6 +16543,8 @@ for (const [metadataOutcome, buildFailure] of [
 				path.join(f.env.DOCKER_CONFIG, "config.json"),
 				'{"auths":{},"currentContext":"default"}',
 			);
+			if (metadataOutcome === "context")
+				f.env.DOCKER_CONTEXT = "foreign-selection";
 			if (buildFailure) flag(f, "fail-service-color-extractor");
 			const first = await f.run("boat-prepare-app-images").done;
 			fs.writeFileSync(
@@ -16475,7 +16562,9 @@ for (const [metadataOutcome, buildFailure] of [
 					? "AVAILABLE"
 					: metadataOutcome === "denied"
 						? "UNAVAILABLE_NATIVE_EXIT"
-						: "UNAVAILABLE_CAPTURE",
+						: metadataOutcome === "context"
+							? "UNAVAILABLE_ENDPOINT"
+							: "UNAVAILABLE_CAPTURE",
 			);
 			if (metadataOutcome === "available")
 				assert.deepEqual(record.metadata, {
@@ -16488,12 +16577,24 @@ for (const [metadataOutcome, buildFailure] of [
 				});
 			else assert.equal(record.metadata, null);
 			assert.equal(record.attempts, 1);
-			assert.equal(record.engineCLIInvocations, 1);
+			assert.equal(
+				record.workerCommandDispatches,
+				metadataOutcome === "context" ? 0 : 1,
+			);
+			assert.equal(
+				fs.existsSync(path.join(f.control, "actual-version-called")),
+				metadataOutcome !== "context",
+			);
 			assert.equal(record.backendContainerCalls, 0);
-			assert.deepEqual(requests, [
-				{ method: "HEAD", path: "/_ping" },
-				{ method: "GET", path: "/v1.47/version" },
-			]);
+			assert.deepEqual(
+				requests,
+				metadataOutcome === "context"
+					? []
+					: [
+							{ method: "HEAD", path: "/_ping" },
+							{ method: "GET", path: "/v1.47/version" },
+						],
+			);
 			if (buildFailure) {
 				assert.match(first.stderr, /native color-extractor image build failed/);
 				assert.deepEqual(f.appBuilds(), [
@@ -16517,7 +16618,7 @@ for (const [metadataOutcome, buildFailure] of [
 			} else {
 				const second = await f.run("boat-prepare-app-images").done;
 				assert.equal(second.status, 0, second.output);
-				assert.equal(requests.length, 2);
+				assert.equal(requests.length, metadataOutcome === "context" ? 0 : 2);
 				assert.deepEqual(f.appBuilds(), [
 					...completedAppBuilds(),
 					...completedAppBuilds(),

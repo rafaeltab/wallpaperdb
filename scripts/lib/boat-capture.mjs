@@ -70,6 +70,11 @@ function beginCapture({
 	let failure = null,
 		spawnError = null,
 		terminal = null;
+	const integrityFailures = new Set();
+	const recordIntegrityFailure = (message) => {
+		integrityFailures.add(message);
+		failure ??= message;
+	};
 	const shorten = () => {
 		phase.deadline = Math.min(phase.deadline, performance.now() + disposalMs);
 	};
@@ -89,7 +94,7 @@ function beginCapture({
 		shorten();
 	});
 	child.stdin?.on("error", () => {
-		failure ??= "stdin transport error";
+		recordIntegrityFailure("stdin transport error");
 		shorten();
 	});
 	child.on("exit", (code, signal) => {
@@ -103,7 +108,7 @@ function beginCapture({
 	});
 	for (const name of ["stdout", "stderr"]) {
 		child[name].on("error", () => {
-			failure ??= `${name} transport error`;
+			recordIntegrityFailure(`${name} transport error`);
 			shorten();
 		});
 		child[name].on("data", (b) => {
@@ -120,7 +125,7 @@ function beginCapture({
 					shorten();
 				}
 			} catch {
-				failure ??= `${name} capture write failed`;
+				recordIntegrityFailure(`${name} capture write failed`);
 				shorten();
 			}
 		});
@@ -129,7 +134,9 @@ function beginCapture({
 		try {
 			await finiteShutdownProcess(child, phase);
 		} catch (e) {
-			failure ??= e.message;
+			if (e.message === `Shutdown ${phase.phase}: deadline exceeded`)
+				failure ??= e.message;
+			else recordIntegrityFailure(e.message);
 		} finally {
 			for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"])
 				process.off(sig, cancel);
@@ -137,12 +144,12 @@ function beginCapture({
 				try {
 					fs.fsyncSync(s.fd);
 				} catch {
-					failure ??= "capture fsync failed";
+					recordIntegrityFailure("capture fsync failed");
 				}
 				try {
 					fs.closeSync(s.fd);
 				} catch {
-					failure ??= "capture close failed";
+					recordIntegrityFailure("capture close failed");
 				}
 			}
 		}
@@ -164,6 +171,7 @@ function beginCapture({
 			terminal,
 			spawnError,
 			failure,
+			integrityFailures: [...integrityFailures],
 			files,
 			captureComplete: !failure && !spawnError,
 		};

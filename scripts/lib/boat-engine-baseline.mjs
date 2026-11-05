@@ -239,6 +239,12 @@ export async function observeEngineBaseline({
 		};
 	}
 	fs.mkdirSync(directory, { mode: 0o700 });
+	const parent = fs.openSync(c.evidence, "r");
+	try {
+		fs.fsyncSync(parent);
+	} finally {
+		fs.closeSync(parent);
+	}
 	const transport = [
 		cli,
 		"--no-update",
@@ -275,7 +281,7 @@ export async function observeEngineBaseline({
 		intentSha256: hash(regular(path.join(directory, "intent.json"), true)),
 		evidence: [],
 		attempts: 0,
-		engineCLIInvocations: 0,
+		workerCommandDispatches: 0,
 		engineAPIRequests: 0,
 		backendContainerCalls: 0,
 		metadata: null,
@@ -286,7 +292,7 @@ export async function observeEngineBaseline({
 		else if (mono() + 2 > c.executionDeadline) result.status = "NO_BUDGET";
 		else {
 			result.attempts = 1;
-			result.engineCLIInvocations = null;
+			result.workerCommandDispatches = null;
 			result.engineAPIRequests = null;
 			const native = await captureCommand({
 				argv: transport,
@@ -308,6 +314,21 @@ export async function observeEngineBaseline({
 			require(disposal.pipesClosed &&
 				disposal.unresolved.length ===
 					0, "Engine baseline transport ownership unresolved");
+			// Cumulative integrity failures survive an earlier timeout. A resolved
+			// deadline is optional only when complete remote retirement proof follows.
+			const complete =
+				native.captureComplete === true &&
+				native.failure === null &&
+				disposal.failure == null;
+			const timedOut =
+				native.captureComplete === false &&
+				native.failure === "Shutdown 547-command: deadline exceeded" &&
+				disposal.failure === "deadline exceeded";
+			require(Array.isArray(native.integrityFailures) &&
+				native.integrityFailures.length === 0 &&
+				native.spawnError === null &&
+				(complete ||
+					timedOut), "Engine baseline transport capture integrity failed");
 			const stdout = fs.readFileSync(
 				path.join(directory, "transport/stdout.raw"),
 				"utf8",
@@ -333,7 +354,16 @@ export async function observeEngineBaseline({
 							32768, "Engine baseline raw encoding differs");
 				}
 			result.remote = observed;
-			result.engineCLIInvocations = observed.child ? 1 : 0;
+			// Only the worker's explicit bounded-read deadline is optional. Sticky
+			// ownership errors remain fatal after closed pipes/complete retirement.
+			require((observed.failure == null && observed.child?.failure == null) ||
+				(observed.status === "OBSERVED" &&
+					observed.failure === "Shutdown engine-version: deadline exceeded" &&
+					observed.child.failure ===
+						"deadline exceeded"), "Engine baseline remote integrity failed");
+			// The owned native receipt proves this Mise/Make dispatch, not an
+			// unobserved inner Docker CLI start or an Engine API request count.
+			result.workerCommandDispatches = observed.child ? 1 : 0;
 			result.engineAPIRequests = observed.child
 				? "NOT_COUNTED_NATIVE_VERSION_API_BOUNDARY"
 				: 0;

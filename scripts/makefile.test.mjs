@@ -98,15 +98,25 @@ test("Ingestor caches distinguish scheduling modes only for instrumentation task
 			{ encoding: "utf8", env: childEnv },
 		);
 		assert.equal(result.status, 0, result.stderr);
-		return new Map(JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]));
+		return new Map(
+			JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]),
+		);
 	});
 	for (const task of ["test", "test:integration", "test:unit", "build"]) {
 		const id = `@wallpaperdb/ingestor#${task}`;
 		assert.ok(plans[0].has(id) && plans[1].has(id), `${id} must be planned`);
 		if (task === "test" || task === "test:integration") {
-			assert.notEqual(plans[0].get(id), plans[1].get(id), `${id} must hash scheduling mode`);
+			assert.notEqual(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must hash scheduling mode`,
+			);
 		} else {
-			assert.equal(plans[0].get(id), plans[1].get(id), `${id} must retain its cache identity`);
+			assert.equal(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must retain its cache identity`,
+			);
 		}
 	}
 });
@@ -211,7 +221,11 @@ test("E2E task graphs retain shared infrastructure and product/operations browse
 		],
 		[
 			"--filter=!@wallpaperdb/web-e2e",
-			["@wallpaperdb/factory", "@wallpaperdb/test-utils", "@wallpaperdb/testcontainers"],
+			[
+				"@wallpaperdb/factory",
+				"@wallpaperdb/test-utils",
+				"@wallpaperdb/testcontainers",
+			],
 		],
 	]) {
 		const result = spawnSync(
@@ -327,7 +341,7 @@ test("dev defaults to Compose and scopes workspace dev through Turbo", () => {
 test("stop tears down apps before infrastructure for the selected Compose project", () => {
 	const commands = output("stop", "COMPOSE_PROJECT_NAME=isolated");
 	const apps = commands.indexOf(
-		"docker compose -p isolated -f infra/docker-compose.apps.yml down",
+		"docker compose -p isolated -f infra/docker-compose.apps.yml --profile '*' down",
 	);
 	const infra = commands.indexOf(
 		"docker compose -p isolated -f infra/docker-compose.yml --profile '*' down",
@@ -345,6 +359,8 @@ test("database and Compose commands use explicit selectors", () => {
 	);
 	assert.match(output("apps-stop", "SERVICE=ingestor"), /stop ingestor/);
 	assert.doesNotMatch(output("apps-stop", "SERVICE=ingestor"), / down/);
+	assert.match(output("apps-stop", "SERVICE=tags"), /stop tags/);
+	assert.match(output("apps-stop"), /--profile '\*' down/);
 	assert.match(output("apps-stop"), / down/);
 });
 

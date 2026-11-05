@@ -183,7 +183,7 @@ apps-start: ## Build and start app containers (optional SERVICE)
 	@$(APPS_COMPOSE) up -d $(if $(strip $(ARGS)),$(ARGS),--build) $(SERVICE)
 
 apps-stop: ## Stop apps; tear down app stack when SERVICE is omitted
-	@$(APPS_COMPOSE) $(if $(SERVICE),stop $(SERVICE),down)
+	@$(APPS_COMPOSE) $(if $(SERVICE),stop $(SERVICE),--profile '*' down)
 
 apps-build: ## Build development app images (optional SERVICE)
 	@$(APPS_COMPOSE) build $(ARGS) $(SERVICE)

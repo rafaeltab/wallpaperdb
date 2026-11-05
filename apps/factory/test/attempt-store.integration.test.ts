@@ -3,7 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { Attempts, AttemptsLive, AttemptStore, Plan, IPlanner } from '../src/capabilities/plan/index.js';
+import {
+  Attempts,
+  AttemptsLive,
+  AttemptStore,
+  Plan,
+  IPlanner,
+} from '../src/capabilities/plan/index.js';
 import { Time } from '../src/capabilities/job/index.js';
 import { expect, it } from 'vitest';
 import { sqliteAttemptStore } from '../src/adapters/store/index.js';
@@ -67,11 +73,28 @@ it.each([1000, 900])(
       const next = { ...old, id: '00000000-0000-4000-8000-000000000000', startedAt };
       expect(await Effect.runPromise(store.create(next))).toBe(true);
       const reopened = sqliteAttemptStore(directory);
-    const runtime = ManagedRuntime.make(AttemptsLive.pipe(Layer.provide(Layer.mergeAll(
-      Layer.succeed(AttemptStore, reopened), Layer.succeed(Plan, { preview: () => Effect.die('pending must not plan') }), Layer.succeed(IPlanner, { ownership: () => Effect.succeed(undefined), propose: () => Effect.die('pending must not launch') }), Layer.succeed(Time, { now: () => Effect.succeed(1000) })
-    )))));
-    try { expect(await runtime.runPromise(Effect.flatMap(Attempts, attempts => attempts.pending()))).toEqual(next); }
-    finally { await runtime.dispose(); }
+      const runtime = ManagedRuntime.make(
+        AttemptsLive.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Layer.succeed(AttemptStore, reopened),
+              Layer.succeed(Plan, { preview: () => Effect.die('pending must not plan') }),
+              Layer.succeed(IPlanner, {
+                ownership: () => Effect.succeed(undefined),
+                propose: () => Effect.die('pending must not launch'),
+              }),
+              Layer.succeed(Time, { now: () => Effect.succeed(1000) })
+            )
+          )
+        )
+      );
+      try {
+        expect(
+          await runtime.runPromise(Effect.flatMap(Attempts, (attempts) => attempts.pending()))
+        ).toEqual(next);
+      } finally {
+        await runtime.dispose();
+      }
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

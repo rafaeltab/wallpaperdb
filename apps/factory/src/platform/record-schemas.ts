@@ -123,6 +123,7 @@ export const plannerSchema = z
     revision: z.number().int().nonnegative(),
     requestId: z.string().min(1),
     input: z.string(),
+    inputIdentity: z.string().optional(),
     deadline: z.number().finite(),
     run: z.object({ threadId: z.string().min(1), runId: z.string().min(1) }).optional(),
     retired: z.boolean().optional(),

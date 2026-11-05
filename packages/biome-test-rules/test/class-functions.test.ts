@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
-const promiseDiagnostics = (source) =>
+const promiseDiagnostics = (source: string) =>
 	lint(source).filter((d) => d.message.startsWith("valid-expect-in-promise:"));
 
 test("class constructors and methods retain pinned function boundaries", () => {
@@ -64,7 +64,7 @@ it('case', async () => {
 
 test("class accessor decorators retain assertions outside the function boundary", () => {
 	for (const member of ["get value() { return 1; }", "set value(value) {}"]) {
-		const source = (assertion) =>
+		const source = (assertion: string) =>
 			`import { expect } from 'vitest'; class Example { @decorate(${assertion}) ${member} }`;
 		expect(
 			lint(source("expect(1)")).filter((d) =>

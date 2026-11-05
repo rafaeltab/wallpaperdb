@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
-const retries = (source) =>
+const retries = (source: string) =>
 	lint(source).filter((d) => d.message.startsWith("test-policy/no-retries:"));
 
 test("the pinned retry rule covers registrations, import aliases and shared spreads", () => {

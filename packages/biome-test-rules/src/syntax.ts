@@ -1,15 +1,17 @@
+import type { NativeNode } from "./native-view.ts";
+import type { SyntaxNode, Visitor } from "./contracts.ts";
 // ESTree-shaped syntax views for the pinned rule algorithms. This is not a parser:
 // Biome supplies every source node. Views have stable identity within one traversal.
-export function stringValue(text) {
+export function stringValue(text: string) {
 	return decodeEscapes(text.slice(1, -1));
 }
 
 // ESTree Identifier.name is decoded; native token text retains source escapes.
-export function identifierValue(text) {
+export function identifierValue(text: string) {
 	return decodeEscapes(text);
 }
 
-function decodeEscapes(text) {
+function decodeEscapes(text: string) {
 	return text.replace(
 		/\\(?:u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
 		(sequence) => {
@@ -23,15 +25,23 @@ function decodeEscapes(text) {
 			}
 			if (["\n", "\r", "\r\n"].includes(value)) return "";
 			return (
-				{ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v", 0: "\0" }[
-					value
-				] ?? value
+				(
+					{
+						n: "\n",
+						r: "\r",
+						t: "\t",
+						b: "\b",
+						f: "\f",
+						v: "\v",
+						0: "\0",
+					} as Record<string, string>
+				)[value] ?? value
 			);
 		},
 	);
 }
 
-export function syntaxTree(root) {
+export function syntaxTree(root: NativeNode): SyntaxNode {
 	const source = root.text;
 	const lineStarts = [0];
 	for (
@@ -41,7 +51,7 @@ export function syntaxTree(root) {
 	) {
 		lineStarts.push(newline + 1);
 	}
-	const location = (offset) => {
+	const location = (offset: number) => {
 		const position = Math.min(offset, source.length);
 		let low = 0;
 		let high = lineStarts.length;
@@ -52,7 +62,11 @@ export function syntaxTree(root) {
 		}
 		return { line: low + 1, column: position - lineStarts[low] };
 	};
-	function build(native, start = 0, sourceText) {
+	function build(
+		native: NativeNode | undefined,
+		start = 0,
+		sourceText?: string,
+	): SyntaxNode | null {
 		if (!native) return null;
 		const text = sourceText ?? native.text;
 		const node = {
@@ -60,11 +74,11 @@ export function syntaxTree(root) {
 			type: native.kind,
 			range: [start, start + text.length],
 			children: [],
-		};
+		} as unknown as SyntaxNode;
 		node.loc = { start: location(start), end: location(node.range[1]) };
 		let cursor = 0;
-		function child(value) {
-			if (!value) return null;
+		function child(value: NativeNode | undefined): SyntaxNode {
+			if (!value) return null as unknown as SyntaxNode;
 			const childText = value.text;
 			let index = text.indexOf(childText, cursor);
 			if (index < 0) index = text.indexOf(childText);
@@ -74,10 +88,14 @@ export function syntaxTree(root) {
 				result.parent = node;
 				node.children.push(result);
 			}
-			return result;
+			return result as SyntaxNode;
 		}
-		const list = (values) => (values ?? []).map(child).filter(Boolean);
-		function withDefault(left, initializer) {
+		const list = (values: readonly NativeNode[] | undefined) =>
+			(values ?? []).map(child).filter(Boolean);
+		function withDefault(
+			left: SyntaxNode,
+			initializer: { expression?: NativeNode } | undefined,
+		): SyntaxNode {
 			if (!initializer) return left;
 			const right = child(initializer.expression);
 			const pattern = {
@@ -89,7 +107,7 @@ export function syntaxTree(root) {
 				left,
 				right,
 				children: [left, right],
-			};
+			} as unknown as SyntaxNode;
 			for (const entry of pattern.children) entry.parent = pattern;
 			node.children = node.children.filter((n) => n !== left && n !== right);
 			node.children.push(pattern);
@@ -258,7 +276,7 @@ export function syntaxTree(root) {
 					loc: node.loc,
 					parent: node,
 					children: [],
-				};
+				} as unknown as SyntaxNode;
 				fn.async = !!native.asyncToken;
 				fn.params = list(
 					native.parameters?.items ??
@@ -285,8 +303,8 @@ export function syntaxTree(root) {
 				return child(native.expression);
 			case "JS_CONDITIONAL_EXPRESSION":
 				node.type = "ConditionalExpression";
-				node.test = child(native.test);
-				node.consequent = child(native.consequent);
+				node.test = child(native.test as NativeNode | undefined);
+				node.consequent = child(native.consequent as NativeNode | undefined);
 				node.alternate = child(native.alternate);
 				break;
 			case "JS_ASSIGNMENT_EXPRESSION":
@@ -325,7 +343,7 @@ export function syntaxTree(root) {
 				node.expressions = [];
 				for (const element of native.elements) {
 					if (element.kind === "JS_TEMPLATE_CHUNK_ELEMENT")
-						node.quasis.at(-1).value.raw += element.text;
+						node.quasis.at(-1)!.value.raw += element.text;
 					else {
 						node.expressions.push(child(element.expression ?? element));
 						node.quasis.push({ value: { raw: "" } });
@@ -350,12 +368,12 @@ export function syntaxTree(root) {
 		}
 		return node;
 	}
-	const tree = build(root, 0, source);
+	const tree = build(root, 0, source)!;
 	tree.parent = undefined;
 	return tree;
 }
 
-export function visitSyntax(node, visitor) {
+export function visitSyntax(node: SyntaxNode, visitor: Visitor): void {
 	visitor[node.type]?.(node);
 	for (const child of node.children) visitSyntax(child, visitor);
 	visitor[`${node.type}:exit`]?.(node);

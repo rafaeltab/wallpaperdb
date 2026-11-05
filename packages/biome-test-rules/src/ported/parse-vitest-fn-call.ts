@@ -1,43 +1,76 @@
+interface ResolvedName {
+	local: string;
+	original: string | null;
+	type: string;
+}
+interface ParsedHead {
+	name: string;
+	head: ResolvedName & { node: SyntaxNode };
+	members: SyntaxNode[];
+}
+interface ParsedCall extends ParsedHead {
+	type: string;
+	matcher?: SyntaxNode;
+	expectApiName?: string | null;
+	expectCall?: SyntaxNode | null;
+	args?: SyntaxNode[];
+	modifiers?: SyntaxNode[];
+}
+interface ExpectChain {
+	kind: string;
+	member: SyntaxNode;
+	callExpression: SyntaxNode | null;
+}
+import type { SyntaxNode, Context } from "../contracts.ts";
 // Adapted from @vitest/eslint-plugin 1.6.27, commit aad57d121647efe764463c37414a8cd67ec9cf92.
 // MIT; see ../../UPSTREAM-LICENSE.txt. Biome supplies syntax/scope and diagnostics.
-import { AST_NODE_TYPES } from "./utils.js";
+import { AST_NODE_TYPES } from "./utils.ts";
 import {
 	DescribeAlias,
 	HookName,
 	ModifierName,
 	TestCaseName,
-} from "./types.js";
-import { ValidVitestFnCallChains } from "./valid-vitest-fn-call-chains.js";
-import { getAccessorValue, isSupportedAccessor } from "./utils.js";
-import { getScope, resolveScope } from "../scope.js";
-export const isTypeOfVitestFnCall = (node, context, types) => {
+} from "./types.ts";
+import { ValidVitestFnCallChains } from "./valid-vitest-fn-call-chains.ts";
+import { getAccessorValue, isSupportedAccessor } from "./utils.ts";
+import { getScope, resolveScope } from "../scope.ts";
+export const isTypeOfVitestFnCall = (
+	node: SyntaxNode,
+	context: Context,
+	types: string[],
+) => {
 	const vitestFnCall = parseVitestFnCall(node, context);
 	return vitestFnCall !== null && types.includes(vitestFnCall.type);
 };
-export const parseVitestFnCall = (node, context) => {
+export const parseVitestFnCall = (node: SyntaxNode, context: Context) => {
 	const vitestFnCall = parseVitestFnCallWithReason(node, context);
 	if (typeof vitestFnCall === "string") return null;
 	return vitestFnCall;
 };
-const parseVitestFnCallCache = new WeakMap();
-export const parseVitestFnCallWithReason = (node, context) => {
+const parseVitestFnCallCache = new WeakMap<
+	SyntaxNode,
+	ParsedCall | string | null
+>();
+export const parseVitestFnCallWithReason = (
+	node: SyntaxNode,
+	context: Context,
+): ParsedCall | string | null => {
 	let parsedVitestFnCall = parseVitestFnCallCache.get(node);
 	if (parsedVitestFnCall) return parsedVitestFnCall;
 	parsedVitestFnCall = parseVitestFnCallWithReasonInner(node, context);
 	parseVitestFnCallCache.set(node, parsedVitestFnCall);
 	return parsedVitestFnCall;
 };
-const determineVitestFnType = (name) => {
+const determineVitestFnType = (name: string) => {
 	if (name === "expect") return "expect";
 	if (name === "expectTypeOf") return "expectTypeOf";
 	if (name === "vi" || name === "vitest") return "vi";
-	if (Object.prototype.hasOwnProperty.call(DescribeAlias, name))
-		return "describe";
-	if (Object.prototype.hasOwnProperty.call(TestCaseName, name)) return "test";
-	if (Object.prototype.hasOwnProperty.call(HookName, name)) return "hook";
+	if (Object.hasOwn(DescribeAlias, name)) return "describe";
+	if (Object.hasOwn(TestCaseName, name)) return "test";
+	if (Object.hasOwn(HookName, name)) return "hook";
 	return "unknown";
 };
-const hasInvalidExpectChain = (chains, matcherIndex) => {
+const hasInvalidExpectChain = (chains: ExpectChain[], matcherIndex: number) => {
 	const modifierChains =
 		matcherIndex === -1 ? chains : chains.slice(0, matcherIndex);
 	if (
@@ -52,9 +85,11 @@ const hasInvalidExpectChain = (chains, matcherIndex) => {
 	const modifierNames = modifierChains
 		.filter((chain) => chain.kind === "modifier")
 		.map((chain) => getAccessorValue(chain.member));
-	if (modifierNames.filter((name) => name === ModifierName.not).length > 1)
+	if (
+		modifierNames.filter((name: string) => name === ModifierName.not).length > 1
+	)
 		return true;
-	const promiseModifierNames = modifierNames.filter((name) =>
+	const promiseModifierNames = modifierNames.filter((name: string) =>
 		promiseExpectModifiers.has(name),
 	);
 	if (promiseModifierNames.length > 1) return true;
@@ -135,14 +170,14 @@ const expectTypeOfModifiers = new Set([
 	ModifierName.instance,
 	ModifierName.items,
 ]);
-const getCallExpression = (member) =>
+const getCallExpression = (member: SyntaxNode) =>
 	member.parent?.type === AST_NODE_TYPES.MemberExpression &&
 	member.parent.parent?.type === AST_NODE_TYPES.CallExpression &&
 	member.parent.parent.callee === member.parent
 		? member.parent.parent
 		: null;
 const classifyExpectChain = (
-	member,
+	member: SyntaxNode,
 	isFirstMemberOfStaticExpectCall = false,
 ) => {
 	const name = getAccessorValue(member);
@@ -171,17 +206,18 @@ const classifyExpectChain = (
 	return { kind: "modifier", member, callExpression };
 };
 const parseExpectCallExpression = (
-	node,
-	topMostCallExpression,
-	typeLessParsedVitestFnCall,
+	node: SyntaxNode,
+	topMostCallExpression: SyntaxNode,
+	typeLessParsedVitestFnCall: ParsedHead,
 ) => {
-	const chains = typeLessParsedVitestFnCall.members.map((member, index) =>
-		classifyExpectChain(
-			member,
-			index === 0 &&
-				typeLessParsedVitestFnCall.head.node.parent?.type ===
-					AST_NODE_TYPES.MemberExpression,
-		),
+	const chains = typeLessParsedVitestFnCall.members.map(
+		(member: SyntaxNode, index) =>
+			classifyExpectChain(
+				member,
+				index === 0 &&
+					typeLessParsedVitestFnCall.head.node.parent?.type ===
+						AST_NODE_TYPES.MemberExpression,
+			),
 	);
 	const matcherIndex = chains.findIndex((chain) => chain.kind === "matcher");
 	if (
@@ -217,12 +253,12 @@ const parseExpectCallExpression = (
 	};
 };
 const parseExpectTypeOfCallExpression = (
-	node,
-	topMostCallExpression,
-	typeLessParsedVitestFnCall,
+	node: SyntaxNode,
+	topMostCallExpression: SyntaxNode,
+	typeLessParsedVitestFnCall: ParsedHead,
 ) => {
-	const matcherIndex = typeLessParsedVitestFnCall.members.findIndex((member) =>
-		getCallExpression(member),
+	const matcherIndex = typeLessParsedVitestFnCall.members.findIndex(
+		(member: SyntaxNode) => getCallExpression(member),
 	);
 	const modifierMembers =
 		matcherIndex === -1
@@ -236,9 +272,11 @@ const parseExpectTypeOfCallExpression = (
 		return null;
 	if (
 		modifierMembers.some(
-			(member) => !expectTypeOfModifiers.has(getAccessorValue(member)),
+			(member: SyntaxNode) =>
+				!expectTypeOfModifiers.has(getAccessorValue(member)),
 		) ||
-		modifierNames.filter((name) => name === ModifierName.not).length > 1 ||
+		modifierNames.filter((name: string) => name === ModifierName.not).length >
+			1 ||
 		(matcherIndex !== -1 &&
 			expectTypeOfModifiers.has(
 				getAccessorValue(typeLessParsedVitestFnCall.members[matcherIndex]),
@@ -268,7 +306,7 @@ const parseExpectTypeOfCallExpression = (
 		modifiers: modifierMembers,
 	};
 };
-export const findTopMostCallExpression = (node) => {
+export const findTopMostCallExpression = (node: SyntaxNode) => {
 	let topMostCallExpression = node;
 	let { parent } = node;
 	while (parent) {
@@ -282,7 +320,10 @@ export const findTopMostCallExpression = (node) => {
 	}
 	return topMostCallExpression;
 };
-const parseVitestFnCallWithReasonInner = (node, context) => {
+const parseVitestFnCallWithReasonInner = (
+	node: SyntaxNode,
+	context: Context,
+) => {
 	const chain = getNodeChain(node);
 	if (!chain?.length) return null;
 	const [first, ...rest] = chain;
@@ -335,7 +376,10 @@ const parseVitestFnCallWithReasonInner = (node, context) => {
 	if (
 		chain
 			.slice(0, chain.length - 1)
-			.some((node) => node.parent?.type !== AST_NODE_TYPES.MemberExpression)
+			.some(
+				(node: SyntaxNode) =>
+					node.parent?.type !== AST_NODE_TYPES.MemberExpression,
+			)
 	)
 		return null;
 	if (
@@ -345,8 +389,9 @@ const parseVitestFnCallWithReasonInner = (node, context) => {
 		return null;
 	return { ...parsedVitestFnCall, type };
 };
-const joinChains = (a, b) => (a && b ? [...a, ...b] : null);
-export function getNodeChain(node) {
+const joinChains = (a: SyntaxNode[] | null, b: SyntaxNode[] | null) =>
+	a && b ? [...a, ...b] : null;
+export function getNodeChain(node: SyntaxNode): SyntaxNode[] | null {
 	if (isSupportedAccessor(node)) return [node];
 	switch (node.type) {
 		case AST_NODE_TYPES.TaggedTemplateExpression:
@@ -358,7 +403,11 @@ export function getNodeChain(node) {
 	}
 	return null;
 }
-const resolveVitestFn = (context, node, identifier) => {
+const resolveVitestFn = (
+	context: Context,
+	node: SyntaxNode,
+	identifier: string,
+) => {
 	const scope = getScope(context, node);
 	const maybeImport = resolveScope(scope, identifier);
 	if (maybeImport === "local") return null;
@@ -369,8 +418,6 @@ const resolveVitestFn = (context, node, identifier) => {
 			type: "testContext",
 		};
 	if (maybeImport) {
-		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-		// @ts-expect-error
 		const vitestImports = context.settings.vitest?.vitestImports ?? [];
 		const isVitestImport =
 			maybeImport.source === "vitest" ||
@@ -394,9 +441,7 @@ const resolveVitestFn = (context, node, identifier) => {
 		type: "global",
 	};
 };
-const resolvePossibleAliasedGlobal = (global, context) => {
-	// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-	// @ts-expect-error
+const resolvePossibleAliasedGlobal = (global: string, context: Context) => {
 	const globalAliases = context.settings.vitest?.globalAliases ?? {};
 	const alias = Object.entries(globalAliases).find(([_, aliases]) =>
 		aliases.includes(global),
@@ -404,10 +449,10 @@ const resolvePossibleAliasedGlobal = (global, context) => {
 	if (alias) return alias[0];
 	return null;
 };
-const isAncestorTestCaseCall = ({ parent }) => {
+const isAncestorTestCaseCall = ({ parent }: SyntaxNode) => {
 	return (
 		parent?.type === AST_NODE_TYPES.CallExpression &&
 		parent.callee.type === AST_NODE_TYPES.Identifier &&
-		Object.prototype.hasOwnProperty.call(TestCaseName, parent.callee.name)
+		Object.hasOwn(TestCaseName, parent.callee.name)
 	);
 };

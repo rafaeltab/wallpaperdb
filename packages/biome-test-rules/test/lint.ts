@@ -1,3 +1,9 @@
+export interface Diagnostic {
+	category: string;
+	message: string;
+	[key: string]: unknown;
+}
+
 import { expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import {
@@ -21,8 +27,20 @@ const biome = join(
 );
 
 export function lint(
-	source,
-	files = {},
+	source: string,
+	files?: Record<string, string>,
+	filename?: string,
+	reporter?: "json",
+): Diagnostic[];
+export function lint(
+	source: string,
+	files: Record<string, string>,
+	filename: string,
+	reporter: "terminal",
+): string;
+export function lint(
+	source: string,
+	files: Record<string, string> = {},
 	filename = "example.test.ts",
 	reporter = "json",
 ) {
@@ -32,7 +50,7 @@ export function lint(
 			readFileSync(join(workspace, "test-correctness.json"), "utf8"),
 		);
 		config.linter = { rules: { preset: "none" } };
-		config.plugins = config.plugins.map((plugin) => ({
+		config.plugins = config.plugins.map((plugin: { path: string }) => ({
 			...plugin,
 			path: join(workspace, plugin.path),
 		}));
@@ -66,7 +84,7 @@ export function lint(
 		).toBeTruthy();
 		if (reporter !== "json") return result.stdout + result.stderr;
 		expect(result.stdout, result.stderr).toBeTruthy();
-		const report = JSON.parse(result.stdout);
+		const report: { diagnostics: Diagnostic[] } = JSON.parse(result.stdout);
 		expect(
 			!report.diagnostics.some((d) => /Rule .* errored:/.test(d.message)),
 			JSON.stringify(report.diagnostics),

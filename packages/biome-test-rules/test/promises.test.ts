@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 
 test("Biome rejects unhandled directly imported helper promises", () => {
 	const files = {

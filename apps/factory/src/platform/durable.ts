@@ -7,8 +7,10 @@ import {
   openSync,
   fsyncSync,
   closeSync,
+  realpathSync,
+  lstatSync,
 } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, basename, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { z } from 'zod';
@@ -29,12 +31,21 @@ import {
 } from './record-schemas.js';
 
 const filename = 'factory.sqlite';
+function canonicalDirectory(directory: string) {
+  let existing = resolve(directory);
+  const suffix: string[] = [];
+  while (!existsSync(existing)) {
+    suffix.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  return join(realpathSync(existing), ...suffix);
+}
 function rootFor(directory: string) {
-  let current = resolve(directory);
+  let current = canonicalDirectory(directory);
   for (;;) {
     if (existsSync(join(current, filename))) return current;
     const parent = dirname(current);
-    if (parent === current) return resolve(directory);
+    if (parent === current) return canonicalDirectory(directory);
     current = parent;
   }
 }
@@ -85,6 +96,8 @@ function rejectNestedDatabases(root: string, namespace = ''): void {
   const directory = join(root, namespace);
   if (!existsSync(directory)) return;
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isSymbolicLink() && stateNamespace(namespace, entry.name))
+      throw new Error('Symlinks are not supported in durable namespaces');
     if (entry.name === filename && namespace)
       throw new Error('Nested SQLite database requires explicit state-root reconciliation');
     if (entry.isDirectory() && stateNamespace(namespace, entry.name))
@@ -145,6 +158,8 @@ function connection<A>(
 ): A {
   const root = rootFor(directory);
   mkdirSync(root, { recursive: true, mode: 0o700 });
+  if (existsSync(join(root, filename)) && lstatSync(join(root, filename)).isSymbolicLink())
+    throw new Error('SQLite database symlinks are not supported');
   const client = new Database(join(root, filename));
   try {
     chmodSync(join(root, filename), 0o600);
@@ -195,14 +210,14 @@ function connection<A>(
         },
         { behavior: 'immediate' }
       );
-    return work(db, relative(root, resolve(directory)), client);
+    return work(db, relative(root, canonicalDirectory(directory)), client);
   } finally {
     client.close();
   }
 }
 /** Open, migrate and import only. No external reconciliation or worker launch. */
 export function initializeState(directory: string, migrateSchema = true) {
-  const explicitRoot = resolve(directory);
+  const explicitRoot = canonicalDirectory(directory);
   for (
     let ancestor = dirname(explicitRoot);
     ancestor !== explicitRoot;
@@ -212,7 +227,7 @@ export function initializeState(directory: string, migrateSchema = true) {
       throw new Error('Explicit state root cannot inherit an ancestor SQLite database');
     if (dirname(ancestor) === ancestor) break;
   }
-  rejectNestedDatabases(resolve(directory));
+  rejectNestedDatabases(explicitRoot);
   return connection(
     directory,
     (db) => ({

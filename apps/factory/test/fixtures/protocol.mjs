@@ -161,15 +161,24 @@ if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--he
       JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
     );
   } else if (args[1] === 'send') {
-    const journals = join(config.directory, 'joins');
-    writeFileSync(
-      join(config.directory, 'review-capacity-observed.json'),
-      JSON.stringify(
-        readdirSync(journals, { recursive: true })
-          .filter((name) => name.endsWith('recovery-progress.json'))
-          .map((name) => JSON.parse(readFileSync(join(journals, name), 'utf8')))
-      )
+    const { DatabaseSync } = await import('node:sqlite');
+    const shared = existsSync(join(config.directory, 'factory.sqlite'));
+    const database = new DatabaseSync(
+      join(config.directory, ...(shared ? [] : ['joins']), 'factory.sqlite'),
+      { readOnly: true }
     );
+    try {
+      const snapshots = database
+        .prepare('SELECT value FROM records WHERE name = ? AND namespace LIKE ?')
+        .all('recovery-progress.json', shared ? 'joins/%' : '%')
+        .map((record) => JSON.parse(record.value));
+      writeFileSync(
+        join(config.directory, 'review-capacity-observed.json'),
+        JSON.stringify(snapshots)
+      );
+    } finally {
+      database.close();
+    }
     if (config.restack.repair) {
       writeFileSync(
         join(state.thread.worktreePath, 'shared.txt'),
@@ -682,9 +691,11 @@ else if (args[1] === 'start') {
                 runId: resource.latestRunId,
                 text: JSON.stringify({
                   ...(resource.stage === 'babysitting'
-                    ? { delivery: `${(resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8))}:${resource.stageIndex}` }
+                    ? {
+                        delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex}`,
+                      }
                     : {}),
-                  jobId: (resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)),
+                  jobId: resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8),
                   stage: 'babysitting',
                   base: config.base,
                   outcome: 'WAITING_FOR_GITHUB',
@@ -702,9 +713,12 @@ else if (args[1] === 'start') {
                     runId: resource.latestRunId,
                     text: JSON.stringify({
                       ...(resource.stage === 'babysitting'
-                        ? { delivery: `${(resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8))}:${resource.stageIndex}` }
+                        ? {
+                            delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex}`,
+                          }
                         : {}),
-                      jobId: (resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)),
+                      jobId:
+                        resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8),
                       stage:
                         resource.stage ??
                         ['implementation', 'review', 'publication'][resource.runCount - 1],

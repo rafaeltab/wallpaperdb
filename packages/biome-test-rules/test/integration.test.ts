@@ -76,6 +76,11 @@ function isolatedRepository() {
 			);
 	}
 	const rules = "packages/biome-test-rules";
+	// Keep probe diagnostics visible alongside warnings in the adapted sources.
+	const manifestPath = join(directory, rules, "package.json");
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	manifest.scripts.lint += " --max-diagnostics=200";
+	writeFileSync(manifestPath, JSON.stringify(manifest));
 	copyFileSync(
 		join(repository, rules, "vitest.config.ts"),
 		join(directory, rules, "vitest.config.ts"),
@@ -153,7 +158,7 @@ function makeLint(directory: string, workspace: string, force = true) {
 		[
 			"lint",
 			`PACKAGE=${workspace}`,
-			`TURBO_FLAGS=--filter=${filter} --only${force ? " --force" : ""} -- --max-diagnostics=200`,
+			`TURBO_FLAGS=--filter=${filter} --only${force ? " --force" : ""}`,
 		],
 		{
 			cwd: directory,

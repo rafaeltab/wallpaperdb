@@ -2,25 +2,8 @@ import { z } from 'zod';
 import { command } from '../../platform/index.js';
 import { ancestor } from './ancestry.js';
 import { landedPrerequisite } from './landed-prerequisite.js';
-const sha = z.string().regex(/^[a-f0-9]{40}$/);
-export const joinBoundary = z.object({
-  base: sha,
-  prBase: z.string(),
-  pin: sha,
-  landed: z
-    .array(
-      z.object({
-        issue: z.number().int().positive(),
-        pr: z.number().int().positive(),
-        commit: sha,
-        url: z.string(),
-        branch: z.string(),
-        tip: sha,
-        originalHead: sha.optional(),
-      })
-    )
-    .max(100),
-});
+import { joinBoundarySchema as joinBoundary } from '../../platform/index.js';
+export { joinBoundary };
 export type JoinBoundary = z.infer<typeof joinBoundary>;
 type Gh = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 export const requiredCommits = (boundary: JoinBoundary) => [

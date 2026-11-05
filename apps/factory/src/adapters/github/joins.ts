@@ -1,16 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
-  access,
-  link,
-  mkdir,
-  mkdtemp,
-  open,
-  readdir,
-  readFile,
-  rename,
-  rmdir,
-  unlink,
-} from 'node:fs/promises';
+import { access, mkdtemp, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect, Layer as EffectLayer } from 'effect';
 import { z } from 'zod';
@@ -25,7 +14,14 @@ import {
   Restack,
   RestackLive,
 } from '../../capabilities/restack/index.js';
-import { command } from '../../platform/index.js';
+import {
+  command,
+  publisher,
+  readRecord,
+  recordNames,
+  replaceProgress,
+  initializeState,
+} from '../../platform/index.js';
 import { t3Restacker } from '../t3/index.js';
 import { normalizeChecks, passingChecks } from './checks.js';
 import { runInContext, admitRecovery } from './context.js';
@@ -44,43 +40,14 @@ import {
   closedParentsKnown,
 } from './join-boundary.js';
 
+import {
+  journalGroup as group,
+  journalLayer as layer,
+  journalLanding as landing,
+  journalIntent as intent,
+} from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
-const layer = z.object({
-  issue: z.number().int().positive(),
-  pr: z.number().int().positive(),
-  commit: sha,
-  reviewedCommit: sha.optional(),
-  context: z.string().optional(),
-  owningThreadId: z.string().optional(),
-  branch: z.string(),
-  url: z.string(),
-  parent: sha,
-  prBase: z.string(),
-});
 type Layer = z.infer<typeof layer>;
-const group = z.object({
-  number: z.number().int().positive(),
-  pull_requests: z.array(z.object({ number: z.number().int().positive() })),
-});
-const landing = z.object({
-  anchor: layer,
-  commit: sha,
-  branch: z.string(),
-  covered: z.array(sha).default([]),
-  removed: z.array(z.number()).default([]),
-});
-const intent = z.object({
-  writerKey: z.string().optional(),
-  boundary: joinBoundary.optional(),
-  landing: landing.optional(),
-  groups: z.array(group),
-  members: z.array(z.number().int().positive()),
-  numbers: z.array(z.number().int()).max(100),
-  generation: sha.optional(),
-  repairOf: sha.optional(),
-  layers: z.array(layer),
-  replay: z.array(layer.extend({ next: sha, onto: sha, target: z.string(), tree: sha })),
-});
 type Intent = z.infer<typeof intent>;
 type RepairAuthority = { request: StageRequest; evidence: StageEvidence };
 export interface JoinConfiguration {
@@ -94,66 +61,17 @@ type Gh = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 
 const errno = (cause: unknown, expected: string) =>
   z.object({ code: z.literal(expected) }).safeParse(cause).success;
-async function syncDirectory(directory: string) {
-  const handle = await open(directory, 'r');
-  try {
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
-async function syncNewParents(directory: string, stop: string) {
-  let current = directory;
-  while (current !== stop) {
-    await syncDirectory(current);
-    current = dirname(current);
-  }
-  await syncDirectory(stop);
-}
-async function writeDurable(path: string, value: unknown) {
-  const handle = await open(path, 'wx');
-  try {
-    await handle.writeFile(JSON.stringify(value));
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-}
-async function linkOnce(source: string, target: string) {
-  return link(source, target)
-    .then(() => true)
-    .catch((cause) => {
-      if (errno(cause, 'EEXIST')) return false;
-      throw cause;
-    });
-}
-/** Atomic immutable journal records precede every external publication. */
-async function publish(directory: string, name: string, value: unknown) {
-  const createdDirectory = await mkdir(directory, { recursive: true });
-  if (createdDirectory) await syncNewParents(directory, dirname(createdDirectory));
-  const temporary = await mkdtemp(join(directory, '.write-'));
-  const path = join(temporary, 'value');
-  await writeDurable(path, value);
-  const created = await linkOnce(path, join(directory, name));
-  await unlink(path);
-  await rmdir(temporary);
-  await syncDirectory(directory);
-  return created;
-}
-async function read(directory: string, name: string): Promise<unknown | null> {
-  try {
-    return JSON.parse(await readFile(join(directory, name), 'utf8'));
-  } catch (cause) {
-    if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return null;
-    throw cause;
-  }
-}
+/** Immutable SQLite journal records precede external publication. */
+const publish = (directory: string, name: string, value: unknown) =>
+  publisher(directory)(name, value);
+const read = readRecord;
 const id = (numbers: readonly number[]) =>
   createHash('sha256')
     .update(JSON.stringify([...numbers].sort((a, b) => a - b)))
     .digest('hex');
 
 export function prerequisiteJoin(project: string, base: string, config: JoinConfiguration, gh: Gh) {
+  initializeState(config.directory);
   const git = (args: string[], signal?: AbortSignal) =>
     command('git', args, project, signal).then((text) => text.trim());
   const directory = (numbers: readonly number[]) => join(config.directory, id(numbers));
@@ -401,7 +319,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const blockingFile = async (dir: string) => {
     const saved = await legacyBlock(dir);
     if (saved) return saved;
-    const names = await readdir(dir).catch((cause) => {
+    const names = await recordNames(dir).catch((cause) => {
       if (errno(cause, 'ENOENT')) return [];
       throw cause;
     });
@@ -437,7 +355,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const retainedConflict = async (path: string, signal?: AbortSignal) => {
     const dir = dirname(path);
     if (dirname(dir) !== config.directory) return undefined;
-    for (const name of (await readdir(dir)).filter((name) => /^resolved-\d+\.json$/.test(name))) {
+    for (const name of (await recordNames(dir)).filter((name) =>
+      /^resolved-\d+\.json$/.test(name)
+    )) {
       const saved = z
         .object({
           issue: z.number(),
@@ -474,13 +394,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       worktree: path,
       snapshot: await attemptSnapshot(path, signal),
     });
-  const saveProgress = async (dir: string, value: unknown) => {
-    const path = join(await mkdtemp(join(dir, '.progress-')), 'value');
-    await writeDurable(path, value);
-    await rename(path, join(dir, 'recovery-progress.json'));
-    await rmdir(dirname(path));
-    await syncDirectory(dir);
-  };
+  const saveProgress = replaceProgress;
   const attemptRebase = async (
     item: Layer,
     onto: string,
@@ -1879,7 +1793,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   const operationDirectories = async () => {
     let entries: string[];
     try {
-      entries = await readdir(config.directory);
+      entries = await recordNames(config.directory);
     } catch (cause) {
       if (errno(cause, 'ENOENT')) return [];
       throw cause;

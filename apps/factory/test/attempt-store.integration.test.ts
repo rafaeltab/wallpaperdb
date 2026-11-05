@@ -111,3 +111,100 @@ it('SQLite attempt storage satisfies the shared application contract', async () 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('persists a validated successful advisory result across reopen and refuses corrupt stored results without repairing them', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-attempt-result-'));
+  try {
+    initializeState(directory);
+    const store = sqliteAttemptStore(directory);
+    const attempt = {
+      id: randomUUID(),
+      revision: 0,
+      startedAt: 100,
+      deadline: 120100,
+      phase: 'discovery' as const,
+    };
+    await Effect.runPromise(store.create(attempt));
+    const result = {
+      kind: 'preview' as const,
+      selected: [{ issue: 42, reason: 'Thin experiment', dependsOn: [], conflicts: [] }],
+      rejected: [{ issue: 43, reason: 'Unsettled API' }],
+      input: {
+        issues: [
+          {
+            number: 42,
+            title: 'Synthetic issue',
+            blockers: [40],
+            parents: [10],
+            recovery: {
+              progress: 'Parked',
+              active: false,
+              classification: 'SIMPLE' as const,
+              threadId: 'synthetic-thread',
+              question: 'Which interface?',
+            },
+          },
+        ],
+      },
+    };
+    const done = { ...attempt, revision: 1, phase: 'succeeded' as const, finishedAt: 500, result };
+    expect(await Effect.runPromise(store.save(done))).toBe(true);
+    expect(await Effect.runPromise(sqliteAttemptStore(directory).get(attempt.id))).toEqual(done);
+    expect(await Effect.runPromise(store.pending())).toBeUndefined();
+    const { default: Database } = await import('better-sqlite3');
+    const client = new Database(join(directory, 'factory.sqlite'));
+    const corrupt = JSON.stringify({
+      ...result,
+      selected: [{ issue: -1, reason: 'Invalid stored selection', dependsOn: [], conflicts: [] }],
+    });
+    try {
+      client
+        .prepare('UPDATE planning_attempts SET result = ? WHERE id = ?')
+        .run(corrupt, attempt.id);
+    } finally {
+      client.close();
+    }
+    await expect(
+      Effect.runPromise(sqliteAttemptStore(directory).get(attempt.id))
+    ).rejects.toMatchObject({ _tag: 'Unavailable', operation: 'attempt-store' });
+    const inspected = new Database(join(directory, 'factory.sqlite'));
+    try {
+      expect(
+        inspected.prepare('SELECT result FROM planning_attempts WHERE id = ?').get(attempt.id)
+      ).toEqual({ result: corrupt });
+    } finally {
+      inspected.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it.each([
+  { revision: 1, phase: 'discovery' as const },
+  { revision: 0, phase: 'freshness' as const },
+])(
+  'rejects noninitial creation $phase/$revision without consuming the active slot',
+  async (invalid) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-attempt-invalid-'));
+    try {
+      initializeState(directory);
+      const store = sqliteAttemptStore(directory);
+      const initial = {
+        id: randomUUID(),
+        revision: 0,
+        startedAt: 100,
+        deadline: 120100,
+        phase: 'discovery' as const,
+      };
+      await expect(
+        Effect.runPromise(store.create({ ...initial, ...invalid }))
+      ).rejects.toMatchObject({ _tag: 'Unavailable', operation: 'attempt-store' });
+      expect(await Effect.runPromise(store.pending())).toBeUndefined();
+      expect(await Effect.runPromise(store.get(initial.id))).toBeUndefined();
+      expect(await Effect.runPromise(store.create(initial))).toBe(true);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);

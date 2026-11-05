@@ -11,7 +11,7 @@ import {
   type PlanningInput,
   type PlannerOwnership,
 } from '../src/capabilities/plan/index.js';
-import { Time } from '../src/capabilities/job/index.js';
+import { Time, Unavailable } from '../src/capabilities/job/index.js';
 import { controlledAttemptStore } from './fixtures/attempt-store.js';
 const input: PlanningInput = {
   issues: [],
@@ -331,3 +331,171 @@ it.each([
     await runtime.dispose();
   }
 });
+
+it.each(['preview', 'stale'] as const)(
+  'persists a completed %s through freshness with bounded presentation context and does not replay terminal work',
+  async (kind) => {
+    const store = controlledAttemptStore();
+    const original = {
+      id: 'successful-attempt',
+      revision: 0,
+      startedAt: 100,
+      deadline: 120100,
+      phase: 'discovery' as const,
+    };
+    await Effect.runPromise(store.create(original));
+    const issue = {
+      number: 42,
+      url: 'https://github.com/rafaeltab/wallpaperdb/issues/42',
+      title: 'Synthetic issue',
+      body: 'Full requirements stay in planner context',
+      author: 'rafaeltab',
+      open: true,
+      labels: ['ready-for-agent'],
+      comments: [],
+      blockers: [40],
+      parents: [10],
+      blockersReady: true,
+      prerequisiteEvidence: 'Synthetic verified prerequisite',
+      recovery: { progress: 'Parked', question: 'Which interface?' },
+    };
+    const selected =
+      kind === 'preview'
+        ? [{ issue: 42, reason: 'Thin experiment', dependsOn: [], conflicts: [] }]
+        : [];
+    const rejected = kind === 'stale' ? [{ issue: 0, reason: 'Inputs changed' }] : [];
+    let calls = 0;
+    const runtime = ManagedRuntime.make(
+      AttemptsLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(AttemptStore, store),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: () => Effect.die('The Plan port already owns the proposal'),
+            }),
+            Layer.succeed(Plan, {
+              preview: (attempt) =>
+                Effect.gen(function* () {
+                  if (!attempt) return yield* Effect.die('Missing attempt identity');
+                  expect({ requestId: attempt.requestId, deadline: attempt.deadline }).toEqual({
+                    requestId: original.id,
+                    deadline: original.deadline,
+                  });
+                  calls++;
+                  yield* attempt.progress('freshness');
+                  return { kind, selected, rejected, input: { ...input, issues: [issue] } };
+                }),
+            }),
+            Layer.succeed(Time, { now: () => Effect.succeed(500) })
+          )
+        )
+      )
+    );
+    try {
+      const attempts = await runtime.runPromise(Attempts);
+      await runtime.runPromise(attempts.execute(original.id));
+      const expected = {
+        kind,
+        selected,
+        rejected,
+        input: {
+          issues: [
+            {
+              number: 42,
+              title: 'Synthetic issue',
+              blockers: [40],
+              parents: [10],
+              recovery: { progress: 'Parked', question: 'Which interface?' },
+            },
+          ],
+        },
+      };
+      expect(await runtime.runPromise(attempts.observe(original.id))).toMatchObject({
+        id: original.id,
+        phase: 'succeeded',
+        startedAt: 100,
+        deadline: 120100,
+        finishedAt: 500,
+        elapsedMs: 400,
+        result: expected,
+      });
+      expect((await Effect.runPromise(store.get(original.id)))?.result).toEqual(expected);
+      expect(await runtime.runPromise(attempts.pending())).toBeUndefined();
+      expect(await runtime.runPromise(attempts.observe('missing'))).toBeUndefined();
+      await runtime.runPromise(attempts.execute(original.id));
+      await runtime.runPromise(attempts.execute('missing'));
+      expect(calls).toBe(1);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
+
+it.each([false, true])(
+  'records a dependency failure without exposing its cause, with matching rejection detail=%s',
+  async (knownRejection) => {
+    const store = controlledAttemptStore();
+    const original = {
+      id: 'failed-attempt',
+      revision: 0,
+      startedAt: 100,
+      deadline: 120100,
+      phase: 'discovery' as const,
+    };
+    await Effect.runPromise(store.create(original));
+    const safeDetail = 'T3 rejected launch with -32602. No worker started.';
+    const runtime = ManagedRuntime.make(
+      AttemptsLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(AttemptStore, store),
+            Layer.succeed(IPlanner, {
+              ownership: () =>
+                Effect.succeed(
+                  knownRejection
+                    ? {
+                        requestId: original.id,
+                        revision: 1,
+                        deadline: original.deadline,
+                        retired: true,
+                        phase: 'failed' as const,
+                        detail: safeDetail,
+                      }
+                    : undefined
+                ),
+              propose: () => Effect.die('No direct proposal'),
+            }),
+            Layer.succeed(Plan, {
+              preview: () =>
+                Effect.fail(
+                  new Unavailable({
+                    operation: 'synthetic-discovery',
+                    cause: new Error('Synthetic private diagnostic'),
+                  })
+                ),
+            }),
+            Layer.succeed(Time, { now: () => Effect.succeed(500) })
+          )
+        )
+      )
+    );
+    try {
+      const attempts = await runtime.runPromise(Attempts);
+      await runtime.runPromise(attempts.execute(original.id));
+      expect(await Effect.runPromise(store.get(original.id))).toMatchObject({
+        id: original.id,
+        deadline: original.deadline,
+        phase: 'failed',
+        detail: knownRejection
+          ? safeDetail
+          : 'Planning dependency failed. No implementation dispatched.',
+      });
+      expect(JSON.stringify(await runtime.runPromise(attempts.observe(original.id)))).not.toContain(
+        'Synthetic private diagnostic'
+      );
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

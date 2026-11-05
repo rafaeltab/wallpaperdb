@@ -1,6 +1,6 @@
 # Prototype the factory frontend
 
-The [factory operations UI](../apps/factory/README.md) is a Vite/React client for the existing HTTP backend. Repository setup and tools follow [CONTRIBUTING.md](../CONTRIBUTING.md).
+The [factory operations UI](../apps/factory/README.md) is a Vite/React client for the existing HTTP backend. Pinned tools and setup are defined in [mise.toml](../mise.toml) and the [Makefile](../Makefile).
 
 From the repository root, point Vite at the intended backend and start HMR:
 

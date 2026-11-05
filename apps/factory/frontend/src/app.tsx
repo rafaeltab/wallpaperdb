@@ -12,8 +12,18 @@ export function SchedulerControls({
   command: Command;
   pending: boolean;
 }) {
-  const [editing, setDraft] = useState<ScheduleSnapshot['state']>();
-  const draft = editing ?? snapshot.state;
+  const [editing, setDraft] = useState<{
+    revision: number;
+    concurrency: string;
+    allowance: string;
+    paused: boolean;
+  }>();
+  const draft = editing ?? {
+    revision: snapshot.state.revision,
+    concurrency: String(snapshot.state.concurrency),
+    allowance: String(snapshot.state.allowance),
+    paused: snapshot.state.paused,
+  };
   return (
     <section>
       <h2>Scheduler controls</h2>
@@ -24,11 +34,11 @@ export function SchedulerControls({
           event.preventDefault();
           const saved = await command('/api/scheduler', {
             revision: draft.revision,
-            concurrency: draft.concurrency,
-            allowance: draft.allowance,
+            concurrency: Number(draft.concurrency),
+            allowance: Number(draft.allowance),
             paused: draft.paused,
           });
-          if (saved?.state) setDraft(undefined);
+          if (saved?.state) setDraft((current) => (current === editing ? undefined : current));
         }}
       >
         <label>
@@ -38,7 +48,7 @@ export function SchedulerControls({
             type="number"
             required
             value={draft.concurrency}
-            onChange={(event) => setDraft({ ...draft, concurrency: Number(event.target.value) })}
+            onChange={(event) => setDraft({ ...draft, concurrency: event.target.value })}
           />
         </label>
         <label>
@@ -48,7 +58,7 @@ export function SchedulerControls({
             type="number"
             required
             value={draft.allowance}
-            onChange={(event) => setDraft({ ...draft, allowance: Number(event.target.value) })}
+            onChange={(event) => setDraft({ ...draft, allowance: event.target.value })}
           />
         </label>
         <p>Use -1 for unlimited. Lowering limits preserves existing work.</p>

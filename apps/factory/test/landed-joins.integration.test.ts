@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { writeFile, readFile, rename, readdir, unlink } from 'node:fs/promises';
+import { writeFile, readFile, rename, readdir, unlink } from './fixtures/durable-state.js';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { Job, JobLive, JobStore, Issues, Execution, Time } from '../src/capabilities/job/index.js';

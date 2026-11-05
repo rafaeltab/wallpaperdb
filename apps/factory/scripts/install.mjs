@@ -22,6 +22,7 @@ execFileSync(
 );
 try {
   await cp('dist', temporary, { recursive: true });
+  await cp('drizzle', join(temporary, 'drizzle'), { recursive: true });
   const self = join(temporary, 'node_modules/.pnpm/node_modules/@wallpaperdb/factory');
   await rm(self, { force: true });
   await symlink('../../../..', self);
@@ -37,7 +38,7 @@ try {
         lock: createHash('sha256')
           .update(await readFile(join(repository, 'pnpm-lock.yaml')))
           .digest('hex'),
-        stateFormat: 1,
+        stateFormat: 2,
       },
       null,
       2

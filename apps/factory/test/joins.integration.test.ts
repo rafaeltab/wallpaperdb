@@ -10,7 +10,8 @@ import {
 } from '../src/capabilities/plan/index.js';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
 import type { Status } from '../src/capabilities/job/index.js';
-import { readFile, writeFile, readdir, rename, unlink, chmod, mkdir } from 'node:fs/promises';
+import { chmod, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename, unlink } from './fixtures/durable-state.js';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import {

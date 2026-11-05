@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { chmod, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { githubIssues } from '../../src/adapters/github/index.js';
+import { initializeState } from '../../src/platform/index.js';
 import { protocol } from './setup.js';
 export async function joinFixture(
   options: {
@@ -36,6 +37,7 @@ export async function joinFixture(
   } = {}
 ) {
   const host = await protocol();
+  initializeState(host.directory);
   const previous = process.env.PATH;
   const fixture = process.env.FACTORY_FIXTURE;
   process.env.PATH = `${host.directory}:${previous}`;

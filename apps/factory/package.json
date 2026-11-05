@@ -21,7 +21,9 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:browser:install": "playwright install --with-deps chromium",
     "service:install": "node scripts/install.mjs",
-    "service:activate": "node scripts/activate.mjs"
+    "service:activate": "node scripts/activate.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/main.ts --migrate-only"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -33,7 +35,9 @@
     "@opentelemetry/sdk-trace-base": "2.11.0",
     "@opentelemetry/resources": "2.11.0",
     "@wallpaperdb/core": "workspace:*",
-    "@opentelemetry/core": "2.11.0"
+    "@opentelemetry/core": "2.11.0",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "0.38.4"
   },
   "devDependencies": {
     "@wallpaperdb/scripts": "workspace:*",
@@ -44,10 +48,13 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "5.0.2",
-    "@playwright/test": "^1.51.1"
+    "@playwright/test": "^1.51.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "drizzle-kit": "0.30.6"
   },
   "exports": {},
   "files": [
-    "dist"
+    "dist",
+    "drizzle"
   ]
 }

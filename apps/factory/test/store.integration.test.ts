@@ -39,7 +39,7 @@ it('reserves once across independent instances and retains launch claim after re
       issueTitle: 'Implement a factory worker',
     });
     await writeFile(join(directory, 'intent.json'), '{broken');
-    await expect(Effect.runPromise(reopened.read())).rejects.toMatchObject({ _tag: 'Unavailable' });
+    expect(await Effect.runPromise(reopened.read())).toMatchObject({ id: 'job-1' });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

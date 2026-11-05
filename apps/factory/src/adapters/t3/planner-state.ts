@@ -1,26 +1,13 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { z } from 'zod';
-import { publisher } from '../../platform/index.js';
-const schema = z
-  .object({
-    revision: z.number().int().nonnegative(),
-    requestId: z.string().min(1),
-    input: z.string(),
-    deadline: z.number().finite(),
-    run: z.object({ threadId: z.string().min(1), runId: z.string().min(1) }).optional(),
-    retired: z.boolean().optional(),
-  })
-  .strict();
+import { publisher, requiredRecord } from '../../platform/index.js';
+import { plannerSchema as schema } from '../../platform/index.js';
 export function plannerState(directory: string) {
   const publish = publisher(directory);
   const read = async () => {
     let latest: z.infer<typeof schema> | undefined;
     for (let revision = 0; ; revision++) {
       try {
-        latest = schema.parse(
-          JSON.parse(await readFile(join(directory, `planner-${revision}.json`), 'utf8'))
-        );
+        latest = schema.parse(await requiredRecord(directory, `planner-${revision}.json`));
         if (latest.revision !== revision) throw new Error('Invalid planner revision');
       } catch (cause) {
         if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return latest;

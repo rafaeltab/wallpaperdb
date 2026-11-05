@@ -6,7 +6,7 @@ function command(program, args) {
 	const result = spawnSync(program, args, { encoding: "utf8" });
 	if (result.error || result.status !== 0) {
 		throw new Error(
-			`${program} ${args.join(" ")}: ${result.error?.message ?? result.stderr.trim()}. Run make install; see CONTRIBUTING.md.`,
+			`${program} ${args.join(" ")}: ${result.error?.message ?? result.stderr.trim()}. Run make install to install the tools pinned in mise.toml.`,
 		);
 	}
 	return result.stdout.trim();

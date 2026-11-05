@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+	copyFileSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 // Do not inherit selectors or dry-run flags from the parent make invocation.
@@ -47,6 +56,93 @@ function plannedTask(target, workspace, taskName) {
 	assert.ok(task, `${workspace} must plan ${taskName}`);
 	return task;
 }
+
+function workspaceFixture(t) {
+	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-make-selector-"));
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	copyFileSync("Makefile", join(directory, "Makefile"));
+	writeFileSync(
+		join(directory, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n",
+	);
+	for (const [path, name, marker] of [
+		[directory, "@wallpaperdb/root", "root"],
+		[join(directory, "packages/probe"), "@wallpaperdb/probe", "child"],
+	]) {
+		mkdirSync(path, { recursive: true });
+		writeFileSync(
+			join(path, "package.json"),
+			JSON.stringify({
+				name,
+				private: true,
+				scripts: { probe: "node probe.mjs" },
+			}),
+		);
+		writeFileSync(
+			join(path, "probe.mjs"),
+			`console.log(JSON.stringify({ workspace: ${JSON.stringify(marker)}, args: process.argv.slice(2) }));\n`,
+		);
+	}
+	return directory;
+}
+
+for (const [workspace, marker] of [
+	["root", "root"],
+	["probe", "child"],
+]) {
+	test(`one-off scripts execute in the ${workspace} workspace and forward arguments`, (t) => {
+		const result = spawnSync(
+			"make",
+			[
+				"--no-print-directory",
+				"run",
+				`PACKAGE=${workspace}`,
+				"SCRIPT=probe",
+				"ARGS=hello --flag",
+				"SHELL=/bin/sh",
+			],
+			{
+				cwd: workspaceFixture(t),
+				encoding: "utf8",
+				env,
+			},
+		);
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			result.stdout
+				.split("\n")
+				.includes(
+					JSON.stringify({ workspace: marker, args: ["hello", "--flag"] }),
+				),
+			result.stdout,
+		);
+	});
+}
+
+test("one-off scripts fail when a workspace directory has no matching package", (t) => {
+	const directory = workspaceFixture(t);
+	writeFileSync(
+		join(directory, "packages/probe/package.json"),
+		JSON.stringify({ name: "@other/probe", private: true }),
+	);
+	const result = spawnSync(
+		"make",
+		[
+			"--no-print-directory",
+			"run",
+			"PACKAGE=probe",
+			"SCRIPT=probe",
+			"SHELL=/bin/sh",
+		],
+		{
+			cwd: directory,
+			encoding: "utf8",
+			env,
+		},
+	);
+	assert.notEqual(result.status, 0, result.stdout + result.stderr);
+	assert.match(result.stdout + result.stderr, /No projects matched/);
+});
 
 test("Compose image plans and prebuilt startup are explicit opt-ins", () => {
 	assert.match(output("apps-build", "ARGS=--print"), / build --print\s*$/);
@@ -98,15 +194,25 @@ test("Ingestor caches distinguish scheduling modes only for instrumentation task
 			{ encoding: "utf8", env: childEnv },
 		);
 		assert.equal(result.status, 0, result.stderr);
-		return new Map(JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]));
+		return new Map(
+			JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]),
+		);
 	});
 	for (const task of ["test", "test:integration", "test:unit", "build"]) {
 		const id = `@wallpaperdb/ingestor#${task}`;
 		assert.ok(plans[0].has(id) && plans[1].has(id), `${id} must be planned`);
 		if (task === "test" || task === "test:integration") {
-			assert.notEqual(plans[0].get(id), plans[1].get(id), `${id} must hash scheduling mode`);
+			assert.notEqual(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must hash scheduling mode`,
+			);
 		} else {
-			assert.equal(plans[0].get(id), plans[1].get(id), `${id} must retain its cache identity`);
+			assert.equal(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must retain its cache identity`,
+			);
 		}
 	}
 });
@@ -211,7 +317,11 @@ test("E2E task graphs retain shared infrastructure and product/operations browse
 		],
 		[
 			"--filter=!@wallpaperdb/web-e2e",
-			["@wallpaperdb/factory", "@wallpaperdb/test-utils", "@wallpaperdb/testcontainers"],
+			[
+				"@wallpaperdb/factory",
+				"@wallpaperdb/test-utils",
+				"@wallpaperdb/testcontainers",
+			],
 		],
 	]) {
 		const result = spawnSync(
@@ -305,7 +415,7 @@ test("focused tests select one workspace and serialize dependency builds and tes
 		);
 		assert.ok(
 			focused.includes(
-				`pnpm --filter @wallpaperdb/${workspace} exec vitest run --maxWorkers=1 --no-file-parallelism ${file}`,
+				`pnpm --filter @wallpaperdb/${workspace} --fail-if-no-match exec vitest run --maxWorkers=1 --no-file-parallelism ${file}`,
 			),
 		);
 		assert.doesNotMatch(
@@ -314,6 +424,10 @@ test("focused tests select one workspace and serialize dependency builds and tes
 			"the shared command must support gateway Vitest 5",
 		);
 	}
+	assert.match(
+		output("test-focused", "PACKAGE=root"),
+		/pnpm --workspace-root exec vitest run/,
+	);
 });
 
 test("dev defaults to Compose and scopes workspace dev through Turbo", () => {
@@ -361,7 +475,7 @@ test("one-off scripts require a package and script", () => {
 	assert.notEqual(make("run", "PACKAGE=web").status, 0);
 	assert.match(
 		output("run", "PACKAGE=web", "SCRIPT=preview"),
-		/pnpm --filter @wallpaperdb\/web run preview/,
+		/pnpm --filter @wallpaperdb\/web --fail-if-no-match run preview/,
 	);
 });
 

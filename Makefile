@@ -48,6 +48,7 @@ $(error Unknown PACKAGE '$(PACKAGE)'. Use a workspace directory name, e.g. web o
 endif
 endif
 TURBO_PACKAGE = $(if $(filter root,$(PACKAGE)),//,@wallpaperdb/$(PACKAGE))
+PNPM_PACKAGE = $(if $(filter root,$(PACKAGE)),--workspace-root,--filter @wallpaperdb/$(PACKAGE) --fail-if-no-match)
 FILTER = $(if $(PACKAGE),--filter=$(TURBO_PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
@@ -67,7 +68,7 @@ help: ## Show commands and selectors
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z][a-z0-9-]*:.*## / {printf "  %-22s %s\n", $$1, $$2}' Makefile
 
 install: ## Install dependencies and initialize this worktree
-	@command -v mise >/dev/null 2>&1 || { echo 'mise is required. See CONTRIBUTING.md for setup.' >&2; exit 127; }
+	@command -v mise >/dev/null 2>&1 || { echo 'Install mise: https://mise.jdx.dev/getting-started.html, then run make install.' >&2; exit 127; }
 	mise install --locked
 	mise exec -- node scripts/toolchain.mjs
 	mise exec -- pnpm install --frozen-lockfile
@@ -97,7 +98,7 @@ test: ## Run workspace test scripts (optional PACKAGE)
 test-focused: ## Build dependencies and run selected tests serially (requires PACKAGE; optional ARGS)
 	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
 	@$(TURBO) run build --filter="$(TURBO_PACKAGE)^..." --concurrency=1
-	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
+	@pnpm $(PNPM_PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)
@@ -133,7 +134,7 @@ check: ## Build, lint, and type-check (optional PACKAGE)
 run: ## Run a package.json script (requires PACKAGE and SCRIPT; optional ARGS)
 	$(if $(PACKAGE),,$(error run requires PACKAGE, e.g. make run PACKAGE=web SCRIPT=preview))
 	$(if $(SCRIPT),,$(error run requires SCRIPT, e.g. make run PACKAGE=web SCRIPT=preview))
-	@pnpm --filter @wallpaperdb/$(PACKAGE) run $(SCRIPT) $(ARGS)
+	@pnpm $(PNPM_PACKAGE) run $(SCRIPT) $(ARGS)
 
 docker-status: ## Show the shared Docker validation owner and queue
 	@node scripts/docker-validation.mjs --status

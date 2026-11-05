@@ -73,8 +73,8 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       );
       // Exercise the browser's persisted-document lifecycle without assuming
       // headless Chromium's navigation policy actually selects BFCache.
-      await page.evaluate(() =>
-        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+      await page.evaluate(
+        "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))"
       );
       const restoredRefresh = page.waitForResponse(
         (response) =>
@@ -82,8 +82,8 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
           response.url() === `http://127.0.0.1:${address.port}/`,
         { timeout: 5000 }
       );
-      await page.evaluate(() =>
-        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+      await page.evaluate(
+        "window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))"
       );
       await restoredRefresh;
       await browserExpect(page.getByText('Status: running')).toBeVisible();

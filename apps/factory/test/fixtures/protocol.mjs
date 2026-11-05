@@ -31,7 +31,8 @@ if (
   basename(process.argv[1]) === 'gh' &&
   args[0] === 'api' &&
   args[1] === 'graphql' &&
-  earlyFlag('-f')?.includes('closedByPullRequestsReferences')
+  earlyFlag('-f')?.includes('closedByPullRequestsReferences') &&
+  !earlyFlag('-f')?.includes('includeClosedPrs:true')
 ) {
   const number = Number(earlyFlag('-f').match(/issue\(number:(\d+)\)/)[1]);
   console.log(
@@ -456,18 +457,20 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
     );
   else if (args[0] === 'api' && args[1] === 'graphql') {
     if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
-      reply([
-        {
-          data: {
-            repository: {
-              pullRequests: {
-                nodes: config.planning.openPulls ?? [],
-                pageInfo: { hasNextPage: false, endCursor: null },
+      reply(
+        config.planning.openPullPages ?? [
+          {
+            data: {
+              repository: {
+                pullRequests: {
+                  nodes: config.planning.openPulls ?? [],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
               },
             },
           },
-        },
-      ]);
+        ]
+      );
     else {
       const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
       const issue = config.planning.issues.find((i) => i.number === n) ?? config.planning.context;
@@ -477,23 +480,35 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           repository: {
             issue: {
               ...issue,
-              parent: config.planning.parent
-                ? {
-                    number: config.planning.parent,
-                    url: `https://github.com/rafaeltab/wallpaperdb/issues/${config.planning.parent}`,
-                  }
-                : null,
+              parent:
+                config.planning.foreignParent ??
+                (config.planning.parent
+                  ? {
+                      number: config.planning.parent,
+                      url: `https://github.com/rafaeltab/wallpaperdb/issues/${config.planning.parent}`,
+                    }
+                  : null),
               labels: conn(issue.labels),
               assignees: conn([]),
               comments: { totalCount: issue.comments.length },
-              projectItems: conn([]),
+              projectItems: {
+                ...conn(config.planning.projectItems ?? []),
+                pageInfo: { hasNextPage: config.planning.incompleteMetadata ?? false },
+              },
+              closedByPullRequestsReferences: conn(config.planning.nativePulls?.[n] ?? []),
               timelineItems: conn([]),
             },
           },
         },
       });
     }
-  } else if (args[0] === 'api') reply([config.planning.blockers ?? []]);
+  } else if (args[0] === 'api')
+    reply([
+      (config.planning.blockers ?? []).map((b) => ({
+        html_url: `https://github.com/rafaeltab/wallpaperdb/issues/${b.number}`,
+        ...b,
+      })),
+    ]);
   else
     reply(
       config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context

@@ -1,6 +1,12 @@
 import { Effect, Layer, Semaphore } from 'effect';
 import { Time } from '../job/index.js';
-import { Observations, ObservationStore, ObservationSource, LocalSnapshot } from './contract.js';
+import {
+  Observations,
+  ObservationStore,
+  ObservationSource,
+  LocalSnapshot,
+  observationStaleAfterMs,
+} from './contract.js';
 export const ObservationsLive = Layer.effect(
   Observations,
   Effect.gen(function* () {
@@ -92,8 +98,9 @@ function dated(value: import('./contract.js').ObservationState, now: number) {
       ? 'error'
       : value.observedAt === undefined
         ? 'initial'
-        : now - value.observedAt > 60000
+        : now - value.observedAt > observationStaleAfterMs
           ? 'stale'
           : 'current';
-  return { ...value, state };
+  const ageMs = value.observedAt === undefined ? undefined : Math.max(0, now - value.observedAt);
+  return { ...value, state, ageMs, stale: ageMs !== undefined && ageMs > observationStaleAfterMs };
 }

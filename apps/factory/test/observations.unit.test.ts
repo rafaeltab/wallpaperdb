@@ -1,3 +1,5 @@
+import { controlledObservations } from './fixtures/observations.js';
+import { observationStoreContract } from './fixtures/observation-contract.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { Time, Unavailable } from '../src/capabilities/job/index.js';
@@ -11,7 +13,7 @@ import {
 } from '../src/capabilities/observe/index.js';
 import { operationsServer } from '../src/http/index.js';
 it('serves all snapshots locally while GitHub and workflow reconciliation are unavailable', async () => {
-  let value: ObservationState = {};
+  const store = controlledObservations();
   let revision = 3;
   const runtime = ManagedRuntime.make(
     ObservationsLive.pipe(
@@ -25,14 +27,7 @@ it('serves all snapshots locally while GitHub and workflow reconciliation are un
                 entries: [],
               }),
           }),
-          Layer.succeed(ObservationStore, {
-            read: () => Effect.succeed(value),
-            refresh: (state) =>
-              Effect.sync(() => {
-                value = { ...value, ...state };
-              }),
-            jobs: () => Effect.void,
-          }),
+          Layer.succeed(ObservationStore, store),
           Layer.succeed(ObservationSource, {
             read: () =>
               Effect.fail(new Unavailable({ operation: 'offline', cause: 'unavailable' })),
@@ -156,13 +151,35 @@ it('retains current local controls and rejects a cached job with a different ide
       jobs: [{ intent: { id: 'current' }, execution: { kind: 'ambiguous' }, elapsedMs: 20 }],
       localWork: [{ control: { revision: 4, cancelled: true } }],
     });
+    retained.jobs = [
+      {
+        kind: 'job',
+        intent,
+        execution: { kind: 'ambiguous' },
+        elapsedMs: 0,
+        resume: { index: 1, runId: 'old', revision: 3 },
+        prerequisite: {
+          url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+          commit: intent.base,
+        },
+        delivery: { stage: 'ci', commit: intent.base, ready: true, landed: false, active: true },
+      },
+    ];
+    const cancelled = await runtime.runPromise(observer.schedule());
+    expect(cancelled.jobs).toMatchObject([
+      {
+        delivery: { activity: 'cancelled', active: false, ready: false },
+        resume: undefined,
+        prerequisite: undefined,
+      },
+    ]);
   } finally {
     await runtime.dispose();
   }
 });
 
 it('keeps snapshots responsive during a blocked independent refresh', async () => {
-  let value: ObservationState = {};
+  const store = controlledObservations();
   let release!: () => void;
   let started!: () => void;
   const waiting = new Promise<void>((resolve) => {
@@ -183,14 +200,7 @@ it('keeps snapshots responsive during a blocked independent refresh', async () =
                 entries: [],
               }),
           }),
-          Layer.succeed(ObservationStore, {
-            read: () => Effect.succeed(value),
-            refresh: (update) =>
-              Effect.sync(() => {
-                value = { ...value, ...update };
-              }),
-            jobs: () => Effect.void,
-          }),
+          Layer.succeed(ObservationStore, store),
           Layer.succeed(ObservationSource, {
             read: () =>
               Effect.promise(async () => {
@@ -212,6 +222,76 @@ it('keeps snapshots responsive during a blocked independent refresh', async () =
   } finally {
     release();
     await refreshing;
+    await runtime.dispose();
+  }
+});
+
+observationStoreContract('controlled observations', async () => ({
+  store: controlledObservations(),
+  close: async () => undefined,
+}));
+
+it('dates last-known facts consistently with the conservative refresh cadence and clears errors on recovery', async () => {
+  const store = controlledObservations();
+  let now = 10;
+  const runtime = ManagedRuntime.make(
+    ObservationsLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, { now: () => Effect.succeed(now) }),
+          Layer.succeed(ObservationStore, store),
+          Layer.succeed(ObservationSource, { read: () => Effect.die('Snapshot does not refresh') }),
+          Layer.succeed(LocalSnapshot, {
+            read: () =>
+              Effect.succeed({
+                state: { revision: 0, concurrency: 1, allowance: 1, paused: true, admissions: [] },
+                entries: [],
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const observer = await runtime.runPromise(Observations);
+    await Effect.runPromise(
+      store.refresh({ startedAt: 5, observedAt: 10, facts: { issues: [], pullRequests: [] } })
+    );
+    now = 120010;
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      state: 'current',
+      ageMs: 120000,
+      stale: false,
+    });
+    now = 240011;
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      state: 'stale',
+      ageMs: 240001,
+      stale: true,
+    });
+    await Effect.runPromise(store.refresh({ startedAt: now }));
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      state: 'loading',
+      stale: true,
+      observedAt: 10,
+    });
+    await Effect.runPromise(store.refresh({ startedAt: now, failedAt: now, error: 'offline' }));
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      state: 'error',
+      stale: true,
+      observedAt: 10,
+    });
+    now++;
+    await Effect.runPromise(
+      store.refresh({ startedAt: now, observedAt: now, facts: { issues: [], pullRequests: [] } })
+    );
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      state: 'current',
+      stale: false,
+      ageMs: 0,
+      error: undefined,
+    });
+  } finally {
     await runtime.dispose();
   }
 });

@@ -10,10 +10,12 @@ export interface PlanningIssue {
     labels: readonly string[];
     assignees: readonly string[];
     projectStatus: string | null;
+    projectPriority: string | null;
+    projectSize: string | null;
     commentCount: number;
     blockers: readonly number[];
     parents: readonly number[];
-    pullRequests: readonly number[];
+    pullRequests: readonly { number: number; url: string; state: 'OPEN' | 'CLOSED' | 'MERGED' }[];
   };
   readonly number: number;
   readonly url: string;

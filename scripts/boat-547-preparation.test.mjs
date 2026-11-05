@@ -18,6 +18,51 @@ const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
 
+test("547 image diagnostics distinguish native exit from complete capture and drainage", async (t) => {
+	const f = preparationFixture(t);
+	f.env.CONTROL_FAIL = "chromium-install";
+	await assert.rejects(f.run(), /Native Make terminal or drainage failed/);
+	const result = json(
+		path.join(f.config.evidence, "chromium-install/result.json"),
+	);
+	assert.deepEqual(result.commandFailure, {
+		kind: "NATIVE_EXIT",
+		terminal: { code: 2, signal: null },
+		expectedCode: 0,
+		captureComplete: true,
+		pipesClosed: true,
+	});
+	assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+	const directory = path.join(f.config.evidence, "chromium-install/command");
+	assert.equal(json(path.join(directory, "receipt.json")).terminal.code, 2);
+	assert.deepEqual(json(path.join(directory, "disposal.json")).unresolved, []);
+});
+
+test("547 image diagnostics refuse corrupt raw as capture failure despite a native nonzero exit", async (t) => {
+	const f = preparationFixture(t);
+	f.env.CONTROL_FAIL = "chromium-install";
+	await assert.rejects(
+		f.run({
+			make: async (argv, options) => {
+				const receipt = await f.make(argv, options);
+				if (argv[1] === "boat-prepare-chromium")
+					fs.appendFileSync(
+						path.join(options.directory, "stderr.raw"),
+						"changed after native capture\n",
+					);
+				return receipt;
+			},
+		}),
+		/Captured stderr integrity failed/,
+	);
+	const result = json(
+		path.join(f.config.evidence, "chromium-install/result.json"),
+	);
+	assert.equal(result.commandFailure.kind, "CAPTURE_OR_DRAINAGE");
+	assert.deepEqual(result.commandFailure.terminal, { code: 2, signal: null });
+	assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
+});
+
 test("547 complete preparation reuses Make capture and publishes each phase before returning", async (t) => {
 	const f = preparationFixture(t);
 	const result = await f.run({

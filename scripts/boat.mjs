@@ -349,6 +349,7 @@ function execute(
 		}
 		if (!shutdown && !sourceObservation) child.on("error", reject);
 		const complete = (code, signal) => {
+			const nativeTerminal = { code, signal };
 			const status = code ?? (signal === "SIGINT" ? 130 : 143);
 			if (captureOverflow || forwardingOverflow) {
 				reject(new Error("Captured transport output limit exceeded"));
@@ -363,10 +364,12 @@ function execute(
 					`${path.basename(command)} failed (${status}); ${shutdown ? (typeof code === "string" && /^[a-z_]{1,80}$/.test(code) ? code : "transport failure") : (code ?? (capture ? err.slice(-1000) : "see command output"))}`,
 				);
 				error.code = code;
+				error.terminal = nativeTerminal;
 				reject(error);
 			} else
 				resolve({
 					status,
+					terminal: nativeTerminal,
 					out,
 					output: decoded,
 					outputOverflow,
@@ -1603,6 +1606,83 @@ function prepareInfraImages() {
 	console.log(`BOAT_INFRA_IMAGES ${JSON.stringify({ project, images })}`);
 }
 
+function imageCommandEvent(record) {
+	try {
+		event("app-image-command", record);
+	} catch (error) {
+		// The enclosing native capture still retains the observation if the
+		// private controller event file cannot be written. Never replace a build
+		// failure with a supplemental diagnostic failure.
+		console.error(
+			`BOAT_IMAGE_EVENT_UNAVAILABLE ${error.code ?? "write-failed"}`,
+		);
+	}
+	console.log(`BOAT_APP_IMAGE_COMMAND ${JSON.stringify(record)}`);
+}
+
+async function applicationImageCommand(id, admission, command) {
+	const transport = [
+		"ssh",
+		id,
+		"--",
+		"bash",
+		"-lc",
+		`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
+	];
+	const binding = {
+		execution: randomBytes(12).toString("hex"),
+		workerId: id,
+		admission: admission ?? null,
+		service: command[1].slice("SERVICE=".length),
+		argv: ["make", ...command, "BOAT_EXEC=worker"],
+		transport: { executable: cli, argv: ["--no-update", ...transport] },
+	};
+	const began = process.hrtime.bigint();
+	imageCommandEvent({
+		...binding,
+		stage: "BEGIN",
+		wallUTC: new Date().toISOString(),
+		monotonicNs: String(began),
+	});
+	let terminal,
+		failed = false;
+	try {
+		const result = await boat(transport);
+		terminal = result.terminal;
+		return result;
+	} catch (error) {
+		failed = true;
+		terminal = error.terminal;
+		throw error;
+	} finally {
+		// A hard interruption may prevent this block. BEGIN without TERMINAL
+		// leaves completion unknown; it never proves an inner Make exit.
+		const ended = process.hrtime.bigint();
+		imageCommandEvent({
+			...binding,
+			stage: "TERMINAL",
+			wallUTC: new Date().toISOString(),
+			monotonicNs: String(ended),
+			elapsedNs: String(ended - began),
+			outcome: {
+				boundary: "owned-ssh-cli",
+				...(terminal ?? { code: null, signal: null, observed: false }),
+			},
+			...(failed
+				? {
+						backend: {
+							status: "UNAVAILABLE",
+							reason:
+								"owned SSH build transport has no qualified backend diagnostic capability",
+							supplementalCalls: 0,
+							totalCapMs: 0,
+						},
+					}
+				: {}),
+		});
+	}
+}
+
 function applicationImageCommands() {
 	const project = process.env.COMPOSE_PROJECT_NAME;
 	if (!project) throw new Error("Missing application Compose project");
@@ -1792,10 +1872,13 @@ async function command() {
 						try {
 							for (const command of commands) {
 								selected();
-								await ssh(
-									id,
-									`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
-								);
+								if (targets[0] === "boat-prepare-app-images")
+									await applicationImageCommand(id, admission, command);
+								else
+									await ssh(
+										id,
+										`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
+									);
 							}
 							selected();
 							if (
@@ -1830,6 +1913,9 @@ async function command() {
 					ms: Date.now() - entered,
 					completed,
 					commands,
+					...(targets[0] === "boat-prepare-app-images"
+						? { commandSelection: "PLANNED" }
+						: {}),
 				});
 			}
 			// Acquisition never consumes still-wanted process restoration.

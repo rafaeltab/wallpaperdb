@@ -139,6 +139,16 @@ export function makeCommand(argv, options) {
 function captured(directory, receipt, expectedArgv, code = 2) {
 	const invocation = read(path.join(directory, "invocation.json"));
 	const disposal = read(path.join(directory, "disposal.json"));
+	const refused = (kind, message) =>
+		Object.assign(new Error(message), {
+			commandFailure: {
+				kind,
+				terminal: receipt.terminal,
+				expectedCode: code,
+				captureComplete: receipt.captureComplete,
+				pipesClosed: disposal.pipesClosed,
+			},
+		});
 	if (
 		JSON.stringify(read(path.join(directory, "receipt.json"))) !==
 			JSON.stringify(receipt) ||
@@ -147,21 +157,26 @@ function captured(directory, receipt, expectedArgv, code = 2) {
 		receipt.ended.monotonic >= receipt.deadline ||
 		disposal.failure
 	)
-		throw new Error("Captured completion or original deadline mismatch");
-	if (
+		throw refused(
+			"CAPTURE_OR_DEADLINE",
+			"Captured completion or original deadline mismatch",
+		);
+	const captureFailed =
 		JSON.stringify(receipt.argv) !== JSON.stringify(expectedArgv) ||
 		JSON.stringify(invocation.argv) !== JSON.stringify(expectedArgv) ||
 		!receipt.captureComplete ||
 		receipt.failure ||
 		receipt.spawnError ||
-		receipt.terminal?.signal !== null ||
-		receipt.terminal?.code !== code ||
+		!receipt.terminal ||
 		disposal.pipesClosed !== true ||
 		disposal.unresolved?.length !== 0 ||
-		JSON.stringify(disposal.terminal) !== JSON.stringify(receipt.terminal)
-	)
-		throw new Error("Native Make terminal or drainage failed");
-	return Object.fromEntries(
+		JSON.stringify(disposal.terminal) !== JSON.stringify(receipt.terminal);
+	if (captureFailed)
+		throw refused(
+			"CAPTURE_OR_DRAINAGE",
+			"Native Make terminal or drainage failed",
+		);
+	const raw = Object.fromEntries(
 		["stdout", "stderr"].map((name) => {
 			const bytes = fs.readFileSync(path.join(directory, `${name}.raw`));
 			const expected = receipt.files[name];
@@ -170,10 +185,16 @@ function captured(directory, receipt, expectedArgv, code = 2) {
 				bytes.length !== expected.bytes ||
 				sha(bytes) !== expected.sha256
 			)
-				throw new Error(`Captured ${name} integrity failed`);
+				throw refused(
+					"CAPTURE_OR_DRAINAGE",
+					`Captured ${name} integrity failed`,
+				);
 			return [name, bytes];
 		}),
 	);
+	if (receipt.terminal.signal !== null || receipt.terminal.code !== code)
+		throw refused("NATIVE_EXIT", "Native Make terminal or drainage failed");
+	return raw;
 }
 
 function manifest(directory, exclude = []) {
@@ -385,6 +406,7 @@ async function execute547Phase(
 		Object.assign(result, {
 			status: "FAIL",
 			error: error.message,
+			...(error.commandFailure ? { commandFailure: error.commandFailure } : {}),
 			failedAt: clock(),
 			cleanup: {
 				status: binding.worker

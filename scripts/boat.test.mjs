@@ -16035,6 +16035,7 @@ if(a[0]==='compose'&&a.includes('build')){
  if(!model().services[service]?.build||model().services[service].profiles?.length)throw Error('Exactly one default build service must be requested');
  const record=stage=>fs.appendFileSync(path.join(c,'app-build-log'),JSON.stringify({service,stage})+'\\n');
  record('entered');
+ if(fs.existsSync(path.join(c,'fail-service-'+service))){console.error('native '+service+' image build failed');process.exit(23);}
  if(asset){
   console.log('Asset image printed success before completion');fs.writeFileSync(path.join(c,'asset-build-entered'),'yes');
   while(fs.existsSync(path.join(c,'hold-asset-build'))&&!fs.existsSync(path.join(c,'release-asset-build')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
@@ -16062,6 +16063,254 @@ process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process
 		},
 	};
 }
+
+function imageCommandEvents(f) {
+	const file = path.join(f.root, ".boat/events.jsonl");
+	return fs.existsSync(file)
+		? fs
+				.readFileSync(file, "utf8")
+				.trim()
+				.split("\n")
+				.map(JSON.parse)
+				.filter((e) => e.kind === "app-image-command")
+		: [];
+}
+
+test("image diagnostics persist BEGIN before launch and actual serial TERMINAL outcomes", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const sibling = f.json(".boat/state.json").daemon;
+	flag(f, "hold-asset-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "asset-build-entered"));
+		}, "Asset actual launch before terminal observation");
+		const events = imageCommandEvents(f);
+		assert.deepEqual(
+			events.map((e) => [e.stage, e.service]),
+			[["BEGIN", "asset"]],
+		);
+		assert.equal(liveOwnedProcess(f.root, sibling), true);
+	} finally {
+		flag(f, "release-asset-build");
+		await f.observe(command);
+	}
+	assert.equal((await command.done).status, 0);
+	const events = imageCommandEvents(f),
+		state = f.json(".boat/state.json");
+	const native = freshCalls(f).filter(
+		(a) => a.includes("ssh") && a.at(-1).includes("make 'apps-build'"),
+	);
+	assert.deepEqual(
+		events.map((e) => [e.stage, e.service]),
+		expectedAppBuildServices.flatMap((service) => [
+			["BEGIN", service],
+			["TERMINAL", service],
+		]),
+	);
+	for (let i = 0; i < events.length; i += 2) {
+		const begin = events[i],
+			end = events[i + 1];
+		assert.equal(begin.workerId, "fake-new-worker");
+		assert.equal(begin.admission, state.admission.token);
+		assert.deepEqual(begin.argv, [
+			"make",
+			"apps-build",
+			`SERVICE=${begin.service}`,
+			"BOAT_EXEC=worker",
+		]);
+		assert.equal(
+			begin.transport.executable,
+			path.join(f.root, ".mise/boat/boat"),
+		);
+		assert.deepEqual(begin.transport.argv, native[i / 2]);
+		assert.ok(Number.isFinite(Date.parse(begin.wallUTC)));
+		assert.ok(Number.isFinite(Date.parse(end.wallUTC)));
+		assert.ok(BigInt(begin.monotonicNs) <= BigInt(end.monotonicNs));
+		assert.equal(end.execution, begin.execution);
+		assert.equal(
+			end.elapsedNs,
+			String(BigInt(end.monotonicNs) - BigInt(begin.monotonicNs)),
+		);
+		assert.deepEqual(end.outcome, {
+			boundary: "owned-ssh-cli",
+			code: 0,
+			signal: null,
+		});
+		assert.equal(end.backend, undefined);
+	}
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+	assert.equal(
+		(await command.done).stdout
+			.split("\n")
+			.filter((line) => line.startsWith("BOAT_APP_IMAGE_COMMAND ")).length,
+		18,
+	);
+	const planned = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse)
+		.findLast((e) => e.kind === "app-image-preparation");
+	assert.equal(planned.commandSelection, "PLANNED");
+	assert.deepEqual(
+		planned.commands,
+		expectedAppBuildServices.map((service) => [
+			"apps-build",
+			`SERVICE=${service}`,
+		]),
+	);
+});
+
+test("image diagnostics preserve intermediate native failure without later selector or backend effects", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const sibling = f.json(".boat/state.json").daemon;
+	flag(f, "fail-service-color-extractor");
+	const result = await f.observe(f.run("boat-prepare-app-images"));
+	assert.equal(result.status, 2, result.output);
+	assert.match(result.stderr, /native color-extractor image build failed/);
+	assert.deepEqual(f.appBuilds(), [
+		{ service: "asset", stage: "entered" },
+		{ service: "asset", stage: "completed" },
+		{ service: "color-extractor", stage: "entered" },
+	]);
+	const events = imageCommandEvents(f);
+	assert.deepEqual(
+		events.map((e) => [e.stage, e.service]),
+		[
+			["BEGIN", "asset"],
+			["TERMINAL", "asset"],
+			["BEGIN", "color-extractor"],
+			["TERMINAL", "color-extractor"],
+		],
+	);
+	const failed = events.at(-1);
+	// The real fixture SSH CLI sees Make's 2, not the controlled engine's 23.
+	assert.deepEqual(failed.outcome, {
+		boundary: "owned-ssh-cli",
+		code: 2,
+		signal: null,
+	});
+	assert.deepEqual(failed.backend, {
+		status: "UNAVAILABLE",
+		reason:
+			"owned SSH build transport has no qualified backend diagnostic capability",
+		supplementalCalls: 0,
+		totalCapMs: 0,
+	});
+	const builds = freshCalls(f).filter(
+		(a) => a.includes("ssh") && a.at(-1).includes("make 'apps-build'"),
+	);
+	assert.equal(builds.length, 2);
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+});
+
+test("image diagnostics hard interruption leaves terminal unknown and preserves owning siblings", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const sibling = f.json(".boat/state.json").daemon;
+	flag(f, "hold-asset-build");
+	const command = f.run("boat-prepare-app-images");
+	try {
+		await f.readiness.wait(() => {
+			assert.equal(command.closed, false, command.output());
+			return fs.existsSync(path.join(f.control, "asset-build-entered"));
+		}, "actual held build before owned interruption");
+	} finally {
+		await stopLockFixtureChildren([command]);
+		flag(f, "release-asset-build");
+	}
+	assert.equal((await command.done).signal, "SIGTERM");
+	assert.deepEqual(
+		imageCommandEvents(f).map((e) => [e.stage, e.service]),
+		[["BEGIN", "asset"]],
+	);
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+});
+
+test("image diagnostics original capture deadline retires held work without fabricated completion", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const sibling = f.json(".boat/state.json").daemon;
+	flag(f, "hold-asset-build");
+	const { makeCommand } = await import("./lib/boat-hillclimb.mjs");
+	const start = Number(process.hrtime.bigint()) / 1e9,
+		directory = path.join(f.control, "native-image-capture");
+	// The real capture owns its deadline and disposal before any await.
+	const pending = makeCommand(["make", "boat-prepare-app-images"], {
+		cwd: f.root,
+		env: f.env,
+		directory,
+		deadline: start + 5,
+		disposalMs: 1000,
+	});
+	let receipt;
+	try {
+		await f.readiness.wait(
+			() => fs.existsSync(path.join(f.control, "asset-build-entered")),
+			"native capture actual held build",
+		);
+		receipt = await pending;
+	} finally {
+		flag(f, "release-asset-build");
+		await pending;
+	}
+	const disposal = JSON.parse(
+		fs.readFileSync(path.join(directory, "disposal.json")),
+	);
+	assert.equal(receipt.captureComplete, false);
+	assert.match(receipt.failure, /deadline exceeded/);
+	assert.ok(receipt.ended.monotonic <= start + 5);
+	assert.equal(disposal.pipesClosed, true);
+	assert.deepEqual(disposal.unresolved, []);
+	assert.equal(processGroupRunning(disposal.spawnedPid), false);
+	assert.deepEqual(
+		imageCommandEvents(f).map((e) => [e.stage, e.service]),
+		[["BEGIN", "asset"]],
+	);
+	assert.deepEqual(f.appBuilds(), [{ service: "asset", stage: "entered" }]);
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+	t.diagnostic(JSON.stringify({ receipt, disposal }));
+});
+
+test("image diagnostics event write refusal preserves native failure and captured observation", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const hook = path.join(f.directory, "image-event-refusal.cjs");
+	fs.writeFileSync(
+		hook,
+		`const fs=require('node:fs');const append=fs.appendFileSync;fs.appendFileSync=function(file,bytes,...args){if(String(file).endsWith('/events.jsonl')&&String(bytes).includes('"kind":"app-image-command"'))throw Object.assign(new Error('controlled diagnostic write refusal'),{code:'EACCES'});return append.call(this,file,bytes,...args)};`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	flag(f, "fail-service-color-extractor");
+	const result = await f.observe(f.run("boat-prepare-app-images"));
+	assert.equal(result.status, 2, result.output);
+	assert.match(result.stderr, /native color-extractor image build failed/);
+	assert.match(result.stderr, /BOAT_IMAGE_EVENT_UNAVAILABLE EACCES/);
+	const observations = result.stdout
+		.split("\n")
+		.filter((line) => line.startsWith("BOAT_APP_IMAGE_COMMAND "))
+		.map((line) => JSON.parse(line.slice("BOAT_APP_IMAGE_COMMAND ".length)));
+	assert.deepEqual(
+		observations.map((e) => [e.stage, e.service]),
+		[
+			["BEGIN", "asset"],
+			["TERMINAL", "asset"],
+			["BEGIN", "color-extractor"],
+			["TERMINAL", "color-extractor"],
+		],
+	);
+	assert.equal(observations.at(-1).outcome.code, 2);
+	assert.equal(observations.at(-1).backend.supplementalCalls, 0);
+});
 
 for (const ordering of ["completed", "held", "selected-before-build"])
 	test(`preparation maintenance renews the selected worker with image build ${ordering}`, {
@@ -16424,6 +16673,13 @@ test("app image phase refuses later services after generation changes during Ass
 	assert.equal(fs.existsSync(path.join(f.control, "app-build-entered")), false);
 	assertPreparationDefersDevelopment(f);
 	assert.equal(f.json(".boat/state.json").id, "replacement-worker");
+	assert.deepEqual(
+		imageCommandEvents(f).map((e) => [e.stage, e.service]),
+		[
+			["BEGIN", "asset"],
+			["TERMINAL", "asset"],
+		],
+	);
 });
 
 test("app image phase awaits the ordinary build before deferring fresh wanted restoration", async (t) => {

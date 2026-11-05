@@ -39,6 +39,9 @@ export function sourcePreparationFixture(
 				});
 				for (const entry of [
 					"authority.json",
+					"controls-before.json",
+					"controls-after-intent.json",
+					"control-oracle-negative.json",
 					"ownership-transition.json",
 					"public-command",
 					"preparation",
@@ -174,12 +177,17 @@ export function sourcePreparationFixture(
 	fs.writeFileSync(
 		path.join(root, ".mise/boat/boat"),
 		`#!/usr/bin/env node
-const fs=require('fs'),cp=require('child_process');const args=process.argv.slice(2);
+const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');const args=process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(args)+'\\n');
 const s=JSON.parse(fs.readFileSync('.boat/state.json'));
 if(args.includes('info'))console.log(JSON.stringify({sandbox:{id:s.id,name:s.admission.name,type:'large',state:'stopped',stop:s.shutdownAttempt.completion.provider.stop}}));
 else if(args.includes('usage')){
  if(${JSON.stringify(fault)}==='after-intent')cp.execFileSync('python',['-c','import os;os.utime("tracked-0",ns=(1793841786244371690,1793841786244371690))']);
+ const controls=JSON.parse(fs.readFileSync(${JSON.stringify(path.join(directory, "controls-before.json"))})).map(p=>{
+  const b=fs.readFileSync(p.path),s=fs.lstatSync(p.path);
+  return {path:p.path,bodyBase64:b.toString('base64'),bytes:b.length,sha256:crypto.createHash('sha256').update(b).digest('hex'),mode:s.mode&511,regular:s.isFile()&&!s.isSymbolicLink()};
+ });
+ fs.writeFileSync(${JSON.stringify(path.join(directory, "controls-after-intent.json"))},JSON.stringify({atControlledUsageBeforeReturn:true,controls}));
  console.log('{}');
 }else {console.error('CONTROL REFUSES EFFECT '+JSON.stringify(args));process.exitCode=97;}
 `,
@@ -219,6 +227,14 @@ else if(args.includes('usage')){
 				cwdGit("rev-parse", "--git-path", "index").toString().trim(),
 			),
 		),
+	);
+	const controlInputs = controls.map((p) => ({
+		...p,
+		bodyBase64: fs.readFileSync(p.path).toString("base64"),
+	}));
+	fs.writeFileSync(
+		path.join(directory, "controls-before.json"),
+		JSON.stringify(controlInputs),
 	);
 	const data = {
 		root,
@@ -324,6 +340,7 @@ fs.mkdirSync=function(name,...args){
 		calls,
 		files,
 		state,
+		controlInputs,
 		config,
 		retain: (name) => {
 			retentionName = name;

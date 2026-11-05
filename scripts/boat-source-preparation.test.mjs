@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
+import { createHash } from "node:crypto";
 import { prepare547Source } from "./lib/boat-source-preparation.mjs";
 import {
 	sourcePreparationFixture,
@@ -9,6 +10,75 @@ import {
 } from "./test-fixtures/source-preparation.mjs";
 
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+function expectedControls(f, intent) {
+	const observed = intent
+		? json(path.join(f.directory, "controls-after-intent.json"))
+		: null;
+	if (intent) assert.equal(observed.atControlledUsageBeforeReturn, true);
+	return f.controlInputs.map((before) => {
+		const record =
+			observed?.controls.find((p) => p.path === before.path) ?? before;
+		if (intent) {
+			assert.equal(record.regular, true);
+			assert.equal(record.mode, before.mode);
+		}
+		const bytes = Buffer.from(record.bodyBase64, "base64");
+		if (
+			intent &&
+			(before.path.endsWith("/.boat/state.json") ||
+				before.path.endsWith(".worker.json"))
+		) {
+			const after = JSON.parse(bytes),
+				original = JSON.parse(Buffer.from(before.bodyBase64, "base64"));
+			assert.equal(after.developmentWanted, false);
+			assert.match(after.shutdownAttempt.lastInvocationId, /^[a-f0-9-]{36}$/);
+			assert.equal(after.shutdownAttempt.phase, "initial");
+			after.developmentWanted = original.developmentWanted;
+			delete after.shutdownAttempt.lastInvocationId;
+			delete after.shutdownAttempt.phase;
+			assert.deepEqual(
+				after,
+				original,
+				"Only ordinary intent bookkeeping may change",
+			);
+		} else assert.deepEqual(bytes, Buffer.from(before.bodyBase64, "base64"));
+		return {
+			path: before.path,
+			bytes: bytes.length,
+			sha256: digest(bytes),
+			mode: before.mode,
+			body: bytes,
+		};
+	});
+}
+
+function assertControlArchive(actual, expected) {
+	assert.equal(actual.length, 11);
+	assert.deepEqual(
+		actual.map((x) => x.original.path).sort(),
+		expected.map((x) => x.path).sort(),
+	);
+	for (const input of expected) {
+		const archived = actual.find((x) => x.original.path === input.path);
+		assert.deepEqual(
+			archived.body,
+			input.body,
+			`Archived control bytes: ${input.path}`,
+		);
+		const identity = {
+			path: input.path,
+			bytes: input.bytes,
+			sha256: input.sha256,
+			mode: input.mode,
+		};
+		assert.deepEqual(archived.original, identity);
+		for (const key of ["bytes", "sha256", "mode"])
+			assert.equal(archived[key], identity[key]);
+		assert.equal(archived.fileMode, input.mode);
+	}
+}
 
 for (const fault of ["owner-stopped", "owner-running", "owner-admission"])
 	test(`source preparation review refuses ${fault} before controller effects`, async (t) => {
@@ -175,6 +245,46 @@ for (const [name, options, calls] of [
 			);
 			assert.equal(entry.original.mtimeNs, "1793841786244371689");
 		}
+		const expected = expectedControls(f, calls);
+		const controlArchive = archive
+			.slice(28)
+			.map((entry) => ({
+				...entry,
+				body: fs.readFileSync(path.join(f.evidence, "archive", entry.file)),
+				fileMode:
+					fs.lstatSync(path.join(f.evidence, "archive", entry.file)).mode &
+					0o777,
+			}));
+		assertControlArchive(controlArchive, expected);
+		// A self-consistent empty payload/manifest must still fail the independent
+		// control oracle. The actual native archive remains unchanged.
+		const bad = controlArchive.map((x) => ({ ...x }));
+		bad[0] = {
+			...bad[0],
+			body: Buffer.alloc(0),
+			bytes: 0,
+			sha256: digest(Buffer.alloc(0)),
+			original: {
+				...bad[0].original,
+				bytes: 0,
+				sha256: digest(Buffer.alloc(0)),
+			},
+		};
+		assert.throws(
+			() => assertControlArchive(bad, expected),
+			/Archived control bytes/,
+		);
+		fs.writeFileSync(
+			path.join(f.directory, "control-oracle-negative.json"),
+			JSON.stringify({
+				selfConsistentEmptyControlRefused: true,
+				path: bad[0].original.path,
+				expectedBytes: expected[0].bytes,
+				mutantBytes: 0,
+				actualArchivePreserved: true,
+			}),
+			{ flag: "wx", mode: 0o600 },
+		);
 		for (let i = 0; i < 9; i++)
 			assert.equal(
 				fs.readFileSync(path.join(f.root, `tracked-${i}`), "utf8"),

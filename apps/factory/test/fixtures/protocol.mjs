@@ -454,15 +454,46 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
         number,
       }))
     );
-  else if (args[0] === 'api' && args[1] === 'graphql')
-    reply({
-      data: {
-        repository: {
-          issue: { parent: config.planning.parent ? { number: config.planning.parent } : null },
+  else if (args[0] === 'api' && args[1] === 'graphql') {
+    if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
+      reply([
+        {
+          data: {
+            repository: {
+              pullRequests: {
+                nodes: config.planning.openPulls ?? [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
         },
-      },
-    });
-  else if (args[0] === 'api') reply([config.planning.blockers ?? []]);
+      ]);
+    else {
+      const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
+      const issue = config.planning.issues.find((i) => i.number === n) ?? config.planning.context;
+      const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
+      reply({
+        data: {
+          repository: {
+            issue: {
+              ...issue,
+              parent: config.planning.parent
+                ? {
+                    number: config.planning.parent,
+                    url: `https://github.com/rafaeltab/wallpaperdb/issues/${config.planning.parent}`,
+                  }
+                : null,
+              labels: conn(issue.labels),
+              assignees: conn([]),
+              comments: { totalCount: issue.comments.length },
+              projectItems: conn([]),
+              timelineItems: conn([]),
+            },
+          },
+        },
+      });
+    }
+  } else if (args[0] === 'api') reply([config.planning.blockers ?? []]);
   else
     reply(
       config.planning.issues.find((i) => i.number === Number(args[2])) ?? config.planning.context

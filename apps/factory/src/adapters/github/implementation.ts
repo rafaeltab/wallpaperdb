@@ -21,21 +21,26 @@ const blockersSchema = z.array(
 );
 /** Verified prerequisites are operator assertions of acceptance/review/CI readiness
  * at a pinned commit. Live PR head and ancestry are checked before using them. */
-export function githubIssues(config: {
-  project: string;
-  base: string;
-  joins?: JoinConfiguration;
-  prBase?: string;
-  prerequisites: readonly VerifiedPrerequisite[];
-  readyPrerequisites?: () => Effect.Effect<readonly VerifiedPrerequisite[], Unavailable>;
-  admitRecovery?: import('../../capabilities/job/index.js').RecoveryAdmission;
-}): Issues {
+export function githubIssues(
+  config: {
+    project: string;
+    base: string;
+    joins?: JoinConfiguration;
+    prBase?: string;
+    prerequisites: readonly VerifiedPrerequisite[];
+    readyPrerequisites?: () => Effect.Effect<readonly VerifiedPrerequisite[], Unavailable>;
+    admitRecovery?: import('../../capabilities/job/index.js').RecoveryAdmission;
+  },
+  read?: (args: string[], signal?: AbortSignal) => Promise<unknown>
+): Issues {
   const contextualPromise: typeof githubPromise = (options) =>
     githubPromise({ ...options, defaultRecoveryAdmission: config.admitRecovery });
-  const gh = (args: string[], signal?: AbortSignal) =>
-    command('gh', args, config.project, signal).then((text) =>
-      text.trim() ? JSON.parse(text) : null
-    );
+  const gh =
+    read ??
+    ((args: string[], signal?: AbortSignal) =>
+      command('gh', args, config.project, signal).then((text) =>
+        text.trim() ? JSON.parse(text) : null
+      ));
   const joins = config.joins
     ? prerequisiteJoin(config.project, config.base, config.joins, gh)
     : undefined;

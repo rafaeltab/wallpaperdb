@@ -372,6 +372,23 @@
                 "^build",
                 "build"
             ]
+        },
+        "@wallpaperdb/factory#test:unit": {
+            "dependsOn": [
+                "^build",
+                "build"
+            ],
+            "outputs": [
+                "coverage/unit/**",
+                "coverage/frontend/**"
+            ]
+        },
+        "@wallpaperdb/factory#test:e2e": {
+            "dependsOn": [
+                "^build",
+                "build"
+            ],
+            "cache": false
         }
     }
 }

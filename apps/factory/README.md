@@ -2,6 +2,12 @@
 
 Repository-owned operational infrastructure for continuously admitting and observing trusted ready issues through implementation, independent review, publication and CI observation. It is separate from the WallpaperDB product and runs on the host so it can use the existing authenticated GitHub and headless T3 installation.
 
+## Frontend prototyping
+
+The Vite/React operations UI lives in [frontend](frontend/). Start editing [App](frontend/src/app.tsx), [preview components](frontend/src/preview.tsx), [job components](frontend/src/jobs.tsx), or [styles](frontend/src/style.css). It is separate from the WallpaperDB product UI.
+
+Use the [prototyping guide](../../docs/factory-frontend.md) for the Make commands, backend selection, HMR and packaged-asset verification. The factory package owns both builds; production serves the compiled UI on the backend's private origin without a development server.
+
 ## Capabilities
 
 Validated semantic plans continuously refill capacity. A maintainer can also select a trusted ready issue and narrow its execution with context. Both paths share durable admission controls. The factory durably reserves the admission and expected implementation stage, requests a dedicated T3 thread/worktree using gpt-6.1-sol, and shows stage, elapsed time and issue/thread links. Launch uncertainty preserves the reservation and reconciles the exact job identity instead of launching twice. Only a structured outcome from the expected completed run (or a current babysitting watcher run carrying the exact active delivery identity), at the clean current commit and pinned base, advances a stage. Review-loop requires fresh independent Standards, Spec and Defects review; applicable tests, coverage and CRAP remain mandatory. Mutation and hosted review are advisory. The dashboard distinguishes current-commit PR readiness from verified default-branch landing.

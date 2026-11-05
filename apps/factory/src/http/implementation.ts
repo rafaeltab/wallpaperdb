@@ -6,7 +6,7 @@ import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import type { Plan, Scheduler } from '../capabilities/plan/index.js';
-import { page } from './page.js';
+import { serveAssets } from './assets.js';
 import type { WorkRelationship } from './contract.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
@@ -271,21 +271,7 @@ export function operationsServer(config: {
       ? ((await schedulerStatus(request))?.jobs[0] ?? { kind: 'empty' })
       : execute(request, 'factory.http.status', config.job.status())
   );
-  app.get('/', async (request, reply) => {
-    const schedule = await schedulerStatus(request);
-    return reply
-      .type('text/html')
-      .send(
-        page(
-          schedule?.jobs[0] ??
-            (config.snapshot
-              ? { kind: 'empty' }
-              : await execute(request, 'factory.http.page', config.job.status())),
-          schedule,
-          schedule?.relationships
-        )
-      );
-  });
+  serveAssets(app);
   app.post('/api/job', async (request, reply) => {
     const origin = request.headers.origin;
     if (origin && origin !== `${request.protocol}://${request.headers.host}`)

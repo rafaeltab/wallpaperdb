@@ -6,6 +6,12 @@ import { createHash } from "node:crypto";
 import { finiteShutdownProcess } from "./boat-shutdown.mjs";
 const mono = () => Number(process.hrtime.bigint()) / 1e9;
 const sha = (b) => createHash("sha256").update(b).digest("hex");
+export function independentMakeEnvironment(source = process.env) {
+	const env = { ...(source ?? process.env), MAKELEVEL: "0" };
+	for (const name of ["MAKEFLAGS", "MAKEOVERRIDES", "MFLAGS", "GNUMAKEFLAGS"])
+		delete env[name];
+	return env;
+}
 function save(file, value) {
 	const fd = fs.openSync(file, "wx", 0o600);
 	try {

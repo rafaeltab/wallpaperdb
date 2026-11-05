@@ -56,6 +56,7 @@ import {
 	runOwnedSourceCommand,
 	provenOwnedSourceExit,
 } from "./lib/boat-source-command.mjs";
+import { observeEngineBaseline } from "./lib/boat-engine-baseline.mjs";
 
 const root = process.cwd();
 const dir = path.join(root, ".boat");
@@ -1633,7 +1634,7 @@ function imageCommandEvent(record) {
 	console.log(`BOAT_APP_IMAGE_COMMAND ${JSON.stringify(record)}`);
 }
 
-async function applicationImageCommand(id, admission, command) {
+async function applicationImageCommand(id, admission, command, engineBaseline) {
 	const transport = [
 		"ssh",
 		id,
@@ -1643,6 +1644,12 @@ async function applicationImageCommand(id, admission, command) {
 		`${workerEnvironment}; cd ${remote} && mise exec -- make ${command.map(quote).join(" ")} BOAT_EXEC=worker`,
 	];
 	const binding = {
+		...(engineBaseline
+			? {
+					diagnosticContract: "image-diagnostics-v2-engine-baseline-v1",
+					engineBaseline,
+				}
+			: {}),
 		execution: randomBytes(12).toString("hex"),
 		workerId: id,
 		admission: admission ?? null,
@@ -1683,7 +1690,7 @@ async function applicationImageCommand(id, admission, command) {
 			},
 			...(failed
 				? {
-						backend: {
+						[engineBaseline ? "backendContainer" : "backend"]: {
 							status: "UNAVAILABLE",
 							reason:
 								"owned SSH build transport has no qualified backend diagnostic capability",
@@ -1885,10 +1892,41 @@ async function command() {
 							preparation: { worker: id, admission },
 						});
 						try {
+							let engine;
+							if (targets[0] === "boat-prepare-app-images") {
+								engine = await observeEngineBaseline({
+									root,
+									worker: id,
+									admission,
+									cli,
+									remote,
+									workerEnvironment,
+									assertCurrent: () => {
+										selected();
+										if (
+											JSON.stringify(manifest()) !== JSON.stringify(source) ||
+											fingerprint(
+												root,
+												installationInputs(Object.keys(source)),
+											) !== dependencies
+										)
+											throw new Error(
+												"Engine baseline preparation inputs changed",
+											);
+									},
+								});
+								if (engine)
+									event("engine-version-baseline", {
+										workerId: id,
+										admission,
+										...engine,
+									});
+								selected();
+							}
 							for (const command of commands) {
 								selected();
 								if (targets[0] === "boat-prepare-app-images")
-									await applicationImageCommand(id, admission, command);
+									await applicationImageCommand(id, admission, command, engine);
 								else
 									await ssh(
 										id,

@@ -17,6 +17,7 @@ import {
 import http from "node:http";
 import { once } from "node:events";
 import { stripVTControlCharacters } from "node:util";
+import { engineBaselineContext } from "./lib/boat-engine-baseline.mjs";
 
 test("successful full app cleanup clears restoration intent while partial and failed cleanup preserve it", () => {
 	assert.equal(developmentWantedAfterCommand(true, ["apps-stop"], 0), false);
@@ -1224,6 +1225,8 @@ async function lockGenerationCheckout(
 		"scripts/lib/boat-source-generation.mjs",
 		"scripts/lib/boat-source-command.mjs",
 		"scripts/lib/boat-asset-migration.mjs",
+		"scripts/lib/boat-engine-baseline.mjs",
+		"scripts/lib/boat-capture.mjs",
 		"scripts/package.json",
 	]) {
 		local(name, fs.readFileSync(path.join(repository, name)));
@@ -16076,6 +16079,462 @@ function imageCommandEvents(f) {
 		: [];
 }
 
+function managedEngineContext(f, changes = {}) {
+	const state = f.json(".boat/state.json");
+	const evidence = path.join(f.directory, "managed-engine-round");
+	fs.mkdirSync(evidence, { mode: 0o700 });
+	const deadline = Number(process.hrtime.bigint()) / 1e9 + 25;
+	const env = engineBaselineContext(
+		{ worktree: f.root, round: "engine-baseline-fixture", evidence },
+		{ worker: state.id, admission: state.admission.token },
+		"prepare-startup-app-images",
+		evidence,
+		deadline,
+	);
+	const file = path.join(evidence, "engine-context.json");
+	const initial = JSON.parse(fs.readFileSync(file));
+	assert.equal(
+		initial.executionDeadline,
+		deadline - 5,
+		"Parent disposal reserve must remain outside the diagnostic clock",
+	);
+	const context = { ...initial, ...changes };
+	const bytes = Buffer.from(JSON.stringify(context));
+	fs.writeFileSync(file, bytes);
+	Object.assign(f.env, env);
+	f.env.BOAT_547_ENGINE_CONTEXT_SHA256 = createHash("sha256")
+		.update(bytes)
+		.digest("hex");
+	return { evidence, file, context };
+}
+function laterEnginePhase(f, { file, context }) {
+	const bytes = Buffer.from(
+		JSON.stringify({
+			...context,
+			phase: "prepare-app-images-before-restoration",
+		}),
+	);
+	fs.writeFileSync(file, bytes);
+	f.env.BOAT_547_ENGINE_CONTEXT_SHA256 = createHash("sha256")
+		.update(bytes)
+		.digest("hex");
+}
+function retainEngineBaseline(t, evidence) {
+	const destination = process.env.BOAT_ENGINE_EVIDENCE;
+	if (destination)
+		fs.cpSync(
+			evidence,
+			path.join(
+				destination,
+				createHash("sha256").update(t.name).digest("hex").slice(0, 16),
+			),
+			{ recursive: true },
+		);
+}
+
+test("engine baseline managed app preparation consumes one round claim before any selector", {
+	timeout: 30000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	const toolchain = await f.run("boat-prepare-toolchain").done;
+	assert.equal(toolchain.status, 0, toolchain.output);
+	const managed = managedEngineContext(f),
+		{ evidence } = managed;
+	const first = await f.run("boat-prepare-app-images").done;
+	assert.equal(first.status, 0, first.output);
+	const intent = path.join(evidence, "engine-baseline-v1", "intent.json");
+	assert.equal(
+		fs.existsSync(intent),
+		true,
+		"Managed preparation must durably consume its diagnostic claim",
+	);
+	const before = fs.readFileSync(intent);
+	laterEnginePhase(f, managed);
+	const second = await f.run("boat-prepare-app-images").done;
+	assert.equal(second.status, 0, second.output);
+	assert.deepEqual(fs.readFileSync(intent), before);
+	const baselineCalls = freshCalls(f).filter(
+		(argv) =>
+			argv.includes("ssh") &&
+			argv.at(-1).includes("boat-engine-baseline.mjs --worker"),
+	);
+	assert.equal(
+		baselineCalls.length,
+		1,
+		"Repeated image phases must not reacquire the diagnostic",
+	);
+	assert.deepEqual(f.appBuilds(), [
+		...completedAppBuilds(),
+		...completedAppBuilds(),
+	]);
+	retainEngineBaseline(t, evidence);
+});
+
+for (const [scenario, changes, expected] of [
+	["no budget", { executionDeadline: 1 }, "NO_BUDGET"],
+	["already cancelled", { cancelled: true }, "CANCELLED"],
+])
+	test(`engine baseline ${scenario} consumes intent without transport or API`, {
+		timeout: 20000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t, true);
+		assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+		const managed = managedEngineContext(f, changes),
+			{ evidence } = managed;
+		const result = await f.run("boat-prepare-app-images").done;
+		assert.equal(result.status, 0, result.output);
+		const observation = JSON.parse(
+			fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+		);
+		assert.equal(observation.status, expected);
+		assert.equal(observation.attempts, 0);
+		assert.equal(
+			freshCalls(f).filter((a) =>
+				a.at(-1)?.includes("boat-engine-baseline.mjs --worker"),
+			).length,
+			0,
+		);
+		assert.deepEqual(f.appBuilds(), completedAppBuilds());
+		laterEnginePhase(f, managed);
+		assert.equal((await f.run("boat-prepare-app-images").done).status, 0);
+		assert.equal(
+			freshCalls(f).filter((a) =>
+				a.at(-1)?.includes("boat-engine-baseline.mjs --worker"),
+			).length,
+			0,
+		);
+		retainEngineBaseline(t, evidence);
+	});
+
+for (const scenario of [
+	"foreign intent",
+	"interrupted intent",
+	"replacement admission",
+	"tampered evidence",
+	"superseded context",
+])
+	test(`engine baseline ${scenario} refuses re-entry before a diagnostic or image write`, {
+		timeout: 20000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t, true);
+		assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+		const { evidence, context, file } = managedEngineContext(f);
+		const claim = path.join(evidence, "engine-baseline-v1");
+		if (scenario === "foreign intent") {
+			fs.mkdirSync(claim, { mode: 0o700 });
+			fs.writeFileSync(
+				path.join(claim, "intent.json"),
+				JSON.stringify({
+					owner: {
+						version: context.version,
+						root: context.root,
+						round: context.round,
+						worker: "foreign-worker",
+						admission: "foreign-admission",
+					},
+				}),
+				{ mode: 0o600 },
+			);
+		} else if (scenario === "superseded context") {
+			const state = f.json(".boat/state.json");
+			state.admission.token = "replacement-admission";
+			f.local(".boat/state.json", JSON.stringify(state));
+		} else {
+			assert.equal((await f.run("boat-prepare-app-images").done).status, 0);
+			if (scenario === "interrupted intent")
+				fs.unlinkSync(path.join(claim, "result.json"));
+			else if (scenario === "tampered evidence")
+				fs.appendFileSync(path.join(claim, "transport/stdout.raw"), "changed");
+			else {
+				const state = f.json(".boat/state.json");
+				state.admission.token = "replacement-admission";
+				f.local(".boat/state.json", JSON.stringify(state));
+				const updated = { ...context, admission: state.admission.token };
+				const bytes = Buffer.from(JSON.stringify(updated));
+				fs.writeFileSync(file, bytes);
+				f.env.BOAT_547_ENGINE_CONTEXT_SHA256 = createHash("sha256")
+					.update(bytes)
+					.digest("hex");
+			}
+		}
+		const calls = freshCalls(f).length,
+			builds = f.appBuilds();
+		const result = await f.run("boat-prepare-app-images").done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			/Engine baseline (claim belongs|prior attempt|prior evidence|round or owner)/,
+		);
+		assert.equal(
+			freshCalls(f)
+				.slice(calls)
+				.some((a) => a.at(-1)?.includes("boat-engine-baseline.mjs --worker")),
+			false,
+		);
+		assert.deepEqual(f.appBuilds(), builds);
+		retainEngineBaseline(t, evidence);
+	});
+
+test("engine baseline unresolved remote child refuses image work despite a closed local transport", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+	const { evidence, context } = managedEngineContext(f);
+	const sibling = f.json(".boat/state.json").daemon;
+	const cli = path.join(f.root, ".mise/boat/boat");
+	const owner = {
+		version: context.version,
+		root: context.root,
+		round: context.round,
+		worker: context.worker,
+		admission: context.admission,
+	};
+	const reported = {
+		owner,
+		closed: true,
+		status: "OBSERVED",
+		child: {
+			pipesClosed: true,
+			unresolved: [{ pid: 123456, birth: "controlled-unresolved" }],
+		},
+	};
+	fs.writeFileSync(
+		cli,
+		fs
+			.readFileSync(cli, "utf8")
+			.replace(
+				"const command=argv.at(-1)",
+				`if(argv.includes('ssh')&&argv.at(-1).includes('boat-engine-baseline.mjs --worker')){console.log(${JSON.stringify("BOAT_ENGINE_VERSION_V1 " + JSON.stringify(reported))});process.exit(0);}\nconst command=argv.at(-1)`,
+			),
+	);
+	const result = await f.run("boat-prepare-app-images").done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Engine baseline remote ownership differs/);
+	const record = JSON.parse(
+		fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+	);
+	assert.equal(record.status, "UNRESOLVED");
+	assert.equal(record.native.captureComplete, true);
+	assert.deepEqual(record.native.terminal, { code: 0, signal: null });
+	assert.deepEqual(f.appBuilds(), []);
+	assert.equal(liveOwnedProcess(f.root, sibling), true);
+	retainEngineBaseline(t, evidence);
+});
+
+test("engine baseline transport delay consumes its original allowance and fails closed without remote proof", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+	const { evidence } = managedEngineContext(f);
+	const cli = path.join(f.root, ".mise/boat/boat");
+	fs.writeFileSync(
+		cli,
+		fs
+			.readFileSync(cli, "utf8")
+			.replace(
+				"const command=argv.at(-1)",
+				`if(argv.includes('ssh')&&argv.at(-1).includes('boat-engine-baseline.mjs --worker')){Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,5000);}\nconst command=argv.at(-1)`,
+			),
+	);
+	const result = await f.run("boat-prepare-app-images").done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /remote retirement unproven/);
+	const record = JSON.parse(
+		fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+	);
+	assert.equal(record.status, "UNRESOLVED");
+	assert.equal(record.native.captureComplete, false);
+	assert.ok(
+		record.ended -
+			JSON.parse(
+				fs.readFileSync(path.join(evidence, "engine-baseline-v1/intent.json")),
+			).began <
+			2,
+	);
+	assert.deepEqual(f.appBuilds(), []);
+	retainEngineBaseline(t, evidence);
+});
+
+for (const [metadataOutcome, buildFailure] of [
+	["available", false],
+	["available", true],
+	["denied", false],
+	["denied", true],
+	["hang", false],
+])
+	test(`engine baseline actual Docker ${metadataOutcome} preserves build ${buildFailure ? "failure" : "success"}`, {
+		timeout: 30000,
+	}, async (t) => {
+		const f = await appImagesCheckout(t, true);
+		assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+		const { evidence } = managedEngineContext(f);
+		const socket = path.join(f.directory, "engine.sock");
+		const { createServer } = await import("node:http");
+		const requests = [];
+		const server = createServer((request, response) => {
+			requests.push({ method: request.method, path: request.url });
+			if (request.method === "HEAD" && request.url === "/_ping") {
+				response.writeHead(200, { "API-Version": "1.47" });
+				response.end();
+			} else if (request.method === "GET" && request.url === "/v1.47/version") {
+				if (metadataOutcome === "hang") return;
+				if (metadataOutcome === "denied") {
+					response.writeHead(403, { "Content-Type": "application/json" });
+					response.end(
+						JSON.stringify({ message: "ENGINE_BASELINE_FIXTURE_DENIED" }),
+					);
+					return;
+				}
+				response.writeHead(200, { "Content-Type": "application/json" });
+				response.end(
+					JSON.stringify({
+						Version: "27.5.1",
+						ApiVersion: "1.47",
+						MinAPIVersion: "1.44",
+						Os: "linux",
+						Arch: "arm64",
+						Components: [
+							{
+								Name: "Engine",
+								Version: "27.5.1",
+								Details: { GitCommit: "0123456789abcdef" },
+							},
+						],
+					}),
+				);
+			} else {
+				response.writeHead(403);
+				response.end("Unexpected Engine API");
+			}
+		});
+		await new Promise((resolve, reject) => {
+			server.once("error", reject);
+			server.listen(socket, resolve);
+		});
+		try {
+			const cliWork = path.join(f.directory, "pinned-engine-cli");
+			for (const file of [
+				"mise.toml",
+				"mise.lock",
+				"package.json",
+				"scripts/toolchain-bin/docker",
+				"scripts/docker-config.mjs",
+			]) {
+				const destination = path.join(cliWork, file);
+				fs.mkdirSync(path.dirname(destination), { recursive: true });
+				fs.copyFileSync(
+					path.join(import.meta.dirname, "..", file),
+					destination,
+				);
+			}
+			fs.chmodSync(path.join(cliWork, "scripts/toolchain-bin/docker"), 0o755);
+			const bin = path.join(f.directory, "home/.local/bin"),
+				docker = path.join(bin, "docker");
+			fs.renameSync(docker, docker + "-app-images");
+			const actualMise = execFileSync("sh", ["-c", "command -v mise"], {
+				encoding: "utf8",
+			}).trim();
+			fs.writeFileSync(
+				docker,
+				`#!${process.execPath}\nconst cp=require('child_process');const a=process.argv.slice(2);if(a[0]==='version'){const env={...process.env,MISE_DATA_DIR:${JSON.stringify(path.join(os.homedir(), ".local/share/mise"))},MISE_TRUSTED_CONFIG_PATHS:${JSON.stringify(cliWork)},PATH:${JSON.stringify(`${path.dirname(actualMise)}:/usr/local/bin:/usr/bin:/bin`)}};process.exit(cp.spawnSync(${JSON.stringify(actualMise)},['exec','--','docker',...a],{cwd:${JSON.stringify(cliWork)},env,stdio:'inherit'}).status??1);}process.exit(cp.spawnSync(${JSON.stringify(docker + "-app-images")},a,{env:process.env,stdio:'inherit'}).status??1);\n`,
+				{ mode: 0o755 },
+			);
+			f.env.DOCKER_HOST = `unix://${socket}`;
+			for (const name of [
+				"DOCKER_CONTEXT",
+				"DOCKER_TLS",
+				"DOCKER_TLS_VERIFY",
+				"DOCKER_CERT_PATH",
+				"DOCKER_CUSTOM_HEADERS",
+				"DOCKER_API_VERSION",
+			])
+				delete f.env[name];
+			f.env.DOCKER_CONFIG = path.join(f.directory, "source-docker-config");
+			f.env.WALLPAPERDB_DOCKER_SOURCE_CONFIG = f.env.DOCKER_CONFIG;
+			fs.mkdirSync(f.env.DOCKER_CONFIG);
+			fs.writeFileSync(
+				path.join(f.env.DOCKER_CONFIG, "config.json"),
+				'{"auths":{},"currentContext":"default"}',
+			);
+			if (buildFailure) flag(f, "fail-service-color-extractor");
+			const first = await f.run("boat-prepare-app-images").done;
+			fs.writeFileSync(
+				path.join(evidence, "actual-api.json"),
+				JSON.stringify(requests),
+			);
+			retainEngineBaseline(t, evidence);
+			assert.equal(first.status, buildFailure ? 2 : 0, first.output);
+			const record = JSON.parse(
+				fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+			);
+			assert.equal(
+				record.status,
+				metadataOutcome === "available"
+					? "AVAILABLE"
+					: metadataOutcome === "denied"
+						? "UNAVAILABLE_NATIVE_EXIT"
+						: "UNAVAILABLE_CAPTURE",
+			);
+			if (metadataOutcome === "available")
+				assert.deepEqual(record.metadata, {
+					ClientVersion: "29.1.3",
+					ServerVersion: "27.5.1",
+					ServerAPIVersion: "1.47",
+					ServerGitCommit: "0123456789abcdef",
+					ServerOs: "linux",
+					ServerArch: "arm64",
+				});
+			else assert.equal(record.metadata, null);
+			assert.equal(record.attempts, 1);
+			assert.equal(record.engineCLIInvocations, 1);
+			assert.equal(record.backendContainerCalls, 0);
+			assert.deepEqual(requests, [
+				{ method: "HEAD", path: "/_ping" },
+				{ method: "GET", path: "/v1.47/version" },
+			]);
+			if (buildFailure) {
+				assert.match(first.stderr, /native color-extractor image build failed/);
+				assert.deepEqual(f.appBuilds(), [
+					{ service: "asset", stage: "entered" },
+					{ service: "asset", stage: "completed" },
+					{ service: "color-extractor", stage: "entered" },
+				]);
+				const terminal = imageCommandEvents(f).at(-1);
+				assert.equal(terminal.service, "color-extractor");
+				assert.equal(
+					terminal.diagnosticContract,
+					"image-diagnostics-v2-engine-baseline-v1",
+				);
+				assert.equal(terminal.engineBaseline.status, record.status);
+				assert.equal(terminal.backendContainer.supplementalCalls, 0);
+				assert.deepEqual(terminal.outcome, {
+					boundary: "owned-ssh-cli",
+					code: 2,
+					signal: null,
+				});
+			} else {
+				const second = await f.run("boat-prepare-app-images").done;
+				assert.equal(second.status, 0, second.output);
+				assert.equal(requests.length, 2);
+				assert.deepEqual(f.appBuilds(), [
+					...completedAppBuilds(),
+					...completedAppBuilds(),
+				]);
+			}
+			fs.writeFileSync(
+				path.join(evidence, "actual-api.json"),
+				JSON.stringify(requests),
+			);
+		} finally {
+			server.closeAllConnections();
+			await new Promise((resolve, reject) =>
+				server.close((error) => (error ? reject(error) : resolve())),
+			);
+		}
+	});
+
 test("image diagnostics persist BEGIN before launch and actual serial TERMINAL outcomes", {
 	timeout: 20000,
 }, async (t) => {
@@ -16141,6 +16600,11 @@ test("image diagnostics persist BEGIN before launch and actual serial TERMINAL o
 			signal: null,
 		});
 		assert.equal(end.backend, undefined);
+		assert.equal(
+			end.diagnosticContract,
+			undefined,
+			"Unmanaged image diagnostics keep their original contract",
+		);
 	}
 	assert.equal(liveOwnedProcess(f.root, sibling), true);
 	assert.equal(

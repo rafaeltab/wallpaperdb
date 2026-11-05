@@ -1476,6 +1476,33 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 				ready.inputs.map((input) => input.path).sort(),
 				required.sort(),
 			);
+			const preparation = json(
+				path.join(f.config.evidence, "preparation-result.json"),
+			);
+			const context = json(
+				path.join(
+					f.config.evidence,
+					"prepare-startup-app-images/engine-context.json",
+				),
+			);
+			assert.equal(context.executionDeadline, preparation.coldDeadline - 5);
+			assert.equal(context.round, f.config.round);
+			assert.equal(context.worker, ready.owner.worker);
+			assert.equal(context.admission, ready.owner.admission);
+			assert.equal(context.phase, "prepare-startup-app-images");
+			assert.deepEqual(preparation.engineBaseline.helperPins, [context.helper]);
+			assert.equal(context.helper.path, "scripts/lib/boat-engine-baseline.mjs");
+			assert.equal(
+				context.helper.sha256,
+				createHash("sha256")
+					.update(fs.readFileSync(path.join(repository, context.helper.path)))
+					.digest("hex"),
+			);
+			assert.equal(
+				ready.inputs.length,
+				42,
+				"The separately pinned diagnostic helper cannot extend canonical readiness",
+			);
 			assert.equal(
 				ready.inputs.find(
 					(input) =>

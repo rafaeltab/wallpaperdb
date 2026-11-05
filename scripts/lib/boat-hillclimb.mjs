@@ -2,9 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { captureCommand, captureServingCommand } from "./boat-capture.mjs";
+import {
+	captureCommand,
+	captureServingCommand,
+	independentMakeEnvironment,
+} from "./boat-capture.mjs";
 import { start547Application } from "./boat-547-startup.mjs";
 import { assessAssetBaseline } from "./boat-547-baseline.mjs";
+import {
+	engineBaselineContext,
+	engineBaselineInputs,
+} from "./boat-engine-baseline.mjs";
 import {
 	create547Preparation,
 	preparationInputs,
@@ -128,9 +136,7 @@ export function makeCommand(argv, options) {
 	)
 		throw new Error("Expected Make argv data");
 	// Each independent invocation carries its own options and assignments in argv.
-	const env = { ...(options.env ?? process.env), MAKELEVEL: "0" };
-	for (const name of ["MAKEFLAGS", "MAKEOVERRIDES", "MFLAGS", "GNUMAKEFLAGS"])
-		delete env[name];
+	const env = independentMakeEnvironment(options.env);
 	return options.serving
 		? captureServingCommand({ ...options, argv, env })
 		: captureCommand({ ...options, argv, env });
@@ -389,6 +395,20 @@ async function execute547Phase(
 			directory: command,
 			deadline,
 			cwd: root,
+			...(spec.argv[1] === "boat-prepare-app-images"
+				? {
+						env: {
+							...process.env,
+							...engineBaselineContext(
+								config,
+								binding,
+								spec.id,
+								directory,
+								deadline,
+							),
+						},
+					}
+				: {}),
 		});
 		const raw = captured(command, receipt, spec.argv, spec.code ?? 0);
 		within();
@@ -503,10 +523,13 @@ export async function execute547Preparation(config, dependencies = {}) {
 		]),
 	];
 	const immutable = immutablePaths.map(fileIdentity);
+	const engineHelpers = engineBaselineInputs(root);
 	const preservedImplementation = () => {
 		if (
 			JSON.stringify(immutable) !==
-			JSON.stringify(immutablePaths.map(fileIdentity))
+				JSON.stringify(immutablePaths.map(fileIdentity)) ||
+			JSON.stringify(engineHelpers) !==
+				JSON.stringify(engineBaselineInputs(root))
 		)
 			throw new Error(
 				"Preparation implementation or generated worktree identity changed",
@@ -519,6 +542,12 @@ export async function execute547Preparation(config, dependencies = {}) {
 		phase: "preparation",
 		owner: binding,
 		phases: results,
+		engineBaseline: {
+			contract: "547-engine-baseline-v1",
+			totalCapMs: 2000,
+			helperPins: engineHelpers,
+			backendContainerCalls: 0,
+		},
 	};
 	const currentOwner = () => (binding.worker ? owner(root, identity) : binding);
 	const cleanup = async () => {

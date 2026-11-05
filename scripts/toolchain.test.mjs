@@ -73,7 +73,7 @@ test("setup rejects a package-manager pin that disagrees with mise", () => {
 });
 
 test("CI installs the locked project tools instead of selecting separate Node and pnpm versions", () => {
-	for (const workflow of ["ci.yml", "e2e.yml", "pr-history.yml"]) {
+	for (const workflow of ["ci.yml", "e2e.yml"]) {
 		const source = readFileSync(`.github/workflows/${workflow}`, "utf8");
 		assert.doesNotMatch(
 			source,

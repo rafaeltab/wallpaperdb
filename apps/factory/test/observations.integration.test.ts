@@ -1,3 +1,4 @@
+import { observationStoreContract } from './fixtures/observation-contract.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,6 +23,8 @@ it('migrates observation tables and retains last complete facts and dates on fai
           labels: ['ready-for-agent'],
           assignees: ['rafaeltab'],
           projectStatus: null,
+          projectPriority: null,
+          projectSize: null,
           commentCount: 2,
           blockers: [2],
           parents: [3],
@@ -52,4 +55,13 @@ it('migrates observation tables and retains last complete facts and dates on fai
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+observationStoreContract('SQLite observations', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-observe-contract-'));
+  initializeState(directory);
+  return {
+    store: sqliteObservations(directory),
+    close: () => rm(directory, { recursive: true, force: true }),
+  };
 });

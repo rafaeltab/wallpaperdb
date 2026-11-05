@@ -129,11 +129,18 @@ export function githubPlanning(
                         .flat();
                       if (issue.comments.length !== rawParent.metadata.commentCount)
                         throw new Error('Incomplete comments');
-                      const parent = rawParent.metadata.parents[0]
-                        ? { number: rawParent.metadata.parents[0] }
-                        : null;
-                      const translated = planningContext(issue, parent, native);
-                      return { ...translated, metadata: rawParent.metadata };
+                      const translated = planningContext(issue, rawParent.metadata.parents, native);
+                      return {
+                        ...translated,
+                        metadata: {
+                          ...rawParent.metadata,
+                          pullRequests: rawParent.pullRequests.map(({ number, url, state }) => ({
+                            number,
+                            url,
+                            state,
+                          })),
+                        },
+                      };
                     })
                   ))
                 );
@@ -178,20 +185,10 @@ export function githubPlanning(
 
 function planningContext(
   issue: z.infer<typeof issueSchema>,
-  parent: { number: number } | null,
+  parents: readonly number[],
   native: readonly { number: number }[]
 ) {
   const number = issue.number;
-  const parents = [
-    ...new Set([
-      ...(parent ? [parent.number] : []),
-      ...[
-        ...issue.body.matchAll(
-          /(?:^#{1,6} +Parent[^\n]*\n(?:\s*\n)*|^Parent:\s*)(?:https:\/\/github.com\/rafaeltab\/wallpaperdb\/issues\/|#)(\d+)/gim
-        ),
-      ].map((m) => Number(m[1])),
-    ]),
-  ];
   const blockers = blockerNumbers(native, issue.body);
   return {
     number,

@@ -4,6 +4,7 @@ import {
   ObservationStore,
   ObservationSource,
   LocalSnapshot,
+  observationRefreshIntervalMs,
 } from '../capabilities/observe/index.js';
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -382,7 +383,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     void refreshing.catch(() => undefined);
   };
   refresh();
-  const refreshTimer = setInterval(refresh, 30000);
+  const refreshTimer = setInterval(refresh, observationRefreshIntervalMs);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {

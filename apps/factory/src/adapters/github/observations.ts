@@ -52,10 +52,17 @@ const schema = z.object({
         comments: z.object({ totalCount: z.number().int().nonnegative() }),
         projectItems: connection(
           z.object({
-            project: z.object({ title: z.string(), number: z.number() }),
+            project: z.object({
+              title: z.string(),
+              number: z.number(),
+              owner: z.object({ login: z.string() }),
+            }),
+            priority: z.object({ name: z.string() }).nullable(),
+            size: z.object({ name: z.string() }).nullable(),
             fieldValueByName: z.object({ name: z.string() }).nullable(),
           })
         ),
+        closedByPullRequestsReferences: connection(pull),
         timelineItems: connection(
           z.object({ source: z.union([pull, z.object({ __typename: z.literal('Issue') })]) })
         ),
@@ -78,7 +85,7 @@ export async function observeIssue(
       'api',
       'graphql',
       '-f',
-      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title body state author { login } parent { number url } labels(first:100) { nodes { name } pageInfo { hasNextPage } } assignees(first:100) { nodes { login } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { title number } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${pullFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
+      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title body state author { login } parent { number url } labels(first:100) { nodes { name } pageInfo { hasNextPage } } assignees(first:100) { nodes { login } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${pullFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${pullFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
     ]),
     gh([
       'api',
@@ -90,13 +97,20 @@ export async function observeIssue(
   const issue = schema.parse(raw).data.repository.issue;
   if (issue.number !== n || issue.url !== `https://github.com/rafaeltab/wallpaperdb/issues/${n}`)
     throw new Error('Mismatched observation');
-  const blockers = blockerNumbers(
-    z
-      .array(z.array(z.object({ number })))
-      .parse(deps)
-      .flat(),
-    issue.body
-  );
+  if (
+    issue.parent &&
+    issue.parent.url !== `https://github.com/rafaeltab/wallpaperdb/issues/${issue.parent.number}`
+  )
+    throw new Error('Unsupported foreign parent');
+  const native = z
+    .array(z.array(z.object({ number, html_url: z.string().url() })))
+    .parse(deps)
+    .flat();
+  if (
+    native.some((i) => i.html_url !== `https://github.com/rafaeltab/wallpaperdb/issues/${i.number}`)
+  )
+    throw new Error('Unsupported foreign blocker');
+  const blockers = blockerNumbers(native, issue.body);
   const parents = [
     ...new Set([
       ...(issue.parent ? [issue.parent.number] : []),
@@ -107,11 +121,26 @@ export async function observeIssue(
       ].map((m) => Number(m[1])),
     ]),
   ];
-  const prs: PullObservation[] = issue.timelineItems.nodes.flatMap(({ source: pr }) => {
-    if (pr.__typename !== 'PullRequest') return [];
-    if (pr.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${pr.number}`) return [];
-    return [{ ...translatePull(pr), crossReferencedIssues: [n] }];
-  });
+  const linked = new Map<number, PullObservation>();
+  for (const pr of issue.closedByPullRequestsReferences.nodes) {
+    if (pr.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${pr.number}`)
+      throw new Error('Unsupported foreign linked PR');
+    const value = translatePull(pr);
+    linked.set(pr.number, { ...value, linkedIssues: [...new Set([...value.linkedIssues, n])] });
+  }
+  for (const { source: pr } of issue.timelineItems.nodes) {
+    if (
+      pr.__typename !== 'PullRequest' ||
+      pr.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${pr.number}`
+    )
+      continue;
+    const previous = linked.get(pr.number);
+    linked.set(pr.number, { ...(previous ?? translatePull(pr)), crossReferencedIssues: [n] });
+  }
+  const prs = [...linked.values()];
+  const projectItem = issue.projectItems.nodes.find(
+    (p) => p.project.number === 7 && p.project.owner.login === 'rafaeltab'
+  );
   const metadata: IssueObservation = {
     number: n,
     url: issue.url,
@@ -120,10 +149,9 @@ export async function observeIssue(
     candidate,
     labels: issue.labels.nodes.map((l) => l.name),
     assignees: issue.assignees.nodes.map((a) => a.login),
-    projectStatus:
-      issue.projectItems.nodes.find(
-        (p) => p.project.title === 'WallpaperDB' && p.project.number === 7
-      )?.fieldValueByName?.name ?? null,
+    projectStatus: projectItem?.fieldValueByName?.name ?? null,
+    projectPriority: projectItem?.priority?.name ?? null,
+    projectSize: projectItem?.size?.name ?? null,
     commentCount: issue.comments.totalCount,
     blockers,
     parents,

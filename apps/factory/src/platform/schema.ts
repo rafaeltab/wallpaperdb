@@ -57,6 +57,8 @@ export const githubIssues = sqliteTable('github_issues', {
   labels: text('labels', { mode: 'json' }).$type<readonly string[]>().notNull(),
   assignees: text('assignees', { mode: 'json' }).$type<readonly string[]>().notNull(),
   projectStatus: text('project_status'),
+  projectPriority: text('project_priority'),
+  projectSize: text('project_size'),
   commentCount: integer('comment_count').notNull(),
   blockers: text('blockers', { mode: 'json' }).$type<readonly number[]>().notNull(),
   parents: text('parents', { mode: 'json' }).$type<readonly number[]>().notNull(),

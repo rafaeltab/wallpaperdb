@@ -8,11 +8,12 @@ import {
   Scheduler,
   SchedulerLive,
   ScheduleStore,
+  ScheduleObservations,
   JobPool,
   type PlanningIssue,
   type ScheduleStatus,
 } from '../src/capabilities/plan/index.js';
-import { Issues, type Job, type Status } from '../src/capabilities/job/index.js';
+import { Unavailable, Issues, type Job, type Status } from '../src/capabilities/job/index.js';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
 const base = 'a'.repeat(40);
 const issue = (number: number): PlanningIssue => ({
@@ -110,20 +111,35 @@ function fixture() {
         return job;
       }),
   };
+  const published: ScheduleStatus[] = [];
+  let discoveryFailed = false;
+  let publicationFailed = false;
   let issues = [1, 2, 3, 4].map(issue);
   const source = {
     read: () =>
-      Effect.sync(() => ({
-        issues,
-        job: { kind: 'empty' as const },
-        jobs: [...statuses.values()],
-        scheduleRevision: snapshot().revision,
-        admissions: snapshot().admissions.map((a) => a.issue),
-        paused: snapshot().paused,
-        capacity: { concurrency: snapshot().concurrency, admission: snapshot().allowance },
-      })),
+      discoveryFailed
+        ? Effect.fail(new Unavailable({ operation: 'controlled-discovery', cause: 'offline' }))
+        : Effect.sync(() => ({
+            issues,
+            job: { kind: 'empty' as const },
+            jobs: [...statuses.values()],
+            scheduleRevision: snapshot().revision,
+            admissions: snapshot().admissions.map((a) => a.issue),
+            paused: snapshot().paused,
+            capacity: { concurrency: snapshot().concurrency, admission: snapshot().allowance },
+          })),
   };
   const deps = Layer.mergeAll(
+    Layer.succeed(ScheduleObservations, {
+      publish: (value) =>
+        publicationFailed
+          ? Effect.fail(
+              new Unavailable({ operation: 'controlled-publication', cause: 'storage unavailable' })
+            )
+          : Effect.sync(() => {
+              published.push(value);
+            }),
+    }),
     Layer.succeed(Issues, {
       recoveries: () => Effect.sync(() => recoveries),
       reconcile: () => Effect.sync(() => reconciliation()),
@@ -191,6 +207,13 @@ function fixture() {
       recoveries = values;
     },
     statuses,
+    published,
+    failDiscovery: () => {
+      discoveryFailed = true;
+    },
+    failPublication: () => {
+      publicationFailed = true;
+    },
     launches,
     resumed,
     preparations,
@@ -858,3 +881,46 @@ it.each([-1, 1, 2])(
     }
   }
 );
+
+it('publishes completed recovery facts before failing planner discovery without admitting work', async () => {
+  const f = fixture();
+  try {
+    f.setRecoveries([
+      {
+        issue: 4,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+        progress: 'Awaiting answer',
+        active: false,
+        question: 'Approved scope?',
+        threadId: 'restacker',
+      },
+    ]);
+    f.failDiscovery();
+    await expect(f.run((scheduler) => scheduler.tick(base))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      operation: 'controlled-discovery',
+    });
+    expect(f.published.at(-1)).toMatchObject({
+      recoveries: [{ issue: 4, question: 'Approved scope?', active: false }],
+    });
+    expect(f.launches).toEqual([]);
+    expect(f.snapshot().admissions).toEqual([]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('does not admit work when completed observation publication fails', async () => {
+  const f = fixture();
+  try {
+    f.failPublication();
+    await expect(f.run((scheduler) => scheduler.tick(base))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      operation: 'controlled-publication',
+    });
+    expect(f.launches).toEqual([]);
+    expect(f.snapshot().admissions).toEqual([]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});

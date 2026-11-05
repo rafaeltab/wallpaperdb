@@ -10,3 +10,5 @@ export type { PlanningAttempt, AttemptResult, PlannerOwnership } from './contrac
 export { AttemptsLive } from './attempts.js';
 export type { AttemptSubmission } from './contract.js';
 export { planningInputIdentity } from './implementation.js';
+
+export { ScheduleObservations } from './contract.js';

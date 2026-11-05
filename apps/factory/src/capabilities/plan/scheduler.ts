@@ -4,6 +4,7 @@ import {
   Plan,
   PlanningSource,
   ScheduleStore,
+  ScheduleObservations,
   JobPool,
   Scheduler,
   type ScheduleState,
@@ -42,6 +43,7 @@ export const SchedulerLive = Layer.effect(
   Scheduler,
   Effect.gen(function* () {
     const store = yield* ScheduleStore;
+    const observations = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleObservations));
     const pool = yield* JobPool;
     const plan = yield* Plan;
     const issues = yield* Issues;
@@ -71,7 +73,7 @@ export const SchedulerLive = Layer.effect(
       Effect.gen(function* () {
         const snapshot = yield* Effect.flatMap(store.read(), observe);
         return { ...snapshot, recoveries: yield* issues.recoveries?.() ?? Effect.succeed([]) };
-      });
+      }).pipe(Effect.tap((snapshot) => observations?.publish(snapshot) ?? Effect.void));
     const reserve = (command: Start, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
         const { state } = snapshot;

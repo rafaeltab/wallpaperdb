@@ -1,16 +1,15 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { expect, test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 
 function fixture(t, allowedCapabilityDependencies = {}, configOverrides = {}) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-"));
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	const example = path.join(root, "apps/example");
 	for (const directory of [
 		"scripts",
@@ -63,7 +62,7 @@ function fixture(t, allowedCapabilityDependencies = {}, configOverrides = {}) {
 					timeout: 30_000,
 				},
 			);
-			assert.equal(result.error, undefined, result.error?.message);
+			expect(result.error, result.error?.message).toBe(undefined);
 			return result;
 		},
 	};
@@ -97,15 +96,14 @@ test("ingestor capability arrangement accepts a public upload call and private c
 		"app.ts",
 		"import { upload } from './capabilities/ingestion/index.js';\nexport const run = upload;\n",
 	);
-	assert.equal(project.run().status, 0);
+	expect(project.run().status).toBe(0);
 	project.source(
 		"capabilities/admission/index.ts",
 		"import { normalize } from '../ingestion/private.js';\nexport const admit = normalize;\n",
 	);
 	const rejected = project.run();
-	assert.equal(rejected.status, 1);
-	assert.match(
-		rejected.stderr,
+	expect(rejected.status).toBe(1);
+	expect(rejected.stderr).toMatch(
 		/admission\/index\.ts:1: import capabilities\/ingestion through its index\.ts entry point/,
 	);
 });
@@ -170,11 +168,10 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 		"packages/other/test/consumer.ts",
 		"export const consumer = true;\n",
 	);
-	assert.equal(
-		spawnSync("git", ["init", "-q"], { cwd: project.root }).status,
+	expect(spawnSync("git", ["init", "-q"], { cwd: project.root }).status).toBe(
 		0,
 	);
-	assert.equal(spawnSync("git", ["add", "."], { cwd: project.root }).status, 0);
+	expect(spawnSync("git", ["add", "."], { cwd: project.root }).status).toBe(0);
 	const turbo = path.join(repository, "node_modules/.bin/turbo");
 	const run = () =>
 		spawnSync(
@@ -188,22 +185,20 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 			},
 		);
 	const first = run();
-	assert.equal(first.status, 0, first.stdout + first.stderr);
+	expect(first.status, first.stdout + first.stderr).toBe(0);
 	const cached = run();
-	assert.equal(cached.status, 0, cached.stdout + cached.stderr);
-	assert.match(
+	expect(cached.status, cached.stdout + cached.stderr).toBe(0);
+	expect(
 		cached.stdout,
-		/cache hit/,
 		first.stdout + "\nSECOND RUN\n" + cached.stdout,
-	);
+	).toMatch(/cache hit/);
 	project.write(
 		"packages/other/test/consumer.ts",
 		"import '@wallpaperdb/example/catalogue';\n",
 	);
 	const changed = run();
-	assert.equal(changed.status, 1, changed.stdout + changed.stderr);
-	assert.match(
-		changed.stdout + changed.stderr,
+	expect(changed.status, changed.stdout + changed.stderr).toBe(1);
+	expect(changed.stdout + changed.stderr).toMatch(
 		/another workspace must communicate with the example/,
 	);
 });
@@ -225,8 +220,8 @@ test("architecture workspace check rejects a deployable backend without opt-in",
 			},
 		);
 	const missing = run();
-	assert.equal(missing.status, 1);
-	assert.match(missing.stderr, /example.*lint:architecture/);
+	expect(missing.status).toBe(1);
+	expect(missing.stderr).toMatch(/example.*lint:architecture/);
 	project.write(
 		"apps/example/package.json",
 		JSON.stringify({
@@ -236,7 +231,7 @@ test("architecture workspace check rejects a deployable backend without opt-in",
 			},
 		}),
 	);
-	assert.equal(run().status, 0);
+	expect(run().status).toBe(0);
 });
 
 function validGraph(project) {
@@ -276,15 +271,14 @@ test("architecture discovers capability directories without a names list", (t) =
 		"capabilities/ingestion/private.ts",
 		"export const normalize = (value: string) => value.trim();\n",
 	);
-	assert.equal(project.run().status, 0);
+	expect(project.run().status).toBe(0);
 	project.source(
 		"capabilities/ingestion/private.ts",
 		"import { createHash } from 'node:crypto';\nexport const normalize = createHash;\n",
 	);
 	const rejected = project.run();
-	assert.equal(rejected.status, 1);
-	assert.match(
-		rejected.stderr,
+	expect(rejected.status).toBe(1);
+	expect(rejected.stderr).toMatch(
 		/ingestion depends on external technology node:crypto/,
 	);
 });
@@ -296,17 +290,16 @@ test("architecture requires an index entry for every capability directory", (t) 
 		"export const value = 1;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(result.stderr, /ingestion.*index\.ts/);
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(/ingestion.*index\.ts/);
 });
 
 test("architecture accepts public capability calls, private collaborators and adapter technology", (t) => {
 	const project = fixture(t);
 	validGraph(project);
 	const result = project.run();
-	assert.equal(result.status, 0, result.stderr);
-	assert.match(
-		result.stdout,
+	expect(result.status, result.stderr).toBe(0);
+	expect(result.stdout).toMatch(
 		/public capability entries, inward dependencies and acyclicity verified/,
 	);
 });
@@ -319,9 +312,8 @@ test("architecture rejects another capability importing private implementation",
 		"import { normalize } from '../catalogue/private.js';\nexport const project = normalize;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/projection\/index\.ts:1: import capabilities\/catalogue through its index\.ts entry point/,
 	);
 });
@@ -334,9 +326,8 @@ test("architecture rejects private implementation imports from external tests", 
 		"import { normalize } from '../src/capabilities/catalogue/private.js';\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/test\/catalogue\.test\.ts:1: import capabilities\/catalogue through its index\.ts entry point/,
 	);
 });
@@ -348,9 +339,8 @@ test("architecture rejects vendor dependencies inside capabilities", (t) => {
 		"import { createHash } from 'node:crypto';\nexport const identity = createHash;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/catalogue depends on external technology node:crypto/,
 	);
 });
@@ -363,9 +353,8 @@ test("architecture rejects outward application dependencies on adapters", (t) =>
 		"import { fingerprint } from '../../adapters/search/index.js';\nexport const search = fingerprint;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/catalogue must not depend on adapters\/search\/index\.ts/,
 	);
 });
@@ -377,15 +366,14 @@ test("architecture accepts deliberate named re-exports and rejects wildcard expo
 		"capabilities/catalogue/index.ts",
 		"export { normalize } from './private.js';\n",
 	);
-	assert.equal(project.run().status, 0);
+	expect(project.run().status).toBe(0);
 	project.source(
 		"capabilities/catalogue/index.ts",
 		"export * from './private.js';\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/capability entry point must use explicit named exports/,
 	);
 });
@@ -398,9 +386,8 @@ test("architecture rejects behavior in capability entries", (t) => {
 		"export function normalize(value: string) { return value.trim(); }\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/capability entry point must declare the contract, not implement behavior/,
 	);
 });
@@ -413,9 +400,8 @@ test("architecture checks literal dynamic imports against entry points", (t) => 
 		"export const load = () => import('./capabilities/catalogue/private.js');\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/import capabilities\/catalogue through its index\.ts entry point/,
 	);
 });
@@ -435,9 +421,8 @@ test("architecture reports dependency cycles including private collaborators", (
 		"import { first } from './first.js';\nexport const second = () => first();\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/Dependency cycle: .*catalogue\/first\.ts.*catalogue\/second\.ts.*catalogue\/first\.ts/,
 	);
 });
@@ -449,9 +434,8 @@ test("architecture rejects container injection even in adapters", (t) => {
 		"import { container } from 'tsyringe';\nexport const resolve = container.resolve;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/example uses Effect service layers; remove tsyringe/,
 	);
 });
@@ -472,9 +456,8 @@ for (const [name, directory, specifier] of [
 			`import { search } from '${specifier}';\n`,
 		);
 		const result = project.run();
-		assert.equal(result.status, 1);
-		assert.match(
-			result.stderr,
+		expect(result.status).toBe(1);
+		expect(result.stderr).toMatch(
 			/another workspace must communicate with the example through its external contracts/,
 		);
 	});
@@ -489,9 +472,8 @@ for (const directory of ["test", "scripts"]) {
 			"import { search } from '@wallpaperdb/example/catalogue';\n",
 		);
 		const result = project.run();
-		assert.equal(result.status, 1);
-		assert.match(
-			result.stderr,
+		expect(result.status).toBe(1);
+		expect(result.stderr).toMatch(
 			/packages\/other\/(test|scripts)\/bypass\.ts: another workspace must communicate with the example/,
 		);
 	});
@@ -503,15 +485,14 @@ test("architecture permits an explicitly authorized shared policy only in its co
 		"capabilities/catalogue/index.ts",
 		"import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';\nexport const validate = validateProfileMarkdown;\n",
 	);
-	assert.equal(project.run().status, 0);
+	expect(project.run().status).toBe(0);
 	project.source(
 		"capabilities/projection/index.ts",
 		"import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';\nexport const validate = validateProfileMarkdown;\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/projection depends on external technology @wallpaperdb\/profile-markdown/,
 	);
 });
@@ -523,13 +504,11 @@ test("architecture shared-policy exception does not allow vendor dependencies or
 		"import { createHash } from 'node:crypto';\nimport { hidden } from '@wallpaperdb/profile-markdown/private';\nexport const value = [createHash, hidden];\n",
 	);
 	const result = project.run();
-	assert.equal(result.status, 1);
-	assert.match(
-		result.stderr,
+	expect(result.status).toBe(1);
+	expect(result.stderr).toMatch(
 		/catalogue depends on external technology node:crypto/,
 	);
-	assert.match(
-		result.stderr,
+	expect(result.stderr).toMatch(
 		/catalogue depends on external technology @wallpaperdb\/profile-markdown\/private/,
 	);
 });

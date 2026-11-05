@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
@@ -13,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 
 const runner = new URL("./docker-validation.mjs", import.meta.url).pathname;
 
@@ -33,8 +32,8 @@ test("Make automatically coordinates CI and integration, and provides queue stat
 			],
 			{ encoding: "utf8", env: { ...process.env, MAKEFLAGS: "", MFLAGS: "" } },
 		);
-		assert.equal(result.status, 0, result.stderr);
-		assert.match(result.stdout, /docker-validation\.mjs/);
+		expect(result.status, result.stderr).toBe(0);
+		expect(result.stdout).toMatch(/docker-validation\.mjs/);
 	}
 });
 
@@ -59,7 +58,7 @@ function fixture(t) {
 					if (await closedWithin(child, 1000)) return;
 					if (existsSync(child.workloadFile)) {
 						const pid = Number(readFileSync(child.workloadFile, "utf8"));
-						assert.ok(Number.isSafeInteger(pid) && pid > 1);
+						expect(Number.isSafeInteger(pid) && pid > 1).toBeTruthy();
 						try {
 							process.kill(-pid, "SIGKILL");
 						} catch (error) {
@@ -71,10 +70,10 @@ function fixture(t) {
 					if (!closed)
 						for (const stream of [child.stdin, child.stdout, child.stderr])
 							stream.destroy();
-					assert.ok(
+					expect(
 						closed,
 						`fixture child ${child.pid} did not close after SIGKILL`,
-					);
+					).toBeTruthy();
 				}),
 			);
 			const failures = results.filter((result) => result.status === "rejected");
@@ -87,7 +86,7 @@ function fixture(t) {
 			rmSync(root, { recursive: true, force: true });
 		}
 	}
-	t.after(cleanup);
+	t.onTestFinished(cleanup);
 	const env = {
 		...process.env,
 		DOCKER_VALIDATION_LOCK_FILE: join(root, "host.lock"),
@@ -135,7 +134,7 @@ function fixture(t) {
 			env,
 			encoding: "utf8",
 		});
-		assert.equal(result.status, 0, result.stderr);
+		expect(result.status, result.stderr).toBe(0);
 		return result.stdout;
 	}
 	return { root, env, start, status, cleanup };
@@ -143,7 +142,7 @@ function fixture(t) {
 
 test("fixture teardown kills a coordinator that cannot process SIGTERM", async (t) => {
 	let workloadPid;
-	t.after(() => {
+	t.onTestFinished(() => {
 		if (!workloadPid) return;
 		try {
 			process.kill(-workloadPid, "SIGKILL");
@@ -162,7 +161,7 @@ test("fixture teardown kills a coordinator that cannot process SIGTERM", async (
 	const rescue = setTimeout(() => child.kill("SIGCONT"), 3000);
 	try {
 		await f.cleanup();
-		assert.equal((await child.done).signal, "SIGKILL");
+		expect((await child.done).signal).toBe("SIGKILL");
 		await until(() => {
 			try {
 				const stat = readFileSync(`/proc/${workloadPid}/stat`, "utf8");
@@ -172,7 +171,7 @@ test("fixture teardown kills a coordinator that cannot process SIGTERM", async (
 				throw error;
 			}
 		});
-		assert.equal(existsSync(f.root), false);
+		expect(existsSync(f.root)).toBe(false);
 	} finally {
 		clearTimeout(rescue);
 		child.kill("SIGCONT");
@@ -182,10 +181,10 @@ test("fixture teardown kills a coordinator that cannot process SIGTERM", async (
 async function until(check, details = () => "", timeoutMs = 5000) {
 	const deadline = Date.now() + timeoutMs;
 	while (!check()) {
-		assert.ok(
+		expect(
 			Date.now() < deadline,
 			`queue condition did not become true: ${details()}`,
-		);
+		).toBeTruthy();
 		await delay(20);
 	}
 }
@@ -226,16 +225,16 @@ test("Docker validation exposes the owner and executes waiting work in admission
 		"require('node:fs').appendFileSync('order', 'third\\n')",
 	);
 	await until(() => f.status().includes("waiting: third"));
-	assert.match(f.status(), /running: owner/);
-	assert.equal(existsSync(join(f.root, "order")), false);
+	expect(f.status()).toMatch(/running: owner/);
+	expect(existsSync(join(f.root, "order"))).toBe(false);
 	owner.stdin.end();
 	for (const child of [owner, second, third]) {
 		const result = await child.done;
-		assert.equal(result.status, 0, result.output);
-		assert.match(result.output, /waited .*execution/);
+		expect(result.status, result.output).toBe(0);
+		expect(result.output).toMatch(/waited .*execution/);
 	}
-	assert.equal(readFileSync(join(f.root, "order"), "utf8"), "second\nthird\n");
-	assert.doesNotMatch(f.status(), /running:|waiting:/);
+	expect(readFileSync(join(f.root, "order"), "utf8")).toBe("second\nthird\n");
+	expect(f.status()).not.toMatch(/running:|waiting:/);
 });
 
 test("timing out or interrupting queued work never runs its command or blocks later work", async (t) => {
@@ -250,18 +249,18 @@ test("timing out or interrupting queued work never runs its command or blocks la
 		"require('node:fs').writeFileSync('wrong', '')",
 		{ DOCKER_VALIDATION_TIMEOUT: "1" },
 	);
-	assert.equal((await timeout.done).status, 75);
+	expect((await timeout.done).status).toBe(75);
 	const interrupted = f.start(
 		"interrupted",
 		"require('node:fs').writeFileSync('wrong', '')",
 	);
 	await until(() => f.status().includes("waiting: interrupted"));
 	interrupted.kill("SIGTERM");
-	assert.equal((await interrupted.done).status, 143);
+	expect((await interrupted.done).status).toBe(143);
 	owner.stdin.end();
-	assert.equal((await owner.done).status, 0);
-	assert.equal((await f.start("next", "process.exit(17)").done).status, 17);
-	assert.equal(existsSync(join(f.root, "wrong")), false);
+	expect((await owner.done).status).toBe(0);
+	expect((await f.start("next", "process.exit(17)").done).status).toBe(17);
+	expect(existsSync(join(f.root, "wrong"))).toBe(false);
 });
 
 test("validation coordinates with legacy flock users without replacing the lock", async (t) => {
@@ -277,13 +276,13 @@ test("validation coordinates with legacy flock users without replacing the lock"
 		],
 		{ stdio: ["pipe", "ignore", "ignore"] },
 	);
-	t.after(() => legacy.kill("SIGTERM"));
+	t.onTestFinished(() => legacy.kill("SIGTERM"));
 	await until(() => existsSync(join(f.root, "legacy")));
 	const waiting = f.start("new", "process.exit(0)");
 	await until(() => f.status().includes("waiting: new"));
 	legacy.stdin.end();
 	const result = await waiting.done;
-	assert.equal(result.status, 0, result.output);
+	expect(result.status, result.output).toBe(0);
 });
 
 test("a later blocking flock user cannot repeatedly overtake the queue head", async (t) => {
@@ -299,7 +298,7 @@ test("a later blocking flock user cannot repeatedly overtake the queue head", as
 		],
 		{ stdio: ["pipe", "ignore", "ignore"] },
 	);
-	t.after(() => {
+	t.onTestFinished(() => {
 		owner.stdin.end();
 		owner.kill("SIGTERM");
 	});
@@ -324,16 +323,16 @@ test("a later blocking flock user cannot repeatedly overtake the queue head", as
 		],
 		{ stdio: "ignore" },
 	);
-	t.after(() => legacy.kill("SIGTERM"));
+	t.onTestFinished(() => legacy.kill("SIGTERM"));
 	const legacyDone = new Promise((resolve) => legacy.once("close", resolve));
 	await until(
 		() => blockedFlockWaiters(f.env.DOCKER_VALIDATION_LOCK_FILE) === 2,
 	);
 	owner.stdin.end();
 	const result = await queued.done;
-	assert.equal(result.status, 0, result.output);
-	assert.equal(await legacyDone, 0);
-	assert.equal(readFileSync(join(f.root, "order"), "utf8"), "queued\nlegacy\n");
+	expect(result.status, result.output).toBe(0);
+	expect(await legacyDone).toBe(0);
+	expect(readFileSync(join(f.root, "order"), "utf8")).toBe("queued\nlegacy\n");
 });
 
 test("a queue head waiting on a legacy lock cancels without waiting for its deadline", async (t) => {
@@ -349,7 +348,7 @@ test("a queue head waiting on a legacy lock cancels without waiting for its dead
 		],
 		{ stdio: ["pipe", "ignore", "ignore"] },
 	);
-	t.after(() => {
+	t.onTestFinished(() => {
 		owner.stdin.end();
 		owner.kill("SIGTERM");
 	});
@@ -370,10 +369,10 @@ test("a queue head waiting on a legacy lock cancels without waiting for its dead
 	});
 	queued.kill("SIGTERM");
 	await until(() => result !== undefined);
-	assert.equal(result.status, 143, result.output);
-	assert.equal(existsSync(join(f.root, "wrong")), false);
+	expect(result.status, result.output).toBe(143);
+	expect(existsSync(join(f.root, "wrong"))).toBe(false);
 	owner.stdin.end();
-	assert.equal((await f.start("next", "process.exit(0)").done).status, 0);
+	expect((await f.start("next", "process.exit(0)").done).status).toBe(0);
 });
 
 test("a killed waiter leaves no permanent queue blockage", async (t) => {
@@ -389,8 +388,8 @@ test("a killed waiter leaves no permanent queue blockage", async (t) => {
 	await stale.done;
 	const next = f.start("next", "process.exit(0)");
 	owner.stdin.end();
-	assert.equal((await owner.done).status, 0);
-	assert.equal((await next.done).status, 0);
+	expect((await owner.done).status).toBe(0);
+	expect((await next.done).status).toBe(0);
 });
 
 test("an unreaped zombie waiter does not block later validation", async (t) => {
@@ -430,12 +429,12 @@ while (!fs.existsSync('reap-child') && Date.now() < deadline) Atomics.wait(barri
 		});
 		const next = f.start("next", "process.exit(0)");
 		owner.stdin.end();
-		assert.equal((await owner.done).status, 0);
+		expect((await owner.done).status).toBe(0);
 		const result = await next.done;
-		assert.equal(result.status, 0, result.output);
+		expect(result.status, result.output).toBe(0);
 		const zombie = readFileSync(`/proc/${pid}/stat`, "utf8");
-		assert.match(zombie.slice(zombie.lastIndexOf(")") + 2), /^Z /);
-		assert.equal(existsSync(join(f.root, "wrong")), false);
+		expect(zombie.slice(zombie.lastIndexOf(")") + 2)).toMatch(/^Z /);
+		expect(existsSync(join(f.root, "wrong"))).toBe(false);
 	} finally {
 		if (pid) {
 			try {
@@ -454,13 +453,13 @@ test("a nested coordinated command borrows its inherited lock instead of waiting
 		`const { spawnSync } = require('node:child_process'); process.exit(spawnSync(process.execPath, [${JSON.stringify(runner)}, '--label', 'inner', '--', process.execPath, '-e', 'process.exit(19)'], { stdio: ['inherit', 'inherit', 'inherit', 3] }).status)`,
 	);
 	const result = await nested.done;
-	assert.equal(result.status, 19, result.output);
+	expect(result.status, result.output).toBe(19);
 });
 
 test("an unlocked descriptor for the same inode is rejected without acquiring a lease", (t) => {
 	const f = fixture(t);
 	const fd = openSync(f.env.DOCKER_VALIDATION_LOCK_FILE, "w", 0o600);
-	t.after(() => closeSync(fd));
+	t.onTestFinished(() => closeSync(fd));
 	const result = spawnSync(
 		process.execPath,
 		[
@@ -481,12 +480,11 @@ test("an unlocked descriptor for the same inode is rejected without acquiring a 
 			},
 		},
 	);
-	assert.equal(result.status, 1, result.stdout + result.stderr);
-	assert.match(result.stderr, /Inherited Docker lease does not own/);
-	assert.equal(existsSync(join(f.root, "wrong")), false);
-	assert.equal(existsSync(`${f.env.DOCKER_VALIDATION_LOCK_FILE}.queue`), false);
-	assert.doesNotMatch(
-		readFileSync(`/proc/self/fdinfo/${fd}`, "utf8"),
+	expect(result.status, result.stdout + result.stderr).toBe(1);
+	expect(result.stderr).toMatch(/Inherited Docker lease does not own/);
+	expect(existsSync(join(f.root, "wrong"))).toBe(false);
+	expect(existsSync(`${f.env.DOCKER_VALIDATION_LOCK_FILE}.queue`)).toBe(false);
+	expect(readFileSync(`/proc/self/fdinfo/${fd}`, "utf8")).not.toMatch(
 		/^lock:/m,
 	);
 });
@@ -498,10 +496,12 @@ test("a nested launcher that drops the descriptor fails clearly before execution
 		`const { spawnSync } = require('node:child_process'); process.exit(spawnSync(process.execPath, [${JSON.stringify(runner)}, '--label', 'inner', '--', process.execPath, '-e', "require('node:fs').writeFileSync('wrong', '')"], { stdio: 'inherit' }).status)`,
 	);
 	const result = await nested.done;
-	assert.equal(result.status, 1, result.output);
-	assert.match(result.output, /Cannot reuse inherited Docker lock descriptor/);
-	assert.match(result.output, /Forward WALLPAPERDB_DOCKER_LEASE_FD/);
-	assert.equal(existsSync(join(f.root, "wrong")), false);
+	expect(result.status, result.output).toBe(1);
+	expect(result.output).toMatch(
+		/Cannot reuse inherited Docker lock descriptor/,
+	);
+	expect(result.output).toMatch(/Forward WALLPAPERDB_DOCKER_LEASE_FD/);
+	expect(existsSync(join(f.root, "wrong"))).toBe(false);
 });
 
 test("killing a coordinator keeps the host locked until its surviving command exits", async (t) => {
@@ -514,20 +514,19 @@ test("killing a coordinator keeps the host locked until its surviving command ex
 	const exited = new Promise((resolve) => owner.once("exit", resolve));
 	owner.kill("SIGKILL");
 	await exited;
-	assert.notEqual(
+	expect(
 		spawnSync("flock", ["-n", f.env.DOCKER_VALIDATION_LOCK_FILE, "true"])
 			.status,
-		0,
-	);
+	).not.toBe(0);
 	const next = f.start("next", "require('node:fs').writeFileSync('next', '')");
 	await until(
 		() => f.status().includes("waiting: next"),
 		() => next.output(),
 	);
-	assert.equal(existsSync(join(f.root, "next")), false);
+	expect(existsSync(join(f.root, "next"))).toBe(false);
 	writeFileSync(join(f.root, "release"), "");
 	const result = await next.done;
-	assert.equal(result.status, 0, result.output);
+	expect(result.status, result.output).toBe(0);
 });
 
 test("interruption completes promptly when the workload group exits", async (t) => {
@@ -543,18 +542,17 @@ test("interruption completes promptly when the workload group exits", async (t) 
 	});
 	child.kill("SIGTERM");
 	await until(() => result !== undefined, child.output, 2000);
-	assert.equal(result.status, 143, result.output);
-	assert.equal(
+	expect(result.status, result.output).toBe(143);
+	expect(
 		spawnSync("flock", ["-n", f.env.DOCKER_VALIDATION_LOCK_FILE, "true"])
 			.status,
-		0,
-	);
+	).toBe(0);
 });
 
 for (const inherit of [true, false]) {
 	test(`interruption kills a surviving descendant after its parent exits, inherited lock=${inherit}`, async (t) => {
 		let pid;
-		t.after(() => {
+		t.onTestFinished(() => {
 			if (pid) {
 				try {
 					process.kill(pid, "SIGKILL");
@@ -571,7 +569,7 @@ for (const inherit of [true, false]) {
 		await until(() => existsSync(join(f.root, "descendant")));
 		pid = Number(readFileSync(join(f.root, "descendant"), "utf8"));
 		owner.kill("SIGTERM");
-		assert.equal((await owner.done).status, 143);
+		expect((await owner.done).status).toBe(143);
 		await until(() => {
 			try {
 				const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
@@ -581,10 +579,9 @@ for (const inherit of [true, false]) {
 				throw error;
 			}
 		});
-		assert.equal(
+		expect(
 			spawnSync("flock", ["-n", f.env.DOCKER_VALIDATION_LOCK_FILE, "true"])
 				.status,
-			0,
-		);
+		).toBe(0);
 	});
 }

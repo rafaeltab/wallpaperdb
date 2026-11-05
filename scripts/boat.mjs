@@ -1915,12 +1915,6 @@ async function command() {
 											);
 									},
 								});
-								if (engine)
-									event("engine-version-baseline", {
-										workerId: id,
-										admission,
-										...engine,
-									});
 								selected();
 							}
 							for (const command of commands) {

@@ -42,7 +42,9 @@ function beginCapture({
 		!serving &&
 		(!Number.isFinite(deadline) || deadline - mono() <= disposalMs / 1000)
 	)
-		throw new Error("Insufficient original command deadline");
+		throw Object.assign(new Error("Insufficient original command deadline"), {
+			code: "NO_EXECUTION_BUDGET",
+		});
 	fs.mkdirSync(dir, { mode: 0o700 }); // Exclusive phase directory. No overwrite/retry.
 	const parent = fs.openSync(path.dirname(dir), "r");
 	try {

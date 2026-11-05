@@ -294,98 +294,113 @@ export async function observeEngineBaseline({
 			result.attempts = 1;
 			result.workerCommandDispatches = null;
 			result.engineAPIRequests = null;
-			const native = await captureCommand({
-				argv: transport,
-				cwd: root,
-				directory: path.join(directory, "transport"),
-				deadline: began + 2,
-				disposalMs: 1000,
-				limit: 32768,
-			});
-			result.native = native;
-			result.evidence = [
-				"invocation.json",
-				"receipt.json",
-				"disposal.json",
-				"stdout.raw",
-				"stderr.raw",
-			].map((file) => evidencePin(path.join(directory, "transport", file)));
-			const disposal = read(path.join(directory, "transport/disposal.json"));
-			require(disposal.pipesClosed &&
-				disposal.unresolved.length ===
-					0, "Engine baseline transport ownership unresolved");
-			// Cumulative integrity failures survive an earlier timeout. A resolved
-			// deadline is optional only when complete remote retirement proof follows.
-			const complete =
-				native.captureComplete === true &&
-				native.failure === null &&
-				disposal.failure == null;
-			const timedOut =
-				native.captureComplete === false &&
-				native.failure === "Shutdown 547-command: deadline exceeded" &&
-				disposal.failure === "deadline exceeded";
-			require(Array.isArray(native.integrityFailures) &&
-				native.integrityFailures.length === 0 &&
-				native.spawnError === null &&
-				(complete ||
-					timedOut), "Engine baseline transport capture integrity failed");
-			const stdout = fs.readFileSync(
-				path.join(directory, "transport/stdout.raw"),
-				"utf8",
-			);
-			require(stdout.startsWith(frame) &&
-				stdout.endsWith("\n") &&
-				stdout.split("\n").length ===
-					2, "Engine baseline remote retirement unproven");
-			const observed = JSON.parse(stdout.slice(frame.length));
-			require(JSON.stringify(observed.owner) === JSON.stringify(identity) &&
-				observed.closed === true &&
-				(["UNAVAILABLE_ENDPOINT", "NO_BUDGET"].includes(observed.status) ||
+			let native;
+			try {
+				native = await captureCommand({
+					argv: transport,
+					cwd: root,
+					directory: path.join(directory, "transport"),
+					deadline: began + 2,
+					disposalMs: 1000,
+					limit: 32768,
+				});
+			} catch (error) {
+				if (error.code !== "NO_EXECUTION_BUDGET") throw error;
+				Object.assign(result, {
+					status: "NO_BUDGET",
+					attempts: 0,
+					workerCommandDispatches: 0,
+					engineAPIRequests: 0,
+				});
+			}
+			if (native) {
+				result.native = native;
+				result.evidence = [
+					"invocation.json",
+					"receipt.json",
+					"disposal.json",
+					"stdout.raw",
+					"stderr.raw",
+				].map((file) => evidencePin(path.join(directory, "transport", file)));
+				const disposal = read(path.join(directory, "transport/disposal.json"));
+				require(disposal.pipesClosed &&
+					disposal.unresolved.length ===
+						0, "Engine baseline transport ownership unresolved");
+				// Cumulative integrity failures survive an earlier timeout. A resolved
+				// deadline is optional only when complete remote retirement proof follows.
+				const complete =
+					native.captureComplete === true &&
+					native.failure === null &&
+					disposal.failure == null;
+				const timedOut =
+					native.captureComplete === false &&
+					native.failure === "Shutdown 547-command: deadline exceeded" &&
+					disposal.failure === "deadline exceeded";
+				require(Array.isArray(native.integrityFailures) &&
+					native.integrityFailures.length === 0 &&
+					native.spawnError === null &&
+					(complete ||
+						timedOut), "Engine baseline transport capture integrity failed");
+				const stdout = fs.readFileSync(
+					path.join(directory, "transport/stdout.raw"),
+					"utf8",
+				);
+				require(stdout.startsWith(frame) &&
+					stdout.endsWith("\n") &&
+					stdout.split("\n").length ===
+						2, "Engine baseline remote retirement unproven");
+				const observed = JSON.parse(stdout.slice(frame.length));
+				require(JSON.stringify(observed.owner) === JSON.stringify(identity) &&
+					observed.closed === true &&
+					(["UNAVAILABLE_ENDPOINT", "NO_BUDGET"].includes(observed.status) ||
+						(observed.status === "OBSERVED" &&
+							observed.child?.pipesClosed === true &&
+							observed.child.unresolved.length ===
+								0)), "Engine baseline remote ownership differs");
+				if (observed.child)
+					for (const name of ["stdout", "stderr"]) {
+						require(typeof observed[name] === "string" &&
+							Buffer.from(observed[name], "base64").toString("base64") ===
+								observed[name] &&
+							Buffer.from(observed[name], "base64").length <=
+								32768, "Engine baseline raw encoding differs");
+					}
+				result.remote = observed;
+				// Only the worker's explicit bounded-read deadline is optional. Sticky
+				// ownership errors remain fatal after closed pipes/complete retirement.
+				require((observed.failure == null && observed.child?.failure == null) ||
 					(observed.status === "OBSERVED" &&
-						observed.child?.pipesClosed === true &&
-						observed.child.unresolved.length ===
-							0)), "Engine baseline remote ownership differs");
-			if (observed.child)
-				for (const name of ["stdout", "stderr"]) {
-					require(typeof observed[name] === "string" &&
-						Buffer.from(observed[name], "base64").toString("base64") ===
-							observed[name] &&
-						Buffer.from(observed[name], "base64").length <=
-							32768, "Engine baseline raw encoding differs");
-				}
-			result.remote = observed;
-			// Only the worker's explicit bounded-read deadline is optional. Sticky
-			// ownership errors remain fatal after closed pipes/complete retirement.
-			require((observed.failure == null && observed.child?.failure == null) ||
-				(observed.status === "OBSERVED" &&
-					observed.failure === "Shutdown engine-version: deadline exceeded" &&
-					observed.child.failure ===
-						"deadline exceeded"), "Engine baseline remote integrity failed");
-			// The owned native receipt proves this Mise/Make dispatch, not an
-			// unobserved inner Docker CLI start or an Engine API request count.
-			result.workerCommandDispatches = observed.child ? 1 : 0;
-			result.engineAPIRequests = observed.child
-				? "NOT_COUNTED_NATIVE_VERSION_API_BOUNDARY"
-				: 0;
-			if (!native.captureComplete) result.status = "UNAVAILABLE_CAPTURE";
-			else if (native.terminal.code !== 0 || native.terminal.signal)
-				result.status = "UNAVAILABLE_NATIVE_EXIT";
-			else if (["UNAVAILABLE_ENDPOINT", "NO_BUDGET"].includes(observed.status))
-				result.status = observed.status;
-			else if (observed.cancelled || observed.failure || observed.overflow)
-				result.status = "UNAVAILABLE_CAPTURE";
-			else if (
-				observed.child.terminal.code !== 0 ||
-				observed.child.terminal.signal
-			)
-				result.status = "UNAVAILABLE_NATIVE_EXIT";
-			else {
-				const raw = Buffer.from(observed.stdout, "base64");
-				try {
-					result.metadata = parseMetadata(raw.toString("utf8"));
-					result.status = "AVAILABLE";
-				} catch {
-					result.status = "UNAVAILABLE_METADATA";
+						observed.failure === "Shutdown engine-version: deadline exceeded" &&
+						observed.child.failure ===
+							"deadline exceeded"), "Engine baseline remote integrity failed");
+				// The owned native receipt proves this Mise/Make dispatch, not an
+				// unobserved inner Docker CLI start or an Engine API request count.
+				result.workerCommandDispatches = observed.child ? 1 : 0;
+				result.engineAPIRequests = observed.child
+					? "NOT_COUNTED_NATIVE_VERSION_API_BOUNDARY"
+					: 0;
+				if (!native.captureComplete) result.status = "UNAVAILABLE_CAPTURE";
+				else if (native.terminal.code !== 0 || native.terminal.signal)
+					result.status = "UNAVAILABLE_NATIVE_EXIT";
+				else if (
+					["UNAVAILABLE_ENDPOINT", "NO_BUDGET"].includes(observed.status)
+				)
+					result.status = observed.status;
+				else if (observed.cancelled || observed.failure || observed.overflow)
+					result.status = "UNAVAILABLE_CAPTURE";
+				else if (
+					observed.child.terminal.code !== 0 ||
+					observed.child.terminal.signal
+				)
+					result.status = "UNAVAILABLE_NATIVE_EXIT";
+				else {
+					const raw = Buffer.from(observed.stdout, "base64");
+					try {
+						result.metadata = parseMetadata(raw.toString("utf8"));
+						result.status = "AVAILABLE";
+					} catch {
+						result.status = "UNAVAILABLE_METADATA";
+					}
 				}
 			}
 		}

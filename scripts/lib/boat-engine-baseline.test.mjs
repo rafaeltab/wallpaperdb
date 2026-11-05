@@ -4,13 +4,69 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { captureCommand } from "./boat-capture.mjs";
 import net from "node:net";
 
 const helper = fileURLToPath(
 	new URL("boat-engine-baseline.mjs", import.meta.url),
 );
+
+test("Engine acquisition exhausting its original execution slot records no-budget without dispatch or retry", async (t) => {
+	const directory = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-engine-acquisition-"),
+	);
+	t.after(() => {
+		fs.rmSync(directory, { recursive: true });
+		assert.equal(fs.existsSync(directory), false);
+		t.diagnostic(JSON.stringify({ fixture: directory, removed: true }));
+	});
+	const script = path.join(directory, "acquisition.mjs");
+	fs.writeFileSync(
+		script,
+		`import fs from 'node:fs';import path from 'node:path';import {engineBaselineContext,observeEngineBaseline} from ${JSON.stringify(pathToFileURL(helper).href)};
+const root=${JSON.stringify(directory)},evidence=path.join(root,'round');fs.mkdirSync(evidence,{mode:0o700});
+const owner={worker:'fixture-worker',admission:'fixture-admission'};
+Object.assign(process.env,engineBaselineContext({worktree:root,round:'acquisition-control',evidence},owner,'prepare-startup-app-images',evidence,Number(process.hrtime.bigint())/1e9+25));
+let checks=0;const args={root,...owner,cli:'/NEVER_DISPATCH_ENGINE_FIXTURE',remote:'/unused-owned-fixture',workerEnvironment:'true',assertCurrent:()=>{if(checks++===0)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1200);}};
+let first;try{first=await observeEngineBaseline(args);}catch(error){const file=path.join(evidence,'engine-baseline-v1/result.json');console.log(JSON.stringify({firstError:error.message,record:fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):null,transportExists:fs.existsSync(path.join(evidence,'engine-baseline-v1/transport'))}));throw error;}
+const intent=fs.readFileSync(path.join(evidence,'engine-baseline-v1/intent.json'));const second=await observeEngineBaseline(args);const record=JSON.parse(fs.readFileSync(path.join(evidence,'engine-baseline-v1/result.json')));
+console.log(JSON.stringify({first,second,record,intentUnchanged:intent.equals(fs.readFileSync(path.join(evidence,'engine-baseline-v1/intent.json'))),transportExists:fs.existsSync(path.join(evidence,'engine-baseline-v1/transport'))}));\n`,
+	);
+	const receipt = await captureCommand({
+		argv: [process.execPath, script],
+		cwd: directory,
+		directory: path.join(directory, "capture"),
+		deadline: Number(process.hrtime.bigint()) / 1e9 + 5,
+		disposalMs: 1000,
+		limit: 32768,
+	});
+	const stdout = fs.readFileSync(
+			path.join(directory, "capture/stdout.raw"),
+			"utf8",
+		),
+		stderr = fs.readFileSync(
+			path.join(directory, "capture/stderr.raw"),
+			"utf8",
+		),
+		disposal = JSON.parse(
+			fs.readFileSync(path.join(directory, "capture/disposal.json")),
+		);
+	t.diagnostic(JSON.stringify({ receipt, disposal, stdout, stderr }));
+	assert.equal(receipt.captureComplete, true);
+	assert.deepEqual(receipt.terminal, { code: 0, signal: null });
+	assert.equal(disposal.pipesClosed, true);
+	assert.deepEqual(disposal.unresolved, []);
+	const result = JSON.parse(stdout);
+	assert.equal(result.first.status, "NO_BUDGET");
+	assert.equal(result.first.attempts, 0);
+	assert.ok(result.first.elapsedMs >= 1200 && result.first.elapsedMs <= 2000);
+	assert.equal(result.second.status, "ALREADY_RECORDED");
+	assert.equal(result.record.workerCommandDispatches, 0);
+	assert.equal(result.record.engineAPIRequests, 0);
+	assert.equal(result.intentUnchanged, true);
+	assert.equal(result.transportExists, false);
+});
 
 for (const changed of [false, true])
 	test(`Engine worker helper ${changed ? "refuses changed" : "accepts exact"} source authority before endpoint access`, async (t) => {

@@ -16173,6 +16173,58 @@ test("engine baseline managed app preparation consumes one round claim before an
 	retainEngineBaseline(t, evidence);
 });
 
+test("engine baseline caller cannot accept extra diagnostic publication outside its original allowance", {
+	timeout: 20000,
+}, async (t) => {
+	const f = await appImagesCheckout(t, true);
+	assert.equal((await f.run("boat-prepare-toolchain").done).status, 0);
+	const { evidence } = managedEngineContext(f);
+	const hook = path.join(f.directory, "diagnostic-publication-delay.cjs");
+	fs.writeFileSync(
+		hook,
+		`const fs=require('node:fs');const append=fs.appendFileSync;fs.appendFileSync=function(file,bytes,...args){if(String(file).endsWith('/events.jsonl')&&String(bytes).includes('"kind":"engine-version-baseline"')){fs.writeFileSync(${JSON.stringify(path.join(f.control, "diagnostic-mirror-entered"))},'entered');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,2200);}return append.call(this,file,bytes,...args);};`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const result = await f.run("boat-prepare-app-images").done;
+	const intent = JSON.parse(
+		fs.readFileSync(path.join(evidence, "engine-baseline-v1/intent.json")),
+	);
+	const observation = JSON.parse(
+		fs.readFileSync(path.join(evidence, "engine-baseline-v1/result.json")),
+	);
+	const firstImage = imageCommandEvents(f).find((e) => e.stage === "BEGIN");
+	const elapsed = firstImage
+		? Number(firstImage.monotonicNs) / 1e9 - intent.began
+		: null;
+	t.diagnostic(
+		JSON.stringify({
+			result,
+			observation,
+			elapsedToFirstImageSeconds: elapsed,
+			mirrorEntered: fs.existsSync(
+				path.join(f.control, "diagnostic-mirror-entered"),
+			),
+		}),
+	);
+	retainEngineBaseline(t, evidence);
+	if (result.status === 0) {
+		assert.ok(
+			firstImage,
+			"Successful caller requires an actual first image BEGIN observation",
+		);
+		assert.ok(
+			elapsed <= 2,
+			`Successful caller accepted late diagnostic publication at ${elapsed}s`,
+		);
+		assert.deepEqual(f.appBuilds(), completedAppBuilds());
+		assert.equal(observation.attempts, 1);
+	} else {
+		assert.deepEqual(f.appBuilds(), []);
+		assert.equal(observation.status, "UNRESOLVED");
+		assert.match(result.output, /Engine baseline.*(deadline|publication)/);
+	}
+});
+
 for (const [scenario, changes, expected] of [
 	["no budget", { executionDeadline: 1 }, "NO_BUDGET"],
 	["already cancelled", { cancelled: true }, "CANCELLED"],

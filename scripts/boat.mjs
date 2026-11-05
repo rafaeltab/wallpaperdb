@@ -1175,6 +1175,19 @@ async function stopAdmission(budget) {
 		`Stopped owned candidate ${a.candidate.id}; admission history retained, no replacement admitted.`,
 	);
 }
+function stopOwnership() {
+	const expectedWorkerId = process.env.BOAT_EXPECTED_WORKER_ID;
+	const expectedAdmissionToken = process.env.BOAT_EXPECTED_ADMISSION;
+	if (expectedWorkerId && !/^[A-Za-z0-9_-]+$/.test(expectedWorkerId))
+		throw new Error("Invalid expected stop worker identity");
+	if (
+		expectedAdmissionToken &&
+		!/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken)
+	)
+		throw new Error("Invalid expected stop admission identity");
+	return { expectedWorkerId, expectedAdmissionToken };
+}
+
 async function stop(
 	remove = false,
 	targets,
@@ -1744,7 +1757,9 @@ async function command() {
 		.slice(args.indexOf("--") + 1)
 		.filter((v) => !v.startsWith("BOAT_EXEC="));
 	if (targets[0] === "stop") {
-		await stop(false, targets);
+		const stopped = await stop(false, targets, stopOwnership());
+		if (stopped === false)
+			throw new Error("Expected stop ownership changed; no stop executed");
 		return;
 	}
 	admit();
@@ -2493,10 +2508,8 @@ try {
 	} else if (["stop", "delete", "observe-stop"].includes(action)) {
 		owned();
 		const observeOnly = action === "observe-stop";
-		const expectedWorkerId =
-			action !== "delete" ? process.env.BOAT_EXPECTED_WORKER_ID : undefined;
-		const expectedAdmissionToken =
-			action !== "delete" ? process.env.BOAT_EXPECTED_ADMISSION : undefined;
+		const { expectedWorkerId, expectedAdmissionToken } =
+			action === "delete" ? {} : stopOwnership();
 		const expectedStopId = observeOnly
 			? process.env.BOAT_EXPECTED_STOP_ID
 			: undefined;
@@ -2507,13 +2520,6 @@ try {
 			throw new Error(
 				"Stop observation requires exact worker, admission and stop identities",
 			);
-		if (expectedWorkerId && !/^[A-Za-z0-9_-]+$/.test(expectedWorkerId))
-			throw new Error("Invalid expected stop worker identity");
-		if (
-			expectedAdmissionToken &&
-			!/^[A-Za-z0-9_-]+$/.test(expectedAdmissionToken)
-		)
-			throw new Error("Invalid expected stop admission identity");
 		if (expectedStopId && !/^[A-Za-z0-9_-]+$/.test(expectedStopId))
 			throw new Error("Invalid expected stop operation identity");
 		const stopped = await stop(action === "delete", undefined, {

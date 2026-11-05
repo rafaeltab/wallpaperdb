@@ -10,6 +10,100 @@ import {
 
 const json = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
+for (const fault of ["owner-stopped", "owner-running", "owner-admission"])
+	test(`source preparation review refuses ${fault} before controller effects`, async (t) => {
+		const f = sourcePreparationFixture(t, { fault });
+		f.retain(fault);
+		captured(f, await f.run(), 2);
+		const transition = json(
+			path.join(f.directory, "ownership-transition.json"),
+		);
+		assert.equal(transition.atLifecycleAcquisition, true);
+		assert.equal(transition.guardWorker, f.state.id);
+		assert.equal(transition.guardAdmission, f.state.admission.token);
+		assert.equal(
+			fs.readFileSync(path.join(f.root, ".boat/state.json"), "utf8"),
+			transition.bytes,
+		);
+		assert.equal(
+			fs.existsSync(f.calls),
+			false,
+			"No provider hook may run on a superseded owner",
+		);
+		assert.equal(fs.existsSync(path.join(f.evidence, "archive")), false);
+		for (let i = 0; i < 28; i++)
+			assert.equal(
+				fs.readFileSync(f.files[i].path, "utf8"),
+				`owned-change-${i}\n`,
+			);
+	});
+
+for (const fault of ["missing-pid", "partial-pid", "foreign-lock"])
+	test(`source preparation review preserves ownership during ${fault}`, async (t) => {
+		const f = sourcePreparationFixture(t, { wanted: false, strings: true });
+		f.retain(fault);
+		const originalHome = process.env.HOME;
+		process.env.HOME = path.join(f.directory, "home");
+		t.after(() => {
+			process.env.HOME = originalHome;
+		});
+		const lock = path.join(f.root, ".boat/source.lock"),
+			pid = path.join(lock, "pid");
+		const open = fs.openSync,
+			write = fs.writeFileSync;
+		let injected = false;
+		if (fault === "missing-pid")
+			t.mock.method(fs, "openSync", (file, ...args) => {
+				if (file === pid) {
+					injected = true;
+					throw new Error("controlled PID publication failed");
+				}
+				return open(file, ...args);
+			});
+		t.mock.method(fs, "writeFileSync", (file, ...args) => {
+			const target =
+				file === pid ||
+				(typeof file === "number" &&
+					fs.readlinkSync(`/proc/self/fd/${file}`) === pid);
+			if (!injected && target) {
+				injected = true;
+				if (fault === "foreign-lock") {
+					fs.renameSync(lock, lock + ".retained-owned");
+					fs.mkdirSync(lock);
+					write(pid, "foreign-owner", { mode: 0o600 });
+				} else if (fault === "partial-pid") {
+					if (typeof file === "number") fs.writeSync(file, "12");
+					else write(file, "12", { flag: "wx", mode: 0o600 });
+				}
+				throw new Error("controlled PID publication failed");
+			}
+			return write(file, ...args);
+		});
+		await assert.rejects(
+			prepare547Source(json(f.config)),
+			/controlled PID publication failed/,
+		);
+		assert.equal(injected, true);
+		if (fault === "foreign-lock") {
+			assert.equal(fs.readFileSync(pid, "utf8"), "foreign-owner");
+			assert.match(
+				json(path.join(f.evidence, "result.json")).cleanupError,
+				/foreign lock retained/,
+			);
+		} else
+			assert.equal(
+				fs.existsSync(lock),
+				false,
+				"Retire the exact partially acquired lock",
+			);
+		assert.equal(fs.existsSync(f.calls), false);
+		for (let i = 0; i < 28; i++)
+			assert.equal(
+				fs.readFileSync(f.files[i].path, "utf8"),
+				`owned-change-${i}\n`,
+			);
+	});
+
 test("source preparation archive failure retires its own lock and preserves source", async (t) => {
 	const f = sourcePreparationFixture(t, { wanted: false, strings: true });
 	f.retain("archive-failure");

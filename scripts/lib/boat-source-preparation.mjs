@@ -128,8 +128,8 @@ export async function prepare547Source({ authority: pin, evidence }) {
 		if (ownedLock) {
 			const current = fs.lstatSync(sourceLock, { bigint: true });
 			assert(
-				current.ino === ownedLock.ino &&
-					current.dev === ownedLock.dev &&
+				current.ino === ownedLock.directory.ino &&
+					current.dev === ownedLock.directory.dev &&
 					fs.readFileSync(path.join(sourceLock, "pid"), "utf8") ===
 						String(process.pid),
 				"Source lock superseded",
@@ -182,6 +182,13 @@ export async function prepare547Source({ authority: pin, evidence }) {
 	verify();
 	const before = json(stateFile),
 		enrollment = json(path.join(root, ".boat/enrollment.json"));
+	assert(
+		typeof before.id === "string" &&
+			/^[A-Za-z0-9_-]+$/.test(before.id) &&
+			typeof before.admission?.token === "string" &&
+			/^[A-Za-z0-9_-]+$/.test(before.admission.token),
+		"Expected complete stop worker/admission identities",
+	);
 	assert(
 		enrollment.root === root &&
 			enrollment.key === authority.key &&
@@ -303,6 +310,11 @@ export async function prepare547Source({ authority: pin, evidence }) {
 				directory: path.join(evidence, "intent"),
 				deadline,
 				disposalMs: 5000,
+				env: {
+					...process.env,
+					BOAT_EXPECTED_WORKER_ID: before.id,
+					BOAT_EXPECTED_ADMISSION: before.admission.token,
+				},
 			});
 			const disposal = json(path.join(evidence, "intent/disposal.json"));
 			assert.deepEqual(
@@ -358,11 +370,20 @@ export async function prepare547Source({ authority: pin, evidence }) {
 		);
 		verify(); // Same exact decoder and native comparison after the Make boundary.
 		fs.mkdirSync(sourceLock, { mode: 0o700 });
-		ownedLock = fs.lstatSync(sourceLock, { bigint: true });
-		fs.writeFileSync(path.join(sourceLock, "pid"), String(process.pid), {
-			flag: "wx",
-			mode: 0o600,
-		});
+		ownedLock = {
+			directory: fs.lstatSync(sourceLock, { bigint: true }),
+			pid: null,
+			published: false,
+		};
+		const pidFile = fs.openSync(path.join(sourceLock, "pid"), "wx", 0o600);
+		try {
+			ownedLock.pid = fs.fstatSync(pidFile, { bigint: true });
+			fs.writeFileSync(pidFile, String(process.pid));
+			fs.fsyncSync(pidFile);
+			ownedLock.published = true;
+		} finally {
+			fs.closeSync(pidFile);
+		}
 		const mutableControls = new Set([
 			stateFile,
 			path.join(root, ".boat/usage.json"),
@@ -516,13 +537,31 @@ export async function prepare547Source({ authority: pin, evidence }) {
 			try {
 				const current = fs.lstatSync(sourceLock, { bigint: true });
 				assert(
-					current.ino === ownedLock.ino &&
-						current.dev === ownedLock.dev &&
-						fs.readFileSync(path.join(sourceLock, "pid"), "utf8") ===
-							String(process.pid),
+					current.isDirectory() &&
+						current.ino === ownedLock.directory.ino &&
+						current.dev === ownedLock.directory.dev,
 					"Source lock superseded; foreign lock retained",
 				);
-				fs.unlinkSync(path.join(sourceLock, "pid"));
+				const entries = fs.readdirSync(sourceLock);
+				if (ownedLock.pid) {
+					const currentPid = fs.lstatSync(path.join(sourceLock, "pid"), {
+						bigint: true,
+					});
+					assert(
+						entries.length === 1 &&
+							entries[0] === "pid" &&
+							currentPid.isFile() &&
+							currentPid.nlink === 1n &&
+							currentPid.ino === ownedLock.pid.ino &&
+							currentPid.dev === ownedLock.pid.dev &&
+							(!ownedLock.published ||
+								fs.readFileSync(path.join(sourceLock, "pid"), "utf8") ===
+									String(process.pid)),
+						"Source PID entry superseded; foreign lock retained",
+					);
+					fs.unlinkSync(path.join(sourceLock, "pid"));
+				} else
+					assert.equal(entries.length, 0, "Unowned source lock entry retained");
 				fs.rmdirSync(sourceLock);
 			} catch (error) {
 				releaseFailure = error;

@@ -39,6 +39,7 @@ export function sourcePreparationFixture(
 				});
 				for (const entry of [
 					"authority.json",
+					"ownership-transition.json",
 					"public-command",
 					"preparation",
 					"controlled-provider-calls.jsonl",
@@ -283,6 +284,28 @@ json.dump(x,open(p,'w'))`,
 		JSON.stringify({ authority: pin(authority), evidence }),
 	);
 	const env = { ...process.env, HOME: home };
+	if (fault.startsWith("owner-")) {
+		const hook = path.join(directory, "owner-transition.cjs");
+		fs.writeFileSync(
+			hook,
+			`const fs=require('fs'),path=require('path');
+const mkdir=fs.mkdirSync,root=${JSON.stringify(root)},external=${JSON.stringify(external)},record=${JSON.stringify(path.join(directory, "ownership-transition.json"))};
+fs.mkdirSync=function(name,...args){
+ if(process.cwd()===root&&path.resolve(String(name))===path.join(root,'.boat/lifecycle.lock')&&!fs.existsSync(record)){
+  const s=JSON.parse(fs.readFileSync(path.join(root,'.boat/state.json')));
+  if(${JSON.stringify(fault)}!=='owner-admission')s.id='replacement-worker';
+  s.admission.token='replacement-admission';s.admission.name='replacement-name';s.admission.candidate.id=s.id;s.admission.candidate.name=s.admission.name;
+  s.snapshotRecovery.workerId=s.id;s.shutdownAttempt.workerId=s.id;s.shutdownAttempt.completion.workerId=s.id;s.shutdownAttempt.completion.provider.id=s.id;
+  if(${JSON.stringify(fault)}==='owner-running'){s.runningSince=Date.now();s.snapshotRecovery.status='ACTIVE';delete s.shutdownAttempt;}
+  const bytes=JSON.stringify(s);fs.writeFileSync(path.join(root,'.boat/state.json'),bytes);fs.writeFileSync(external,bytes);
+  fs.writeFileSync(record,JSON.stringify({at:new Date().toISOString(),pid:process.pid,atLifecycleAcquisition:true,state:s,bytes,guardWorker:process.env.BOAT_EXPECTED_WORKER_ID,guardAdmission:process.env.BOAT_EXPECTED_ADMISSION}));
+ }
+ return mkdir.call(this,name,...args);
+};`,
+			{ mode: 0o600 },
+		);
+		env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --require=${hook}`.trim();
+	}
 	for (const name of [
 		"MAKEFLAGS",
 		"MFLAGS",

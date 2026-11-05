@@ -12,18 +12,18 @@ for (const path of [release, config, state]) {
 }
 if (!/^wallpaperdb-factory-[a-z0-9-]+$/.test(name ?? ''))
   throw new Error('Use a dedicated wallpaperdb-factory-NAME service');
-const installation = JSON.parse(await readFile(join(release, 'installation.json'), 'utf8'));
 const realRelease = await realpath(release);
+const installation = JSON.parse(await readFile(join(realRelease, 'installation.json'), 'utf8'));
 const realState = await realpath(state);
 if (realState === realRelease || realState.startsWith(realRelease + '/'))
   throw new Error('Keep durable state outside the installation');
 const format = JSON.parse(
-  await readFile(join(state, 'format.json'), 'utf8').catch((error) => {
+  await readFile(join(realState, 'format.json'), 'utf8').catch((error) => {
     if (error.code === 'ENOENT') return '{"format":1}';
     throw error;
   })
 );
-const sqlite = await access(join(state, 'factory.sqlite')).then(
+const sqlite = await access(join(realState, 'factory.sqlite')).then(
   () => true,
   () => false
 );

@@ -46,7 +46,15 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.ts", "*.json"]
+    "includes": [
+      "src/**/*.ts",
+      "test/**/*.ts",
+      "scripts/**/*.ts",
+      "*.ts",
+      "*.json",
+      "frontend/**/*.ts",
+      "frontend/**/*.tsx"
+    ]
   },
   "root": false,
   "extends": "//"

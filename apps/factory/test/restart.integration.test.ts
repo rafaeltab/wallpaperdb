@@ -167,9 +167,9 @@ it('a fresh process reconciles publication after a lost response without repeati
         }),
       { timeout: 10000, interval: 30 }
     );
-    const page = await (await fetch(origin)).text();
-    expect(page).toContain('t3-thread://v1/thread-live');
-    expect(page).toContain('Elapsed:');
+    const page = JSON.stringify(await (await fetch(`${origin}/api/job`)).json());
+    expect(page).toContain('thread-live');
+    expect(page).toContain('elapsedMs');
     expect(
       (await host.calls()).filter(
         (call) => call.binary === 't3' && call.args[1] === 'start' && !call.args.includes('--help')

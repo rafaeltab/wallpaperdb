@@ -474,6 +474,10 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
   !args.includes('--worktree')
 ) {
   const prompt = args[3] === '-' ? readFileSync(0, 'utf8') : args[3];
+  if (prompt.length > 120000 || config.planner.rejectStart) {
+    console.error(JSON.stringify({ code: -32602, message: 'message: maximum length 120000' }));
+    process.exit(1);
+  }
   const request = JSON.parse(prompt.split('Request: ')[1]);
   writeFileSync(join(config.directory, 'planner.json'), JSON.stringify(request));
   if (config.planner.lostStart) process.exit(1);

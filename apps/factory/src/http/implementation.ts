@@ -19,6 +19,10 @@ export function operationsServer(config: {
   job: Job;
   plan?: Plan;
   scheduler?: Scheduler;
+  attempts?: {
+    submit(): Promise<import('../capabilities/plan/index.js').AttemptSubmission>;
+    observe(id: string): Promise<unknown | undefined>;
+  };
   relationships?: (
     issues: readonly number[]
   ) => Effect.Effect<readonly WorkRelationship[], Unavailable>;
@@ -92,7 +96,7 @@ export function operationsServer(config: {
         .code(403)
         .type('application/problem+json')
         .send(problem(403, 'factory-origin', 'Request origin rejected'));
-    if (!config.plan)
+    if (!config.plan && !config.attempts)
       return reply
         .code(503)
         .type('application/problem+json')
@@ -102,7 +106,52 @@ export function operationsServer(config: {
         .code(400)
         .type('application/problem+json')
         .send(problem(400, 'factory-request', 'Preview accepts no overrides'));
-    return execute(request, 'factory.http.plan', config.plan.preview());
+    if (config.attempts) {
+      const result = await config.attempts.submit();
+      if (result.kind === 'blocked')
+        return reply
+          .code(409)
+          .type('application/problem+json')
+          .send({
+            ...problem(
+              409,
+              'factory-plan-ownership',
+              result.reason === 'reconciliation-required'
+                ? 'Unbound planner launch requires operator reconciliation'
+                : 'Previous bound planner is outstanding'
+            ),
+            requestId: result.requestId,
+            reason: result.reason,
+          });
+      if (result.kind === 'busy')
+        return reply
+          .code(409)
+          .type('application/problem+json')
+          .send({
+            ...problem(
+              409,
+              'factory-plan-busy',
+              'Planner attempt is outstanding; observe before retrying'
+            ),
+            attemptId: result.id,
+          });
+      return reply.code(202).header('location', `/api/plan/${result.id}`).send(result);
+    }
+    if (config.plan) return execute(request, 'factory.http.plan', config.plan.preview());
+    return reply
+      .code(503)
+      .type('application/problem+json')
+      .send(problem(503, 'factory-unavailable', 'Plan preview unavailable'));
+  });
+  app.get('/api/plan/:id', async (request, reply) => {
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    const result = parsed.success ? await config.attempts?.observe(parsed.data.id) : undefined;
+    if (!result)
+      return reply
+        .code(404)
+        .type('application/problem+json')
+        .send(problem(404, 'factory-plan-missing', 'Planner attempt not found'));
+    return result;
   });
   if (config.scheduler) {
     const scheduler = config.scheduler;

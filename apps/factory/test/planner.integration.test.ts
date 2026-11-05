@@ -24,7 +24,7 @@ it('translates a bound assistant proposal and rejects malformed or user messages
           number: 580,
           url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
           title: 'Large spec context',
-          body: 'x'.repeat(150000),
+          body: 'x'.repeat(15000),
           author: 'rafaeltab',
           open: true,
           labels: ['ready-for-agent'],
@@ -316,3 +316,190 @@ it.each(['{', JSON.stringify({ revision: 1, requestId: 'saved', input: '{}', dea
     }
   }
 );
+
+it('retires a confirmed validation rejection and permits a fresh normal proposal', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    await host.save({ planner: { rejectStart: true } });
+    await expect(Effect.runPromise(t3Planner(config).propose(input))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    expect(await Effect.runPromise(t3Planner(config).propose(input))).toEqual({
+      selected: [],
+      deferred: [],
+    });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('rejects an oversized prompt before launch intent and retains a useful terminal outcome', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await writeFile(`${host.directory}/calls.jsonl`, '');
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const input = {
+      issues: [
+        {
+          number: 580,
+          url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+          title: 'Large context',
+          body: 'x'.repeat(150000),
+          author: 'rafaeltab',
+          open: true,
+          labels: ['ready-for-agent'],
+          comments: [],
+          parents: [],
+          blockers: [],
+          blockersReady: true,
+          prerequisiteEvidence: '',
+        },
+      ],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    await expect(Effect.runPromise(t3Planner(config).propose(input))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    const { plannerState } = await import('../src/adapters/t3/index.js');
+    expect(await plannerState(config.stateDirectory).read()).toMatchObject({
+      revision: 0,
+      phase: 'failed',
+      retired: true,
+      detail: expect.stringContaining('maximum is 120000'),
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(0);
+    expect(await Effect.runPromise(t3Planner(config).propose({ ...input, issues: [] }))).toEqual({
+      selected: [],
+      deferred: [],
+    });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('reconciles late completion after the original deadline but retains active bound and uncertain unbound ownership', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const { plannerState } = await import('../src/adapters/t3/index.js');
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const journal = plannerState(config.stateDirectory);
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    const requestId = 'legacy-bound';
+    await writeFile(`${host.directory}/planner.json`, JSON.stringify({ requestId, input }));
+    await journal.save({
+      revision: 0,
+      requestId,
+      input: JSON.stringify(input),
+      deadline: Date.now() - 100,
+      run: { threadId: 'planner-thread', runId: 'planner-run' },
+      phase: 'running',
+    });
+    await host.save({ planner: { status: 'running', proposal: { selected: [], deferred: [] } } });
+    expect(await Effect.runPromise(t3Planner(config).ownership())).toMatchObject({
+      requestId,
+      deadline: expect.any(Number),
+      run: { runId: 'planner-run' },
+    });
+    expect((await journal.read())?.retired).not.toBe(true);
+    await host.save({ planner: { status: 'completed', proposal: { selected: [], deferred: [] } } });
+    expect(await Effect.runPromise(t3Planner(config).ownership())).toMatchObject({
+      requestId,
+      retired: true,
+      phase: 'succeeded',
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(0);
+    expect(await Effect.runPromise(t3Planner(config).propose(input))).toEqual({
+      selected: [],
+      deferred: [],
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('replays the same retired bound proposal across the proposal-to-freshness crash gap without another launch', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const { plannerState } = await import('../src/adapters/t3/index.js');
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    const attempt = { requestId: 'same-attempt', deadline: Date.now() + 60000 };
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    expect(await Effect.runPromise(t3Planner(config).propose(input, attempt))).toEqual({
+      selected: [],
+      deferred: [],
+    });
+    const saved = await plannerState(config.stateDirectory).read();
+    expect(saved).toMatchObject({
+      requestId: attempt.requestId,
+      deadline: attempt.deadline,
+      retired: true,
+      run: { threadId: 'planner-thread', runId: 'planner-run' },
+    });
+    expect(await Effect.runPromise(t3Planner(config).propose(input, attempt))).toEqual({
+      selected: [],
+      deferred: [],
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    await expect(
+      Effect.runPromise(t3Planner(config).propose({ ...input, paused: true }, attempt))
+    ).rejects.toMatchObject({ _tag: 'Unavailable' });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

@@ -47,7 +47,10 @@ async function preview(
           Layer.succeed(PlanningSource, {
             read: () => Effect.sync(() => ({ ...input, issues: changed && reads++ ? [] : issues })),
           }),
-          Layer.succeed(IPlanner, { propose: () => Effect.succeed(proposed) })
+          Layer.succeed(IPlanner, {
+            ownership: () => Effect.succeed(undefined),
+            propose: () => Effect.succeed(proposed),
+          })
         )
       )
     )

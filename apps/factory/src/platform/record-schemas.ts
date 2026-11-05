@@ -126,6 +126,17 @@ export const plannerSchema = z
     deadline: z.number().finite(),
     run: z.object({ threadId: z.string().min(1), runId: z.string().min(1) }).optional(),
     retired: z.boolean().optional(),
+    phase: z.enum(['launch-intent', 'running', 'succeeded', 'failed', 'uncertain']).optional(),
+    detail: z.string().max(1000).optional(),
+    reconciliation: z
+      .object({
+        operator: z.string().min(1),
+        evidence: z.string().min(1).max(1000),
+        code: z.literal(-32602),
+        at: z.number(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const sha = z.string().regex(/^[a-f0-9]{40}$/);

@@ -53,7 +53,16 @@ export interface Proposal {
 }
 /** Preview only. No adapter may dispatch implementation work. */
 export interface IPlanner {
-  propose(input: PlanningInput): Effect.Effect<Proposal, Unavailable>;
+  /** Observe exact bound ownership, including late completion, before blocking retries.
+   * Unbound claims remain uncertain. Never launches a worker. */
+  ownership(
+    reconcile?: boolean,
+    requestId?: string
+  ): Effect.Effect<PlannerOwnership | undefined, Unavailable>;
+  propose(
+    input: PlanningInput,
+    attempt?: { requestId: string; deadline: number }
+  ): Effect.Effect<Proposal, Unavailable>;
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
 export interface Preview {
@@ -63,7 +72,11 @@ export interface Preview {
   readonly input: PlanningInput;
 }
 export interface Plan {
-  preview(): Effect.Effect<Preview, Unavailable>;
+  preview(attempt?: {
+    requestId: string;
+    deadline: number;
+    progress: (phase: 'discovery' | 'freshness') => Effect.Effect<void, Unavailable>;
+  }): Effect.Effect<Preview, Unavailable>;
 }
 export const Plan = Context.Service<Plan>('wallpaperdb.factory.Plan');
 
@@ -127,3 +140,66 @@ export interface Scheduler {
   cancel(jobId: string): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
 }
 export const Scheduler = Context.Service<Scheduler>('wallpaperdb.factory.Scheduler');
+
+export interface PlannerOwnership {
+  requestId: string;
+  revision: number;
+  deadline: number;
+  phase?: 'launch-intent' | 'running' | 'succeeded' | 'failed' | 'uncertain';
+  run?: { threadId: string; runId: string };
+  retired?: boolean;
+  detail?: string;
+}
+export interface AttemptResult {
+  kind: Preview['kind'];
+  selected: Preview['selected'];
+  rejected: Preview['rejected'];
+  input: {
+    issues: readonly {
+      number: number;
+      title: string;
+      blockers: readonly number[];
+      parents: readonly number[];
+      recovery?: PlanningIssue['recovery'];
+    }[];
+  };
+}
+export interface PlanningAttempt {
+  id: string;
+  revision: number;
+  startedAt: number;
+  deadline: number;
+  phase: 'discovery' | 'freshness' | 'succeeded' | 'failed';
+  finishedAt?: number;
+  detail?: string;
+  result?: AttemptResult;
+}
+/** Atomic creation excludes concurrent unfinished attempts. Updates compare revisions,
+ * preserve identity/start/deadline and return false on conflicts. */
+export interface AttemptStore {
+  pending(): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
+  get(id: string): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
+  create(attempt: PlanningAttempt): Effect.Effect<boolean, Unavailable>;
+  save(attempt: PlanningAttempt): Effect.Effect<boolean, Unavailable>;
+}
+export const AttemptStore = Context.Service<AttemptStore>('wallpaperdb.factory.AttemptStore');
+export interface Attempts {
+  submit(id: string): Effect.Effect<AttemptSubmission, Unavailable>;
+  observe(id: string): Effect.Effect<
+    | (Omit<PlanningAttempt, 'phase'> & {
+        phase: string;
+        elapsedMs: number;
+        launch?: PlannerOwnership;
+      })
+    | undefined,
+    Unavailable
+  >;
+  pending(): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
+  execute(id: string): Effect.Effect<void, Unavailable>;
+}
+export const Attempts = Context.Service<Attempts>('wallpaperdb.factory.Attempts');
+
+export type AttemptSubmission =
+  | { kind: 'accepted'; id: string }
+  | { kind: 'busy'; id: string }
+  | { kind: 'blocked'; requestId: string; reason: 'outstanding' | 'reconciliation-required' };

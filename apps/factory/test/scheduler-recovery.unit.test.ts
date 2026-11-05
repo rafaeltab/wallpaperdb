@@ -148,6 +148,7 @@ function setup(lostSend = true, immediate = false) {
     Layer.succeed(JobPool, pool),
     Layer.succeed(PlanningSource, source),
     Layer.succeed(IPlanner, {
+      ownership: () => Effect.succeed(undefined),
       propose: () =>
         Effect.succeed({
           selected: [{ issue: 2, reason: 'Independent thin slice', dependsOn: [], conflicts: [] }],

@@ -1,6 +1,20 @@
 import { Context, type Effect } from 'effect';
 import type { Status, Unavailable, RecoveryStatus } from '../job/index.js';
 export interface PlanningIssue {
+  readonly metadata?: {
+    number: number;
+    url: string;
+    title: string;
+    open: boolean;
+    candidate: boolean;
+    labels: readonly string[];
+    assignees: readonly string[];
+    projectStatus: string | null;
+    commentCount: number;
+    blockers: readonly number[];
+    parents: readonly number[];
+    pullRequests: readonly number[];
+  };
   readonly number: number;
   readonly url: string;
   readonly title: string;

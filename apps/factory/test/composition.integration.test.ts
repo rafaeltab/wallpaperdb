@@ -65,9 +65,8 @@ it('continues admitted work through publication without an operations-page obser
       base: host.base,
       blockers: [{ number: 400, state: 'closed' }],
     });
-    expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
-      relationships: [{ issue: 577, blockers: [400] }],
-    });
+    // Relationship refresh is independently verified below. HTTP no longer fetches it.
+    expect((await running.app.inject('/api/scheduler')).statusCode).toBe(200);
     await vi.waitFor(
       async () => {
         expect(
@@ -79,9 +78,13 @@ it('continues admitted work through publication without an operations-page obser
       },
       { timeout: 10000, interval: 30 }
     );
-    expect((await running.app.inject('/api/job')).json()).toMatchObject({
-      delivery: { stage: 'ci', ready: true, landed: false },
-    });
+    await vi.waitFor(
+      async () =>
+        expect((await running.app.inject('/api/job')).json()).toMatchObject({
+          delivery: { stage: 'ci', ready: true, landed: false },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     // Discovery must derive the prerequisite assertion from this completed job.
     // Missing issue evidence still prevents a child launch.
     await host.save({
@@ -128,9 +131,13 @@ it('continues admitted work through publication without an operations-page obser
       prs: [pr],
       overrides: { status: 'completed', runCount: 5, latestRunId: 'watcher-5' },
     });
-    expect((await running.app.inject('/api/job')).json()).toMatchObject({
-      delivery: { stage: 'review', ready: false },
-    });
+    await vi.waitFor(
+      async () =>
+        expect((await running.app.inject('/api/job')).json()).toMatchObject({
+          delivery: { stage: 'review', ready: false },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     await host.save({
       complete: true,
       base: host.base,
@@ -204,17 +211,78 @@ it('continuously admits a validated semantic plan through production adapters wi
           ).toHaveLength(1),
         { timeout: 10000, interval: 30 }
       );
-      const status = (await running.app.inject('/api/scheduler')).json();
-      expect(status).toMatchObject({
-        state: { concurrency: 1, allowance: 1, paused: false, admissions: [{ issue: 581 }] },
-        jobs: [{ kind: 'job', execution: { kind: 'found', threadId: 'thread-live' } }],
-      });
+      await vi.waitFor(
+        async () =>
+          expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+            state: { concurrency: 1, allowance: 1, paused: false, admissions: [{ issue: 581 }] },
+            jobs: [{ kind: 'job', execution: { kind: 'found', threadId: 'thread-live' } }],
+          }),
+        { timeout: 10000, interval: 30 }
+      );
       const plannerInput = JSON.parse(await readFile(join(host.directory, 'planner.json'), 'utf8'));
       expect(JSON.stringify(plannerInput)).toContain('Implement scheduler');
     } finally {
       await running.close();
     }
   } finally {
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
+it('refreshes GitHub observations without clients and keeps HTTP local', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const issue = (number: number, body: string) => ({
+    number,
+    url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+    title: `Observed ${number}`,
+    body,
+    state: 'OPEN',
+    author: { login: 'rafaeltab' },
+    labels: [{ name: 'ready-for-agent' }],
+    comments: [],
+  });
+  await host.save({
+    planning: { candidates: [577], issues: [issue(577, 'Blocked by: #400'), issue(400, '')] },
+  });
+  const running = await startFactory({
+    FACTORY_PROJECT: host.repository,
+    FACTORY_T3_PROJECT_ID: 'project-id',
+    FACTORY_BASE: host.base,
+    FACTORY_T3_BINARY: host.binary,
+    FACTORY_STATE: host.directory + '/state',
+    FACTORY_PORT: '0',
+  });
+  try {
+    const { sqliteObservations } = await import('../src/adapters/store/index.js');
+    const { Effect } = await import('effect');
+    // Observe durable storage, not HTTP, until independent background work completes.
+    await vi.waitFor(
+      async () =>
+        expect(
+          (
+            await Effect.runPromise(sqliteObservations(host.directory + '/state').read())
+          ).facts?.issues.map((i) => i.number)
+        ).toEqual([400, 577]),
+      { timeout: 10000, interval: 30 }
+    );
+    const count = (await host.calls()).filter((c) => c.binary === 'gh').length;
+    expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+      relationships: [
+        { issue: 400, blockers: [] },
+        { issue: 577, blockers: [400] },
+      ],
+    });
+    for (const url of ['/', '/api/job', '/api/scheduler', '/api/observations'])
+      expect((await running.app.inject(url)).statusCode).toBe(200);
+    expect((await host.calls()).filter((c) => c.binary === 'gh').length).toBe(count);
+  } finally {
+    await running.close();
     process.env.PATH = previous.path;
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;

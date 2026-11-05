@@ -29,3 +29,5 @@ export { records } from './schema.js';
 
 export { stateConnection } from './durable.js';
 export { planningAttempts } from './schema.js';
+
+export { githubIssues, githubPulls, observationRefresh } from './schema.js';

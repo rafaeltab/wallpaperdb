@@ -166,6 +166,7 @@ function fixture() {
     Layer.succeed(JobPool, pool),
     Layer.succeed(PlanningSource, source),
     Layer.succeed(IPlanner, {
+      ownership: () => Effect.succeed(undefined),
       propose: () =>
         Effect.sync(() => {
           duringPlan?.();

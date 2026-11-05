@@ -649,3 +649,40 @@ it('renders current dependency direction from the admitted issue read model and 
     await app.close();
   }
 });
+
+it('returns prompt acceptance and observations, and separates observable busy attempts from legacy ownership', async () => {
+  const id = '65361fc1-cee7-46c7-aefb-6bfbf75d1824';
+  let outcome: import('../src/capabilities/plan/index.js').AttemptSubmission = {
+    kind: 'accepted',
+    id,
+  };
+  const app = operationsServer({
+    base: 'a'.repeat(40),
+    job: idle,
+    run: Effect.runPromise,
+    attempts: {
+      submit: async () => outcome,
+      observe: async (value) =>
+        value === id ? { id, phase: 'discovery', elapsedMs: 0 } : undefined,
+    },
+  });
+  try {
+    const accepted = await app.inject({ method: 'POST', url: '/api/plan', payload: {} });
+    expect(accepted.statusCode).toBe(202);
+    expect(accepted.headers.location).toBe(`/api/plan/${id}`);
+    expect((await app.inject(`/api/plan/${id}`)).json()).toMatchObject({ id, phase: 'discovery' });
+    outcome = { kind: 'busy', id };
+    const busy = await app.inject({ method: 'POST', url: '/api/plan', payload: {} });
+    expect(busy.statusCode).toBe(409);
+    expect(busy.json()).toMatchObject({ attemptId: id });
+    outcome = { kind: 'blocked', requestId: id, reason: 'reconciliation-required' };
+    const blocked = await app.inject({ method: 'POST', url: '/api/plan', payload: {} });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.headers.location).toBeUndefined();
+    expect(blocked.json()).toMatchObject({ requestId: id, reason: 'reconciliation-required' });
+    expect(blocked.json()).not.toHaveProperty('attemptId');
+    expect((await app.inject('/api/plan/unknown')).statusCode).toBe(404);
+  } finally {
+    await app.close();
+  }
+});

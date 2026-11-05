@@ -14,9 +14,11 @@ import {
   type RecoveryAdmission,
 } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
-import { fileStore, fileScheduleStore } from '../adapters/store/index.js';
+import { fileStore, fileScheduleStore, sqliteAttemptStore } from '../adapters/store/index.js';
 import {
-  Plan,
+  Attempts,
+  AttemptsLive,
+  AttemptStore,
   PlanLive,
   PlanningSource,
   IPlanner,
@@ -34,6 +36,7 @@ import { t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
+import { planningWorker } from './planning.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
@@ -239,7 +242,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   ).pipe(Layer.provideMerge(jobLayer));
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
-      Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
+      Layer.provideMerge(
+        AttemptsLive.pipe(
+          Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
+          Layer.provide(
+            Layer.succeed(AttemptStore, sqliteAttemptStore(configuration.FACTORY_STATE))
+          )
+        )
+      ),
       Layer.provideMerge(schedulerDeps),
       Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
     )
@@ -254,6 +264,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     cancel: (id) => scheduler.cancel(id),
   };
   const requests = new AbortController();
+  const attempts = await planningWorker({
+    attempts: await runtime.runPromise(Attempts),
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+  });
   const relationshipSource = await runtime.runPromise(Issues);
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
@@ -268,7 +282,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           }))
         );
       }),
-    plan: await runtime.runPromise(Plan),
+    attempts,
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
   try {
@@ -328,6 +342,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       } finally {
         clearTimeout(deadline);
         requests.abort();
+        await attempts.close();
         await observing?.catch(() => undefined);
         await runtime.dispose();
         await Promise.all([...workers.values()].map((worker) => worker.dispose()));

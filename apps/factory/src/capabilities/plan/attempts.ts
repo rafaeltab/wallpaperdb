@@ -1,0 +1,152 @@
+import { Effect, Layer } from 'effect';
+import { Time, Unavailable } from '../job/index.js';
+import { Attempts, AttemptStore, Plan, IPlanner, type PlanningAttempt } from './contract.js';
+export const AttemptsLive = Layer.effect(
+  Attempts,
+  Effect.gen(function* () {
+    const store = yield* AttemptStore;
+    const plan = yield* Plan;
+    const planner = yield* IPlanner;
+    const time = yield* Time;
+    const conflict = () =>
+      Effect.fail(new Unavailable({ operation: 'attempt-conflict', cause: null }));
+    const save = (attempt: PlanningAttempt) =>
+      store.save(attempt).pipe(Effect.flatMap((saved) => (saved ? Effect.void : conflict())));
+    const pending = () => store.pending();
+    return {
+      pending,
+      submit: (id) =>
+        Effect.gen(function* () {
+          const startedAt = yield* time.now();
+          const existing = yield* pending();
+          if (existing) return { kind: 'busy' as const, id: existing.id };
+          // A bound worker can finish after a deadline. Reconcile it before deciding busy.
+          const ownership = yield* planner.ownership().pipe(
+            Effect.timeoutOrElse({
+              duration: 1000,
+              orElse: () =>
+                Effect.fail(
+                  new Unavailable({ operation: 'planner-observation-timeout', cause: null })
+                ),
+            })
+          );
+          if (ownership && !ownership.retired) {
+            const known = yield* store.get(ownership.requestId);
+            return known
+              ? { kind: 'busy' as const, id: known.id }
+              : {
+                  kind: 'blocked' as const,
+                  requestId: ownership.requestId,
+                  reason: ownership.run
+                    ? ('outstanding' as const)
+                    : ('reconciliation-required' as const),
+                };
+          }
+          const attempt: PlanningAttempt = {
+            id,
+            revision: 0,
+            startedAt,
+            deadline: startedAt + 120000,
+            phase: 'discovery',
+          };
+          const created = yield* store.create(attempt);
+          return created
+            ? { kind: 'accepted' as const, id: attempt.id }
+            : { kind: 'busy' as const, id: (yield* store.pending())?.id ?? id };
+        }),
+      observe: (id) =>
+        Effect.gen(function* () {
+          const attempt = yield* store.get(id);
+          if (!attempt) return undefined;
+          const ownership = yield* planner.ownership(false, id);
+          const launch = ownership?.requestId === id ? ownership : undefined;
+          const now = yield* time.now();
+          return {
+            ...attempt,
+            phase:
+              attempt.phase === 'discovery' && launch
+                ? (launch.phase ?? (launch.run ? 'running' : 'uncertain'))
+                : attempt.phase,
+            elapsedMs: Math.max(0, (attempt.finishedAt ?? now) - attempt.startedAt),
+            launch,
+          };
+        }),
+      execute: (id) =>
+        Effect.gen(function* () {
+          const attempt = yield* store.get(id);
+          if (!attempt || attempt.finishedAt !== undefined) return;
+          const original = attempt;
+          const operation = Effect.gen(function* () {
+            const now = yield* time.now();
+            if (now >= original.deadline)
+              return yield* Effect.fail(
+                new Unavailable({ operation: 'planning-deadline', cause: null })
+              );
+            const result = yield* plan
+              .preview({
+                requestId: id,
+                deadline: original.deadline,
+                progress: (phase) =>
+                  Effect.gen(function* () {
+                    const current = yield* store.get(id);
+                    if (!current) return yield* conflict();
+                    yield* save({ ...current, revision: current.revision + 1, phase });
+                  }),
+              })
+              .pipe(
+                Effect.timeoutOrElse({
+                  duration: original.deadline - now,
+                  orElse: () =>
+                    Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
+                })
+              );
+            const current = yield* store.get(id);
+            if (!current) return yield* conflict();
+            yield* save({
+              ...current,
+              revision: current.revision + 1,
+              phase: 'succeeded',
+              finishedAt: yield* time.now(),
+              result: {
+                kind: result.kind,
+                selected: result.selected,
+                rejected: result.rejected,
+                input: {
+                  issues: result.input.issues.map(
+                    ({ number, title, blockers, parents, recovery }) => ({
+                      number,
+                      title,
+                      blockers,
+                      parents,
+                      recovery,
+                    })
+                  ),
+                },
+              },
+            });
+          });
+          yield* operation.pipe(
+            Effect.catch((error) =>
+              Effect.gen(function* () {
+                const current = yield* store.get(id);
+                if (!current) return yield* conflict();
+                const ownership = yield* planner.ownership(false, id);
+                yield* save({
+                  ...current,
+                  revision: current.revision + 1,
+                  phase: 'failed',
+                  finishedAt: yield* time.now(),
+                  detail:
+                    ownership?.requestId === id && ownership.detail
+                      ? ownership.detail
+                      : error.operation === 'planning-deadline'
+                        ? 'Overall planning deadline exceeded. Launch ownership is retained until observation or reconciliation.'
+                        : 'Planning dependency failed. No implementation dispatched.',
+                });
+              })
+            )
+          );
+        }).pipe(Effect.withSpan('factory.planning.attempt')),
+    };
+  })
+);

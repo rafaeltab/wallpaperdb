@@ -107,6 +107,7 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
       }),
       Layer.succeed(PlanningSource, source),
       Layer.succeed(IPlanner, {
+        ownership: () => Effect.succeed(undefined),
         propose: () =>
           Effect.succeed({
             selected: [574, 575].map((issue) => ({

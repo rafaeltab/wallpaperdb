@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { writeFile } from 'node:fs/promises';
@@ -48,11 +49,13 @@ it('reattaches a durable planner run after process death without launching anoth
       planning: { candidates: [], issues: [] },
       planner: { status: 'running', proposal: { selected: [], deferred: [] } },
     });
-    const request = fetch(`${origin}/api/plan`, {
+    const submitted = await fetch(`${origin}/api/plan`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{}',
-    }).catch(() => undefined);
+    });
+    expect(submitted.status).toBe(202);
+    const { id } = z.object({ id: z.string().uuid() }).parse(await submitted.json());
     await vi.waitFor(
       async () =>
         expect(
@@ -63,7 +66,7 @@ it('reattaches a durable planner run after process death without launching anoth
       { timeout: 10000, interval: 30 }
     );
     await stop(child);
-    await request;
+
     child = launch();
     await ready();
     expect(
@@ -74,18 +77,23 @@ it('reattaches a durable planner run after process death without launching anoth
           body: '{}',
         })
       ).status
-    ).toBe(503);
+    ).toBe(409);
     await host.save({
       planning: { candidates: [], issues: [] },
       planner: { proposal: { selected: [], deferred: [] } },
     });
-    const recovered = await fetch(`${origin}/api/plan`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{}',
-    });
-    expect(recovered.status).toBe(200);
-    expect(await recovered.json()).toMatchObject({ kind: 'preview', selected: [] });
+    await vi.waitFor(
+      async () => {
+        const recovered = await fetch(`${origin}/api/plan/${id}`);
+        expect(recovered.status).toBe(200);
+        expect(await recovered.json()).toMatchObject({
+          id,
+          phase: 'succeeded',
+          result: { kind: 'preview', selected: [] },
+        });
+      },
+      { timeout: 10000, interval: 50 }
+    );
     const starts = (await host.calls()).filter(
       (call) => call.args[1] === 'start' && !call.args.includes('--help')
     );

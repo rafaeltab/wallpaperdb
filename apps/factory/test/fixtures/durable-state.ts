@@ -96,9 +96,12 @@ export async function unlink(path: string) {
   if (!result.changes) throw missing();
 }
 export async function rename(source: string, target: string) {
-  if (!isRecord(source)) return fs.rename(source, target);
-  const data = await readFile(source, 'utf8');
-  if (target.endsWith('.json')) await writeFile(target, data);
+  const sourceIsRecord = isRecord(source);
+  const targetIsRecord = isRecord(target);
+  if (!sourceIsRecord && !targetIsRecord) return fs.rename(source, target);
+  const data = sourceIsRecord ? await readFile(source, 'utf8') : await fs.readFile(source, 'utf8');
+  if (targetIsRecord) await writeFile(target, data);
   else await fs.writeFile(target, data);
-  await unlink(source);
+  if (sourceIsRecord) await unlink(source);
+  else await fs.unlink(source);
 }

@@ -3,7 +3,17 @@ import { startFactory } from '../src/composition/index.js';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, readFile, readdir, readlink, rm, writeFile, cp } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  readlink,
+  rm,
+  writeFile,
+  cp,
+  symlink,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -314,6 +324,72 @@ it('rejects explicit migration of an existing child database beneath another aut
         child,
       ])
     ).rejects.toMatchObject({ code: 1 });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(source, { recursive: true, force: true });
+  }
+});
+
+it('rejects a symlink alias hiding ancestor authority and allows a standalone alias', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  try {
+    const parent = join(root, 'parent');
+    initializeState(parent);
+    const child = join(parent, 'issue-42');
+    await mkdir(child);
+    const alias = join(root, 'alias');
+    await symlink(child, alias);
+    expect(() => initializeState(alias)).toThrow(/ancestor/);
+    await expect(
+      promisify(execFile)(process.execPath, [
+        '--import',
+        'tsx',
+        'src/main.ts',
+        '--migrate-only',
+        alias,
+      ])
+    ).rejects.toMatchObject({ code: 1 });
+    const standalone = join(root, 'standalone');
+    await mkdir(standalone);
+    const validAlias = join(root, 'valid-alias');
+    await symlink(standalone, validAlias);
+    expect(initializeState(validAlias)).toEqual({ format: 2, records: 0 });
+    await publisher(join(validAlias, 'issue-42'))('launch-claimed.json', { version: 1 });
+    expect(await readRecord(join(standalone, 'issue-42'), 'launch-claimed.json')).toEqual({
+      version: 1,
+    });
+    expect(initializeState(standalone)).toEqual({ format: 2, records: 1 });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('rejects declared namespace symlinks after parent initialization', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
+  try {
+    initializeState(root);
+    initializeState(source);
+    await symlink(source, join(root, 'issue-42'));
+    expect(() => initializeState(root)).toThrow(/symlink/i);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(source, { recursive: true, force: true });
+  }
+});
+
+it('rejects a database-file symlink before adopting another states authority', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'factory-sqlite-'));
+  const source = await mkdtemp(join(tmpdir(), 'factory-sqlite-child-'));
+  try {
+    initializeState(source);
+    await publisher(source)('launch-claimed.json', { version: 1 });
+    await symlink(join(source, 'factory.sqlite'), join(root, 'factory.sqlite'));
+    expect(() => initializeState(root)).toThrow(/symlink/i);
+    await expect(publisher(root)('launch-claimed.json', { version: 1 })).rejects.toThrow(
+      /symlink/i
+    );
+    expect(await publisher(source)('launch-claimed.json', { version: 1 })).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(source, { recursive: true, force: true });

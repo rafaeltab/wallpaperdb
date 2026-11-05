@@ -18,10 +18,7 @@ export function operationsServer(config: {
   ) => Promise<A>;
   job: Job;
   snapshot?: () => Effect.Effect<
-    import('../capabilities/plan/index.js').ScheduleStatus & {
-      relationships?: readonly WorkRelationship[];
-      observations?: import('../capabilities/observe/index.js').ObservationState;
-    },
+    import('../capabilities/observe/index.js').ScheduleSnapshot,
     Unavailable
   >;
   plan?: Plan;

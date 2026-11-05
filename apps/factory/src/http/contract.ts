@@ -22,4 +22,5 @@ export interface WorkRelationship {
  * reconciliation. Planning-attempt submission/observation contracts remain in
  * capabilities/plan; this layer adds no deadline or phase changes.
  */
-export type OperationsObservation = import('../capabilities/observe/index.js').ObservationState;
+export type OperationsObservation = import('../capabilities/observe/index.js').ObservationSnapshot;
+export type OperationsSnapshot = import('../capabilities/observe/index.js').ScheduleSnapshot;

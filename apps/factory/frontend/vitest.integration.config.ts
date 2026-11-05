@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 export default defineBaseConfig({
   test: {
@@ -7,6 +8,11 @@ export default defineBaseConfig({
     maxWorkers: 1,
     coverage: {
       provider: 'v8',
+      reporter: [
+        ['lcov', { projectRoot: fileURLToPath(new URL('../../../', import.meta.url)) }],
+        'json',
+        'json-summary',
+      ],
       include: ['frontend/src/**/*.{ts,tsx}'],
       reportsDirectory: './coverage/integration/frontend',
     },

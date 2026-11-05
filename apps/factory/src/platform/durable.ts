@@ -202,8 +202,16 @@ function connection<A>(
 }
 /** Open, migrate and import only. No external reconciliation or worker launch. */
 export function initializeState(directory: string, migrateSchema = true) {
-  if (rootFor(directory) !== resolve(directory))
-    throw new Error('Explicit state root cannot inherit an ancestor SQLite database');
+  const explicitRoot = resolve(directory);
+  for (
+    let ancestor = dirname(explicitRoot);
+    ancestor !== explicitRoot;
+    ancestor = dirname(ancestor)
+  ) {
+    if (existsSync(join(ancestor, filename)))
+      throw new Error('Explicit state root cannot inherit an ancestor SQLite database');
+    if (dirname(ancestor) === ancestor) break;
+  }
   rejectNestedDatabases(resolve(directory));
   return connection(
     directory,

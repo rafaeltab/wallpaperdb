@@ -71,6 +71,22 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       await browserExpect(page.locator('#observation-notice')).toHaveText(
         'Observations refresh automatically.'
       );
+      // Exercise the browser's persisted-document lifecycle without assuming
+      // headless Chromium's navigation policy actually selects BFCache.
+      await page.evaluate(() =>
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+      );
+      const restoredRefresh = page.waitForResponse(
+        (response) =>
+          response.request().resourceType() === 'fetch' &&
+          response.url() === `http://127.0.0.1:${address.port}/`,
+        { timeout: 5000 }
+      );
+      await page.evaluate(() =>
+        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+      );
+      await restoredRefresh;
+      await browserExpect(page.getByText('Status: running')).toBeVisible();
 
       await page.getByRole('link', { name: 'Refresh observation' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();

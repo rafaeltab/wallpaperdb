@@ -740,7 +740,7 @@ it.each([
         projectId: 'project-id',
       },
     };
-    const second = githubIssues(config);
+    const second = githubIssues(config, f.readGitHub);
     if (!second.prepare) throw new Error('Missing second prepare');
     await Effect.runPromise(second.prepare(7));
     const next = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
@@ -806,7 +806,7 @@ it.each([
     if (kind === 'failed-ci') live.newCI = 'FAILURE';
     if (kind === 'corrupt-group') live.groups = [];
     await writeFile(path, JSON.stringify(live));
-    const current = githubIssues({ ...config, base: kind === 'changed-pin' ? g : config.base });
+    const current = githubIssues({ ...config, base: kind === 'changed-pin' ? g : config.base }, f.readGitHub);
     if (kind === 'wrong-tree') {
       await expect(
         Effect.runPromise(

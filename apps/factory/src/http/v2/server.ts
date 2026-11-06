@@ -46,17 +46,20 @@ export function fakeV2Server(options: FakeV2Options = {}) {
 }
 export type V2Data = Omit<ReturnType<typeof fakeState>, 'submit' | 'plan' | 'receipt'> & {
   receipt(
-    id: string
+    id: string,
+    headers?: Record<string, string | string[] | undefined>
   ):
     | ReturnType<ReturnType<typeof fakeState>['receipt']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['receipt']>>;
   plan(
-    id: string
+    id: string,
+    headers?: Record<string, string | string[] | undefined>
   ):
     | ReturnType<ReturnType<typeof fakeState>['plan']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['plan']>>;
   submit(
-    command: import('./contract.js').FactoryV2Command
+    command: import('./contract.js').FactoryV2Command,
+    headers?: Record<string, string | string[] | undefined>
   ):
     | ReturnType<ReturnType<typeof fakeState>['submit']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['submit']>>;
@@ -281,14 +284,14 @@ export function registerV2Routes(
   app.get('/api/v2/plans/:id', async (request, reply) => {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
-    const result = await data.plan(parsed.data.id);
+    const result = await data.plan(parsed.data.id, request.headers);
     return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown plan.'));
   });
   app.get('/api/v2/commands/:id', async (request, reply) => {
     const parsed = receiptParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     return (
-      (await data.receipt(parsed.data.id)) ??
+      (await data.receipt(parsed.data.id, request.headers)) ??
       sendProblem(reply, problem(404, 'not-found', 'Unknown command.'))
     );
   });
@@ -297,7 +300,7 @@ export function registerV2Routes(
       return sendProblem(reply, problem(415, 'unsupported', 'JSON required.'));
     const parsed = commandSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, 'Invalid command payload.');
-    const result = await data.submit(parsed.data);
+    const result = await data.submit(parsed.data, request.headers);
     return 'code' in result
       ? sendProblem(reply, result)
       : reply

@@ -1,18 +1,18 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import test from "node:test";
+import { test } from "vitest";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching snapshot", (t) => {
 	const root = fs.mkdtempSync(
 		path.join(os.tmpdir(), "migration-replay-contract-"),
 	);
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	fs.mkdirSync(path.join(root, "scripts"));
 	fs.mkdirSync(path.join(root, "apps/fixture/drizzle/meta"), {
 		recursive: true,
@@ -73,7 +73,7 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 		'"width" integer NOT NULL,\n\t"height" integer NOT NULL,',
 		'"height" integer NOT NULL,\n\t"width" integer NOT NULL,',
 	);
-	assert.notEqual(reordered, sql);
+	expect(reordered).not.toBe(sql);
 	for (const [label, migration, expectedStatus, viewDefinition = viewSql] of [
 		["matching", sql, 0],
 		["matching with different physical column order", reordered, 0],
@@ -119,13 +119,11 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 			[path.join(root, "scripts/check-migration-replay.mjs")],
 			{ encoding: "utf8", timeout: 90_000 },
 		);
-		assert.equal(result.error, undefined, result.error?.message);
-		assert.equal(
-			result.status,
+		expect(result.error, result.error?.message).toBe(undefined);
+		expect(result.status, `${label}: ${result.stdout}\n${result.stderr}`).toBe(
 			expectedStatus,
-			`${label}: ${result.stdout}\n${result.stderr}`,
 		);
 		if (expectedStatus)
-			assert.match(result.stderr, /schema differs from snapshot/);
+			expect(result.stderr).toMatch(/schema differs from snapshot/);
 	}
 });

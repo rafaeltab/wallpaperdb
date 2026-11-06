@@ -1,12 +1,12 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { checkDocumentation } from "./check-documentation.mjs";
 test("documentation resolves links, duplicate headings, references and unique skills", (t) => {
 	const root = mkdtempSync(join(tmpdir(), "docs-check-"));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
 	const write = (p, s) => {
 		const file = join(root, p);
 		mkdirSync(join(file, ".."), { recursive: true });
@@ -21,22 +21,22 @@ test("documentation resolves links, duplicate headings, references and unique sk
 		"guide.md",
 		"[ok](target.md#a-heading-1)\n[ref][target]\n[target]: target.md\nUse $example.\n```sh\n[example](missing.md)\n```\n",
 	);
-	assert.deepEqual(checkDocumentation(root, ["guide.md"]), []);
+	expect(checkDocumentation(root, ["guide.md"])).toStrictEqual([]);
 	write("name (draft).md", "# A *formatted* heading\n");
 	write(
 		"guide.md",
 		"[nested [label]](<name (draft).md#a-formatted-heading>)\n\n    [code](missing.md)\n",
 	);
-	assert.deepEqual(checkDocumentation(root, ["guide.md"]), []);
+	expect(checkDocumentation(root, ["guide.md"])).toStrictEqual([]);
 	write(
 		"guide.md",
 		"[bad](target.md#missing)\n[absent](absent.md)\nUse $unknown-skill.\n",
 	);
-	assert.equal(checkDocumentation(root, ["guide.md"]).length, 3);
+	expect(checkDocumentation(root, ["guide.md"]).length).toBe(3);
 	write("guide.md", "Use `$unknown-skill` for this task.");
-	assert.equal(checkDocumentation(root, ["guide.md"]).length, 1);
+	expect(checkDocumentation(root, ["guide.md"]).length).toBe(1);
 	write(".agents/skills/example/SKILL.md", "---\nname: example\n---\n");
-	assert.ok(
+	expect(
 		checkDocumentation(root, []).some((e) => e.includes("duplicate skill")),
-	);
+	).toBeTruthy();
 });

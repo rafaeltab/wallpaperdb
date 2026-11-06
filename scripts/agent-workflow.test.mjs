@@ -1,5 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect } from "vitest";
+import { test } from "vitest";
 import { issuePreflight } from "./agent-workflow.mjs";
 const ready = () => ({
 	state: "OPEN",
@@ -9,16 +9,16 @@ const ready = () => ({
 	project: { owner: "rafaeltab", number: 7, status: "In Progress" },
 });
 test("issue preflight rejects closed, unassigned, blocked and wrong-project work", () => {
-	assert.deepEqual(issuePreflight(ready(), "agent", "In Progress"), []);
+	expect(issuePreflight(ready(), "agent", "In Progress")).toStrictEqual([]);
 	for (const change of [
 		{ state: "CLOSED" },
 		{ assignees: [] },
 		{ blockedBy: { nodes: [{ state: "OPEN" }], totalCount: 1 } },
 		{ project: { owner: "someone", number: 7, status: "In Progress" } },
 	])
-		assert.ok(
+		expect(
 			issuePreflight({ ...ready(), ...change }, "agent", "In Progress").length,
-		);
+		).toBeTruthy();
 });
 test("issue preflight accepts only individually verified stack blockers", () => {
 	const url = "https://github.com/rafaeltab/wallpaperdb/issues/2";
@@ -26,12 +26,13 @@ test("issue preflight accepts only individually verified stack blockers", () => 
 		...ready(),
 		blockedBy: { nodes: [{ url, state: "OPEN" }], totalCount: 1 },
 	};
-	assert.deepEqual(
+	expect(
 		issuePreflight(issue, "agent", "In Progress", new Set([url])),
-		[],
-	);
-	assert.ok(issuePreflight(issue, "agent", "In Progress", new Set()).length);
-	assert.ok(
+	).toStrictEqual([]);
+	expect(
+		issuePreflight(issue, "agent", "In Progress", new Set()).length,
+	).toBeTruthy();
+	expect(
 		issuePreflight(
 			{
 				...issue,
@@ -44,7 +45,7 @@ test("issue preflight accepts only individually verified stack blockers", () => 
 			"In Progress",
 			new Set([url]),
 		).length,
-	);
+	).toBeTruthy();
 });
 
 import { prReadiness, ciAssessmentErrors } from "./agent-workflow.mjs";
@@ -68,7 +69,7 @@ test("conditional applicability binds trusted policy and effective merge configu
 			},
 		],
 	};
-	assert.deepEqual(ciAssessmentErrors(assessment, snapshot), []);
+	expect(ciAssessmentErrors(assessment, snapshot)).toStrictEqual([]);
 	for (const change of [
 		{ head: "d".repeat(40) },
 		{ policySha: "d".repeat(40) },
@@ -90,9 +91,9 @@ test("conditional applicability binds trusted policy and effective merge configu
 			],
 		},
 	])
-		assert.ok(
+		expect(
 			ciAssessmentErrors({ ...assessment, ...change }, snapshot).length,
-		);
+		).toBeTruthy();
 });
 test("readiness allows explicitly assessed conditional skips while retaining failed and required gates", () => {
 	const pr = {
@@ -110,10 +111,12 @@ test("readiness allows explicitly assessed conditional skips while retaining fai
 			rationale: "trusted paths condition excludes this change",
 		},
 	];
-	assert.deepEqual(prReadiness(pr, ["build"], exclusions), []);
-	assert.ok(prReadiness(pr, ["build"]).length);
-	assert.ok(prReadiness(pr, ["build", "conditional-docs"], exclusions).length);
-	assert.ok(
+	expect(prReadiness(pr, ["build"], exclusions)).toStrictEqual([]);
+	expect(prReadiness(pr, ["build"]).length).toBeTruthy();
+	expect(
+		prReadiness(pr, ["build", "conditional-docs"], exclusions).length,
+	).toBeTruthy();
+	expect(
 		prReadiness(
 			{
 				...pr,
@@ -124,8 +127,8 @@ test("readiness allows explicitly assessed conditional skips while retaining fai
 			[],
 			exclusions,
 		).length,
-	);
-	assert.ok(
+	).toBeTruthy();
+	expect(
 		prReadiness(
 			{
 				...pr,
@@ -136,7 +139,7 @@ test("readiness allows explicitly assessed conditional skips while retaining fai
 			[],
 			exclusions,
 		).length,
-	);
+	).toBeTruthy();
 });
 test("PR readiness never treats absent, pending or unknown checks as passing", () => {
 	const pr = {
@@ -146,11 +149,15 @@ test("PR readiness never treats absent, pending or unknown checks as passing", (
 			{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
 		],
 	};
-	assert.deepEqual(prReadiness(pr, ["build"]), []);
-	assert.ok(prReadiness({ ...pr, statusCheckRollup: [] }, ["build"]).length);
-	assert.ok(prReadiness({ ...pr, mergeable: "UNKNOWN" }, ["build"]).length);
-	assert.ok(prReadiness(pr, null).length);
-	assert.ok(
+	expect(prReadiness(pr, ["build"])).toStrictEqual([]);
+	expect(
+		prReadiness({ ...pr, statusCheckRollup: [] }, ["build"]).length,
+	).toBeTruthy();
+	expect(
+		prReadiness({ ...pr, mergeable: "UNKNOWN" }, ["build"]).length,
+	).toBeTruthy();
+	expect(prReadiness(pr, null).length).toBeTruthy();
+	expect(
 		prReadiness(
 			{
 				...pr,
@@ -161,7 +168,7 @@ test("PR readiness never treats absent, pending or unknown checks as passing", (
 			},
 			["build"],
 		).length,
-	);
+	).toBeTruthy();
 });
 
 import { reviewEvidenceErrors } from "./agent-workflow.mjs";
@@ -188,21 +195,21 @@ test("review evidence requires all axes and preserves actual reviewed comparison
 		current,
 		reviews: ["Standards", "Spec", "Defects"].map(review),
 	};
-	assert.deepEqual(reviewEvidenceErrors(evidence, current), []);
-	assert.ok(
+	expect(reviewEvidenceErrors(evidence, current)).toStrictEqual([]);
+	expect(
 		reviewEvidenceErrors(
 			{ ...evidence, reviews: evidence.reviews.slice(1) },
 			current,
 		).length,
-	);
-	assert.ok(
+	).toBeTruthy();
+	expect(
 		reviewEvidenceErrors(evidence, { ...current, head: "d".repeat(40) }).length,
-	);
+	).toBeTruthy();
 	const pending = {
 		...evidence,
 		reviews: [...evidence.reviews, { ...review("Spec"), outcome: "pending" }],
 	};
-	assert.ok(reviewEvidenceErrors(pending, current).length);
+	expect(reviewEvidenceErrors(pending, current).length).toBeTruthy();
 });
 
 import fs from "node:fs";
@@ -211,7 +218,9 @@ import path from "node:path";
 import { publishMarkdown } from "./agent-workflow.mjs";
 test("Markdown publication passes hostile body text as a file and verifies exact readback", (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "publication-"));
-	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	t.onTestFinished(() =>
+		fs.rmSync(directory, { recursive: true, force: true }),
+	);
 	const body =
 		"First line\n\n```sh\n$(touch /tmp/should-not-exist)\nEOF\n```\n";
 	const bodyFile = path.join(directory, "body.md");
@@ -220,28 +229,25 @@ test("Markdown publication passes hostile body text as a file and verifies exact
 	const run = (_program, args) => {
 		if (args.includes("--body-file")) {
 			posted = fs.readFileSync(args[args.indexOf("--body-file") + 1], "utf8");
-			assert.ok(!args.includes(body));
+			expect(!args.includes(body)).toBeTruthy();
 			return "https://github.com/owner/repo/issues/1";
 		}
 		return JSON.stringify({ body: posted });
 	};
-	assert.equal(
+	expect(
 		publishMarkdown({ kind: "issue-edit", subject: "1", bodyFile }, run)
 			.bodyVerified,
-		true,
-	);
-	assert.equal(posted, body);
-	assert.throws(
-		() =>
-			publishMarkdown(
-				{ kind: "issue-edit", subject: "1", bodyFile },
-				(_p, args) =>
-					args.includes("--body-file")
-						? ""
-						: JSON.stringify({ body: "different" }),
-			),
-		/readback/,
-	);
+	).toBe(true);
+	expect(posted).toBe(body);
+	expect(() =>
+		publishMarkdown(
+			{ kind: "issue-edit", subject: "1", bodyFile },
+			(_p, args) =>
+				args.includes("--body-file")
+					? ""
+					: JSON.stringify({ body: "different" }),
+		),
+	).toThrow(/readback/);
 });
 
 test("a workflow display name cannot grant a CI exemption", () => {
@@ -256,8 +262,8 @@ test("a workflow display name cannot grant a CI exemption", () => {
 			},
 		],
 	};
-	assert.ok(prReadiness(pr, ["critical"]).length);
-	assert.deepEqual(
+	expect(prReadiness(pr, ["critical"]).length).toBeTruthy();
+	expect(
 		prReadiness(
 			{
 				...pr,
@@ -265,8 +271,7 @@ test("a workflow display name cannot grant a CI exemption", () => {
 			},
 			[],
 		),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 import { markAdvisoryChecks } from "./agent-workflow.mjs";
@@ -290,8 +295,8 @@ test("advisory status is bound to the authenticated pilot path and current head"
 			head_sha: head,
 		}),
 	);
-	assert.deepEqual(
-		pr.statusCheckRollup.map((c) => c.advisory),
-		[true, false],
-	);
+	expect(pr.statusCheckRollup.map((c) => c.advisory)).toStrictEqual([
+		true,
+		false,
+	]);
 });

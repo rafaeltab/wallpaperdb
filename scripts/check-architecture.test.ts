@@ -37,9 +37,8 @@ for (const [label, entry, implementation, barrel] of [
 		project.source("capabilities/search/implementation.ts", implementation);
 		project.source("capabilities/search/barrel.ts", barrel);
 		const rejected = project.run();
-		assert.equal(rejected.status, 1, rejected.stdout);
-		assert.match(
-			rejected.stderr,
+		expect(rejected.status, rejected.stdout).toBe(1);
+		expect(rejected.stderr).toMatch(
 			/public contract Search must be declared in contract.ts/,
 		);
 		project.source(
@@ -51,7 +50,7 @@ for (const [label, entry, implementation, barrel] of [
 			"export { type Search, type Search as default } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
 		);
 		const allowed = project.run();
-		assert.equal(allowed.status, 0, allowed.stderr);
+		expect(allowed.status, allowed.stderr).toBe(0);
 	});
 
 test("public capability contracts originate in contract.ts through aliases and barrels", (t) => {
@@ -71,9 +70,8 @@ test("public capability contracts originate in contract.ts through aliases and b
 			"export type { Search } from './implementation.js';",
 		);
 		const result = project.run();
-		assert.equal(result.status, 1, result.stdout);
-		assert.match(
-			result.stderr,
+		expect(result.status, result.stdout).toBe(1);
+		expect(result.stderr).toMatch(
 			/public contract Search must be declared in contract.ts/,
 		);
 		project.source(
@@ -85,7 +83,7 @@ test("public capability contracts originate in contract.ts through aliases and b
 			"export type { Search } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
 		);
 		const allowed = project.run();
-		assert.equal(allowed.status, 0, allowed.stderr);
+		expect(allowed.status, allowed.stderr).toBe(0);
 	}
 });
 

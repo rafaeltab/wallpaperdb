@@ -1,12 +1,12 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { checkMigrations } from "./check-migrations.mjs";
 test("migration metadata requires SQL, ordered journals and linked snapshots", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "migration-audit-"));
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	fs.mkdirSync(path.join(root, "meta"));
 	const write = (file, data) =>
 		fs.writeFileSync(
@@ -20,11 +20,11 @@ test("migration metadata requires SQL, ordered journals and linked snapshots", (
 		id: "first",
 		prevId: "00000000-0000-0000-0000-000000000000",
 	});
-	assert.ok(checkMigrations(root).some((e) => e.includes("SQL")));
+	expect(checkMigrations(root).some((e) => e.includes("SQL"))).toBeTruthy();
 	write("0000_initial.sql", "create table example(id int);");
-	assert.deepEqual(checkMigrations(root), []);
+	expect(checkMigrations(root)).toStrictEqual([]);
 	write("meta/_journal.json", {
 		entries: [{ idx: 1, tag: "0000_initial", when: 1 }],
 	});
-	assert.ok(checkMigrations(root).some((e) => e.includes("index")));
+	expect(checkMigrations(root).some((e) => e.includes("index"))).toBeTruthy();
 });

@@ -1,5 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect } from "vitest";
+import { test } from "vitest";
 import { guardedPush } from "./guarded-push.mjs";
 const head = "a".repeat(40),
 	expected = "b".repeat(40);
@@ -22,44 +22,38 @@ test("guarded publication requires an open unchanged PR and uses a literal expec
 		run,
 		() => (++reads === 1 ? pr : { ...pr, headRefOid: head }),
 	);
-	assert.ok(
+	expect(
 		pushed.includes(
 			`--force-with-lease=refs/heads/feature/$(literal):${expected}`,
 		),
-	);
-	assert.equal(pushed.at(-1), `${head}:refs/heads/feature/$(literal)`);
-	assert.throws(
-		() =>
-			guardedPush(
-				{
-					pr: { ...pr, state: "CLOSED" },
-					expectedHead: expected,
-					head,
-					validatedHead: head,
-				},
-				run,
-				() => pr,
-			),
-		/open/,
-	);
-	assert.throws(
-		() =>
-			guardedPush(
-				{ pr, expectedHead: expected, head, validatedHead: head },
-				run,
-				() => ({ ...pr, headRefOid: head }),
-			),
-		/changed/,
-	);
-	assert.throws(
-		() =>
-			guardedPush(
-				{ pr, expectedHead: expected, head, validatedHead: expected },
-				run,
-				() => pr,
-			),
-		/validated/,
-	);
+	).toBeTruthy();
+	expect(pushed.at(-1)).toBe(`${head}:refs/heads/feature/$(literal)`);
+	expect(() =>
+		guardedPush(
+			{
+				pr: { ...pr, state: "CLOSED" },
+				expectedHead: expected,
+				head,
+				validatedHead: head,
+			},
+			run,
+			() => pr,
+		),
+	).toThrow(/open/);
+	expect(() =>
+		guardedPush(
+			{ pr, expectedHead: expected, head, validatedHead: head },
+			run,
+			() => ({ ...pr, headRefOid: head }),
+		),
+	).toThrow(/changed/);
+	expect(() =>
+		guardedPush(
+			{ pr, expectedHead: expected, head, validatedHead: expected },
+			run,
+			() => pr,
+		),
+	).toThrow(/validated/);
 });
 
 import fs from "node:fs";
@@ -68,7 +62,9 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 test("the actual Git lease rejects a stale remote head", (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lease-test-"));
-	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	t.onTestFinished(() =>
+		fs.rmSync(directory, { recursive: true, force: true }),
+	);
 	const remote = path.join(directory, "remote.git"),
 		local = path.join(directory, "local");
 	fs.mkdirSync(local);
@@ -113,13 +109,12 @@ test("the actual Git lease rejects a stale remote head", (t) => {
 	guardedPush({ pr, head, expectedHead, validatedHead: head }, run, () =>
 		++reads === 1 ? pr : { ...pr, headRefOid: head },
 	);
-	assert.equal(
+	expect(
 		git(["--git-dir", remote, "rev-parse", "refs/heads/selected"]).trim(),
-		head,
-	);
-	assert.throws(() =>
+	).toBe(head);
+	expect(() =>
 		guardedPush({ pr, head, expectedHead, validatedHead: head }, run, () => pr),
-	);
+	).toThrow();
 });
 
 test("rewrite authorization must be an explicit boolean", () => {
@@ -130,19 +125,17 @@ test("rewrite authorization must be an explicit boolean", () => {
 		headRepository: { name: "repo" },
 		headRepositoryOwner: { login: "owner" },
 	};
-	assert.throws(
-		() =>
-			guardedPush(
-				{
-					pr,
-					expectedHead: expected,
-					head,
-					validatedHead: head,
-					rewriteAuthorized: "false",
-				},
-				() => "",
-				() => pr,
-			),
-		/boolean/,
-	);
+	expect(() =>
+		guardedPush(
+			{
+				pr,
+				expectedHead: expected,
+				head,
+				validatedHead: head,
+				rewriteAuthorized: "false",
+			},
+			() => "",
+			() => pr,
+		),
+	).toThrow(/boolean/);
 });

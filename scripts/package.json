@@ -27,7 +27,7 @@
 		"agent": "node agent-workflow.mjs",
 		"check:services": "node check-service-wiring.mjs",
 		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts...",
-		"test:integration": "node --test check-migration-replay.integration.mjs && node check-migration-replay.mjs"
+		"test:integration": "cd .. && scripts/node_modules/.bin/vitest run --config scripts/vitest.integration.config.ts && node scripts/check-migration-replay.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

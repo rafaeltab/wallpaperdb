@@ -1,16 +1,16 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import test from "node:test";
+import { test } from "vitest";
 import { verifyStackReadiness } from "./stack-readiness.mjs";
 import { reviewEvidenceErrors } from "./agent-workflow.mjs";
 
 test("stack readiness verifies the parent commit, passing logs, review axes and issue record", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "stack-readiness-"));
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	const run = (program, args) =>
 		execFileSync(program, args, {
 			cwd: root,
@@ -116,60 +116,50 @@ test("stack readiness verifies the parent commit, passing logs, review axes and 
 		fs.writeFileSync(reviewFile, JSON.stringify(reviews));
 	};
 	write();
-	assert.deepEqual(
-		[...verifyStackReadiness(assessment, context, run)],
-		[blocker],
-	);
-	assert.throws(
-		() => verifyStackReadiness({ ...assessment, blockers: [] }, context, run),
-		/exactly/,
-	);
-	assert.throws(
-		() => verifyStackReadiness({ ...assessment, head: parent }, context, run),
-		/current head/,
-	);
-	assert.throws(
-		() =>
-			verifyStackReadiness(
-				assessment,
-				{
-					...context,
-					readIssue: () => ({
-						url: blocker,
-						state: "OPEN",
-						body: "no evidence",
-					}),
-				},
-				run,
-			),
-		/record/,
-	);
-	assert.throws(
-		() =>
-			verifyStackReadiness(
-				assessment,
-				{
-					...context,
-					readPr: () => ({ ...context.readPr(), headRefOid: head }),
-				},
-				run,
-			),
-		/evidenced head/,
-	);
+	expect([...verifyStackReadiness(assessment, context, run)]).toStrictEqual([
+		blocker,
+	]);
+	expect(() =>
+		verifyStackReadiness({ ...assessment, blockers: [] }, context, run),
+	).toThrow(/exactly/);
+	expect(() =>
+		verifyStackReadiness({ ...assessment, head: parent }, context, run),
+	).toThrow(/current head/);
+	expect(() =>
+		verifyStackReadiness(
+			assessment,
+			{
+				...context,
+				readIssue: () => ({
+					url: blocker,
+					state: "OPEN",
+					body: "no evidence",
+				}),
+			},
+			run,
+		),
+	).toThrow(/record/);
+	expect(() =>
+		verifyStackReadiness(
+			assessment,
+			{
+				...context,
+				readPr: () => ({ ...context.readPr(), headRefOid: head }),
+			},
+			run,
+		),
+	).toThrow(/evidenced head/);
 	write({ ...validation, sourceDigest: sha("dirty source") });
-	assert.throws(
-		() => verifyStackReadiness(assessment, context, run),
+	expect(() => verifyStackReadiness(assessment, context, run)).toThrow(
 		/passing validation/,
 	);
 	write(validation, { ...ledger, reviews: ledger.reviews.slice(1) });
-	assert.throws(
-		() => verifyStackReadiness(assessment, context, run),
+	expect(() => verifyStackReadiness(assessment, context, run)).toThrow(
 		/independent review/,
 	);
 	write();
 	fs.appendFileSync(log, "changed");
-	assert.throws(
-		() => verifyStackReadiness(assessment, context, run),
+	expect(() => verifyStackReadiness(assessment, context, run)).toThrow(
 		/artifact/,
 	);
 	const descendant = {
@@ -177,7 +167,7 @@ test("stack readiness verifies the parent commit, passing logs, review axes and 
 		head: parent,
 		blockers: [{ ...assessment.blockers[0], head }],
 	};
-	assert.throws(() =>
+	expect(() =>
 		verifyStackReadiness(
 			descendant,
 			{
@@ -187,5 +177,5 @@ test("stack readiness verifies the parent commit, passing logs, review axes and 
 			},
 			run,
 		),
-	);
+	).toThrow();
 });

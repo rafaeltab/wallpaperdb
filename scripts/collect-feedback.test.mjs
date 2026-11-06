@@ -1,5 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { expect } from "vitest";
+import { test } from "vitest";
 import { collectFeedback } from "./collect-feedback.mjs";
 const page = (nodes, next = null) => ({
 	nodes,
@@ -20,17 +20,17 @@ test("feedback collection exhausts outer threads and every inner comment connect
 						"more-threads",
 					),
 		comments: (thread, cursor) => {
-			assert.equal(thread, "thread-1");
-			assert.equal(cursor, "more-comments");
+			expect(thread).toBe("thread-1");
+			expect(cursor).toBe("more-comments");
 			return page([{ id: "comment-2" }]);
 		},
 		reviews: () => [{ id: "review-1", body: "summary" }],
 		conversation: () => [{ id: "conversation-1" }],
 	});
-	assert.deepEqual(
-		result.threads.map((t) => t.comments.map((c) => c.id)),
-		[["comment-1", "comment-2"], ["comment-3"]],
-	);
-	assert.equal(result.reviews[0].id, "review-1");
-	assert.equal(result.conversation[0].id, "conversation-1");
+	expect(result.threads.map((t) => t.comments.map((c) => c.id))).toStrictEqual([
+		["comment-1", "comment-2"],
+		["comment-3"],
+	]);
+	expect(result.reviews[0].id).toBe("review-1");
+	expect(result.conversation[0].id).toBe("conversation-1");
 });

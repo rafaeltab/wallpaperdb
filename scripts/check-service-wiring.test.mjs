@@ -1,12 +1,12 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { checkServiceWiring } from "./check-service-wiring.mjs";
 test("service audit requires deployment, environment, health, ingress and Bruno wiring", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "service-wiring-"));
-	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	const write = (file, text) => {
 		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
 		fs.writeFileSync(path.join(root, file), text);
@@ -25,14 +25,13 @@ test("service audit requires deployment, environment, health, ingress and Bruno 
 		env_file: [{ path: path.join(root, "apps/example/.env") }],
 		healthcheck: { test: ["CMD", "true"] },
 	};
-	assert.deepEqual(
+	expect(
 		checkServiceWiring(root, { services: { example: service } }),
-		[],
-	);
-	assert.ok(checkServiceWiring(root, { services: {} }).length);
-	assert.ok(
+	).toStrictEqual([]);
+	expect(checkServiceWiring(root, { services: {} }).length).toBeTruthy();
+	expect(
 		checkServiceWiring(root, {
 			services: { example: { ...service, healthcheck: {} } },
 		}).length,
-	);
+	).toBeTruthy();
 });

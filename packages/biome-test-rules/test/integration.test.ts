@@ -382,7 +382,7 @@ function sourceTestDirectory(path: string): string | undefined {
 	return undefined;
 }
 
-test("Make lint discovers each workspace's actual test directories and accepts valid assertions", () => {
+describe("Make lint discovers each workspace's actual test directories and accepts valid assertions", () => {
 	const fixtures = [["root", "test/integration/biome-discovery-probe.test.ts"]];
 	for (const workspace of workspaces) {
 		const manifest = JSON.parse(
@@ -408,34 +408,35 @@ test("Make lint discovers each workspace's actual test directories and accepts v
 		["infra-local", "infra/biome-discovery-probe.test.ts"],
 		["user", "apps/user/test/fixtures/biome-discovery-probe.ts"],
 	);
-	const directory = isolatedRepository();
-	try {
-		for (const [workspace, path] of fixtures) {
-			const fixture = join(directory, path);
-			mkdirSync(dirname(fixture), { recursive: true });
-			writeFileSync(
-				fixture,
-				'import { expect } from "vitest";\nexpect(1, 2);\n',
-			);
-			const invalid = makeLint(directory, workspace);
-			expect(invalid.status, path).not.toBe(0);
-			expect(
-				invalid.output.includes(basename(path)),
-				invalid.output,
-			).toBeTruthy();
-			expect(invalid.output, path).toMatch(
-				/Expect must have a corresponding matcher/,
-			);
-			writeFileSync(
-				fixture,
-				'import { expect } from "vitest";\nexpect(1).toBe(1);\n',
-			);
-			const valid = makeLint(directory, workspace);
-			expect(valid.status, valid.output).toBe(0);
-			rmSync(fixture);
-		}
-	} finally {
-		rmSync(directory, { recursive: true, force: true });
+	for (const [workspace, path] of fixtures) {
+		test(`${workspace}: ${path}`, () => {
+			const directory = isolatedRepository();
+			try {
+				const fixture = join(directory, path);
+				mkdirSync(dirname(fixture), { recursive: true });
+				writeFileSync(
+					fixture,
+					'import { expect } from "vitest";\nexpect(1, 2);\n',
+				);
+				const invalid = makeLint(directory, workspace);
+				expect(invalid.status, path).not.toBe(0);
+				expect(
+					invalid.output.includes(basename(path)),
+					invalid.output,
+				).toBeTruthy();
+				expect(invalid.output, path).toMatch(
+					/Expect must have a corresponding matcher/,
+				);
+				writeFileSync(
+					fixture,
+					'import { expect } from "vitest";\nexpect(1).toBe(1);\n',
+				);
+				const valid = makeLint(directory, workspace);
+				expect(valid.status, valid.output).toBe(0);
+			} finally {
+				rmSync(directory, { recursive: true, force: true });
+			}
+		});
 	}
 });
 

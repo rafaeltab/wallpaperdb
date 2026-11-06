@@ -33,6 +33,8 @@ test("documentation resolves links, duplicate headings, references and unique sk
 		"[bad](target.md#missing)\n[absent](absent.md)\nUse $unknown-skill.\n",
 	);
 	assert.equal(checkDocumentation(root, ["guide.md"]).length, 3);
+	write("guide.md", "Use `$unknown-skill` for this task.");
+	assert.equal(checkDocumentation(root, ["guide.md"]).length, 1);
 	write(".agents/skills/example/SKILL.md", "---\nname: example\n---\n");
 	assert.ok(
 		checkDocumentation(root, []).some((e) => e.includes("duplicate skill")),

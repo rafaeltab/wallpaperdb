@@ -93,6 +93,12 @@ export function checkDocumentation(root, files) {
 					links.push(references.get(node.identifier));
 				else errors.push(`${file}: unresolved reference ${node.identifier}`);
 			}
+			if (
+				node.type === "inlineCode" &&
+				/^\$[a-z][a-z0-9-]*$/.test(node.value) &&
+				!skills.has(node.value.slice(1))
+			)
+				errors.push(`${file}: unknown skill ${node.value}`);
 			if (node.type === "text")
 				for (const match of node.value.matchAll(/\$([a-z][a-z0-9-]*)\b/g))
 					if (!skills.has(match[1]))

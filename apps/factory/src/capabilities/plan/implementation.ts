@@ -142,7 +142,7 @@ export const PlanLive = Layer.effect(
           );
         }).pipe(
           Effect.timeoutOrElse({
-            duration: 600000,
+            duration: attempt ? Math.max(0, attempt.deadline - Date.now()) : 600000,
             orElse: () =>
               Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
           }),

@@ -66,7 +66,11 @@ it('serves the real React app over Vite HMR, proxies same-origin browser POSTs a
     const origin = vite.resolvedUrls?.local[0];
     if (!origin) throw new Error('Missing dev URL');
     expect((await fetch(`${origin}@vite/client`)).status).toBe(200);
-    const page = await browser.newPage();
+    const page = await browser.newPage({
+      recordVideo: process.env.FACTORY_DEMO_DIRECTORY
+        ? { dir: process.env.FACTORY_DEMO_DIRECTORY }
+        : undefined,
+    });
     await page.goto(origin);
     await browserExpect(page.getByRole('heading', { name: 'Factory operations' })).toBeVisible();
     await browserExpect(page.getByText('GitHub: loading (stale).')).toBeVisible();

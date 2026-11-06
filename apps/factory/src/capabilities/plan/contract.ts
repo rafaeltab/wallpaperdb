@@ -89,7 +89,7 @@ export interface Preview {
 }
 export interface Plan {
   preview(attempt?: {
-    requestId: string;
+    requestId?: string;
     deadline: number;
     progress: (phase: 'discovery' | 'handoff' | 'freshness') => Effect.Effect<void, Unavailable>;
   }): Effect.Effect<Preview, Unavailable>;

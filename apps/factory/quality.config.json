@@ -9,7 +9,7 @@
     "adapters/clock"
   ],
   "allowedCapabilityDependencies": {
-    "board": ["observe", "job", "plan"],
+    "board": ["observe", "job", "plan", "node:crypto"],
     "restack": ["job"],
     "observe": ["job", "plan"]
   }

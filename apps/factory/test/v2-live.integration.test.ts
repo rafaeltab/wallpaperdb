@@ -296,7 +296,7 @@ async function liveBoard(config: {
     commands: () => Effect.succeed([...records.values()]),
   };
   const board = await Effect.runPromise(
-    makeBoard(config).pipe(
+    makeBoard({ ...config, epoch: 'test' }).pipe(
       Effect.provideService(BoardStore, store),
       Effect.provideService(
         BoardCommands,
@@ -315,7 +315,137 @@ async function liveBoard(config: {
   });
   return {
     ...data,
-    publish: (input: ScheduleSnapshot) => Effect.runPromise(board.publish(input)),
+    publish: (
+      input: ScheduleSnapshot,
+      plan?: import('../src/capabilities/plan/index.js').PlanningAttempt
+    ) => Effect.runPromise(board.publish(input, plan)),
     idle: () => pending ?? Promise.resolve(),
   };
 }
+
+it('searches the local issue index with generation-bound pages and publishes advisory plan details', async () => {
+  const { issueObservation } = await import('./fixtures/v2.js');
+  const input = {
+    ...initial,
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [issueObservation(1), issueObservation(2, { candidate: false })],
+        pullRequests: [],
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const page = (await app.inject('/api/v2/issues/search?q=Issue&limit=1')).json();
+    expect(page.hits).toHaveLength(1);
+    expect(page.nextPageToken).toBeTypeOf('string');
+    const next = (
+      await app.inject(
+        `/api/v2/issues/search?q=Issue&limit=1&pageToken=${encodeURIComponent(page.nextPageToken)}`
+      )
+    ).json();
+    expect(next.hits[0]).toMatchObject({
+      issue: { number: 2 },
+      startAction: { availability: { state: 'disabled' } },
+    });
+    await board.publish(input, {
+      id: '00000000-0000-4000-8000-000000000008',
+      revision: 1,
+      startedAt: 3000,
+      deadline: 6000,
+      finishedAt: 4000,
+      phase: 'succeeded',
+      result: {
+        kind: 'preview',
+        selected: [{ issue: 1, reason: 'Next', dependsOn: [], conflicts: [] }],
+        rejected: [{ issue: 2, reason: 'Not ready' }],
+        input: {
+          issues: [
+            { number: 1, title: 'Issue 1', parents: [], blockers: [] },
+            { number: 2, title: 'Issue 2', parents: [], blockers: [] },
+          ],
+        },
+      },
+    });
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(snapshot.meta.currentPlanId).toBe('plan:00000000-0000-4000-8000-000000000008');
+    const plan = (
+      await app.inject('/api/v2/plans/plan%3A00000000-0000-4000-8000-000000000008')
+    ).json();
+    expect(plan.attempt).toMatchObject({
+      phase: 'succeeded',
+      result: {
+        selected: [{ issueId: 'issue:rafaeltab/wallpaperdb/1' }],
+        rejected: [{ issueId: 'issue:rafaeltab/wallpaperdb/2' }],
+      },
+    });
+    expect(plan.entities.issues['issue:rafaeltab/wallpaperdb/1']).toBeDefined();
+    await board.publish({ ...input, state: { ...input.state, revision: 1 } });
+    expect(
+      (
+        await app.inject(
+          `/api/v2/issues/search?q=Issue&limit=1&pageToken=${encodeURIComponent(page.nextPageToken)}`
+        )
+      ).json()
+    ).toMatchObject({ code: 'stale-action' });
+  } finally {
+    await app.close();
+  }
+});
+
+it('uses verified PR ancestry for linear stacks, stops at forks and retains cards after failed refresh', async () => {
+  const { pullObservation } = await import('./fixtures/v2.js');
+  const input = {
+    ...initial,
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [],
+        pullRequests: [
+          pullObservation(10),
+          pullObservation(11),
+          pullObservation(12),
+          pullObservation(13),
+        ],
+        verifiedPrBases: [
+          { base: 10, tip: 11 },
+          { base: 11, tip: 12 },
+          { base: 11, tip: 13 },
+        ],
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(Object.values(before.entities.stacks).map((s) => s.pullRequestIdsBaseToTip)).toEqual([
+      ['pr:rafaeltab/wallpaperdb/10', 'pr:rafaeltab/wallpaperdb/11'],
+    ]);
+    expect(Object.values(before.entities.items)).toHaveLength(4);
+    await board.publish({
+      ...input,
+      observations: {
+        ...input.observations,
+        state: 'error',
+        failedAt: 5000,
+        error: 'provider timeout',
+      },
+    });
+    const after = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(Object.keys(after.entities.items)).toEqual(Object.keys(before.entities.items));
+    expect(after.entities.sources['source:github']).toMatchObject({
+      refresh: 'failed',
+      observedAt: new Date(2000).toISOString(),
+    });
+    expect(Object.keys(after.entities.stacks)).toEqual(Object.keys(before.entities.stacks));
+  } finally {
+    await app.close();
+  }
+});

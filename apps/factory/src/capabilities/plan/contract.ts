@@ -203,6 +203,7 @@ export interface PlanningAttempt {
 /** Atomic creation excludes concurrent unfinished attempts. Updates compare revisions,
  * preserve identity/start/deadline and return false on conflicts. */
 export interface AttemptStore {
+  latest?(): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
   pending(): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
   get(id: string): Effect.Effect<PlanningAttempt | undefined, Unavailable>;
   create(attempt: PlanningAttempt): Effect.Effect<boolean, Unavailable>;

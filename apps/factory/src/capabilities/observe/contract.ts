@@ -81,6 +81,7 @@ export interface PullObservation {
   evidenceHead: string;
 }
 export interface Facts {
+  verifiedPrBases?: readonly { base: number; tip: number }[];
   issues: readonly IssueObservation[];
   pullRequests: readonly PullObservation[];
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import {
   makeBoard,
@@ -8,9 +9,13 @@ import {
   type FactoryV2Command,
 } from '../capabilities/board/index.js';
 import { Time, Unavailable } from '../capabilities/job/index.js';
-import type { Scheduler, AttemptSubmission } from '../capabilities/plan/index.js';
+import {
+  AttemptStore,
+  type Scheduler,
+  type AttemptSubmission,
+} from '../capabilities/plan/index.js';
 import type { ScheduleSnapshot } from '../capabilities/observe/index.js';
-import { sqliteBoard } from '../adapters/store/index.js';
+import { sqliteAttemptStore, sqliteBoard } from '../adapters/store/index.js';
 import { systemTime } from '../adapters/clock/index.js';
 import { liveV2Data } from '../http/index.js';
 
@@ -27,13 +32,23 @@ export async function v2Producer(config: {
     Layer.mergeAll(
       Layer.succeed(BoardStore, sqliteBoard(config.directory, config.scopeId)),
       Layer.succeed(BoardCommands, commandAdapter(config)),
-      Layer.succeed(Time, systemTime)
+      Layer.succeed(Time, systemTime),
+      Layer.succeed(AttemptStore, sqliteAttemptStore(config.directory))
     )
   );
   const run = <A>(effect: Effect.Effect<A, Unavailable>) =>
     runtime.runPromise(effect, { signal: config.signal });
   const board = await runtime.runPromise(
-    Effect.flatMap(config.read(), (initial) => makeBoard({ scopeId: config.scopeId, initial }))
+    Effect.flatMap(config.read(), (initial) =>
+      makeBoard({ scopeId: config.scopeId, epoch: randomUUID(), initial })
+    )
+  );
+  const attemptStore = sqliteAttemptStore(config.directory);
+  const latestPlan = () => attemptStore.latest?.() ?? attemptStore.pending();
+  await run(
+    Effect.flatMap(latestPlan(), (plan) =>
+      Effect.flatMap(config.read(), (input) => board.publish(input, plan))
+    )
   );
   let publishing: Promise<void> | undefined,
     working: Promise<void> | undefined,
@@ -41,7 +56,9 @@ export async function v2Producer(config: {
   const refresh = () => {
     if (publishing || closed) return;
     publishing = run(
-      Effect.flatMap(config.read(), board.publish).pipe(Effect.catch(Effect.logError))
+      Effect.flatMap(latestPlan(), (plan) =>
+        Effect.flatMap(config.read(), (input) => board.publish(input, plan))
+      ).pipe(Effect.catch(Effect.logError))
     ).finally(() => {
       publishing = undefined;
     });

@@ -10,6 +10,7 @@ import type {
   Readiness,
   FactoryV2ItemDetails,
 } from './model.js';
+import { stacks } from './stacks.js';
 import { entity, known, unknown, timestamp, issueId, pullId, jobId, threadId } from './values.js';
 const gh = 'source:github',
   local = 'source:factory',
@@ -659,6 +660,9 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
     admission: { limit: limit(input.state.allowance), consumed: input.state.admissions.length },
     actionIds: [],
   });
+  const topology = stacks(tables, facts?.verifiedPrBases ?? [], observed);
+  tables.relationships = topology.relationships;
+  tables.stacks = topology.stacks;
   const snapshot: FactoryV2Snapshot = {
     apiVersion: 2,
     scopeId,
@@ -667,7 +671,7 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
     meta: {
       dataMode: 'live',
       coverage,
-      diagnostics: [],
+      diagnostics: topology.diagnostics,
       factory,
       currentPlanId: null,
       transport: { changes: true, events: true, suggestedPollMs: 1000 },

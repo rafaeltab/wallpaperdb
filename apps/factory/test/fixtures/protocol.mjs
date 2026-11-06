@@ -479,7 +479,24 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           },
         ]
       );
-    else {
+    else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
+      const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
+      const nodes = config.planning.issues.map((issue) => ({
+        ...issue,
+        parent: null,
+        labels: conn(issue.labels),
+        assignees: conn([]),
+        comments: { totalCount: issue.comments.length },
+        projectItems: conn(config.planning.projectItems ?? []),
+      }));
+      reply([
+        {
+          data: {
+            repository: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } },
+          },
+        },
+      ]);
+    } else {
       const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
       const issue = config.planning.issues.find((i) => i.number === n) ?? config.planning.context;
       const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });

@@ -1,3 +1,4 @@
+import { githubFeedback } from "./collect-feedback.mjs";
 import { publishMarkdown } from "./publish-markdown.mjs";
 export { publishMarkdown };
 import { command, github } from "./lib/agent-command.mjs";
@@ -281,6 +282,21 @@ async function main() {
 				2,
 			),
 		);
+	} else if (action === "feedback") {
+		const pr = readPr(subject);
+		const repo = repositoryMetadata();
+		if (!pr.url.startsWith(`https://github.com/${repo.nameWithOwner}/pull/`))
+			throw new Error("PR belongs to another repository");
+		const feedback = githubFeedback(repo.nameWithOwner, pr.number);
+		const refreshed = readPr(subject);
+		const errors =
+			refreshed.headRefOid === pr.headRefOid
+				? []
+				: ["PR head changed while collecting feedback"];
+		console.log(
+			JSON.stringify({ head: pr.headRefOid, ...feedback, errors }, null, 2),
+		);
+		if (errors.length) process.exitCode = 1;
 	} else
 		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }

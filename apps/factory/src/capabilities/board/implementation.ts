@@ -10,9 +10,8 @@ import { retainFacts, retainFact } from './retention.js';
 import { entityChanges } from './changes.js';
 import { BoardCommands, BoardStore, type CommandRecord } from './contract.js';
 import type { Action, BoardChanges, BoardCommand, BoardDelta, BoardFailure } from './model.js';
-import { planDetails } from './plans.js';
+import { includePlan, planDetails } from './plans.js';
 import { project } from './projection.js';
-import { coverageFor } from './coverage.js';
 import { issueSearch } from './search.js';
 import { failure, version } from './values.js';
 
@@ -49,19 +48,7 @@ export function makeBoard(config: {
         yield* store.planBasis(`plan:${config.initialPlan.id}`),
         planningIdentity(input)
       );
-      initial.snapshot = {
-        ...initial.snapshot,
-        meta: {
-          ...initial.snapshot.meta,
-          currentPlanId: detail.attempt.id,
-          coverage: coverageFor(detail.entities.issues, !!input.observations.facts),
-        },
-        entities: {
-          ...initial.snapshot.entities,
-          issues: detail.entities.issues,
-          plans: { [detail.attempt.id]: detail.attempt },
-        },
-      };
+      initial.snapshot = includePlan(initial.snapshot, detail, !!input.observations.facts);
     }
     let current = { ...initial, snapshot: actions(initial.snapshot, input, initial.details) };
     for (const detail of Object.values(current.details)) {
@@ -115,19 +102,7 @@ export function makeBoard(config: {
             basis ?? undefined,
             planningIdentity(input)
           );
-          next.snapshot = {
-            ...next.snapshot,
-            meta: {
-              ...next.snapshot.meta,
-              currentPlanId: detail.attempt.id,
-              coverage: coverageFor(detail.entities.issues, !!input.observations.facts),
-            },
-            entities: {
-              ...next.snapshot.entities,
-              issues: detail.entities.issues,
-              plans: { [detail.attempt.id]: detail.attempt },
-            },
-          };
+          next.snapshot = includePlan(next.snapshot, detail, !!input.observations.facts);
         }
         revision++;
         next.snapshot = actions({ ...next.snapshot, cursor: cursor() }, input, next.details);

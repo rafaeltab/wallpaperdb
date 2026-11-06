@@ -213,7 +213,7 @@ export function App() {
         Continuous admission of valid plans. Review, publication and CI observation follow accepted
         stage outcomes.
       </p>
-      <Preview />
+      <Preview threads={snapshot?.threads} />
       <p role="status">
         {error ||
           (!snapshot ? 'Loading local observations…' : 'Observations refresh automatically.')}

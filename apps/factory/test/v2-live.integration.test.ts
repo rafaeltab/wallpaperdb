@@ -807,6 +807,29 @@ it('keeps a parked owning job visible when its bound PR is closed', async () => 
   }
 });
 
+it('shows an unbound parked job alongside another PR associated with its issue', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42, { linkedIssues: [1] }), false);
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(snapshot.entities.items['item:issue:rafaeltab/wallpaperdb/1']).toMatchObject({
+      section: 'working',
+      attention: { state: 'required' },
+      jobIds: ['job:rafaeltab/wallpaperdb/1'],
+    });
+    expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/42'].jobIds).toEqual([]);
+    expect(
+      Object.values(snapshot.entities.items).filter((i) =>
+        i.jobIds.includes('job:rafaeltab/wallpaperdb/1')
+      )
+    ).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
+});
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

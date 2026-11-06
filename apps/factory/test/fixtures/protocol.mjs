@@ -387,7 +387,7 @@ export async function runProtocol(environment, argv, output, signal) {
           comments: state.issueComments?.[number] ?? [],
         };
       else if (args[0] === 'issue' && args[1] === 'comment')
-      state.evidence += `\n${flag('--body')}`;
+        state.evidence += `\n${flag('--body')}`;
       else if (args[0] === 'api' && args[1] === 'graphql')
         result = { data: { repository: { issue: { parent: { number: 571 } } } } };
       else if (args[0] === 'api' && args[1].includes('dependencies'))

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { prepare547Source } from "./lib/boat-source-preparation.mjs";
 import {
 	sourcePreparationFixture,
@@ -207,6 +208,7 @@ test("source preparation archive failure retires its own lock and preserves sour
 });
 
 function captured(f, result, expected) {
+	assert.equal(result.byteLimitPerStream, 65536);
 	assert.equal(
 		result.terminal.code,
 		expected,
@@ -246,15 +248,12 @@ for (const [name, options, calls] of [
 			assert.equal(entry.original.mtimeNs, "1793841786244371689");
 		}
 		const expected = expectedControls(f, calls);
-		const controlArchive = archive
-			.slice(28)
-			.map((entry) => ({
-				...entry,
-				body: fs.readFileSync(path.join(f.evidence, "archive", entry.file)),
-				fileMode:
-					fs.lstatSync(path.join(f.evidence, "archive", entry.file)).mode &
-					0o777,
-			}));
+		const controlArchive = archive.slice(28).map((entry) => ({
+			...entry,
+			body: fs.readFileSync(path.join(f.evidence, "archive", entry.file)),
+			fileMode:
+				fs.lstatSync(path.join(f.evidence, "archive", entry.file)).mode & 0o777,
+		}));
 		assertControlArchive(controlArchive, expected);
 		// A self-consistent empty payload/manifest must still fail the independent
 		// control oracle. The actual native archive remains unchanged.
@@ -376,4 +375,126 @@ test("source preparation rejects unsafe reconstructed authority instead of rebas
 			fs.readFileSync(f.files[i].path, "utf8"),
 			`owned-change-${i}\n`,
 		);
+});
+
+test("source preparation public Make publishes all 28 controlled effect receipts", async (t) => {
+	const f = sourcePreparationFixture(t, { wanted: false, strings: true });
+	f.retain("effect-receipts");
+	assert.equal(f.state.runningSince, null);
+	assert.equal(f.state.developmentWanted, false);
+	assert(f.root.startsWith(f.directory + path.sep));
+	const authorityBytes = fs.readFileSync(f.authority);
+	const authority = JSON.parse(authorityBytes);
+	const config = json(f.config);
+	const producerSources = [
+		"./lib/boat-source-preparation.mjs",
+		"./lib/boat-source-identity.mjs",
+	].map((p) => pin(fileURLToPath(new URL(p, import.meta.url))));
+	const native = await f.run();
+	const result = fs.existsSync(path.join(f.evidence, "result.json"))
+		? json(path.join(f.evidence, "result.json"))
+		: null;
+	fs.writeFileSync(
+		path.join(f.directory, "effect-results-before-assertions.json"),
+		JSON.stringify(
+			{ native, result, authority, config, producerSources },
+			null,
+			2,
+		) + "\n",
+		{ flag: "wx", mode: 0o600 },
+	);
+	captured(f, native, 0);
+	assert.equal(result.status, "PASS_OWNED_SOURCE_PREPARATION");
+	assert.equal(result.archiveVerified, true);
+	assert.equal(result.mutations, 28);
+	assert.equal(result.makeInvocations, 0);
+	assert.equal(result.restored.length, 9);
+	assert.equal(fs.existsSync(path.join(f.evidence, "intent")), false);
+	assert.equal(fs.existsSync(f.calls), false);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/source.lock")), false);
+	assert.equal(json(path.join(f.evidence, "archive/manifest.json")).length, 39);
+	assert.deepEqual(fs.readFileSync(f.authority), authorityBytes);
+	assert(
+		Array.isArray(result.effects),
+		"Missing maintained 28-path effect publication",
+	);
+	assert.equal(result.effects.length, 28);
+	assert.deepEqual(
+		result.effects.map((r) => r.before.path),
+		f.files.map((r) => r.path),
+	);
+	for (const [i, receipt] of result.effects.entries()) {
+		for (const key of [
+			"path",
+			"device",
+			"inode",
+			"mtimeNs",
+			"uid",
+			"gid",
+			"mode",
+			"linkCount",
+			"bytes",
+			"sha256",
+		])
+			assert.equal(receipt.before[key], authority.files[i][key]);
+		assert.equal(receipt.directoryFsyncCompleted, true);
+		assert.equal(receipt.parentAfter.path, f.root);
+		assert.equal(typeof receipt.heldAfter.inode, "string");
+		assert.equal(typeof receipt.heldAfter.mtimeNs, "string");
+		if (i < 9) {
+			assert.deepEqual(receipt.operation, {
+				type: "write",
+				payload: {
+					bytes: 11,
+					sha256: authority.selectedTrackedRestores[i].sha256,
+				},
+			});
+			assert.equal(fs.readFileSync(f.files[i].path, "utf8"), `selected-${i}\n`);
+			assert.equal(
+				receipt.heldAfter.sha256,
+				authority.selectedTrackedRestores[i].sha256,
+			);
+			assert.equal(receipt.heldAfter.inode, receipt.before.inode);
+			assert.equal(receipt.heldAfter.linkCount, 1);
+			assert.deepEqual(receipt.entryAfter, receipt.heldAfter);
+			assert.equal(receipt.fileFsyncCompleted, true);
+		} else {
+			assert.deepEqual(receipt.operation, { type: "unlink", payload: null });
+			assert.equal(fs.existsSync(f.files[i].path), false);
+			assert.equal(receipt.heldAfter.linkCount, 0);
+			assert.equal(receipt.heldAfter.sha256, receipt.before.sha256);
+			assert.equal(receipt.entryAfter, null);
+			assert.equal(receipt.fileFsyncCompleted, false);
+		}
+	}
+	assert.deepEqual(result.effectReceiptBinding.configuration, config);
+	assert.deepEqual(result.effectReceiptBinding.approvedResetPlan, {
+		head: authority.head,
+		tree: authority.tree,
+		restores: authority.selectedTrackedRestores,
+		deletions: authority.files
+			.filter((r) => r.gitStatus === "??")
+			.map((r) => r.path),
+	});
+	assert.equal(
+		result.effectReceiptBinding.stoppedOwner.worker,
+		"controlled-stopped-worker",
+	);
+	assert.equal(
+		result.effectReceiptBinding.stoppedOwner.admission,
+		"controlled-admission",
+	);
+	assert.equal(result.effectReceiptBinding.stoppedOwner.cost, 0.25);
+	assert.equal(result.effectReceiptBinding.stoppedOwner.runningSince, null);
+	assert.equal(
+		result.effectReceiptBinding.stoppedOwner.accountingAppliedAt,
+		"2026-11-05T00:00:01.000Z",
+	);
+	assert.equal(result.effectReceiptBinding.stoppedOwner.root, f.root);
+	assert(Number.isSafeInteger(result.effectReceiptBinding.producer.pid));
+	assert.match(result.effectReceiptBinding.producer.birth, /^[1-9][0-9]*$/);
+	assert.deepEqual(
+		result.effectReceiptBinding.producer.sourceFiles,
+		producerSources,
+	);
 });

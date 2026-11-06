@@ -39,6 +39,8 @@ export function sourcePreparationFixture(
 				});
 				for (const entry of [
 					"authority.json",
+					"config.json",
+					"effect-results-before-assertions.json",
 					"controls-before.json",
 					"controls-after-intent.json",
 					"control-oracle-negative.json",
@@ -354,6 +356,7 @@ fs.mkdirSync=function(name,...args){
 					"SCRIPT=boat:prepare-source",
 					`ARGS=${config}`,
 					"SHELL=/bin/sh",
+					"BOAT_EXEC=local",
 				],
 				{
 					cwd: repository,
@@ -361,6 +364,7 @@ fs.mkdirSync=function(name,...args){
 					directory: path.join(directory, "public-command"),
 					deadline: Number(process.hrtime.bigint()) / 1e9 + 60,
 					disposalMs: 5000,
+					limit: 65536,
 				},
 			),
 	};

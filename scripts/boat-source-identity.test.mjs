@@ -36,6 +36,20 @@ print(json.dumps(dict(path=p,device=s.st_dev,inode=s.st_ino,mtimeNs=s.st_mtime_n
 	return { directory, file, raw, expected: parseSourceAuthority(raw) };
 }
 
+function retainResetResult(name, value) {
+	const root = process.env.BOAT_SOURCE_IDENTITY_EVIDENCE;
+	if (!root) return;
+	fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+	fs.writeFileSync(
+		path.join(root, `${name}.json`),
+		JSON.stringify(value, null, 2),
+		{
+			flag: "wx",
+			mode: 0o600,
+		},
+	);
+}
+
 test("source identity preserves original legacy integer bytes and canonical production strings", (t) => {
 	const f = fixture(t);
 	assert.match(f.raw.toString(), /"mtimeNs": 1793841786244371689/);
@@ -186,4 +200,113 @@ test("source identity exact restore and deletion preserve unrelated siblings", (
 	resetOwnedSource(sourceIdentity(f.file), null);
 	assert.equal(fs.existsSync(f.file), false);
 	assert.equal(fs.readFileSync(sibling, "utf8"), "unrelated\n");
+});
+
+test("source reset unchanged payload remains a valid owned neighbor", (t) => {
+	const f = fixture(t);
+	const effect = resetOwnedSource(
+		f.expected,
+		Buffer.from("independent original\n"),
+	);
+	const actual = fs.readFileSync(f.file, "utf8");
+	retainResetResult("unchanged-neighbor", {
+		expectedBefore: f.expected,
+		effect: effect ?? null,
+		actualPayload: actual,
+		actualInode: fs.lstatSync(f.file, { bigint: true }).ino.toString(),
+	});
+	assert.equal(actual, "independent original\n");
+	assert.equal(
+		fs.lstatSync(f.file, { bigint: true }).ino.toString(),
+		f.expected.inode,
+	);
+});
+
+test("source reset in-place effect receipt binds the actual held-fd payload", (t) => {
+	const f = fixture(t);
+	const effect = resetOwnedSource(f.expected, Buffer.from("APPROVED\n"));
+	const actual = fs.readFileSync(f.file, "utf8");
+	retainResetResult("in-place-effect", {
+		expectedBefore: f.expected,
+		effect: effect ?? null,
+		actualPayload: actual,
+		actualInode: fs.lstatSync(f.file, { bigint: true }).ino.toString(),
+	});
+	assert.equal(actual, "APPROVED\n", "The native reset itself completed");
+	assert.ok(effect, "Missing producer-owned source reset effect receipt");
+	assert.deepEqual(effect.before, f.expected);
+	assert.deepEqual(effect.operation, {
+		type: "write",
+		payload: {
+			bytes: 9,
+			sha256:
+				"82c8f8af98b335ba9df3b77d297742d4fbf789e4b0632315dd21be7e02a5d9a3",
+		},
+	});
+	assert.equal(effect.heldAfter.bytes, 9);
+	assert.equal(
+		effect.heldAfter.sha256,
+		"82c8f8af98b335ba9df3b77d297742d4fbf789e4b0632315dd21be7e02a5d9a3",
+	);
+	for (const key of [
+		"path",
+		"device",
+		"inode",
+		"uid",
+		"gid",
+		"mode",
+		"linkCount",
+	])
+		assert.equal(effect.heldAfter[key], f.expected[key]);
+	assert.deepEqual(effect.entryAfter, effect.heldAfter);
+	assert.equal(effect.fileFsyncCompleted, true);
+	assert.equal(effect.directoryFsyncCompleted, true);
+	assert.equal(effect.parentAfter.path, f.directory);
+	assert.equal(
+		effect.parentAfter.inode,
+		fs.lstatSync(f.directory, { bigint: true }).ino.toString(),
+	);
+});
+
+test("source reset deletion effect receipt retains the unlinked fd and no entry", (t) => {
+	const f = fixture(t);
+	const observer = fs.openSync(
+		f.file,
+		fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+	);
+	t.after(() => fs.closeSync(observer));
+	const effect = resetOwnedSource(f.expected, null);
+	const held = fs.fstatSync(observer, { bigint: true });
+	const present = fs.existsSync(f.file);
+	const payload = fs.readFileSync(observer, "utf8");
+	retainResetResult("deletion-effect", {
+		expectedBefore: f.expected,
+		effect: effect ?? null,
+		actualEntryPresent: present,
+		independentHeldLinkCount: Number(held.nlink),
+		actualRetainedPayload: payload,
+	});
+	assert.equal(present, false, "The native unlink itself completed");
+	assert.equal(held.nlink, 0n);
+	assert.equal(payload, "independent original\n");
+	assert.ok(effect, "Missing producer-owned deletion effect receipt");
+	assert.deepEqual(effect.before, f.expected);
+	assert.deepEqual(effect.operation, { type: "unlink", payload: null });
+	assert.equal(effect.heldAfter.linkCount, 0);
+	for (const key of [
+		"path",
+		"device",
+		"inode",
+		"mtimeNs",
+		"uid",
+		"gid",
+		"mode",
+		"bytes",
+		"sha256",
+	])
+		assert.equal(effect.heldAfter[key], f.expected[key]);
+	assert.equal(effect.entryAfter, null, "An absent entry has no native tuple");
+	assert.equal(effect.fileFsyncCompleted, false);
+	assert.equal(effect.directoryFsyncCompleted, true);
+	assert.equal(effect.parentAfter.path, f.directory);
 });

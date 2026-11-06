@@ -110,9 +110,9 @@ function access(file, writable, callback) {
 	);
 	try {
 		const bytes = fs.readFileSync(fd);
-		const current = () => {
-			const a = observed(file, fs.fstatSync(fd, { bigint: true }), bytes);
-			const b = observed(file, fs.lstatSync(file, { bigint: true }), bytes);
+		const current = (payload = bytes) => {
+			const a = observed(file, fs.fstatSync(fd, { bigint: true }), payload);
+			const b = observed(file, fs.lstatSync(file, { bigint: true }), payload);
 			assert.deepEqual(a, b, "Source fd/current-entry identity changed");
 			assert.equal(
 				fs.realpathSync(path.dirname(file)),
@@ -143,6 +143,17 @@ export function verifySourceIdentity(value) {
 	});
 }
 
+function readHeldPayload(fd, maximum) {
+	const buffer = Buffer.alloc(maximum);
+	let length = 0;
+	while (length < maximum) {
+		const count = fs.readSync(fd, buffer, length, maximum - length, length);
+		if (count === 0) break;
+		length += count;
+	}
+	return buffer.subarray(0, length);
+}
+
 // The immutable authority remains expected throughout archive and CAS. Never
 // substitute a fresh observation for a refused expected identity.
 export function resetOwnedSource(value, bytes) {
@@ -152,7 +163,15 @@ export function resetOwnedSource(value, bytes) {
 		"Expected exact restore bytes or deletion",
 	);
 	return access(expected.path, true, (fd, _before, current) => {
-		assert.deepEqual(current(), expected, "Owned source identity changed");
+		const before = current();
+		assert.deepEqual(before, expected, "Owned source identity changed");
+		const operation =
+			bytes === null
+				? null
+				: {
+						type: "write",
+						payload: { bytes: bytes.length, sha256: hash(bytes) },
+					};
 		if (bytes === null) fs.unlinkSync(expected.path);
 		else {
 			let written = 0;
@@ -168,10 +187,96 @@ export function resetOwnedSource(value, bytes) {
 			fs.fsyncSync(fd);
 		}
 		const directory = fs.openSync(path.dirname(expected.path), "r");
+		let parentAfter;
 		try {
 			fs.fsyncSync(directory);
+			const held = fs.fstatSync(directory, { bigint: true });
+			const entry = fs.lstatSync(path.dirname(expected.path), { bigint: true });
+			assert(held.isDirectory() && entry.isDirectory());
+			assert.equal(held.dev, entry.dev, "Source parent changed");
+			assert.equal(held.ino, entry.ino, "Source parent changed");
+			assert.equal(
+				fs.realpathSync(path.dirname(expected.path)),
+				path.dirname(expected.path),
+			);
+			parentAfter = {
+				path: path.dirname(expected.path),
+				device: held.dev.toString(),
+				inode: held.ino.toString(),
+				mtimeNs: held.mtimeNs.toString(),
+				uid: Number(held.uid),
+				gid: Number(held.gid),
+				mode: Number(held.mode & 0o777n),
+				linkCount: Number(held.nlink),
+			};
 		} finally {
 			fs.closeSync(directory);
 		}
+		if (bytes === null) {
+			const actual = readHeldPayload(fd, before.bytes + 1);
+			const held = fs.fstatSync(fd, { bigint: true });
+			assert(held.isFile() && held.nlink === 0n, "Deleted fd remains linked");
+			assert.deepEqual(actual, _before, "Deleted fd payload changed");
+			assert.equal(held.size, BigInt(actual.length));
+			assert.equal(
+				fs.lstatSync(expected.path, { throwIfNoEntry: false }),
+				undefined,
+				"Deleted input returned",
+			);
+			const heldAfter = {
+				path: expected.path,
+				device: held.dev.toString(),
+				inode: held.ino.toString(),
+				mtimeNs: held.mtimeNs.toString(),
+				uid: Number(held.uid),
+				gid: Number(held.gid),
+				mode: Number(held.mode & 0o777n),
+				linkCount: Number(held.nlink),
+				bytes: actual.length,
+				sha256: hash(actual),
+			};
+			for (const key of ["path", "device", "inode", "uid", "gid", "mode"])
+				assert.equal(heldAfter[key], before[key], `Deleted fd changed: ${key}`);
+			return {
+				before,
+				operation: { type: "unlink", payload: null },
+				heldAfter,
+				entryAfter: null,
+				parentAfter,
+				fileFsyncCompleted: false,
+				directoryFsyncCompleted: true,
+			};
+		}
+		const actual = readHeldPayload(fd, bytes.length + 1);
+		assert.deepEqual(actual, bytes, "Actual restored payload changed");
+		assert.equal(
+			hash(actual),
+			operation.payload.sha256,
+			"Approved payload changed",
+		);
+		const heldAfter = current(actual);
+		for (const key of [
+			"path",
+			"device",
+			"inode",
+			"uid",
+			"gid",
+			"mode",
+			"linkCount",
+		])
+			assert.equal(
+				heldAfter[key],
+				before[key],
+				`Restored ownership changed: ${key}`,
+			);
+		return {
+			before,
+			operation,
+			heldAfter,
+			entryAfter: heldAfter,
+			parentAfter,
+			fileFsyncCompleted: true,
+			directoryFsyncCompleted: true,
+		};
 	});
 }

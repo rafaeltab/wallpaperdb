@@ -3,6 +3,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { makeCommand } from "./boat-hillclimb.mjs";
 import {
 	parseSourceAuthority,
@@ -52,6 +53,41 @@ function stateIdentity(state) {
 		stop: state.shutdownAttempt?.completion?.provider?.stop,
 		accountingAppliedAt: state.shutdownAttempt?.accountingAppliedAt,
 		cost: state.cost,
+	};
+}
+
+function resetProducer(ownedLock, sourceLock) {
+	const processStat = fs.readFileSync("/proc/self/stat", "utf8");
+	const birth = processStat
+		.slice(processStat.lastIndexOf(")") + 2)
+		.split(" ")[19];
+	assert(/^[1-9][0-9]*$/.test(birth), "Invalid source producer birth");
+	const sourceFiles = [
+		import.meta.url,
+		new URL("./boat-source-identity.mjs", import.meta.url),
+	].map((url) => {
+		const file = fileURLToPath(url);
+		const stat = fs.lstatSync(file);
+		assert(stat.isFile() && !stat.isSymbolicLink());
+		const bytes = fs.readFileSync(file);
+		return {
+			path: file,
+			bytes: bytes.length,
+			sha256: sha(bytes),
+			mode: stat.mode & 0o777,
+		};
+	});
+	return {
+		pid: process.pid,
+		birth,
+		sourceFiles,
+		sourceLock: {
+			path: sourceLock,
+			device: ownedLock.directory.dev.toString(),
+			inode: ownedLock.directory.ino.toString(),
+			pidFileDevice: ownedLock.pid.dev.toString(),
+			pidFileInode: ownedLock.pid.ino.toString(),
+		},
 	};
 }
 
@@ -298,6 +334,7 @@ export async function prepare547Source({ authority: pin, evidence }) {
 		makeInvocations: 0,
 		mutations: 0,
 		archiveVerified: false,
+		effects: [],
 	};
 	let operationFailure, releaseFailure;
 	try {
@@ -384,6 +421,24 @@ export async function prepare547Source({ authority: pin, evidence }) {
 		} finally {
 			fs.closeSync(pidFile);
 		}
+		result.effectReceiptBinding = {
+			configuration: { authority: { ...pin }, evidence },
+			approvedResetPlan: {
+				head: authority.head,
+				tree: authority.tree,
+				restores: authority.selectedTrackedRestores,
+				deletions: authority.files
+					.filter((f) => f.gitStatus === "??")
+					.map((f) => f.path),
+			},
+			stoppedOwner: {
+				root,
+				key: authority.key,
+				...stateIdentity(before),
+				developmentWanted: false,
+			},
+			producer: resetProducer(ownedLock, sourceLock),
+		};
 		const mutableControls = new Set([
 			stateFile,
 			path.join(root, ".boat/usage.json"),
@@ -466,7 +521,9 @@ export async function prepare547Source({ authority: pin, evidence }) {
 				false,
 				"Source intent changed",
 			);
-			resetOwnedSource(file, restored.get(file.path) ?? null);
+			result.effects.push(
+				resetOwnedSource(file, restored.get(file.path) ?? null),
+			);
 			result.mutations++;
 		}
 		for (const file of authority.files) {

@@ -10,13 +10,22 @@ on:
       - '**/*.md'
 
 jobs:
-  ci:
-    name: Build, Lint, and Test
+  validation:
+    name: Checks (${{ matrix.shard }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: repository
+            filter: '!@wallpaperdb/factory'
+          - shard: factory
+            filter: '@wallpaperdb/factory'
     permissions:
       contents: read
       id-token: write
     env:
+      CI_WORKSPACE_FILTER: ${{ matrix.filter }}
       USE_VERCEL_CACHE: ${{ vars.TURBO_TEAM != '' && (github.actor_id == '29227505' || github.actor_id == '290168728') && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     steps:
       - name: Checkout code
@@ -64,11 +73,61 @@ jobs:
       - name: Install Chromium for browser adapter contracts
         run: make run PACKAGE=web SCRIPT=test:browser:install
 
-      - name: Build, lint, type-check, and test
-        run: make ci
+      - name: Build, lint, and type-check
+        run: make check TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
+
+      - name: Run unit tests
+        run: make test-unit TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
+
+      - name: Run integration tests
+        run: make test-integration TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
+
+      - name: Preserve coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-coverage-${{ matrix.shard }}
+          path: |
+            apps/**/coverage/**/lcov.info
+            packages/**/coverage/**/lcov.info
+          if-no-files-found: error
+
+  ci:
+    name: Build, Lint, and Test
+    needs: validation
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Require every validation shard
+        env:
+          VALIDATION_RESULT: ${{ needs.validation.result }}
+        run: test "$VALIDATION_RESULT" = success
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install locked project tools
+        uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+
+      - name: Verify effective tools
+        run: make toolchain
+
+      - name: Restore repository coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-coverage-repository
+
+      - name: Restore Factory coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-coverage-factory
 
       - name: Merge coverage reports
-        run: pnpm coverage:merge
+        run: make run PACKAGE=root SCRIPT=coverage:merge
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

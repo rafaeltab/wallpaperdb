@@ -401,19 +401,12 @@ export interface Coverage {
   readonly unresolvedIssueIds: readonly IssueId[];
 }
 export interface BoardMeta {
-  readonly dataMode: 'fake' | 'live';
   readonly coverage: Coverage;
   readonly diagnostics: readonly Reason[];
   readonly factory: FactoryControl;
   readonly currentPlanId: EntityId<'plan'> | null;
-  readonly transport: {
-    readonly changes: boolean;
-    readonly events: boolean;
-    readonly suggestedPollMs: number;
-  };
 }
-export interface FactoryV2Snapshot {
-  readonly apiVersion: 2;
+export interface BoardSnapshot {
   readonly scopeId: string;
   readonly cursor: Cursor;
   /** Time this projection revision was committed, not the time of every GET. */
@@ -431,8 +424,7 @@ export type EntityChange = {
       }
     | { readonly table: Table; readonly operation: 'remove'; readonly id: keyof Tables[Table] };
 }[keyof Tables];
-export interface FactoryV2Delta {
-  readonly apiVersion: 2;
+export interface BoardDelta {
   readonly scopeId: string;
   readonly fromCursor: Cursor;
   readonly toCursor: Cursor;
@@ -441,29 +433,22 @@ export interface FactoryV2Delta {
   /** Replace when present; omission means unchanged, never clear. */
   readonly meta?: BoardMeta;
 }
-export type FactoryV2Changes =
+export type BoardChanges =
   | { readonly kind: 'unchanged'; readonly cursor: Cursor }
   | {
       readonly kind: 'changes';
-      readonly batches: readonly FactoryV2Delta[];
+      readonly batches: readonly BoardDelta[];
       readonly nextCursor: Cursor;
       readonly hasMore: boolean;
     }
   | {
       readonly kind: 'resync-required';
-      readonly reason: 'expired' | 'different-scope' | 'reset' | 'slow-consumer';
+      readonly reason: 'expired' | 'different-scope' | 'reset';
     };
-export type FactoryV2Event =
-  | { readonly event: 'change'; readonly id: Cursor; readonly data: FactoryV2Delta }
-  | {
-      readonly event: 'resync-required';
-      readonly data: Extract<FactoryV2Changes, { kind: 'resync-required' }>;
-    };
-
 /** Copy actionId and precondition from an available Action. The server must still
  * validate current state. commandId is a client UUID reused for an uncertain retry.
  */
-export type FactoryV2Command = {
+export type BoardCommand = {
   readonly commandId: string;
   readonly actionId: ActionId;
   readonly precondition: string;
@@ -479,7 +464,7 @@ export type FactoryV2Command = {
   | { readonly kind: 'start'; readonly payload: { readonly context: string } }
   | { readonly kind: 'resume' | 'cancel' | 'preview-plan'; readonly payload: Record<string, never> }
 );
-export interface FactoryV2CommandReceipt {
+export interface CommandReceipt {
   readonly commandId: string;
   readonly version: Version;
   readonly actionId: ActionId;
@@ -490,8 +475,7 @@ export interface FactoryV2CommandReceipt {
   readonly result: { readonly jobId: JobId } | { readonly planId: EntityId<'plan'> } | null;
   readonly resultingCursor: Cursor | null;
 }
-export interface FactoryV2ItemDetails {
-  readonly apiVersion: 2;
+export interface ItemDetails {
   readonly itemId: WorkItemId;
   readonly itemVersion: Version;
   readonly observedAt: Timestamp;
@@ -513,8 +497,7 @@ export interface FactoryV2ItemDetails {
     }[]
   >;
 }
-export interface FactoryV2IssueSearch {
-  readonly apiVersion: 2;
+export interface IssueSearch {
   readonly query: string;
   readonly nextPageToken: string | null;
   readonly coverage: Coverage;
@@ -524,28 +507,24 @@ export interface FactoryV2IssueSearch {
   readonly labels: Tables['labels'];
   readonly repositories: Tables['repositories'];
 }
-export interface FactoryV2PlanDetails {
-  readonly apiVersion: 2;
+export interface PlanDetails {
   readonly attempt: PlanAttempt;
   readonly entities: Pick<
     Tables,
     'issues' | 'repositories' | 'labels' | 'users' | 'sources' | 'threads'
   >;
 }
-export interface FactoryV2Problem {
-  readonly type: string;
-  readonly status: number;
-  readonly code:
-    | 'invalid-request'
-    | 'unavailable'
-    | 'not-found'
-    | 'stale-action'
-    | 'id-reused'
-    | 'command-rejected'
-    | 'unsupported'
-    | 'origin-rejected';
-  readonly title: string;
-  readonly detail: string;
-  readonly retry: 'refresh' | 'observe-command' | 'later' | 'never';
+/** Declared application outcomes; the driving adapter chooses transport responses. */
+export interface BoardFailure {
+  readonly _tag: 'BoardFailure';
+  readonly reason:
+    | 'invalid-input'
+    | 'ledger-unavailable'
+    | 'action-not-found'
+    | 'action-changed'
+    | 'command-id-reused'
+    | 'action-unavailable'
+    | 'search-expired';
+  readonly message: string;
   readonly commandId: string | null;
 }

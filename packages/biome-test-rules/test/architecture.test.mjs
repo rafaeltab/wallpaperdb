@@ -71,3 +71,16 @@ test("fixed-wait diagnostics are advisory and do not flag unrelated application 
 		0,
 	);
 });
+
+test("production capability restrictions do not apply to colocated test execution", () => {
+	const source = "import { Effect } from 'effect'; Effect.runPromise(task);";
+	assert.equal(
+		check(source, "apps/example/src/capabilities/search/policy.test.ts").length,
+		0,
+	);
+	assert.equal(
+		check(source, "apps/example/src/capabilities/search/test/controlled.ts")
+			.length,
+		0,
+	);
+});

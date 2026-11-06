@@ -15,7 +15,11 @@
 		{
 			"path": "./src/architecture.ts",
 			"resolutionKind": "config",
-			"includes": ["**/src/capabilities/**/*.ts"]
+			"includes": [
+				"**/src/capabilities/**/*.ts",
+				"!**/*.{test,spec}.ts",
+				"!**/{test,tests,specs}/**"
+			]
 		}
 	],
 	"overrides": [

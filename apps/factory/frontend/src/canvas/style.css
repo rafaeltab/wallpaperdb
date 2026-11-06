@@ -1,0 +1,294 @@
+:root {
+  color-scheme:dark;
+  font:12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  color:#dfdfe7;
+  background:#0b0b0e;
+}
+body {
+  margin:0;
+}
+.fc-dialog * {
+  box-sizing:border-box;
+}
+.fc-dialog button,.fc-dialog input,.fc-dialog textarea {
+  font:inherit;
+  color:inherit;
+}
+.fc-dialog button {
+  cursor:pointer;
+  border:1px solid transparent;
+  background:transparent;
+  border-radius:4px;
+  padding:5px 8px;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+}
+.fc-dialog button:hover {
+  background:#24242d;
+  border-color:#3b3b47;
+}
+.fc-dialog button:disabled {
+  opacity:.45;
+  cursor:default;
+}
+.fc-dialog a {
+  color:inherit;
+  text-decoration:none;
+}
+.fc-dialog a:hover {
+  text-decoration:underline;
+  color:#fff;
+}
+.fc-dialog :focus-visible {
+  outline:2px solid #82cbb1;
+  outline-offset:3px;
+}
+.fc-fields {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:10px;
+  color:#a8a8b7;
+  flex-shrink:0;
+}
+.fc-size {
+  padding:0 4px;
+  min-width:23px;
+  text-align:center;
+  border:1px solid #383843;
+  border-radius:3px;
+  background:#24242c;
+}
+.fc-card-bottom {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:auto;
+  min-width:0;
+  font-size:10px;
+  line-height:15px;
+}
+.fc-labels {
+  display:flex;
+  gap:4px;
+  min-width:0;
+  overflow:hidden;
+  max-width:200px;
+}
+.fc-label {
+  color:var(--label);
+  border:1px solid color-mix(in srgb,var(--label) 45%,transparent);
+  background:color-mix(in srgb,var(--label) 9%,transparent);
+  padding:0 5px;
+  border-radius:10px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.fc-thread {
+  margin-left:auto;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  overflow:hidden;
+  max-width:160px;
+}
+.fc-thread>a+a::before {
+  content:' · ';
+}
+.fc-muted {
+  color:#9292a2;
+  font-size:10px;
+}
+.fc-checks {
+  display:inline-flex;
+  gap:6px;
+  align-items:center;
+  cursor:default;
+}
+.fc-check {
+  font-size:13px;
+}
+.fc-check-passed {
+  color:#6bcca4;
+}
+.fc-check-failed {
+  color:#df8d96;
+}
+.fc-check-running,.fc-check-queued {
+  color:#d5b17c;
+}
+.fc-check-unknown {
+  color:#9797a7;
+}
+.fc-reviewers {
+  display:inline-flex;
+  gap:4px;
+  align-items:center;
+  font-size:9px;
+  color:#aaaabb;
+}
+.fc-reviewers img,.fc-avatar {
+  width:17px;
+  height:17px;
+  border-radius:50%;
+}
+.fc-avatar {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#343440;
+}
+.fc-command-status {
+  padding:7px 14px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  border-top:1px solid #383842;
+  background:#1b1b23;
+  flex-wrap:wrap;
+}
+.fc-link-preference {
+  align-self:flex-end;
+  padding:4px 14px;
+  font-size:10px;
+  color:#9999a9;
+}
+.fc-empty {
+  padding:80px 30px;
+  color:#a8a8b7;
+}
+.fc-dialog {
+  width:min(680px,94vw);
+  max-height:85dvh;
+  color:#dfdfe7;
+  background:#15151c;
+  border:1px solid #444452;
+  border-radius:8px;
+  padding:20px;
+  font:12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+.fc-dialog::backdrop {
+  background:#0008;
+}
+.fc-dialog header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:-20px;
+  background:#15151c;
+  z-index:1;
+  padding:10px 0;
+}
+.fc-dialog h2 {
+  font-size:15px;
+  margin:0;
+}
+.fc-dialog h3 {
+  font-size:13px;
+  margin-top:20px;
+}
+.fc-dialog label {
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  margin:15px 0;
+}
+.fc-dialog label:has([type=checkbox]) {
+  flex-direction:row;
+  align-items:center;
+}
+.fc-dialog input:not([type=checkbox]),.fc-dialog textarea {
+  border:1px solid #444452;
+  background:#0e0e14;
+  padding:8px;
+  border-radius:4px;
+  width:100%;
+}
+.fc-dialog textarea {
+  min-height:85px;
+  resize:vertical;
+}
+.fc-dialog p {
+  color:#a7a7b7;
+  line-height:1.6;
+}
+.fc-dialog button {
+  background:#22222d;
+  border-color:#3c3c4a;
+}
+.fc-dialog header button {
+  font-size:18px;
+}
+.fc-dialog [role=alert] {
+  color:#efaaaa;
+}
+.fc-panel-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+}
+.fc-search {
+  list-style:none;
+  padding:0;
+  max-height:250px;
+  overflow:auto;
+}
+.fc-search li {
+  border-bottom:1px solid #30303b;
+  padding:7px 0;
+}
+.fc-search li p {
+  margin:4px 8px;
+}
+.fc-search [aria-pressed=true] {
+  border-color:#82cbb1;
+}
+.fc-plan-graph {
+  position:relative;
+  overflow:auto;
+}
+.fc-plan-graph svg {
+  position:absolute;
+  pointer-events:none;
+}
+.fc-plan-graph ol {
+  padding:0;
+  list-style:none;
+  width:480px;
+}
+.fc-plan-graph li {
+  height:80px;
+  margin-bottom:20px;
+  padding:12px;
+  border:1px dashed #779c8d;
+  border-radius:5px;
+  background:#14221d;
+}
+
+/* Real command panels use the prototype's floating surfaces. */
+.fc-dialog.cc-floating { inset:53px 14px auto auto; margin:0; padding:17px; width:410px; max-width:calc(100vw - 28px); max-height:calc(100dvh - 75px); background:#1c1c23; border:1px solid #454550; border-radius:6px; box-shadow:0 12px 45px #0009; }
+.fc-dialog.cc-settings { width:390px; }
+.fc-dialog.cc-start { width:440px; }
+.fc-dialog .cc-floating-title { position:static; padding:0; background:transparent; margin-bottom:18px; }
+.fc-dialog .cc-floating-title button { background:transparent; border:0; padding:0 3px; }
+.fc-dialog label { flex-direction:row; align-items:center; justify-content:space-between; gap:15px; font-size:11px; margin:16px 0; }
+.fc-dialog label:has(textarea), .fc-dialog label:has(input[type=search]) { flex-direction:column; align-items:stretch; }
+.fc-dialog input:not([type=checkbox]), .fc-dialog select { width:80px; padding:6px; font-size:11px; background:#101016; border:1px solid #454553; border-radius:4px; }
+.fc-dialog input[type=search], .fc-dialog textarea { width:100%; }
+.fc-dialog select { width:192px; }
+.fc-dialog p { font-size:10px; margin:6px 0; color:#9690a0; }
+.fc-dialog form>button[type=submit] { display:flex; justify-content:center; padding:8px; background:#2c4a3c; border:1px solid #446653; border-radius:4px; color:#bfe0cd; width:100%; font-size:11px; margin:10px 0; }
+.fc-dialog .fc-command-status { padding:7px 0; font-size:10px; }
+.cc-app>.fc-command-status { position:fixed; top:53px; left:14px; max-width:calc(100vw - 28px); z-index:21; border:1px solid #454550; border-radius:4px; font-size:10px; }
+.fc-banner { position:fixed; left:15px; top:53px; z-index:22; padding:8px; background:#312426; border:1px solid #75444a; border-radius:4px; }
+.cc-empty { margin:60px 30px; color:#838390; }
+.cc-avatar { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#343440; font-size:10px; }
+.cc-app button:disabled { opacity:.4; cursor:default; }
+@media(max-width:700px) { .fc-dialog.cc-floating { top:80px; right:8px; max-height:calc(100dvh - 95px); } }
+
+fieldset.cc-checks { padding:0; margin:0; border:0; min-width:0; }
+
+.cc-labels>.cc-unavailable { font-size:9px; line-height:14px; }

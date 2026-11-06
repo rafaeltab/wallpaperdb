@@ -4,9 +4,9 @@ Repository-owned operational infrastructure for continuously admitting and obser
 
 ## Frontend prototyping
 
-The Vite/React operations UI lives in [frontend](frontend/). Start editing [App](frontend/src/app.tsx), [preview components](frontend/src/preview.tsx), [job components](frontend/src/jobs.tsx), or [styles](frontend/src/style.css). It is separate from the WallpaperDB product UI.
+The Vite/React frontend opens the [v2 canvas](frontend/src/canvas/app.tsx). It shows grouped issues, PR stacks, dependencies, attention, command flows and advisory plans from the v2 contract. The isolated fake server supports development before the live producer is available. The existing [v1 operations UI](frontend/src/app.tsx) remains at `?view=operations`. This frontend is separate from the WallpaperDB product UI.
 
-Use the [prototyping guide](../../docs/factory-frontend.md) for the Make commands, backend selection, HMR and packaged-asset verification. The factory package owns both builds; production serves the compiled UI on the backend's private origin without a development server.
+Use the [frontend development guide](../../docs/factory-frontend.md) for the Make commands, backend selection, HMR and packaged-asset verification. The factory package owns both builds; production serves the compiled UI on the backend's private origin without a development server.
 
 ## Capabilities
 

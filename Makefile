@@ -234,12 +234,12 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@set -e; \
 	start_time=$$(date +%s); \
 	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
-	node scripts/check-documentation.mjs; \
-	node scripts/check-generated.mjs routes; \
-	node scripts/check-generated.mjs openapi; \
-	node scripts/check-service-wiring.mjs; \
-	node scripts/check-migrations.mjs; \
-	node scripts/check-generated.mjs migrations; \
+	node scripts/check-documentation.ts; \
+	node scripts/check-generated.ts routes; \
+	node scripts/check-generated.ts openapi; \
+	node scripts/check-service-wiring.ts; \
+	node scripts/check-migrations.ts; \
+	node scripts/check-generated.ts migrations; \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
@@ -263,4 +263,4 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "✓ Clean complete"
 
 lint-docs: ## Check maintained documentation and skills (ARGS='--changed <base>' for edited imports)
-	@node scripts/check-documentation.mjs $(ARGS)
+	@node scripts/check-documentation.ts $(ARGS)

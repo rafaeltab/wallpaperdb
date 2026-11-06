@@ -1,8 +1,8 @@
 import { expect } from "vitest";
 import { test } from "vitest";
-import { lint } from "./lint.mjs";
+import { lint } from "./lint.ts";
 const check = (
-	source,
+	source: string,
 	file = "apps/example/src/capabilities/search/implementation.ts",
 ) => lint(source, {}, file).filter((d) => d.message.startsWith("capability-"));
 test("capabilities reject runtime execution and global configuration without rejecting shadowed names", () => {

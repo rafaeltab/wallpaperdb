@@ -43,11 +43,11 @@ test coverage != "$CI_TEST_FAILURE"
 			join(directory, "node"),
 			`#!/bin/sh
 case "$1" in
- scripts/check-documentation.mjs) stage=documentation ;;
- scripts/check-generated.mjs) stage=generated-$2 ;;
- scripts/check-service-wiring.mjs) stage=service-wiring ;;
- scripts/check-migrations.mjs) stage=migration-metadata ;;
- scripts/check-migration-replay.mjs) stage=migration-replay ;;
+ scripts/check-documentation.ts) stage=documentation ;;
+ scripts/check-generated.ts) stage=generated-$2 ;;
+ scripts/check-service-wiring.ts) stage=service-wiring ;;
+ scripts/check-migrations.ts) stage=migration-metadata ;;
+ scripts/check-migration-replay.ts) stage=migration-replay ;;
  *) exec "$CI_TEST_NODE" "$@" ;;
 esac
 echo "$stage" >> "$CI_TEST_LOG"

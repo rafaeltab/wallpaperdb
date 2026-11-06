@@ -1,9 +1,17 @@
+interface Manifest {
+	name: string;
+	scripts?: Record<string, string>;
+	dependencies?: Record<string, string>;
+	devDependencies?: Record<string, string>;
+	peerDependencies?: Record<string, string>;
+	optionalDependencies?: Record<string, string>;
+}
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
-const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
-function hasCode(directory, extension = /\.[cm]?[jt]sx?$/) {
+const read = <T>(file: string): T => JSON.parse(fs.readFileSync(file, "utf8"));
+function hasCode(directory: string, extension = /\.[cm]?[jt]sx?$/): boolean {
 	if (!fs.existsSync(directory)) return false;
 	return fs
 		.readdirSync(directory, { withFileTypes: true })
@@ -22,7 +30,7 @@ function hasCode(directory, extension = /\.[cm]?[jt]sx?$/) {
 				: extension.test(e.name),
 		);
 }
-export function checkWorkspaces(root) {
+export function checkWorkspaces(root: string) {
 	const errors = [];
 	const section = fs
 		.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8")
@@ -51,7 +59,10 @@ export function checkWorkspaces(root) {
 				`Unsupported workspace pattern ${pattern}; extend workspace discovery`,
 			);
 	}
-	const manifests = new Map();
+	const manifests = new Map<
+		string,
+		{ directory: string; manifest: Manifest }
+	>();
 	for (const directory of directories) {
 		const file = path.join(root, directory, "package.json");
 		if (!fs.existsSync(file)) {
@@ -61,12 +72,14 @@ export function checkWorkspaces(root) {
 				);
 			continue;
 		}
-		const manifest = read(file);
+		const manifest = read<Manifest>(file);
 		if (manifests.has(manifest.name))
 			errors.push(`Duplicate workspace name ${manifest.name}`);
 		manifests.set(manifest.name, { directory, manifest });
 	}
-	const tasks = read(path.join(root, "turbo.json")).tasks;
+	const tasks = read<{ tasks: Record<string, unknown> }>(
+		path.join(root, "turbo.json"),
+	).tasks;
 	for (const [name, { directory, manifest }] of manifests) {
 		const scripts = manifest.scripts ?? {};
 		if (hasCode(path.join(root, directory, "src"), /\.[cm]?tsx?$/))

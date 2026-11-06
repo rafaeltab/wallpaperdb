@@ -3,12 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "vitest";
-import { checkMigrations } from "./check-migrations.mjs";
+import { checkMigrations } from "./check-migrations.ts";
 test("migration metadata requires SQL, ordered journals and linked snapshots", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "migration-audit-"));
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	fs.mkdirSync(path.join(root, "meta"));
-	const write = (file, data) =>
+	const write = (file: string, data: unknown) =>
 		fs.writeFileSync(
 			path.join(root, file),
 			typeof data === "string" ? data : JSON.stringify(data),

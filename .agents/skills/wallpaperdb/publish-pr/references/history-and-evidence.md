@@ -16,7 +16,7 @@ Use this policy for local independent reviews, hosted code and security reviews,
 
 ### Record the reviewed comparison
 
-Keep a JSON review ledger outside the repository. Before publication, run `make run PACKAGE=scripts SCRIPT=agent ARGS='review-evidence /absolute/path/ledger.json'`. The [validator](../../../../../scripts/agent-workflow.mjs) defines comparison, review-axis, provenance, finding, and hashed-artifact fields. Preserve original reviewer records when carrying evidence forward. Authenticate hosted results and establish their actual comparison; a complete local record alone does not prove independent review occurred.
+Keep a JSON review ledger outside the repository. Before publication, run `make run PACKAGE=scripts SCRIPT=agent ARGS='review-evidence /absolute/path/ledger.json'`. The [validator](../../../../../scripts/agent-workflow.ts) defines comparison, review-axis, provenance, finding, and hashed-artifact fields. Preserve original reviewer records when carrying evidence forward. Authenticate hosted results and establish their actual comparison; a complete local record alone does not prove independent review occurred.
 
 ### Assess applicability after changes
 

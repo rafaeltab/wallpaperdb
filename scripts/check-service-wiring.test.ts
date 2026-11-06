@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "vitest";
-import { checkServiceWiring } from "./check-service-wiring.mjs";
+import { checkServiceWiring } from "./check-service-wiring.ts";
 test("service audit requires deployment, environment, health, ingress and Bruno wiring", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "service-wiring-"));
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
-	const write = (file, text) => {
+	const write = (file: string, text: string) => {
 		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
 		fs.writeFileSync(path.join(root, file), text);
 	};

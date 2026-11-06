@@ -1,3 +1,4 @@
+import type { Nodes, Root } from "mdast";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -6,7 +7,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const parser = unified().use(remarkParse);
-function walk(directory) {
+function walk(directory: string): string[] {
 	if (!fs.existsSync(directory)) return [];
 	return fs
 		.readdirSync(directory, { withFileTypes: true })
@@ -16,16 +17,20 @@ function walk(directory) {
 				: [path.join(directory, e.name)],
 		);
 }
-function visit(node, callback) {
+function visit(node: Nodes, callback: (node: Nodes) => void): void {
 	callback(node);
-	for (const child of node.children ?? []) visit(child, callback);
+	for (const child of "children" in node ? node.children : [])
+		visit(child, callback);
 }
-function text(node) {
-	return node.value ?? (node.children ?? []).map(text).join("");
+function text(node: Nodes): string {
+	return (
+		("value" in node ? node.value : undefined) ??
+		("children" in node ? node.children : []).map(text).join("")
+	);
 }
-function anchors(tree) {
-	const result = new Set();
-	const counts = new Map();
+function anchors(tree: Root) {
+	const result = new Set<string>();
+	const counts = new Map<string, number>();
 	visit(tree, (node) => {
 		if (node.type === "heading") {
 			const slug = text(node)
@@ -45,12 +50,12 @@ function anchors(tree) {
 	});
 	return result;
 }
-export function checkDocumentation(root, files) {
+export function checkDocumentation(root: string, files: string[]) {
 	const errors = [];
-	const skills = new Map();
-	const trees = new Map();
-	const headings = new Map();
-	const tree = (filename) => {
+	const skills = new Map<string, string>();
+	const trees = new Map<string, Root>();
+	const headings = new Map<string, Set<string>>();
+	const tree = (filename: string): Root => {
 		if (!trees.has(filename))
 			trees.set(
 				filename,
@@ -60,7 +65,7 @@ export function checkDocumentation(root, files) {
 						.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, ""),
 				),
 			);
-		return trees.get(filename);
+		return trees.get(filename)!;
 	};
 	for (const filename of walk(path.join(root, ".agents/skills")).filter(
 		(f) => path.basename(f) === "SKILL.md",
@@ -81,8 +86,8 @@ export function checkDocumentation(root, files) {
 	for (const file of files) {
 		const filename = path.resolve(root, file);
 		const source = tree(filename);
-		const references = new Map();
-		const links = [];
+		const references = new Map<string, string>();
+		const links: string[] = [];
 		visit(source, (node) => {
 			if (node.type === "definition") references.set(node.identifier, node.url);
 		});
@@ -90,7 +95,7 @@ export function checkDocumentation(root, files) {
 			if (node.type === "link" || node.type === "image") links.push(node.url);
 			if (node.type === "linkReference" || node.type === "imageReference") {
 				if (references.has(node.identifier))
-					links.push(references.get(node.identifier));
+					links.push(references.get(node.identifier)!);
 				else errors.push(`${file}: unresolved reference ${node.identifier}`);
 			}
 			if (
@@ -108,7 +113,7 @@ export function checkDocumentation(root, files) {
 			if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(link) || /[<>$*{}]/.test(link))
 				continue;
 			const [relative, fragment] = link.split("#");
-			let target;
+			let target: string;
 			try {
 				target = relative
 					? path.resolve(
@@ -126,7 +131,7 @@ export function checkDocumentation(root, files) {
 			}
 			if (fragment && /\.md$/i.test(target)) {
 				if (!headings.has(target)) headings.set(target, anchors(tree(target)));
-				if (!headings.get(target).has(decodeURIComponent(fragment)))
+				if (!headings.get(target)!.has(decodeURIComponent(fragment)))
 					errors.push(`${file}: missing anchor ${link}`);
 			}
 		}

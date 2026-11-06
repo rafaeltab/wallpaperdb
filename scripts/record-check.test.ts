@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "vitest";
-import { recordCheck } from "./record-check.mjs";
+import { recordCheck } from "./record-check.ts";
 test("check records distinguish expected failures, success and source changes during execution", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "record-check-"));
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));

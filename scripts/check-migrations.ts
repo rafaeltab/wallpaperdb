@@ -1,13 +1,15 @@
+import type { Generators } from "./lib/agent-types.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-export function checkMigrations(directory) {
+export function checkMigrations(directory: string) {
 	const errors = [];
-	const journal = JSON.parse(
-		fs.readFileSync(path.join(directory, "meta/_journal.json"), "utf8"),
-	);
-	const expected = new Set();
-	const ids = new Set();
+	const journal: { entries: { idx: number; tag: string; when: number }[] } =
+		JSON.parse(
+			fs.readFileSync(path.join(directory, "meta/_journal.json"), "utf8"),
+		);
+	const expected = new Set<string>();
+	const ids = new Set<string>();
 	let previous = "00000000-0000-0000-0000-000000000000";
 	let timestamp = -Infinity;
 	for (const [index, entry] of journal.entries.entries()) {
@@ -33,7 +35,9 @@ export function checkMigrations(directory) {
 			errors.push(`${directory}: missing snapshot ${entry.idx}`);
 			continue;
 		}
-		const snapshot = JSON.parse(fs.readFileSync(file, "utf8"));
+		const snapshot: { id: string; prevId: string } = JSON.parse(
+			fs.readFileSync(file, "utf8"),
+		);
 		if (!snapshot.id || ids.has(snapshot.id) || snapshot.prevId !== previous)
 			errors.push(`${file}: broken snapshot identity chain`);
 		ids.add(snapshot.id);
@@ -44,9 +48,9 @@ export function checkMigrations(directory) {
 			errors.push(`${directory}: SQL ${file} is absent from the journal`);
 	return errors;
 }
-export function checkSchemaDump(expected, actual) {
+export function checkSchemaDump(expected: string, actual: string) {
 	// PostgreSQL's random psql safety token is the only volatile dump content.
-	const normalize = (dump) =>
+	const normalize = (dump: string) =>
 		dump.replace(/^\\(?:un)?restrict .*\r?\n/gm, "").trim();
 	const wanted = normalize(expected).split("\n");
 	const found = normalize(actual).split("\n");
@@ -66,7 +70,7 @@ if (
 ) {
 	const root = fileURLToPath(new URL("../", import.meta.url));
 	const errors = [];
-	const definitions = JSON.parse(
+	const definitions: Generators[string] = JSON.parse(
 		fs.readFileSync(path.join(root, "generated.config.json"), "utf8"),
 	).migrations;
 	for (const [workspace, { outputs }] of Object.entries(definitions)) {

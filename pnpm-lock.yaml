@@ -1965,6 +1965,9 @@ importers:
       '@types/istanbul-lib-coverage':
         specifier: 2.0.6
         version: 2.0.6
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1

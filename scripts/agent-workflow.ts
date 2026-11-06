@@ -1,11 +1,22 @@
-import { recordCheck, sourceSnapshot } from "./record-check.mjs";
-import { verifyStackReadiness } from "./stack-readiness.mjs";
-import { videoReferences, verifyVideo } from "./verify-video.mjs";
-import { guardedPush } from "./guarded-push.mjs";
-import { githubFeedback } from "./collect-feedback.mjs";
-import { publishMarkdown } from "./publish-markdown.mjs";
+import type {
+	PullRequest,
+	Issue,
+	Check,
+	Workflow,
+	CiAssessment,
+	Comparison,
+	ReviewLedger,
+	ValidationRecord,
+	Exclusion,
+} from "./lib/agent-types.ts";
+import { recordCheck, sourceSnapshot } from "./record-check.ts";
+import { verifyStackReadiness } from "./stack-readiness.ts";
+import { videoReferences, verifyVideo } from "./verify-video.ts";
+import { guardedPush } from "./guarded-push.ts";
+import { githubFeedback } from "./collect-feedback.ts";
+import { publishMarkdown } from "./publish-markdown.ts";
 export { publishMarkdown };
-import { command, github } from "./lib/agent-command.mjs";
+import { command, github } from "./lib/agent-command.ts";
 import path from "node:path";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -13,12 +24,12 @@ import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
 export { command, github };
 export function issuePreflight(
-	issue,
-	login,
-	status,
-	verifiedBlockers = new Set(),
+	issue: Issue,
+	login: string,
+	status: string,
+	verifiedBlockers = new Set<string>(),
 ) {
-	const errors = [];
+	const errors: string[] = [];
 	if (issue.state !== "OPEN") errors.push("Issue must be open");
 	if (!issue.assignees?.some((a) => a.login === login))
 		errors.push(`Issue must be assigned to ${login}`);
@@ -30,14 +41,18 @@ export function issuePreflight(
 		errors.push("Issue dependency discovery is incomplete");
 	if (
 		issue.blockedBy?.nodes?.some(
-			(b) => b.state !== "CLOSED" && !verifiedBlockers.has(b.url),
+			(b) => b.state !== "CLOSED" && !verifiedBlockers.has(b.url ?? ""),
 		)
 	)
 		errors.push("Open blockers require a verified stack-readiness assessment");
 	return errors;
 }
-export function prReadiness(pr, expectedChecks, inapplicableChecks = []) {
-	const errors = [];
+export function prReadiness(
+	pr: Pick<PullRequest, "state" | "mergeable" | "statusCheckRollup">,
+	expectedChecks: string[] | null | undefined,
+	inapplicableChecks: Exclusion[] = [],
+) {
+	const errors: string[] = [];
 	if (pr.state !== "OPEN") errors.push("PR is not open");
 	if (pr.mergeable !== "MERGEABLE")
 		errors.push("Merge-conflict status is not verified");
@@ -61,7 +76,7 @@ export function prReadiness(pr, expectedChecks, inapplicableChecks = []) {
 		if (
 			excluded &&
 			check.conclusion === "SKIPPED" &&
-			!expectedChecks?.includes(name)
+			!expectedChecks?.includes(name ?? "")
 		)
 			continue;
 		if ((check.conclusion ?? check.state) !== "SUCCESS")
@@ -71,8 +86,17 @@ export function prReadiness(pr, expectedChecks, inapplicableChecks = []) {
 	}
 	return errors;
 }
-export function ciAssessmentErrors(assessment, snapshot) {
-	const errors = [];
+export function ciAssessmentErrors(
+	assessment: CiAssessment | null,
+	snapshot: {
+		policySha: string;
+		head: string;
+		baseRef: string;
+		mergeSha?: string | null;
+		policy: Workflow[];
+	},
+) {
+	const errors: string[] = [];
 	if (!assessment) return errors;
 	if (
 		assessment.policySha !== snapshot.policySha ||
@@ -110,8 +134,18 @@ export function ciAssessmentErrors(assessment, snapshot) {
 	}
 	return errors;
 }
-export function markAdvisoryChecks(pr, repo, policy, lookup = github) {
-	const runs = new Map();
+export function markAdvisoryChecks<
+	T extends { headRefOid: string; statusCheckRollup?: Check[] },
+>(
+	pr: T,
+	repo: string,
+	policy: Workflow[],
+	lookup: (args: readonly string[]) => {
+		path?: string;
+		head_sha?: string;
+	} = github,
+) {
+	const runs = new Map<string, { path?: string; head_sha?: string }>();
 	const pilotExists = policy.some(
 		(file) => file.path === ".github/workflows/mutation.yml",
 	);
@@ -125,7 +159,7 @@ export function markAdvisoryChecks(pr, repo, policy, lookup = github) {
 		const id = match[2];
 		if (!runs.has(id))
 			runs.set(id, lookup(["api", `repos/${repo}/actions/runs/${id}`]));
-		const run = runs.get(id);
+		const run = runs.get(id)!;
 		check.advisory =
 			pilotExists &&
 			run.path?.split("@")[0] === ".github/workflows/mutation.yml" &&
@@ -133,7 +167,7 @@ export function markAdvisoryChecks(pr, repo, policy, lookup = github) {
 	}
 	return pr;
 }
-export function readPr(subject) {
+export function readPr(subject: string | undefined): PullRequest {
 	if (!subject || subject.startsWith("-"))
 		throw new Error("Expected PR number or URL");
 	return github([
@@ -144,11 +178,14 @@ export function readPr(subject) {
 		"url,number,state,isDraft,mergeable,headRefOid,headRefName,headRepository,headRepositoryOwner,baseRefName,statusCheckRollup,closingIssuesReferences",
 	]);
 }
-export function repositoryMetadata() {
+export function repositoryMetadata(): {
+	nameWithOwner: string;
+	defaultBranchRef: { name: string };
+} {
 	return github(["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]);
 }
-export function workflowSnapshot(repo, ref) {
-	const files = github([
+export function workflowSnapshot(repo: string, ref: string) {
+	const files = github<Workflow[]>([
 		"api",
 		`repos/${repo}/contents/.github/workflows?ref=${encodeURIComponent(ref)}`,
 	]);
@@ -157,21 +194,24 @@ export function workflowSnapshot(repo, ref) {
 		.map((file) => ({
 			path: file.path,
 			sha: file.sha,
-			content: github([
+			content: github<{ content: string }>([
 				"api",
 				`repos/${repo}/contents/${file.path}?ref=${encodeURIComponent(ref)}`,
 			]).content,
 		}));
 }
-const oid = (value) =>
+const oid = (value: unknown) =>
 	typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
-export function reviewEvidenceErrors(ledger, current) {
-	const errors = [];
+export function reviewEvidenceErrors(
+	ledger: ReviewLedger,
+	current: Comparison,
+) {
+	const errors: string[] = [];
 	if (ledger.pendingScopeDecisions?.length)
 		errors.push("Pending scope decisions");
-	for (const key of ["head", "baseSha", "mergeBase"])
+	for (const key of ["head", "baseSha", "mergeBase"] as const)
 		if (!oid(current[key])) errors.push(`Invalid current ${key}`);
-	for (const key of ["head", "baseRef", "baseSha", "mergeBase"])
+	for (const key of ["head", "baseRef", "baseSha", "mergeBase"] as const)
 		if (ledger.current?.[key] !== current[key])
 			errors.push(`Evidence comparison differs at ${key}`);
 	for (const axis of ["Standards", "Spec", "Defects"]) {
@@ -187,10 +227,10 @@ export function reviewEvidenceErrors(ledger, current) {
 			"diffCommand",
 			"requirements",
 			"scope",
-		])
+		] as const)
 			if (typeof review[key] !== "string" || !review[key].trim())
 				errors.push(`${axis}: missing ${key}`);
-		for (const key of ["head", "baseSha", "mergeBase"])
+		for (const key of ["head", "baseSha", "mergeBase"] as const)
 			if (!oid(review[key])) errors.push(`${axis}: invalid ${key}`);
 		if (
 			review.outcome !== "clean" ||
@@ -200,7 +240,9 @@ export function reviewEvidenceErrors(ledger, current) {
 					f.disposition !== "resolved" &&
 					!(
 						f.disposition === "follow-up" &&
-						/^https:\/\/github.com\/[^/]+\/[^/]+\/issues\/\d+$/.test(f.url)
+						/^https:\/\/github.com\/[^/]+\/[^/]+\/issues\/\d+$/.test(
+							f.url ?? "",
+						)
 					),
 			)
 		)
@@ -229,6 +271,10 @@ export function reviewEvidenceErrors(ledger, current) {
 	}
 	return errors;
 }
+function requiredSubject(subject: string | undefined): string {
+	if (!subject) throw new Error("Expected a subject or input file");
+	return subject;
+}
 async function main() {
 	const [action, subject, ...args] = process.argv.slice(2);
 	if (action === "issue-preflight") {
@@ -236,14 +282,14 @@ async function main() {
 			throw new Error(
 				"Expected issue number or URL and optional required status",
 			);
-		const issue = github([
+		const issue = github<Issue & { id: string }>([
 			"issue",
 			"view",
 			subject,
 			"--json",
 			"id,url,state,assignees,blockedBy",
 		]);
-		const expectedRepository = github([
+		const expectedRepository = github<{ nameWithOwner: string }>([
 			"repo",
 			"view",
 			"--json",
@@ -254,14 +300,20 @@ async function main() {
 		)
 			throw new Error("Issue belongs to another repository");
 		const query = `query($id:ID!){node(id:$id){... on Issue{projectItems(first:100){nodes{project{number owner{... on User{login} ... on Organization{login}}} fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}}} pageInfo{hasNextPage}}}}}`;
-		const connection = github([
-			"api",
-			"graphql",
-			"-f",
-			`query=${query}`,
-			"-f",
-			`id=${issue.id}`,
-		]).data.node.projectItems;
+		const connection = github<{
+			data: {
+				node: {
+					projectItems: {
+						pageInfo: { hasNextPage: boolean };
+						nodes: {
+							project: { number: number; owner: { login: string } };
+							fieldValueByName?: { name: string };
+						}[];
+					};
+				};
+			};
+		}>(["api", "graphql", "-f", `query=${query}`, "-f", `id=${issue.id}`]).data
+			.node.projectItems;
 		if (connection.pageInfo.hasNextPage)
 			throw new Error("Project membership discovery is incomplete");
 		const item = connection.nodes.find(
@@ -274,7 +326,7 @@ async function main() {
 					status: item.fieldValueByName?.name,
 				}
 			: null;
-		const login = github(["api", "user"]).login;
+		const login = github<{ login: string }>(["api", "user"]).login;
 		const head = command("git", ["rev-parse", "HEAD"]).trim();
 		const verifiedBlockers = args[1]
 			? verifyStackReadiness(JSON.parse(fs.readFileSync(args[1], "utf8")), {
@@ -291,11 +343,13 @@ async function main() {
 						)?.[1];
 						if (!number)
 							throw new Error("Blocker issue belongs to another repository");
-						const item = github([
-							"api",
-							`repos/${expectedRepository}/issues/${number}`,
-						]);
-						item.comments = github([
+						const item = github<{
+							html_url: string;
+							state: string;
+							body?: string;
+							comments?: { body?: string }[];
+						}>(["api", `repos/${expectedRepository}/issues/${number}`]);
+						item.comments = github<{ body?: string }[][]>([
 							"api",
 							`repos/${expectedRepository}/issues/${number}/comments`,
 							"--paginate",
@@ -304,7 +358,7 @@ async function main() {
 						return { ...item, url: item.html_url };
 					},
 				})
-			: new Set();
+			: new Set<string>();
 		const errors = issuePreflight(
 			issue,
 			login,
@@ -326,23 +380,23 @@ async function main() {
 		const repo = repositoryMetadata();
 		if (!pr.url.startsWith(`https://github.com/${repo.nameWithOwner}/pull/`))
 			throw new Error("PR belongs to another repository");
-		const liveBase = github([
+		const liveBase = github<{ object: { sha: string } }>([
 			"api",
 			`repos/${repo.nameWithOwner}/git/ref/heads/${encodeURIComponent(pr.baseRefName)}`,
 		]).object.sha;
-		const policySha = github([
+		const policySha = github<{ object: { sha: string } }>([
 			"api",
 			`repos/${repo.nameWithOwner}/git/ref/heads/${encodeURIComponent(repo.defaultBranchRef.name)}`,
 		]).object.sha;
 		const policy = workflowSnapshot(repo.nameWithOwner, policySha);
-		const merge = github([
+		const merge = github<{ merge_commit_sha: string | null }>([
 			"api",
 			`repos/${repo.nameWithOwner}/pulls/${pr.number}`,
 		]).merge_commit_sha;
 		const effective = merge
 			? workflowSnapshot(repo.nameWithOwner, merge)
 			: null;
-		let assessment = args[0]
+		const assessment: CiAssessment | null = args[0]
 			? JSON.parse(fs.readFileSync(args[0], "utf8"))
 			: null;
 		markAdvisoryChecks(pr, repo.nameWithOwner, policy);
@@ -378,7 +432,9 @@ async function main() {
 		console.log(JSON.stringify(result, null, 2));
 		if (errors.length) process.exitCode = 1;
 	} else if (action === "review-evidence") {
-		const ledger = JSON.parse(fs.readFileSync(subject, "utf8"));
+		const ledger: ReviewLedger = JSON.parse(
+			fs.readFileSync(requiredSubject(subject), "utf8"),
+		);
 		const head = command("git", ["rev-parse", "HEAD"]).trim();
 		const baseRef = ledger.current?.baseRef;
 		if (!baseRef || baseRef.startsWith("-"))
@@ -418,7 +474,9 @@ async function main() {
 	} else if (action === "publish") {
 		console.log(
 			JSON.stringify(
-				publishMarkdown(JSON.parse(fs.readFileSync(subject, "utf8"))),
+				publishMarkdown(
+					JSON.parse(fs.readFileSync(requiredSubject(subject), "utf8")),
+				),
 				null,
 				2,
 			),
@@ -439,9 +497,14 @@ async function main() {
 		);
 		if (errors.length) process.exitCode = 1;
 	} else if (action === "push") {
-		const input = JSON.parse(fs.readFileSync(subject, "utf8"));
+		const input: {
+			pr: string;
+			validationFile: string;
+			expectedHead: string;
+			rewriteAuthorized?: unknown;
+		} = JSON.parse(fs.readFileSync(requiredSubject(subject), "utf8"));
 		const pr = readPr(input.pr);
-		const validation = JSON.parse(
+		const validation: ValidationRecord = JSON.parse(
 			fs.readFileSync(input.validationFile, "utf8"),
 		);
 		if (
@@ -479,7 +542,7 @@ async function main() {
 		const pr = readPr(subject);
 		const parsed = new URL(pr.url);
 		const repo = parsed.pathname.split("/").slice(1, 3).join("/");
-		const body = github([
+		const body = github<{ body_html?: string; body?: string }>([
 			"api",
 			`repos/${repo}/issues/${pr.number}`,
 			"-H",
@@ -490,7 +553,9 @@ async function main() {
 			videos.push(await verifyVideo(url));
 		console.log(JSON.stringify({ pr: pr.url, videos }, null, 2));
 	} else if (action === "record-check") {
-		const result = recordCheck(JSON.parse(fs.readFileSync(subject, "utf8")));
+		const result = recordCheck(
+			JSON.parse(fs.readFileSync(requiredSubject(subject), "utf8")),
+		);
 		console.log(JSON.stringify(result, null, 2));
 		if (!result.expectationMet) process.exitCode = 1;
 	} else

@@ -1,8 +1,18 @@
+interface Compose {
+	services?: Record<
+		string,
+		{
+			build?: { dockerfile?: string };
+			healthcheck?: { test?: string[]; disable?: boolean };
+			env_file?: (string | { path: string })[];
+		}
+	>;
+}
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { command } from "./lib/agent-command.mjs";
-function files(directory) {
+import { command } from "./lib/agent-command.ts";
+function files(directory: string): string[] {
 	if (!fs.existsSync(directory)) return [];
 	return fs
 		.readdirSync(directory, { withFileTypes: true })
@@ -12,7 +22,7 @@ function files(directory) {
 				: [path.join(directory, e.name)],
 		);
 }
-export function checkServiceWiring(root, compose) {
+export function checkServiceWiring(root: string, compose: Compose) {
 	const errors = [];
 	const ingress = fs.readFileSync(
 		path.join(root, "infra/caddy/Caddyfile"),
@@ -39,7 +49,7 @@ export function checkServiceWiring(root, compose) {
 			continue;
 		}
 		const [name, service] = match;
-		if (!fs.existsSync(path.join(root, service.build.dockerfile)))
+		if (!fs.existsSync(path.join(root, service.build!.dockerfile!)))
 			errors.push(`${workspace}: missing development Dockerfile`);
 		if (!service.healthcheck?.test?.length || service.healthcheck.disable)
 			errors.push(`${workspace}: missing Compose health check`);
@@ -48,7 +58,7 @@ export function checkServiceWiring(root, compose) {
 		if (
 			!service.env_file?.some(
 				(file) =>
-					path.resolve(file.path ?? file) ===
+					path.resolve(typeof file === "string" ? file : file.path) ===
 					path.join(root, workspace, ".env"),
 			)
 		)
@@ -79,7 +89,7 @@ if (
 	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
 	const root = fileURLToPath(new URL("../", import.meta.url));
-	const compose = JSON.parse(
+	const compose: Compose = JSON.parse(
 		command("docker", [
 			"compose",
 			"-f",

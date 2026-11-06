@@ -1,8 +1,19 @@
+interface Publication {
+	kind: string;
+	subject?: string | number;
+	bodyFile: string;
+	title?: string;
+	base?: string;
+	head?: string;
+	draft?: boolean;
+	attach?: string;
+	event?: string;
+}
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { command } from "./lib/agent-command.mjs";
-export function publishMarkdown(input, run = command) {
+import { command } from "./lib/agent-command.ts";
+export function publishMarkdown(input: Publication, run = command) {
 	const allowed = new Set([
 		"issue-create",
 		"issue-edit",
@@ -26,16 +37,16 @@ export function publishMarkdown(input, run = command) {
 	fs.writeFileSync(file, body, { mode: 0o600 });
 	try {
 		if (resource === "pr" && operation !== "create") {
-			const state = JSON.parse(
+			const state: { state: string } = JSON.parse(
 				run("gh", ["pr", "view", String(input.subject), "--json", "state"]),
 			);
 			if (state.state !== "OPEN")
 				throw new Error("PR is not open; publication stopped");
 		}
-		let url;
-		let readback;
+		let url: string;
+		let readback: unknown;
 		if (operation === "review") {
-			const pr = JSON.parse(
+			const pr: { url: string; number: number } = JSON.parse(
 				run("gh", [
 					"pr",
 					"view",
@@ -55,7 +66,7 @@ export function publishMarkdown(input, run = command) {
 				)
 			)
 				throw new Error("Invalid review event");
-			const review = JSON.parse(
+			const review: { html_url: string; id: number } = JSON.parse(
 				run("gh", ["api", endpoint, "--method", "POST", "--input", "-"], {
 					input: JSON.stringify({ body, event: input.event ?? "COMMENT" }),
 				}),

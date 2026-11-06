@@ -5,20 +5,20 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { test } from "vitest";
-import { verifyStackReadiness } from "./stack-readiness.mjs";
-import { reviewEvidenceErrors } from "./agent-workflow.mjs";
+import { verifyStackReadiness } from "./stack-readiness.ts";
+import { reviewEvidenceErrors } from "./agent-workflow.ts";
 
 test("stack readiness verifies the parent commit, passing logs, review axes and issue record", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "stack-readiness-"));
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
-	const run = (program, args) =>
+	const run = (program: string, args: readonly string[]) =>
 		execFileSync(program, args, {
 			cwd: root,
 			encoding: "utf8",
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 	run("git", ["init"]);
-	const commit = (name) =>
+	const commit = (name: string) =>
 		run("git", [
 			"-c",
 			"user.name=Test",
@@ -33,7 +33,7 @@ test("stack readiness verifies the parent commit, passing logs, review axes and 
 	const parent = run("git", ["rev-parse", "HEAD"]).trim();
 	commit("child");
 	const head = run("git", ["rev-parse", "HEAD"]).trim();
-	const sha = (text) => createHash("sha256").update(text).digest("hex");
+	const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 	const log = path.join(root, "validation.log");
 	fs.writeFileSync(log, "all checks passed\n");
 	const artifact = { path: log, sha256: sha("all checks passed\n") };

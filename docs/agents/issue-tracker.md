@@ -18,7 +18,7 @@ When picking up a GitHub issue, assign it to the authenticated GitHub account us
 
 If assignment or verification fails, stop work on that issue and report the failure. Resume planning and implementation only after assignment is verified.
 
-For the documented [stack exception](#relationships), append an assessment JSON path after the required status. The [stack verifier](../../scripts/stack-readiness.mjs) defines the evidence fields and checks the ancestor commit, validation, independent reviews, and blocker issue record. The assessor must establish acceptance criteria and explain why the ancestor belongs to the same stack; an open PR alone is insufficient.
+For the documented [stack exception](#relationships), append an assessment JSON path after the required status. The [stack verifier](../../scripts/stack-readiness.ts) defines the evidence fields and checks the ancestor commit, validation, independent reviews, and blocker issue record. The assessor must establish acceptance criteria and explain why the ancestor belongs to the same stack; an open PR alone is insufficient.
 
 ## Project lifecycle
 

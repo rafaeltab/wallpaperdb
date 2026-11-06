@@ -1,7 +1,7 @@
 import { expect } from "vitest";
 import { test } from "vitest";
-import { collectFeedback } from "./collect-feedback.mjs";
-const page = (nodes, next = null) => ({
+import { collectFeedback } from "./collect-feedback.ts";
+const page = <T>(nodes: T[], next: string | null = null) => ({
 	nodes,
 	pageInfo: { hasNextPage: next !== null, endCursor: next },
 });

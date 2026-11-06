@@ -17,7 +17,7 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 	fs.mkdirSync(path.join(root, "apps/fixture/drizzle/meta"), {
 		recursive: true,
 	});
-	for (const name of ["check-migrations.mjs", "check-migration-replay.mjs"])
+	for (const name of ["check-migrations.ts", "check-migration-replay.ts"])
 		fs.copyFileSync(
 			path.join(repository, "scripts", name),
 			path.join(root, "scripts", name),
@@ -116,7 +116,7 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 		);
 		const result = spawnSync(
 			process.execPath,
-			[path.join(root, "scripts/check-migration-replay.mjs")],
+			[path.join(root, "scripts/check-migration-replay.ts")],
 			{ encoding: "utf8", timeout: 90_000 },
 		);
 		expect(result.error, result.error?.message).toBe(undefined);

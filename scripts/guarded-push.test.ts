@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 import { test } from "vitest";
-import { guardedPush } from "./guarded-push.mjs";
+import { guardedPush } from "./guarded-push.ts";
 const head = "a".repeat(40),
 	expected = "b".repeat(40);
 test("guarded publication requires an open unchanged PR and uses a literal expected-head lease", () => {
@@ -11,8 +11,8 @@ test("guarded publication requires an open unchanged PR and uses a literal expec
 		headRepository: { name: "repo" },
 		headRepositoryOwner: { login: "owner" },
 	};
-	let pushed;
-	const run = (program, args) => {
+	let pushed: readonly string[] = [];
+	const run = (program: string, args: readonly string[]) => {
 		if (args[0] === "push") pushed = args;
 		return "";
 	};
@@ -68,7 +68,7 @@ test("the actual Git lease rejects a stale remote head", (t) => {
 	const remote = path.join(directory, "remote.git"),
 		local = path.join(directory, "local");
 	fs.mkdirSync(local);
-	const git = (args) =>
+	const git = (args: readonly string[]) =>
 		execFileSync("git", args, {
 			cwd: local,
 			encoding: "utf8",
@@ -99,7 +99,7 @@ test("the actual Git lease rejects a stale remote head", (t) => {
 		headRepository: { name: "repo" },
 		headRepositoryOwner: { login: "owner" },
 	};
-	const run = (_program, args) =>
+	const run = (_program: string, args: readonly string[]) =>
 		git(
 			args.map((arg) =>
 				arg === "https://github.com/owner/repo.git" ? remote : arg,

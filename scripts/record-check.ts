@@ -3,9 +3,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { command } from "./lib/agent-command.mjs";
+import { command } from "./lib/agent-command.ts";
 const repository = fileURLToPath(new URL("../", import.meta.url));
-const digest = (value) => createHash("sha256").update(value).digest("hex");
+const digest = (value: string | Uint8Array) =>
+	createHash("sha256").update(value).digest("hex");
 export function sourceSnapshot() {
 	const head = command("git", ["rev-parse", "HEAD"]).trim();
 	const tree = command("git", ["rev-parse", "HEAD^{tree}"]).trim();
@@ -27,8 +28,23 @@ export function sourceSnapshot() {
 	return { head, tree, sourceDigest: hash.digest("hex") };
 }
 export function recordCheck(
-	request,
-	execute = spawnSync,
+	request: {
+		command: string[];
+		expect: string;
+		output: string;
+		timeoutMs?: number;
+	},
+	execute: (
+		program: string,
+		args: string[],
+		options: import("node:child_process").SpawnSyncOptionsWithStringEncoding,
+	) => Pick<import("node:child_process").SpawnSyncReturns<string>, "status"> &
+		Partial<
+			Pick<
+				import("node:child_process").SpawnSyncReturns<string>,
+				"error" | "signal"
+			>
+		> & { stdout?: string | null; stderr?: string | null } = spawnSync,
 	snapshot = sourceSnapshot,
 ) {
 	if (
@@ -67,7 +83,7 @@ export function recordCheck(
 		) + "\n",
 		{ mode: 0o600 },
 	);
-	let result;
+	let result: ReturnType<typeof execute>;
 	try {
 		result = execute("make", request.command.slice(1), {
 			cwd: repository,

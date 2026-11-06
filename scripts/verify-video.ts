@@ -1,4 +1,4 @@
-export function videoReferences(html, markdown = "") {
+export function videoReferences(html: string, markdown = "") {
 	const urls = [];
 	for (const match of html.matchAll(/<video\b([^>]*)>([\s\S]*?)<\/video>/gi)) {
 		if (!/(?:^|\s)controls(?:\s|=|$)/i.test(match[1]))
@@ -33,7 +33,18 @@ export function videoReferences(html, markdown = "") {
 	if (!urls.length) throw new Error("PR body has no rendered video player");
 	return urls;
 }
-export async function verifyVideo(url, request = fetch) {
+export async function verifyVideo(
+	url: string,
+	request: (
+		url: string,
+		options: RequestInit,
+	) => Promise<
+		Pick<Response, "ok"> &
+			Partial<Pick<Response, "status" | "headers">> & {
+				body?: Pick<ReadableStream, "cancel"> | null;
+			}
+	> = fetch,
+) {
 	const parsed = new URL(url);
 	if (
 		parsed.origin !== "https://github.com" ||
@@ -52,7 +63,7 @@ export async function verifyVideo(url, request = fetch) {
 			);
 		if (
 			!/^(?:video\/|application\/octet-stream)/i.test(
-				response.headers.get("content-type") ?? "",
+				response.headers?.get("content-type") ?? "",
 			)
 		)
 			throw new Error("Attachment response is not video data");

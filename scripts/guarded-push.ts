@@ -1,7 +1,25 @@
-import { command } from "./lib/agent-command.mjs";
-const oid = (value) =>
+interface Push {
+	expectedHead: string;
+	head: string;
+	validatedHead: string;
+	rewriteAuthorized?: unknown;
+	pr: Pick<
+		import("./lib/agent-types.ts").PullRequest,
+		| "state"
+		| "headRefOid"
+		| "headRefName"
+		| "headRepositoryOwner"
+		| "headRepository"
+	> & { url?: string };
+}
+import { command } from "./lib/agent-command.ts";
+const oid = (value: unknown) =>
 	typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
-export function guardedPush(input, run = command, refresh) {
+export function guardedPush(
+	input: Push,
+	run = command,
+	refresh: () => Push["pr"],
+) {
 	const { pr, expectedHead, head, validatedHead } = input;
 	if (
 		input.rewriteAuthorized !== undefined &&

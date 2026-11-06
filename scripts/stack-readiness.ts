@@ -1,17 +1,61 @@
+import type {
+	Artifact,
+	Issue,
+	PullRequest,
+	ReviewLedger,
+	Comparison,
+	ValidationRecord,
+} from "./lib/agent-types.ts";
+interface Assessment {
+	head: string;
+	issue: string;
+	assessor?: string;
+	rationale?: string;
+	blockers: {
+		issue: string;
+		pr: string;
+		head?: string;
+		acceptanceRationale?: string;
+		validationFile: string;
+		reviewFile: string;
+	}[];
+}
+interface Context {
+	head: string;
+	issue: Pick<Issue, "url" | "blockedBy">;
+	repository: string;
+	readPr: (
+		subject: string,
+	) => Pick<
+		PullRequest,
+		"url" | "state" | "isDraft" | "headRefOid" | "baseRefName"
+	>;
+	readIssue: (url: string) => {
+		url: string;
+		state: string;
+		body?: string;
+		comments?: { body?: string }[];
+	};
+	reviewErrors: (ledger: ReviewLedger, current: Comparison) => string[];
+}
 import fs from "node:fs";
 import { createHash } from "node:crypto";
-import { command } from "./lib/agent-command.mjs";
+import { command } from "./lib/agent-command.ts";
 
-function verifyArtifact(artifact) {
+function verifyArtifact(artifact: Artifact | undefined) {
 	const data = artifact?.path && fs.readFileSync(artifact.path);
 	if (
 		!data?.length ||
-		!artifact.sha256 ||
+		!artifact?.sha256 ||
 		createHash("sha256").update(data).digest("hex") !== artifact.sha256
 	)
 		throw new Error("Stack evidence artifact is missing or changed");
 }
-export function verifyStackReadiness(assessment, context, run = command) {
+export function verifyStackReadiness(
+	assessment: Assessment,
+	context: Context,
+	run = command,
+) {
 	if (
 		assessment.head !== context.head ||
 		assessment.issue !== context.issue.url ||
@@ -31,13 +75,15 @@ export function verifyStackReadiness(assessment, context, run = command) {
 			open.length
 	)
 		throw new Error("Stack assessment must cover exactly the open blockers");
-	const verified = new Set();
+	const verified = new Set<string>();
 	for (const blocker of open) {
 		const evidence = assessment.blockers.find(
 			(entry) => entry.issue === blocker.url,
 		);
 		if (
+			!blocker.url ||
 			!evidence ||
+			!evidence.head ||
 			!/^[a-f0-9]{40}$/.test(evidence.head ?? "") ||
 			!evidence.acceptanceRationale?.trim()
 		)
@@ -55,7 +101,7 @@ export function verifyStackReadiness(assessment, context, run = command) {
 				"Blocker PR must be in this repository, ready for review, and at the evidenced head",
 			);
 		run("git", ["merge-base", "--is-ancestor", evidence.head, context.head]);
-		const validation = JSON.parse(
+		const validation: ValidationRecord = JSON.parse(
 			fs.readFileSync(evidence.validationFile, "utf8"),
 		);
 		if (
@@ -77,7 +123,9 @@ export function verifyStackReadiness(assessment, context, run = command) {
 				"Blocker requires completed passing validation at its commit",
 			);
 		for (const check of validation.checks) verifyArtifact(check.artifact);
-		const ledger = JSON.parse(fs.readFileSync(evidence.reviewFile, "utf8"));
+		const ledger: ReviewLedger = JSON.parse(
+			fs.readFileSync(evidence.reviewFile, "utf8"),
+		);
 		if (
 			ledger.current?.head !== evidence.head ||
 			![pr.baseRefName, `origin/${pr.baseRefName}`].includes(
@@ -88,7 +136,7 @@ export function verifyStackReadiness(assessment, context, run = command) {
 			throw new Error(
 				"Blocker requires applicable completed independent review",
 			);
-		for (const review of ledger.reviews)
+		for (const review of ledger.reviews ?? [])
 			for (const artifact of [
 				...(review.artifacts ?? []),
 				...(review.applicability?.artifacts ?? []),

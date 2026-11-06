@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:browser:install": "playwright install --with-deps chromium",
-    "generate:routes": "node scripts/generate-routes.mjs"
+    "generate:routes": "node scripts/generate-routes.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

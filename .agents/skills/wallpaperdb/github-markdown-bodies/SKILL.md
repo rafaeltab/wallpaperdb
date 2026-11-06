@@ -11,7 +11,7 @@ Write the intended body to a temporary file using a structured file-writing tool
 make run PACKAGE=scripts SCRIPT=agent ARGS='publish /absolute/path/publication.json'
 ```
 
-The [publisher](../../../../scripts/publish-markdown.mjs) defines supported `kind` values and options. Supply `bodyFile`, `subject` for an existing object, and `title` for creation. PR creation also accepts `base`, `head`, `draft`, and `attach`. After creating a PR, link it in T3 as the next tool call.
+The [publisher](../../../../scripts/publish-markdown.ts) defines supported `kind` values and options. Supply `bodyFile`, `subject` for an existing object, and `title` for creation. PR creation also accepts `base`, `head`, `draft`, and `attach`. After creating a PR, link it in T3 as the next tool call.
 
 The command snapshots body data, passes literal arguments without a shell, verifies the published body, and removes its private temporary copy. Keep caller-owned body and option files outside Git and remove them after verification.
 

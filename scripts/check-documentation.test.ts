@@ -3,11 +3,11 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "vitest";
-import { checkDocumentation } from "./check-documentation.mjs";
+import { checkDocumentation } from "./check-documentation.ts";
 test("documentation resolves links, duplicate headings, references and unique skills", (t) => {
 	const root = mkdtempSync(join(tmpdir(), "docs-check-"));
 	t.onTestFinished(() => rmSync(root, { recursive: true, force: true }));
-	const write = (p, s) => {
+	const write = (p: string, s: string) => {
 		const file = join(root, p);
 		mkdirSync(join(file, ".."), { recursive: true });
 		writeFileSync(file, s);

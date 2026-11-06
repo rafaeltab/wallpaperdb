@@ -1,6 +1,7 @@
+import type { Check } from "./lib/agent-types.ts";
 import { expect } from "vitest";
 import { test } from "vitest";
-import { issuePreflight } from "./agent-workflow.mjs";
+import { issuePreflight } from "./agent-workflow.ts";
 const ready = () => ({
 	state: "OPEN",
 	url: "https://github.com/rafaeltab/wallpaperdb/issues/1",
@@ -48,7 +49,7 @@ test("issue preflight accepts only individually verified stack blockers", () => 
 	).toBeTruthy();
 });
 
-import { prReadiness, ciAssessmentErrors } from "./agent-workflow.mjs";
+import { prReadiness, ciAssessmentErrors } from "./agent-workflow.ts";
 test("conditional applicability binds trusted policy and effective merge configuration", () => {
 	const snapshot = {
 		head: "a".repeat(40),
@@ -171,12 +172,12 @@ test("PR readiness never treats absent, pending or unknown checks as passing", (
 	).toBeTruthy();
 });
 
-import { reviewEvidenceErrors } from "./agent-workflow.mjs";
+import { reviewEvidenceErrors } from "./agent-workflow.ts";
 test("review evidence requires all axes and preserves actual reviewed comparisons", () => {
 	const head = "a".repeat(40),
 		base = "b".repeat(40);
 	const current = { head, baseRef: "main", baseSha: base, mergeBase: base };
-	const review = (axis) => ({
+	const review = (axis: string) => ({
 		axis,
 		reviewer: "independent",
 		task: "task-1",
@@ -215,7 +216,7 @@ test("review evidence requires all axes and preserves actual reviewed comparison
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { publishMarkdown } from "./agent-workflow.mjs";
+import { publishMarkdown } from "./agent-workflow.ts";
 test("Markdown publication passes hostile body text as a file and verifies exact readback", (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "publication-"));
 	t.onTestFinished(() =>
@@ -225,8 +226,8 @@ test("Markdown publication passes hostile body text as a file and verifies exact
 		"First line\n\n```sh\n$(touch /tmp/should-not-exist)\nEOF\n```\n";
 	const bodyFile = path.join(directory, "body.md");
 	fs.writeFileSync(bodyFile, body);
-	let posted;
-	const run = (_program, args) => {
+	let posted: string | undefined;
+	const run = (_program: string, args: readonly string[]) => {
 		if (args.includes("--body-file")) {
 			posted = fs.readFileSync(args[args.indexOf("--body-file") + 1], "utf8");
 			expect(!args.includes(body)).toBeTruthy();
@@ -274,15 +275,17 @@ test("a workflow display name cannot grant a CI exemption", () => {
 	).toStrictEqual([]);
 });
 
-import { markAdvisoryChecks } from "./agent-workflow.mjs";
+import { markAdvisoryChecks } from "./agent-workflow.ts";
 test("advisory status is bound to the authenticated pilot path and current head", () => {
 	const head = "a".repeat(40);
 	const pr = {
 		headRefOid: head,
-		statusCheckRollup: [1, 2].map((id) => ({
-			name: "pilot",
-			detailsUrl: `https://github.com/owner/repo/actions/runs/${id}/job/10`,
-		})),
+		statusCheckRollup: [1, 2].map(
+			(id): Check => ({
+				name: "pilot",
+				detailsUrl: `https://github.com/owner/repo/actions/runs/${id}/job/10`,
+			}),
+		),
 	};
 	markAdvisoryChecks(
 		pr,

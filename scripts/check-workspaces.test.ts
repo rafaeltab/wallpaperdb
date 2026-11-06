@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "vitest";
-import { checkWorkspaces } from "./check-workspaces.mjs";
+import { checkWorkspaces } from "./check-workspaces.ts";
 test("workspace audit checks membership, task graph and application dependencies", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-audit-"));
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
-	const write = (file, data) => {
+	const write = (file: string, data: unknown) => {
 		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
 		fs.writeFileSync(
 			path.join(root, file),

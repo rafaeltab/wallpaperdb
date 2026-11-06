@@ -50,7 +50,7 @@ function isolatedRepository() {
 		".npmrc",
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.ts",
-		"scripts/check-workspaces.mjs",
+		"scripts/check-workspaces.ts",
 		"scripts/crap.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",

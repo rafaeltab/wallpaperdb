@@ -1,12 +1,13 @@
+import type { Generators } from "./lib/agent-types.ts";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
-function snapshot(directory, outputs) {
-	const result = new Map();
-	function collect(relative) {
+function snapshot(directory: string, outputs: string[]) {
+	const result = new Map<string, string>();
+	function collect(relative: string): void {
 		const filename = path.join(directory, relative);
 		if (!fs.existsSync(filename)) return;
 		if (fs.statSync(filename).isDirectory())
@@ -17,7 +18,11 @@ function snapshot(directory, outputs) {
 	for (const output of outputs) collect(output);
 	return JSON.stringify([...result].sort(([a], [b]) => a.localeCompare(b)));
 }
-export function checkGenerated(workspace, outputs, generate) {
+export function checkGenerated(
+	workspace: string,
+	outputs: string[],
+	generate: (directory: string) => void,
+) {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "generated-check-"));
 	const directory = path.join(temporary, "workspace");
 	try {
@@ -53,10 +58,10 @@ if (
 	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
 	const [kind, selected] = process.argv.slice(2);
-	const definitions = JSON.parse(
+	const definitions: Generators = JSON.parse(
 		fs.readFileSync(path.join(repository, "generated.config.json"), "utf8"),
 	);
-	if (!definitions[kind])
+	if (!kind || !definitions[kind])
 		throw new Error(
 			"Expected routes, openapi or migrations, optionally followed by a workspace basename",
 		);

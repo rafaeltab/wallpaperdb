@@ -18,7 +18,11 @@ const src = path.join(application, "src");
 const capabilitiesRoot = path.join(src, "capabilities");
 const require = createRequire(path.join(application, "package.json"));
 const ts: typeof import("typescript") = require("typescript");
-const config = JSON.parse(
+const config: {
+	capabilities?: unknown;
+	publicModules: string[];
+	allowedCapabilityDependencies?: Record<string, string[]>;
+} = JSON.parse(
 	fs.readFileSync(path.join(application, "quality.config.json"), "utf8"),
 );
 const errors = [];
@@ -70,13 +74,13 @@ function publicModule(filename: string) {
 	const relative = path.relative(src, filename).split(path.sep).join("/");
 	const capabilityName = capability(filename);
 	if (capabilityName) return `capabilities/${capabilityName}`;
-	return config.publicModules.find((module: any) =>
+	return config.publicModules.find((module) =>
 		relative.startsWith(`${module}/`),
 	);
 }
 
 function importPaths(source: import("typescript").SourceFile) {
-	const imports: { specifier: any; node: any }[] = [];
+	const imports: { specifier: string; node: import("typescript").Node }[] = [];
 	function visit(node: import("typescript").Node) {
 		if (
 			(ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -110,8 +114,8 @@ const program = ts.createProgram(sourceFiles, {
 	moduleResolution: ts.ModuleResolutionKind.Bundler,
 });
 const checker = program.getTypeChecker();
-const sources = new Map();
-function readSource(filename) {
+const sources = new Map<string, import("typescript").SourceFile>();
+function readSource(filename: string): import("typescript").SourceFile {
 	if (!sources.has(filename))
 		sources.set(
 			filename,
@@ -123,20 +127,27 @@ function readSource(filename) {
 					true,
 				),
 		);
-	return sources.get(filename);
+	return sources.get(filename)!;
 }
-function contractOrigin(entry) {
+function contractOrigin(entry: import("typescript").ExportSpecifier) {
 	let symbol = checker.getSymbolAtLocation(entry.name);
-	if (symbol?.flags & ts.SymbolFlags.Alias)
+	if (symbol && symbol.flags & ts.SymbolFlags.Alias)
 		symbol = checker.getAliasedSymbol(symbol);
 	const declaration = symbol?.declarations?.find(
-		(node) =>
+		(
+			node,
+		): node is
+			| import("typescript").InterfaceDeclaration
+			| import("typescript").TypeAliasDeclaration
+			| import("typescript").ClassDeclaration
+			| import("typescript").EnumDeclaration
+			| import("typescript").VariableDeclaration =>
 			ts.isInterfaceDeclaration(node) ||
 			ts.isTypeAliasDeclaration(node) ||
 			ts.isClassDeclaration(node) ||
 			ts.isEnumDeclaration(node) ||
 			(ts.isVariableDeclaration(node) &&
-				node.initializer &&
+				!!node.initializer &&
 				ts.isClassExpression(node.initializer)),
 	);
 	return (
@@ -146,7 +157,9 @@ function contractOrigin(entry) {
 		}
 	);
 }
-const graph = new Map(sourceFiles.map((filename) => [filename, []]));
+const graph = new Map<string, string[]>(
+	sourceFiles.map((filename) => [filename, []]),
+);
 for (const filename of [
 	...sourceFiles,
 	...files(path.join(application, "test")),

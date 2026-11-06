@@ -9,7 +9,7 @@
 	},
 	"scripts": {
 		"format": "biome format --write .",
-		"lint": "biome lint . && node check-workspaces.mjs",
+		"lint": "biome lint . && node check-workspaces.ts",
 		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.ts",
 		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.ts",
 		"test:unit": "cd .. && scripts/node_modules/.bin/vitest run",
@@ -18,16 +18,16 @@
 		"format:files": "biome format --write",
 		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts",
 		"test:files": "cd .. && scripts/node_modules/.bin/vitest run",
-		"lint:docs": "node check-documentation.mjs",
-		"lint:workspaces": "node check-workspaces.mjs",
+		"lint:docs": "node check-documentation.ts",
+		"lint:workspaces": "node check-workspaces.ts",
 		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts",
-		"check:generated": "node check-generated.mjs",
-		"check:migrations": "node check-migrations.mjs && node check-generated.mjs migrations",
-		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- pnpm run test:integration",
-		"agent": "node agent-workflow.mjs",
-		"check:services": "node check-service-wiring.mjs",
+		"check:generated": "node check-generated.ts",
+		"check:migrations": "node check-migrations.ts && node check-generated.ts migrations",
+		"check:migration-replay": "node docker-validation.ts --label migration-replay -- pnpm run test:integration",
+		"agent": "node agent-workflow.ts",
+		"check:services": "node check-service-wiring.ts",
 		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts...",
-		"test:integration": "cd .. && scripts/node_modules/.bin/vitest run --config scripts/vitest.integration.config.ts && node scripts/check-migration-replay.mjs"
+		"test:integration": "cd .. && scripts/node_modules/.bin/vitest run --config scripts/vitest.integration.config.ts && node scripts/check-migration-replay.ts"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
@@ -44,6 +44,7 @@
 		"@types/node": "^26.0.1",
 		"tsx": "^4.22.4",
 		"typescript": "^5.7.2",
-		"vitest": "5.0.2"
+		"vitest": "5.0.2",
+		"@types/mdast": "4.0.4"
 	}
 }

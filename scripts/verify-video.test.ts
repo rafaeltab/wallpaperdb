@@ -1,6 +1,6 @@
 import { expect } from "vitest";
 import { test } from "vitest";
-import { videoReferences, verifyVideo } from "./verify-video.mjs";
+import { videoReferences, verifyVideo } from "./verify-video.ts";
 test("video verification requires controls and a public video response", async () => {
 	const url = "https://github.com/user-attachments/assets/example";
 	expect(

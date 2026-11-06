@@ -27,7 +27,9 @@ async function send(payload: string) {
 		signal: AbortSignal.timeout(15000),
 	});
 	const text = await response.text();
-	let body;
+	let body:
+		| { data?: unknown; errors?: { extensions?: { code?: string } }[] }
+		| undefined;
 	try {
 		body = JSON.parse(text);
 	} catch {

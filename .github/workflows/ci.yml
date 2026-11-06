@@ -87,8 +87,8 @@ jobs:
         with:
           name: ci-coverage-${{ matrix.shard }}
           path: |
-            apps/**/coverage/**/lcov.info
-            packages/**/coverage/**/lcov.info
+            apps/*/coverage/**/lcov.info
+            packages/*/coverage/**/lcov.info
           if-no-files-found: error
 
   ci:

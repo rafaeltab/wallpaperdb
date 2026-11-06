@@ -1,6 +1,6 @@
-// Orthogonal routes avoid cards and reserve separate lanes. Crossings are allowed.
+// Prototype router: shortest independent paths. Crossings are allowed; cards are obstacles.
 export type Rect = {
-  id: string;
+  id: number;
   x: number;
   y: number;
   width: number;
@@ -10,7 +10,7 @@ export type Rect = {
   bottomPort?: { x: number; width: number };
 };
 export type Point = { x: number; y: number };
-export type Edge = { source: string; target: string };
+export type Edge = { source: number; target: number };
 const colors = [
   '#78cbb7',
   '#aab7eb',
@@ -85,12 +85,12 @@ function rounded(points: Point[]) {
     d += ` L${p.x},${p.y} Q${b.x},${b.y} ${q.x},${q.y}`;
   }
   const last = points[points.length - 1];
-  return `${d} L${last.x},${last.y}`;
+  return d + ` L${last.x},${last.y}`;
 }
 export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height: number) {
-  const nodeById = new Map<string, Rect>();
+  const nodeById = new Map<number, Rect>();
   for (const node of nodes) if (!nodeById.has(node.id)) nodeById.set(node.id, node);
-  const physicalKey = (id: string) => {
+  const physicalKey = (id: number) => {
     const n = nodeById.get(id);
     return n ? `${n.x}:${n.y}:${n.width}:${n.height}` : undefined;
   };
@@ -140,8 +140,8 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
               (incoming.length + 1),
           y: b.y + b.height,
         };
-    const start = { x: from.x + (left ? -16 : 16), y: from.y },
-      end = b.header ? { x: to.x + (right ? 16 : -16), y: to.y } : { x: to.x, y: to.y + 16 };
+    const start = { x: from.x + (left ? -20 : 20), y: from.y },
+      end = b.header ? { x: to.x + (right ? 20 : -20), y: to.y } : { x: to.x, y: to.y + 20 };
     return { a, b, from, to, start, end };
   });
   // Reserve every terminal before routing, so later ports cannot land on an earlier run.
@@ -168,10 +168,10 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
             n.y - 16 <= by
         )
         .map((n) => ({
-          x: n.x - 8,
-          y: n.y - 8,
-          right: n.x + n.width + 8,
-          bottom: n.y + n.height + 8,
+          x: n.x - 12,
+          y: n.y - 12,
+          right: n.x + n.width + 12,
+          bottom: n.y + n.height + 12,
         }));
       // Leave turning room at other routes' entry/exit points, including future routes.
       for (const [otherIndex, other] of ports.entries()) {
@@ -349,7 +349,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
     return [
       {
         ...edge,
-        key: JSON.stringify([edge.source, edge.target]),
+        key: `${edge.source}-${edge.target}`,
         label: index < 26 ? String.fromCharCode(65 + index) : String(index + 1),
         color: colors[index % colors.length],
         points,

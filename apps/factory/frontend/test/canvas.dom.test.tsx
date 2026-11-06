@@ -15,10 +15,11 @@ async function sample() {
   }
 }
 beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   HTMLDialogElement.prototype.close = function () {
     this.removeAttribute('open');
   };
-  HTMLDialogElement.prototype.showModal = function () {
+  HTMLDialogElement.prototype.show = function () {
     this.setAttribute('open', '');
   };
 });
@@ -40,10 +41,12 @@ it('retains last-known items when refresh fails and disables command controls', 
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
   offline = true;
-  await user.click(screen.getByRole('button', { name: 'Refresh' }));
+  await act(async () => {
+    window.dispatchEvent(new Event('pageshow'));
+  });
   await screen.findByText(/Showing last-known board/);
   expect(screen.getByText('Implement the command centre')).toBeTruthy();
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Apply controls' }).disabled).toBe(
     true
   );
@@ -55,7 +58,7 @@ it('preserves a dirty control draft and blocks saving when the observed control 
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   const input = screen.getByLabelText<HTMLInputElement>('Concurrency', { exact: true });
   await user.clear(input);
   await user.type(input, '7');
@@ -70,7 +73,9 @@ it('preserves a dirty control draft and blocks saving when the observed control 
       },
     },
   };
-  await user.click(screen.getByRole('button', { name: 'Refresh' }));
+  await act(async () => {
+    window.dispatchEvent(new Event('pageshow'));
+  });
   await screen.findByText(/Factory controls changed while editing/);
   expect(input.value).toBe('7');
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Apply controls' }).disabled).toBe(
@@ -117,7 +122,6 @@ it('distinguishes complete empty data from unavailable coverage', async () => {
   let board = await sample();
   board = { ...board, entities: { ...board.entities, items: {} } };
   const client = new FactoryClient(async () => json(board));
-  const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('No work items.');
   board = {
@@ -131,9 +135,13 @@ it('distinguishes complete empty data from unavailable coverage', async () => {
       },
     },
   };
-  await user.click(screen.getByRole('button', { name: 'Refresh' }));
+  await act(async () => {
+    window.dispatchEvent(new Event('pageshow'));
+  });
   await screen.findByText('Work items unavailable. Check source coverage.');
-  expect(screen.getByRole('button', { name: '0+ need attention' })).toBeTruthy();
+  expect(
+    screen.getByRole('button', { name: 'Highlight 0 items needing human attention' })
+  ).toBeTruthy();
 });
 it('keeps uncertain commands recoverable inside the originating dialog without creating a new UUID', async () => {
   const board = await sample(),
@@ -151,7 +159,7 @@ it('keeps uncertain commands recoverable inside the originating dialog without c
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   await user.click(screen.getByRole('button', { name: 'Apply controls' }));
   const dialog = screen.getByRole('dialog', { name: 'Factory controls' });
   expect(dialog.textContent).toContain('Command uncertain');
@@ -222,8 +230,8 @@ it('keeps failed checks and detail check names visible without URLs', async () =
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   const checks = await screen.findByLabelText('Checks: failed. Current comparison');
-  expect(checks.textContent).toContain('×');
-  await user.click(screen.getByRole('button', { name: 'Select Expose observation metadata' }));
+  expect(checks.querySelector('.cc-check.failed svg')).toBeTruthy();
+  await user.click(screen.getByRole('group', { name: 'Select Expose observation metadata' }));
   await user.click(screen.getByRole('button', { name: 'Details' }));
   await screen.findByText('Check without a provider link');
 });
@@ -235,7 +243,9 @@ it('retains supported browser links when native T3 links are unavailable', async
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
   const initial = screen.getAllByRole('link', { name: /T3 ·/ }).map((a) => a.getAttribute('href'));
-  await user.click(screen.getByLabelText('Open T3 links in app'));
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
+  await user.selectOptions(screen.getByLabelText('T3 link destination'), 'native');
+  await user.click(screen.getByRole('button', { name: 'Close Factory controls' }));
   const fallback = screen.getAllByRole('link', { name: /T3 ·/ }).map((a) => a.getAttribute('href'));
   expect(fallback).toEqual(initial);
 });
@@ -253,7 +263,7 @@ it('rejects zero controls before POST while preserving the unlimited option', as
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   const input = screen.getByLabelText('Concurrency');
   await user.clear(input);
   await user.type(input, '0');
@@ -346,7 +356,7 @@ it('submits the exact clicked resume action on a multi-job PR', async () => {
   });
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
-  await user.click(await screen.findByRole('button', { name: 'Select Recover conflicts' }));
+  await user.click(await screen.findByRole('group', { name: 'Select Recover conflicts' }));
   await user.click(screen.getAllByRole('button', { name: /^Resume job/ })[1]);
   expect(JSON.parse(posts[0])).toMatchObject({
     actionId: 'action:resume-second',
@@ -365,7 +375,7 @@ it('preserves the chosen cancel action and precondition while confirmation is op
   });
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
-  await user.click(await screen.findByRole('button', { name: 'Select Recover conflicts' }));
+  await user.click(await screen.findByRole('group', { name: 'Select Recover conflicts' }));
   await user.click(screen.getAllByRole('button', { name: /^Cancel job/ })[1]);
   const item = board.entities.items['item:1006'];
   board = {
@@ -410,30 +420,33 @@ it('shows both relationship directions initially and restores both when the acti
   const user = userEvent.setup();
   render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
   await user.click(
-    await screen.findByRole('button', { name: 'Select Implement the command centre' })
+    await screen.findByRole('group', { name: 'Select Implement the command centre' })
   );
-  const filter = screen.getByRole('button', { name: 'Prerequisites 1' });
+  const filter = screen.getByRole('button', { name: 'Highlight prerequisites' });
+  expect(filter.textContent).toContain('1 prerequisites');
   expect(filter.getAttribute('aria-pressed')).toBe('false');
-  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(3);
+  expect(document.querySelectorAll('.cc-item.cc-selected,.cc-item.cc-related')).toHaveLength(3);
   await user.click(filter);
   expect(filter.getAttribute('aria-pressed')).toBe('true');
-  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(2);
+  expect(document.querySelectorAll('.cc-item.cc-selected,.cc-item.cc-related')).toHaveLength(2);
   await user.click(filter);
   expect(filter.getAttribute('aria-pressed')).toBe('false');
-  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(3);
+  expect(document.querySelectorAll('.cc-item.cc-selected,.cc-item.cc-related')).toHaveLength(3);
 });
 it('reveals collapsed items when attention highlighting is enabled', async () => {
   const board = await sample(),
     user = userEvent.setup();
   render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
   await screen.findByText('Implement the command centre');
-  const collapse = screen.getAllByRole('button', { name: 'Collapse all' });
+  const collapse = screen.getAllByRole('button', { name: /^Collapse all/ });
   await user.click(collapse[1]);
   await user.click(collapse[2]);
-  expect(screen.queryByRole('button', { name: 'Select Reconcile a paused worker' })).toBeNull();
-  await user.click(screen.getByRole('button', { name: '2 need attention' }));
-  await screen.findByRole('button', { name: 'Select Reconcile a paused worker' });
-  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(2);
+  expect(screen.queryByRole('group', { name: 'Select Reconcile a paused worker' })).toBeNull();
+  await user.click(
+    screen.getByRole('button', { name: 'Highlight 2 items needing human attention' })
+  );
+  await screen.findByRole('group', { name: 'Select Reconcile a paused worker' });
+  expect(document.querySelectorAll('.cc-item.cc-selected,.cc-item.cc-related')).toHaveLength(2);
 });
 it.each([
   { preferNative: false, web: null },
@@ -491,8 +504,12 @@ it.each([
     const user = userEvent.setup();
     render(<FactoryApp client={client} />);
     await screen.findByText('Implement the command centre');
-    if (preferNative) await user.click(screen.getByLabelText('Open T3 links in app'));
-    await user.click(screen.getByRole('button', { name: 'Plan preview' }));
+    if (preferNative) {
+      await user.click(screen.getByRole('button', { name: 'Factory settings' }));
+      await user.selectOptions(screen.getByLabelText('T3 link destination'), 'native');
+      await user.click(screen.getByRole('button', { name: 'Close Factory controls' }));
+    }
+    await user.click(screen.getByRole('button', { name: '◇ Preview plan' }));
     const link = await screen.findByRole('link', { name: /Planner in T3/ });
     expect(link.getAttribute('href')).toBe('t3code://threads/env/planner');
   }

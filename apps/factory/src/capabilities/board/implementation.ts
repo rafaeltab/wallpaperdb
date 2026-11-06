@@ -1,153 +1,102 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type {
-  FactoryV2Snapshot,
-  Source,
-  Fact,
+  FactoryV2Delta,
   FactoryV2Changes,
   FactoryV2Problem,
+  FactoryV2ItemDetails,
+  FactoryV2Command,
+  FactoryV2IssueSearch,
+  FactoryV2PlanDetails,
 } from './model.js';
+import { version, problem } from './values.js';
+import { project } from './projection.js';
+import { entityChanges } from './changes.js';
 
-export const version = (value: unknown) =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const timestamp = (value: number | undefined) =>
-  value === undefined ? null : new Date(value).toISOString();
-export function source(
-  kind: Source['kind'],
-  input: { observedAt?: number; startedAt?: number; failedAt?: number; error?: string }
-): Source {
-  const value = {
-    id: `source:${kind}` as const,
-    kind,
-    observedAt: timestamp(input.observedAt),
-    staleAt:
-      input.observedAt === undefined || kind === 'factory'
-        ? null
-        : timestamp(input.observedAt + 240000),
-    refresh: input.error
-      ? ('failed' as const)
-      : input.observedAt === undefined
-        ? ('unavailable' as const)
-        : (input.startedAt ?? 0) > input.observedAt
-          ? ('refreshing' as const)
-          : ('idle' as const),
-    lastAttemptAt: timestamp(input.startedAt),
-    nextAttemptAt:
-      input.startedAt === undefined || kind === 'factory'
-        ? null
-        : timestamp(input.startedAt + 120000),
-    failure: input.error
-      ? {
-          code: 'provider-unavailable',
-          message: 'Refresh failed. Retained facts remain dated by their source.',
-        }
-      : null,
-  };
-  return { ...value, version: version(value) };
-}
-export const known = <T>(value: T, sourceId: Source['id'], observedAt: string): Fact<T> => ({
-  state: 'known',
-  value,
-  sourceId,
-  observedAt,
-});
-export const unknown = (sourceId: Source['id'], reason = 'Not observed.'): Fact<never> => ({
-  state: 'unknown',
-  sourceId,
-  reason,
-});
+/** Local projection lifetime. Publication completes before listeners see a revision. */
 export async function liveBoard(config: {
   scopeId: string;
   initial: ScheduleSnapshot;
   now?: () => number;
 }) {
   const now = config.now ?? Date.now;
-  const initial = config.initial;
-  const cursor = randomUUID();
-  const at = new Date(now()).toISOString();
-  const factory = {
-    id: 'factory:local' as const,
-    version: String(initial.state.revision),
-    paused: initial.state.paused,
-    concurrency: { limit: limit(initial.state.concurrency), occupied: 0 },
-    admission: { limit: limit(initial.state.allowance), consumed: initial.state.admissions.length },
-    actionIds: [],
-  };
-  const snapshot: FactoryV2Snapshot = {
-    apiVersion: 2,
-    scopeId: config.scopeId,
-    cursor,
-    committedAt: at,
-    meta: {
-      dataMode: 'live',
-      coverage: {
-        state: 'unavailable',
-        reasons: [{ code: 'initial', message: 'Provider facts have not been observed.' }],
-        unresolvedIssueIds: [],
-      },
-      diagnostics: [],
-      factory,
-      currentPlanId: null,
-      transport: { changes: true, events: true, suggestedPollMs: 1000 },
-    },
-    entities: {
-      repositories: {},
-      sources: {
-        'source:github': source('github', initial.observations),
-        'source:t3': source('t3', initial.threads ?? {}),
-        'source:factory': source('factory', { observedAt: now() }),
-      },
-      users: {},
-      labels: {},
-      issues: {},
-      pullRequests: {},
-      relationships: {},
-      stacks: {},
-      threads: {},
-      jobs: {},
-      maintenance: {},
-      items: {},
-      actions: {},
-      plans: {},
-    },
-  };
+  const epoch = randomUUID();
+  let revision = 0;
+  const cursor = () =>
+    Buffer.from(JSON.stringify({ scope: config.scopeId, epoch, revision })).toString('base64url');
+  let current = project(config.initial, new Date(now()).toISOString(), config.scopeId, cursor());
+  const history: FactoryV2Delta[] = [];
+  const listeners = new Set<() => void>();
+  let identity = version(stable(config.initial));
   return {
-    snapshot: () => snapshot,
-    changes: (after: string): FactoryV2Changes | FactoryV2Problem =>
-      after === cursor
-        ? { kind: 'unchanged', cursor }
-        : { kind: 'resync-required', reason: 'reset' },
-    subscribe: (_listener: () => void) => () => {},
+    snapshot: () => current.snapshot,
+    publish: async (input: ScheduleSnapshot) => {
+      const nextIdentity = version(stable(input));
+      if (identity === nextIdentity) return;
+      const before = current.snapshot;
+      revision++;
+      const next = project(input, new Date(now()).toISOString(), config.scopeId, cursor());
+      const delta: FactoryV2Delta = {
+        apiVersion: 2,
+        scopeId: config.scopeId,
+        fromCursor: before.cursor,
+        toCursor: next.snapshot.cursor,
+        committedAt: next.snapshot.committedAt,
+        changes: entityChanges(before.entities, next.snapshot.entities),
+        meta: next.snapshot.meta,
+      };
+      history.push(delta);
+      if (history.length > 64) history.shift();
+      current = next;
+      identity = nextIdentity;
+      for (const listener of listeners) listener();
+    },
+    changes: (after: string): FactoryV2Changes | FactoryV2Problem => {
+      if (after === current.snapshot.cursor) return { kind: 'unchanged', cursor: after };
+      const index = history.findIndex((d) => d.fromCursor === after);
+      if (index < 0) return { kind: 'resync-required', reason: 'reset' };
+      const batches = history.slice(index, index + 32);
+      return {
+        kind: 'changes',
+        batches,
+        nextCursor: batches[batches.length - 1].toCursor,
+        hasMore: index + batches.length < history.length,
+      };
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     receipt: (_id: string) => undefined,
-    submit: (_command: import('./model.js').FactoryV2Command): FactoryV2Problem => ({
-      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/factory-v2-unavailable.md',
-      status: 503,
-      code: 'unavailable',
-      title: 'Commands unavailable',
-      detail: 'Command execution is not configured.',
-      retry: 'later',
-      commandId: null,
-    }),
-    search: (
-      _query: string,
-      _limit: number,
-      _token?: string
-    ): import('./model.js').FactoryV2IssueSearch => ({
+    submit: (_command: FactoryV2Command): FactoryV2Problem =>
+      problem(503, 'unavailable', 'Command execution is not configured.'),
+    search: (query: string, _limit: number, _token?: string): FactoryV2IssueSearch => ({
       apiVersion: 2,
-      query: _query,
+      query,
       nextPageToken: null,
-      coverage: snapshot.meta.coverage,
-      sources: snapshot.entities.sources,
+      coverage: current.snapshot.meta.coverage,
+      sources: current.snapshot.entities.sources,
       hits: [],
-      users: {},
-      labels: {},
-      repositories: {},
+      users: current.snapshot.entities.users,
+      labels: current.snapshot.entities.labels,
+      repositories: current.snapshot.entities.repositories,
     }),
-    details: (_id: string): import('./model.js').FactoryV2ItemDetails | undefined => undefined,
-    plan: (_id: string): import('./model.js').FactoryV2PlanDetails | undefined => undefined,
-    close: () => {},
+    details: (id: string): FactoryV2ItemDetails | undefined => current.details[id],
+    plan: (_id: string): FactoryV2PlanDetails | undefined => undefined,
+    close: () => {
+      listeners.clear();
+    },
   };
 }
-function limit(value: number): import('./model.js').Limit {
-  return value === -1 ? { kind: 'unlimited' } : { kind: 'limited', maximum: value };
+function stable(input: ScheduleSnapshot) {
+  return {
+    ...input,
+    jobs: input.jobs.map((j) => (j.kind === 'job' ? { ...j, elapsedMs: undefined } : j)),
+    observations: { ...input.observations, ageMs: undefined, stale: undefined, state: undefined },
+    threads: input.threads
+      ? { ...input.threads, ageMs: undefined, stale: undefined, state: undefined }
+      : undefined,
+  };
 }

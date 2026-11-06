@@ -220,7 +220,11 @@ it('continuously admits a validated semantic plan through production adapters wi
         { timeout: 10000, interval: 30 }
       );
       const plannerInput = JSON.parse(await readFile(join(host.directory, 'planner.json'), 'utf8'));
-      expect(JSON.stringify(plannerInput)).toContain('Implement scheduler');
+      expect(plannerInput.prompt).toContain('# Candidate issues\n\n## open 581 - Scheduler');
+      expect(plannerInput.prompt).not.toContain(candidate.body);
+      const { plannerState } = await import('../src/adapters/t3/index.js');
+      const retained = await plannerState(`${host.directory}/state/planner`).read();
+      expect(retained?.input).toContain(candidate.body);
     } finally {
       await running.close();
     }

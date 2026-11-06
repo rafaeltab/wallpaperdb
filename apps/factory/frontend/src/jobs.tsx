@@ -1,5 +1,5 @@
 import type { ScheduleSnapshot } from './api';
-import { ExternalLink, Issues } from './links';
+import { ExternalLink, Issues, ThreadLinks } from './links';
 type Job = Extract<ScheduleSnapshot['jobs'][number], { kind: 'job' }>;
 export type Command = (
   path: string,
@@ -9,7 +9,9 @@ export function JobCard({
   job,
   command,
   pending,
+  threads,
 }: {
+  threads?: ScheduleSnapshot['threads'];
   job: Job;
   command: Command;
   pending: boolean;
@@ -92,9 +94,11 @@ export function JobCard({
       {observed && (
         <>
           <p>
-            <ExternalLink href={`t3-thread://v1/${encodeURIComponent(observed.threadId)}`}>
-              Open T3 thread
-            </ExternalLink>
+            <ThreadLinks
+              threadId={observed.threadId}
+              environmentId={threads?.facts?.environmentId}
+              browserOrigin={threads?.browserOrigin}
+            />
           </p>
           <small>
             {observed.model} · {observed.worktree}
@@ -147,9 +151,11 @@ export function Work({
           <ExternalLink href={recovery.pr}>Affected PR</ExternalLink>
           {recovery.threadId && (
             <p>
-              <ExternalLink href={`t3-thread://v1/${encodeURIComponent(recovery.threadId)}`}>
-                Open recovery thread
-              </ExternalLink>
+              <ThreadLinks
+                threadId={recovery.threadId}
+                environmentId={snapshot.threads?.facts?.environmentId}
+                browserOrigin={snapshot.threads?.browserOrigin}
+              />
             </p>
           )}
         </article>
@@ -157,7 +163,13 @@ export function Work({
       {snapshot.jobs
         .filter((job) => job.kind === 'job')
         .map((job) => (
-          <JobCard key={job.intent.id} job={job} command={command} pending={pending} />
+          <JobCard
+            threads={snapshot.threads}
+            key={job.intent.id}
+            job={job}
+            command={command}
+            pending={pending}
+          />
         ))}
       {snapshot.jobs.some((job) => job.kind !== 'job') && (
         <p>Reserved admission awaiting reconciliation.</p>

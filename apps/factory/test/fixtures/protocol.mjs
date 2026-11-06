@@ -26,6 +26,14 @@ appendFileSync(
   join(config.directory, 'calls.jsonl'),
   JSON.stringify({ binary: basename(process.argv[1]), args }) + '\n'
 );
+if (args[0] === 'acp-mcp-call' && args[1] === 't3_environment_read') {
+  console.log(JSON.stringify({ structuredContent: { environmentId: 'controlled-environment' } }));
+  process.exit(0);
+}
+if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_list') {
+  console.log(JSON.stringify({ structuredContent: { threads: [], nextCursor: null } }));
+  process.exit(0);
+}
 const earlyFlag = (name) => args[args.indexOf(name) + 1];
 if (
   basename(process.argv[1]) === 'gh' &&

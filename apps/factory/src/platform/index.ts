@@ -31,3 +31,4 @@ export { stateConnection } from './durable.js';
 export { planningAttempts } from './schema.js';
 
 export { githubIssues, githubPulls, observationRefresh } from './schema.js';
+export { t3Observations } from './schema.js';

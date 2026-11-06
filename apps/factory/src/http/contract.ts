@@ -8,6 +8,14 @@ export interface WorkRelationship {
  * GET /api/scheduler returns current local state/revision, admitted jobs,
  * localWork (current intent/control records), last-known recoveries, dated
  * observations and last-known explicit blocker relationships.
+ * GET /api/threads returns an independently dated local T3 metadata snapshot;
+ * scheduler.threads embeds the same contract. Thread createdAt/updatedAt are
+ * source timestamps or null, separate from observedAt and per-association dates.
+ * Branch/worktree and issue associations use explicit retained factory bindings
+ * or T3 PR links plus GitHub closing references. Missing evidence is unavailable
+ * or absent; contradictory bindings remain conflicting. No title inference.
+ * Optional browserOrigin reflects configured Connect access; identity comes
+ * from the supported environment protocol, never a service runtime-state id.
  * GET /api/job returns the first admitted job or empty, from that same local view.
  * GET /api/observations returns the dated observation envelope. Its state is
  * initial/loading/current/stale/error; facts are absent until a complete refresh.

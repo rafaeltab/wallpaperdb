@@ -88,7 +88,7 @@ it('presents a completed worker safely without accepting implementation', () => 
       expect(rendered).toContain('Elapsed: 42 seconds');
       expect(rendered).not.toContain('<form>');
       expect(rendered).not.toContain('<script>unsafe</script>');
-      expect(rendered).toContain('t3-thread://v1/thread-1');
+      expect(rendered).toContain('T3 links unavailable');
       expect(rendered).toContain('does not establish implementation acceptance');
     },
     { ...idle, status: () => Effect.succeed(current) }
@@ -133,7 +133,7 @@ it('renders the parked question safely with the owning thread and resume command
       const rendered = (await renderPage(app)).body;
       expect(rendered).toContain('Active capacity released');
       expect(rendered).toContain('&lt;question&gt;');
-      expect(rendered).toContain('t3-thread://v1/owning-thread');
+      expect(rendered).toContain('T3 links unavailable');
       expect(rendered).toContain('disabled="">Resume existing job');
     },
     {
@@ -258,7 +258,7 @@ it.each([false, true])(
       expect(response.body).toContain('Awaiting independent review-loop');
       if (classified) {
         expect(response.body).toContain('Question: &lt;script&gt;scope?&lt;/script&gt;');
-        expect(response.body).toContain('t3-thread://v1/recovery-thread');
+        expect(response.body).toContain('T3 links unavailable');
       }
     } finally {
       await app.close();

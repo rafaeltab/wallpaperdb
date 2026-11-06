@@ -81,6 +81,7 @@ export interface LocalWork {
   control: import('../job/index.js').Control;
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
+  threads?: import('./threads.js').ThreadSnapshot;
   observations: ObservationSnapshot;
   localWork: readonly LocalWork[];
   relationships?: readonly { issue: number; blockers: readonly number[] }[];

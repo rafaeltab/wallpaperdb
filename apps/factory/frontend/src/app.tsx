@@ -94,6 +94,14 @@ export function ObservationNotice({ snapshot }: { snapshot: ScheduleSnapshot }) 
     <section>
       <h2>Observations</h2>
       <p>
+        T3: {snapshot.threads?.state ?? 'initial'}
+        {snapshot.threads?.stale ? ' (stale)' : ''}. Last observation:{' '}
+        {snapshot.threads?.observedAt === undefined
+          ? 'Unknown'
+          : new Date(snapshot.threads.observedAt).toISOString()}
+      </p>
+      {snapshot.threads?.error && <p>T3 refresh failed. Last-known metadata retained.</p>}
+      <p>
         GitHub: {value?.state ?? 'initial'}
         {value?.stale ? ' (stale)' : ''}.
       </p>

@@ -24,7 +24,8 @@
     "service:activate": "node scripts/activate.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/main.ts --migrate-only",
-    "dev:frontend": "vite --config frontend/vite.config.ts"
+    "dev:frontend": "vite --config frontend/vite.config.ts",
+    "dev:interface-v2": "node --import tsx src/http/v2/demo.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

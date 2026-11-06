@@ -2167,7 +2167,7 @@ it('parks an oversized affected family without blocking reconciliation of retain
       landing: { merge: f.merged, head: f.a },
     });
     const config = { ...f.config, prerequisites };
-    for (const issues of [githubIssues(config), githubIssues(config)]) {
+    for (const issues of [githubIssues(config, f.readGitHub), githubIssues(config, f.readGitHub)]) {
       if (!issues.reconcile || !issues.recoveries) throw new Error('Missing reconciliation');
       await Effect.runPromise(issues.reconcile());
       expect(await Effect.runPromise(issues.recoveries())).toContainEqual(

@@ -1,4 +1,5 @@
 import { recordCheck, sourceSnapshot } from "./record-check.mjs";
+import { verifyStackReadiness } from "./stack-readiness.mjs";
 import { videoReferences, verifyVideo } from "./verify-video.mjs";
 import { guardedPush } from "./guarded-push.mjs";
 import { githubFeedback } from "./collect-feedback.mjs";
@@ -11,7 +12,12 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
 export { command, github };
-export function issuePreflight(issue, login, status) {
+export function issuePreflight(
+	issue,
+	login,
+	status,
+	verifiedBlockers = new Set(),
+) {
 	const errors = [];
 	if (issue.state !== "OPEN") errors.push("Issue must be open");
 	if (!issue.assignees?.some((a) => a.login === login))
@@ -22,7 +28,11 @@ export function issuePreflight(issue, login, status) {
 		errors.push(`Issue status must be ${status}`);
 	if (issue.blockedBy?.totalCount !== issue.blockedBy?.nodes?.length)
 		errors.push("Issue dependency discovery is incomplete");
-	if (issue.blockedBy?.nodes?.some((b) => b.state !== "CLOSED"))
+	if (
+		issue.blockedBy?.nodes?.some(
+			(b) => b.state !== "CLOSED" && !verifiedBlockers.has(b.url),
+		)
+	)
 		errors.push("Open blockers require a verified stack-readiness assessment");
 	return errors;
 }
@@ -211,8 +221,51 @@ async function main() {
 				}
 			: null;
 		const login = github(["api", "user"]).login;
-		const errors = issuePreflight(issue, login, args[0] ?? "In Progress");
-		console.log(JSON.stringify({ issue, errors }, null, 2));
+		const head = command("git", ["rev-parse", "HEAD"]).trim();
+		const verifiedBlockers = args[1]
+			? verifyStackReadiness(JSON.parse(fs.readFileSync(args[1], "utf8")), {
+					head,
+					issue,
+					repository: expectedRepository,
+					readPr,
+					reviewErrors: reviewEvidenceErrors,
+					readIssue(url) {
+						const number = url.match(
+							new RegExp(
+								`^https://github\\.com/${expectedRepository}/issues/(\\d+)$`,
+							),
+						)?.[1];
+						if (!number)
+							throw new Error("Blocker issue belongs to another repository");
+						const item = github([
+							"api",
+							`repos/${expectedRepository}/issues/${number}`,
+						]);
+						item.comments = github([
+							"api",
+							`repos/${expectedRepository}/issues/${number}/comments`,
+							"--paginate",
+							"--slurp",
+						]).flat();
+						return { ...item, url: item.html_url };
+					},
+				})
+			: new Set();
+		const errors = issuePreflight(
+			issue,
+			login,
+			args[0] ?? "In Progress",
+			verifiedBlockers,
+		);
+		if (command("git", ["rev-parse", "HEAD"]).trim() !== head)
+			errors.push("Local head changed during preflight");
+		console.log(
+			JSON.stringify(
+				{ issue, verifiedBlockers: [...verifiedBlockers], errors },
+				null,
+				2,
+			),
+		);
 		if (errors.length) process.exitCode = 1;
 	} else if (action === "pr-snapshot") {
 		const pr = readPr(subject);

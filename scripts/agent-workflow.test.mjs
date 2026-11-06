@@ -20,6 +20,32 @@ test("issue preflight rejects closed, unassigned, blocked and wrong-project work
 			issuePreflight({ ...ready(), ...change }, "agent", "In Progress").length,
 		);
 });
+test("issue preflight accepts only individually verified stack blockers", () => {
+	const url = "https://github.com/rafaeltab/wallpaperdb/issues/2";
+	const issue = {
+		...ready(),
+		blockedBy: { nodes: [{ url, state: "OPEN" }], totalCount: 1 },
+	};
+	assert.deepEqual(
+		issuePreflight(issue, "agent", "In Progress", new Set([url])),
+		[],
+	);
+	assert.ok(issuePreflight(issue, "agent", "In Progress", new Set()).length);
+	assert.ok(
+		issuePreflight(
+			{
+				...issue,
+				blockedBy: {
+					nodes: [...issue.blockedBy.nodes, { url: `${url}0`, state: "OPEN" }],
+					totalCount: 2,
+				},
+			},
+			"agent",
+			"In Progress",
+			new Set([url]),
+		).length,
+	);
+});
 
 import { prReadiness } from "./agent-workflow.mjs";
 test("PR readiness never treats absent, pending or unknown checks as passing", () => {

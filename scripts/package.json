@@ -9,7 +9,7 @@
 	},
 	"scripts": {
 		"format": "biome format --write .",
-		"lint": "biome lint .",
+		"lint": "biome lint . && node check-workspaces.mjs",
 		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.ts",
 		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.ts",
 		"test:unit": "cd .. && scripts/node_modules/.bin/vitest run",
@@ -18,7 +18,9 @@
 		"format:files": "biome format --write",
 		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts",
 		"test:files": "cd .. && scripts/node_modules/.bin/vitest run",
-		"lint:docs": "node check-documentation.mjs"
+		"lint:docs": "node check-documentation.mjs",
+		"lint:workspaces": "node check-workspaces.mjs",
+		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

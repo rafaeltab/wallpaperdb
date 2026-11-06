@@ -31,7 +31,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       });
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
-      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
       const refreshedDraft = page.waitForResponse(
         (response) =>
           response.request().resourceType() === 'fetch' &&
@@ -217,7 +217,7 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
       const page = await browser.newPage();
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
-      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
       await page.getByLabel('Selected issue number').fill('579');
       await page.getByRole('button', { name: 'Start selected issue' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
@@ -330,7 +330,7 @@ it('previews automatically discovered work without starting an implementation wo
       const page = await browser.newPage();
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
-      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
       await page.getByLabel('Pause admissions').check();
       await page.getByRole('button', { name: 'Save scheduler controls' }).click();
 
@@ -384,7 +384,7 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
       const page = await context.newPage();
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
-      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
       await browserExpect(page.getByLabel('Concurrency')).toHaveValue('1');
       await browserExpect(page.getByLabel('Distinct issue allowance')).toHaveValue('1');
       await page.getByLabel('Selected issue number').fill('581');
@@ -460,7 +460,7 @@ it('shows conflict classification and pending questions with a recovery-thread l
       recordVideo: { dir: process.env.FACTORY_DEMO_DIRECTORY ?? join(f.host.directory, 'video') },
     });
     const page = await context.newPage();
-    await page.goto(`http://127.0.0.1:${address.port}`);
+    await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
     await browserExpect(page.getByRole('heading', { name: 'Conflict recovery #4' })).toBeVisible();
     await page.getByRole('heading', { name: 'Conflict recovery #4' }).scrollIntoViewIfNeeded();
     await browserExpect(page.getByText('Classification: COMPLEX')).toBeVisible();
@@ -525,7 +525,7 @@ it.each(['implementation', 'publication'] as const)(
         const page = await browser.newPage();
         const address = running.app.server.address();
         if (!address || typeof address === 'string') throw new Error('Missing listener');
-        await page.goto(`http://127.0.0.1:${address.port}`);
+        await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
         await page.getByLabel('Selected issue number').fill('579');
         await page.getByRole('button', { name: 'Start selected issue' }).click();
         await browserExpect(page.getByText('Status: running')).toBeVisible();

@@ -266,6 +266,9 @@
             ],
             "inputs": [
                 "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/crap.config.mts",
+                "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
+                "$TURBO_ROOT$/packages/crap-typescript-core/package.json",
                 "$TURBO_ROOT$/apps/*/scripts/**",
                 "$TURBO_ROOT$/apps/factory/test/fixtures/protocol.ts",
                 "$TURBO_ROOT$/packages/testcontainers/test/fixtures/start-container.ts",

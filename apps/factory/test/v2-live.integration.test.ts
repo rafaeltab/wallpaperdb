@@ -966,3 +966,28 @@ it('accepts a bounded Unicode start context within the v2 body limit while prese
     await app.close();
   }
 });
+
+it('distinguishes malformed, different-scope and expired live change cursors', async () => {
+  const board = await liveBoard({ scopeId: 'test', initial });
+  const other = await liveBoard({ scopeId: 'other', initial });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const cursor = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().cursor;
+    expect((await app.inject('/api/v2/board/changes?after=malformed')).statusCode).toBe(400);
+    expect(
+      (
+        await app.inject(
+          `/api/v2/board/changes?after=${encodeURIComponent(other.snapshot().cursor)}`
+        )
+      ).json()
+    ).toEqual({ kind: 'resync-required', reason: 'different-scope' });
+    for (let revision = 0; revision < 65; revision++)
+      await board.publish({ ...initial, state: { ...initial.state, revision } });
+    expect(
+      (await app.inject(`/api/v2/board/changes?after=${encodeURIComponent(cursor)}`)).json()
+    ).toEqual({ kind: 'resync-required', reason: 'expired' });
+  } finally {
+    await app.close();
+    other.close();
+  }
+});

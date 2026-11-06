@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
@@ -27,4 +28,34 @@ test("generation verifies artifacts without changing the source checkout", (t) =
 			e.includes("deterministic"),
 		),
 	).toBeTruthy();
+});
+
+test("generation preserves pnpm executable paths in a temporary workspace", (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "generated bin 'quoted-"));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
+	const workspace = path.join(root, "apps/example");
+	const bin = path.join(workspace, "node_modules/.bin");
+	fs.mkdirSync(bin, { recursive: true });
+	fs.writeFileSync(path.join(workspace, "artifact.txt"), "correct");
+	fs.writeFileSync(
+		path.join(root, "generator.ts"),
+		'import {writeFileSync} from "node:fs"; writeFileSync("artifact.txt", "correct");',
+	);
+	fs.writeFileSync(
+		path.join(bin, "generate"),
+		'#!/bin/sh\nbasedir=$(dirname "$0")\nexec node "$basedir/../../../../generator.ts" "$@"\n',
+		{ mode: 0o755 },
+	);
+	expect(
+		checkGenerated(workspace, ["artifact.txt"], (directory) => {
+			fs.writeFileSync(path.join(directory, "artifact.txt"), "stale");
+			execFileSync(path.join(directory, "node_modules/.bin/generate"), [], {
+				cwd: directory,
+				stdio: "pipe",
+			});
+		}),
+	).toStrictEqual([]);
+	expect(fs.readFileSync(path.join(workspace, "artifact.txt"), "utf8")).toBe(
+		"correct",
+	);
 });

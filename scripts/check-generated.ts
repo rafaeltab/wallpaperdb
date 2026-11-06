@@ -33,9 +33,34 @@ export function checkGenerated(
 					file,
 				),
 		});
-		const modules = path.join(workspace, "node_modules");
-		if (fs.existsSync(modules))
-			fs.symlinkSync(modules, path.join(directory, "node_modules"), "dir");
+		const modules = path.resolve(workspace, "node_modules");
+		if (fs.existsSync(modules)) {
+			const copiedModules = path.join(directory, "node_modules");
+			fs.mkdirSync(copiedModules);
+			for (const entry of fs.readdirSync(modules)) {
+				if (entry !== ".bin") {
+					fs.symlinkSync(
+						path.join(modules, entry),
+						path.join(copiedModules, entry),
+					);
+					continue;
+				}
+				const bin = path.join(copiedModules, entry);
+				fs.mkdirSync(bin);
+				for (const executable of fs.readdirSync(path.join(modules, entry))) {
+					// pnpm's wrappers resolve Node entry points relative to their own
+					// path. Run the original wrapper while keeping the copied cwd.
+					const original = path
+						.join(modules, entry, executable)
+						.replaceAll("'", "'\\''");
+					fs.writeFileSync(
+						path.join(bin, executable),
+						`#!/bin/sh\nexec '${original}' "$@"\n`,
+						{ mode: 0o755 },
+					);
+				}
+			}
+		}
 		const before = snapshot(directory, outputs);
 		generate(directory);
 		const first = snapshot(directory, outputs);

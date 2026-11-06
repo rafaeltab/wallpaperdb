@@ -877,6 +877,63 @@ it('keeps attention unknown for historical recovery without structured progress'
   }
 });
 
+it('distinguishes failed CI without an actor from an owned automatic repair', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const pull = pullObservation(42, { ci: 'FAILURE' });
+  const input: ScheduleSnapshot = {
+    ...initial,
+    observations: {
+      state: 'current',
+      stale: false,
+      observedAt: 2000,
+      facts: { issues: [], pullRequests: [pull] },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[
+        'item:pr:rafaeltab/wallpaperdb/42'
+      ]
+    ).toMatchObject({
+      status: { code: 'ci-failed' },
+      attention: { state: 'unknown' },
+    });
+    const owned = parkedSnapshot(pull, true);
+    await board.publish({
+      ...owned,
+      localWork: owned.localWork.map((w) => ({
+        ...w,
+        control: { ...w.control, parked: undefined },
+      })),
+      jobs: owned.jobs.map((j) =>
+        j.kind === 'job'
+          ? {
+              ...j,
+              delivery: {
+                ...j.delivery!,
+                question: undefined,
+                active: true,
+                activity: 'repairing',
+              },
+            }
+          : j
+      ),
+    });
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[
+        'item:pr:rafaeltab/wallpaperdb/42'
+      ]
+    ).toMatchObject({
+      status: { code: 'repairing-ci' },
+      attention: { state: 'none' },
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

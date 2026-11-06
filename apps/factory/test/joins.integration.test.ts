@@ -2077,7 +2077,7 @@ done
     await expect(Effect.runPromise(f.issues.reconcile())).rejects.toMatchObject({
       operation: 'reconcile-prerequisite-joins',
     });
-    const reopened = githubIssues({ ...f.config, prerequisites: [] });
+    const reopened = githubIssues({ ...f.config, prerequisites: [] }, f.readGitHub);
     if (!reopened.reconcile || !reopened.recoveries) throw new Error('Missing reconciliation');
     await Effect.runPromise(reopened.reconcile());
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.d);

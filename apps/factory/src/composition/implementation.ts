@@ -488,10 +488,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       clearInterval(observationTimer);
       clearInterval(refreshTimer);
       clearInterval(threadTimer);
+      // Reserve the remaining shutdown budget for bounded exporter disposal.
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
-      }, 5000);
+      }, 3000);
       try {
         await app.close();
       } finally {

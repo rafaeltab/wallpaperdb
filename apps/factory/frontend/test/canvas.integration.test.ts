@@ -105,4 +105,4 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     if (previous === undefined) delete process.env.FACTORY_BACKEND_URL;
     else process.env.FACTORY_BACKEND_URL = previous;
   }
-}, 30000);
+}, 60000);

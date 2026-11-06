@@ -1662,10 +1662,13 @@ it('retargets the final PR to default with its pinned boundary and dissolves its
       (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
     );
     await saveLanding(f, { join: f.joinState, landing: { merge: f.merged, head: f.a } });
-    const issues = githubIssues({
-      ...f.config,
-      prerequisites: f.config.prerequisites.filter((item) => [1, 4].includes(item.issue)),
-    });
+    const issues = githubIssues(
+      {
+        ...f.config,
+        prerequisites: f.config.prerequisites.filter((item) => [1, 4].includes(item.issue)),
+      },
+      f.readGitHub
+    );
     if (!issues.reconcile) throw new Error('Missing reconciliation');
     await Effect.runPromise(issues.reconcile());
     const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];

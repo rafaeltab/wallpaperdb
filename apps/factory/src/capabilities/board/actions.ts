@@ -1,7 +1,11 @@
 import type { ScheduleSnapshot } from '../observe/index.js';
-import type { Action, ActionKind, FactoryV2Snapshot } from './model.js';
+import type { Action, ActionKind, FactoryV2Snapshot, FactoryV2ItemDetails } from './model.js';
 import { entity, jobId, version } from './values.js';
-export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): FactoryV2Snapshot {
+export function actions(
+  snapshot: FactoryV2Snapshot,
+  input: ScheduleSnapshot,
+  details: Readonly<Record<string, FactoryV2ItemDetails>>
+): FactoryV2Snapshot {
   const result: Record<Action['id'], Action> = {};
   const make = (
     kind: ActionKind,
@@ -96,7 +100,13 @@ export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): F
         {
           ...item,
           actionIds,
-          version: version({ base: item.version, pr: pr?.version, questions, actionIds }),
+          version: version({
+            base: item.version,
+            pr: pr?.version,
+            questions,
+            actionIds,
+            checkRuns: details[item.id]?.checkRuns,
+          }),
         },
       ];
     })

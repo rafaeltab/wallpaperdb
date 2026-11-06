@@ -720,69 +720,76 @@ it('keeps an interrupted accepted command uncertain and prevents its old worker 
   }
 });
 
-it('invalidates item details when individual checks change without changing the card status', async () => {
-  const { pullObservation } = await import('./fixtures/v2.js');
-  const pr = pullObservation(42, {
-    checkRuns: [
-      {
-        id: 'C1',
-        name: 'typecheck',
-        state: 'passed',
-        url: null,
-        head: 'a'.repeat(40),
-        startedAt: null,
-        completedAt: null,
-      },
-    ],
-    ci: 'SUCCESS',
-  });
-  const input = {
-    ...initial,
-    observations: {
-      state: 'current' as const,
-      stale: false,
-      observedAt: 2000,
-      facts: { issues: [], pullRequests: [pr] },
-    },
-  };
-  const board = await liveBoard({ scopeId: 'test', initial: input });
-  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
-  try {
-    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
-    const card = Object.values(before.entities.items)[0];
-    await board.publish({
-      ...input,
-      observations: {
-        ...input.observations,
-        facts: {
-          issues: [],
-          pullRequests: [{ ...pr, checkRuns: [{ ...pr.checkRuns![0], name: 'build' }] }],
+it.each([
+  { name: 'build' },
+  { startedAt: '2026-11-06T12:01:00Z' },
+  { completedAt: '2026-11-06T12:02:00Z' },
+])(
+  'invalidates item details when an individual check changes %j without changing the card status',
+  async (change) => {
+    const { pullObservation } = await import('./fixtures/v2.js');
+    const pr = pullObservation(42, {
+      checkRuns: [
+        {
+          id: 'C1',
+          name: 'typecheck',
+          state: 'passed',
+          url: null,
+          head: 'a'.repeat(40),
+          startedAt: null,
+          completedAt: null,
         },
-      },
+      ],
+      ci: 'SUCCESS',
     });
-    expect(
-      (
-        await app.inject({
-          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
-          headers: { 'if-match': `"${card.version}"` },
-        })
-      ).statusCode
-    ).toBe(412);
-    const current = Object.values(
-      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items
-    )[0];
-    expect(
-      (
-        await app.inject({
-          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
-          headers: { 'if-match': `"${current.version}"` },
-        })
-      ).json()
-    ).toMatchObject({ checkRuns: { state: 'known', value: [{ name: 'build' }] } });
-  } finally {
-    await app.close();
+    const input = {
+      ...initial,
+      observations: {
+        state: 'current' as const,
+        stale: false,
+        observedAt: 2000,
+        facts: { issues: [], pullRequests: [pr] },
+      },
+    };
+    const board = await liveBoard({ scopeId: 'test', initial: input });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const card = Object.values(before.entities.items)[0];
+      await board.publish({
+        ...input,
+        observations: {
+          ...input.observations,
+          facts: {
+            issues: [],
+            pullRequests: [{ ...pr, checkRuns: [{ ...pr.checkRuns![0], ...change }] }],
+          },
+        },
+      });
+      expect(
+        (
+          await app.inject({
+            url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+            headers: { 'if-match': `"${card.version}"` },
+          })
+        ).statusCode
+      ).toBe(412);
+      const current = Object.values(
+        (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items
+      )[0];
+      expect(
+        (
+          await app.inject({
+            url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+            headers: { 'if-match': `"${current.version}"` },
+          })
+        ).json()
+      ).toMatchObject({ checkRuns: { state: 'known', value: [change] } });
+    } finally {
+      await app.close();
+    }
   }
-});
+);
 
 it('keeps a parked owning job visible when its bound PR is closed', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');

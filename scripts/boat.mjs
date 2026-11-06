@@ -729,7 +729,7 @@ async function ensure() {
 async function bootstrap(id) {
 	await ssh(
 		id,
-		`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
+		`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && git -C ${remote} remote add origin https://github.com/rafaeltab/wallpaperdb.git); git -C ${remote} rev-parse --verify HEAD >/dev/null 2>&1 || (cd ${remote} && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
 	);
 }
 function sourceNames() {
@@ -2769,7 +2769,11 @@ try {
 			throw new Error("C requires an isolated cache namespace");
 		if (config)
 			throw new Error("Already enrolled; preserve existing worker ownership");
-		const base = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
+		// The bootstrap fetch needs a published ancestor. Current edits and local
+		// commits are delivered by the ordinary authoritative source projection.
+		const base = execFileSync("git", ["merge-base", "HEAD", "origin/main"])
+			.toString()
+			.trim();
 		write(configFile, {
 			root,
 			mode,

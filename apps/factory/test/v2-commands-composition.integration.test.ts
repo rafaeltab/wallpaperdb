@@ -1,4 +1,5 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import type {
@@ -7,6 +8,8 @@ import type {
   FactoryV2Snapshot,
 } from '../src/http/index.js';
 import { protocol } from './fixtures/setup.js';
+import { fileScheduleStore } from '../src/adapters/store/index.js';
+import { initializeState } from '../src/platform/index.js';
 
 type Running = Awaited<ReturnType<typeof startFactory>>;
 async function composed(
@@ -15,7 +18,8 @@ async function composed(
     host: Awaited<ReturnType<typeof protocol>>;
     save: (patch: object) => Promise<void>;
   }) => Promise<void>,
-  options: object = {}
+  options: object = {},
+  initialControl?: { paused: boolean }
 ) {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
@@ -48,6 +52,20 @@ async function composed(
   try {
     await save({});
     await writeFile(`${host.directory}/authorization`, 'Bearer controlled-protocol');
+    if (initialControl) {
+      initializeState(`${host.directory}/state`);
+      expect(
+        await Effect.runPromise(
+          fileScheduleStore(`${host.directory}/state`).save({
+            revision: 0,
+            paused: initialControl.paused,
+            concurrency: 1,
+            allowance: 1,
+            admissions: [],
+          })
+        )
+      ).toBe(true);
+    }
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
       FACTORY_T3_PROJECT_ID: 'project-id',
@@ -119,6 +137,86 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
     return call.args[1] === 'send' && !call.args.includes('--help') ? [String(call.args[3])] : [];
   });
 }
+
+it('submits one retained advisory preview through v2 while the composed factory is paused', () =>
+  composed(
+    async ({ running, host }) => {
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.issues[
+              'issue:rafaeltab/wallpaperdb/577'
+            ].metadata.state
+          ).toBe('known'),
+        { timeout: 10000, interval: 40 }
+      );
+      const request = {
+        ...(await action(running, 'preview-plan')),
+        commandId: '00000000-0000-4000-8000-000000000035',
+        kind: 'preview-plan',
+        payload: {},
+      };
+      const before = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      const result = await receipt(running, request.commandId);
+      if (!result.result || !('planId' in result.result))
+        throw new Error('Missing retained preview');
+      const planId = result.result.planId;
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await running.app.inject(`/api/v2/plans/${encodeURIComponent(planId)}`)).json()
+          ).toMatchObject({
+            attempt: {
+              id: planId,
+              phase: 'succeeded',
+              basis: { controlVersion: before.meta.factory.version },
+              result: { selected: [{ issueId: 'issue:rafaeltab/wallpaperdb/577' }] },
+            },
+          }),
+        { timeout: 10000, interval: 40 }
+      );
+      const planner = JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8'));
+      expect(planId).toBe(`plan:${planner.requestId}`);
+      const replay = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: request,
+      });
+      expect(replay.statusCode).toBe(200);
+      expect(replay.json()).toEqual(result);
+      const calls = await host.calls();
+      expect(
+        calls.filter(
+          (c) =>
+            c.binary === 't3' &&
+            c.args[1] === 'start' &&
+            !c.args.includes('--help') &&
+            !c.args.includes('--worktree')
+        )
+      ).toHaveLength(1);
+      expect(
+        calls.filter(
+          (c) => c.binary === 't3' && c.args[1] === 'start' && c.args.includes('--worktree')
+        )
+      ).toHaveLength(0);
+      expect(
+        (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.factory
+      ).toMatchObject({ paused: true, admission: { consumed: 0 } });
+    },
+    {
+      planner: {
+        proposal: {
+          selected: [{ issue: 577, reason: 'Advisory selection', dependsOn: [], conflicts: [] }],
+          deferred: [],
+        },
+      },
+    },
+    { paused: true }
+  ));
 
 it('resumes the parked question on the existing implementation job through v2', () =>
   composed(async ({ running, host, save }) => {

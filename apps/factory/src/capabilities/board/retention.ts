@@ -1,4 +1,4 @@
-import type { FactoryV2Snapshot, Fact, Readiness, Relationship } from './model.js';
+import type { BoardSnapshot, Fact, Readiness, Relationship } from './model.js';
 import { entity, version } from './values.js';
 export function retainFact<T>(before: Fact<T> | undefined, after: Fact<T>): Fact<T> {
   return before?.state === 'known' &&
@@ -18,10 +18,7 @@ function readiness(before: Readiness | undefined, after: Readiness): Readiness {
     : after;
 }
 /** Reconfirmation updates shared sources. Facts retain their last changed payload. */
-export function retainFacts(
-  before: FactoryV2Snapshot,
-  after: FactoryV2Snapshot
-): FactoryV2Snapshot {
+export function retainFacts(before: BoardSnapshot, after: BoardSnapshot): BoardSnapshot {
   const prior = before.entities,
     next = after.entities;
   return {

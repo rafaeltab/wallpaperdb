@@ -2,26 +2,21 @@ import { Context, type Effect } from 'effect';
 import type { Unavailable } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type { PlanningAttempt } from '../plan/index.js';
-import type {
-  FactoryV2Command,
-  FactoryV2CommandReceipt,
-  FactoryV2Delta,
-  FactoryV2Snapshot,
-} from './model.js';
+import type { BoardCommand, CommandReceipt, BoardDelta, BoardSnapshot } from './model.js';
 export interface BoardInput {
   schedule: ScheduleSnapshot;
   plan?: PlanningAttempt;
 }
 export interface BoardRecord {
-  snapshot: FactoryV2Snapshot;
+  snapshot: BoardSnapshot;
   inputVersion: string;
-  details: Readonly<Record<string, import('./model.js').FactoryV2ItemDetails>>;
-  history: readonly FactoryV2Delta[];
+  details: Readonly<Record<string, import('./model.js').ItemDetails>>;
+  history: readonly BoardDelta[];
 }
 export interface CommandRecord {
   basis?: import('./model.js').PlanAttempt['basis'] | null;
-  request: FactoryV2Command;
-  receipt: FactoryV2CommandReceipt;
+  request: BoardCommand;
+  receipt: CommandReceipt;
 }
 /** A save publishes one coherent board plus bounded replay atomically. Acceptance binds
  * UUID and full request durably before effects. Claims are never retried after restart:
@@ -39,13 +34,13 @@ export interface BoardStore {
 export const BoardStore = Context.Service<BoardStore>('wallpaperdb.factory.BoardStore');
 export interface BoardCommands {
   execute(
-    command: FactoryV2Command,
+    command: BoardCommand,
     target: import('./model.js').Action,
     input: ScheduleSnapshot
   ): Effect.Effect<
     {
       state: 'succeeded' | 'rejected' | 'uncertain';
-      result: FactoryV2CommandReceipt['result'];
+      result: CommandReceipt['result'];
       reasons: readonly import('./model.js').Reason[];
     },
     Unavailable

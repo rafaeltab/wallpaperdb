@@ -1,12 +1,12 @@
 import type { BoardPlan } from './contract.js';
-import type { FactoryV2PlanDetails, FactoryV2Snapshot, PlanAttempt, Tables } from './model.js';
+import type { PlanDetails, BoardSnapshot, PlanAttempt, Tables } from './model.js';
 import { entity, issueId, timestamp, unknown } from './values.js';
 export function planDetails(
   attempt: BoardPlan,
-  snapshot: FactoryV2Snapshot,
+  snapshot: BoardSnapshot,
   basis?: PlanAttempt['basis'],
   currentInputVersion?: string
-): FactoryV2PlanDetails {
+): PlanDetails {
   const issues: Tables['issues'] = { ...snapshot.entities.issues };
   const referenced = new Set<number>();
   for (const selected of attempt.result?.selected ?? []) {
@@ -85,7 +85,6 @@ export function planDetails(
   });
   const { repositories, labels, users, sources, threads } = snapshot.entities;
   return {
-    apiVersion: 2,
     attempt: plan,
     entities: { issues, repositories, labels, users, sources, threads },
   };

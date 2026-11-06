@@ -5,7 +5,7 @@ import { limit, projectionContext, reason } from './context.js';
 import { populateIssues } from './issues.js';
 import { populateJobs } from './jobs.js';
 import { populateMaintenance } from './maintenance.js';
-import type { FactoryV2Snapshot } from './model.js';
+import type { BoardSnapshot } from './model.js';
 import { populatePulls } from './pulls.js';
 import { stacks } from './stacks.js';
 import { populateThreads } from './threads.js';
@@ -45,18 +45,15 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
   const topology = stacks(tables, facts?.verifiedPrBases ?? [], observed);
   tables.relationships = topology.relationships;
   tables.stacks = topology.stacks;
-  const snapshot: FactoryV2Snapshot = {
-    apiVersion: 2,
+  const snapshot: BoardSnapshot = {
     scopeId,
     cursor,
     committedAt: at,
     meta: {
-      dataMode: 'live',
       coverage,
       diagnostics: topology.diagnostics,
       factory,
       currentPlanId: null,
-      transport: { changes: true, events: true, suggestedPollMs: 1000 },
     },
     entities: tables,
   };

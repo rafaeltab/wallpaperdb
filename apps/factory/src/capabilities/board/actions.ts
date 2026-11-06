@@ -1,11 +1,11 @@
 import type { ScheduleSnapshot } from '../observe/index.js';
-import type { Action, ActionKind, FactoryV2Snapshot, FactoryV2ItemDetails } from './model.js';
+import type { Action, ActionKind, BoardSnapshot, ItemDetails } from './model.js';
 import { entity, jobId, version } from './values.js';
 export function actions(
-  snapshot: FactoryV2Snapshot,
+  snapshot: BoardSnapshot,
   input: ScheduleSnapshot,
-  details: Readonly<Record<string, FactoryV2ItemDetails>>
-): FactoryV2Snapshot {
+  details: Readonly<Record<string, ItemDetails>>
+): BoardSnapshot {
   const result: Record<Action['id'], Action> = {};
   const make = (
     kind: ActionKind,

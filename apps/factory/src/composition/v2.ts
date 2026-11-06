@@ -6,7 +6,7 @@ import {
   BoardCommands,
   type BoardCommands as Commands,
   type Action,
-  type FactoryV2Command,
+  type BoardCommand,
 } from '../capabilities/board/index.js';
 import { Time, Unavailable } from '../capabilities/job/index.js';
 import {
@@ -110,7 +110,7 @@ function commandAdapter(config: {
     reasons: [{ code, message }],
   });
   return {
-    execute: (command: FactoryV2Command, action: Action, input: ScheduleSnapshot) =>
+    execute: (command: BoardCommand, action: Action, input: ScheduleSnapshot) =>
       Effect.gen(function* () {
         if (command.kind === 'configure') {
           const result = yield* config.scheduler.configure({

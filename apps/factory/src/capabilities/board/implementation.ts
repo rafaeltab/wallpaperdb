@@ -12,6 +12,7 @@ import { BoardCommands, BoardStore, type CommandRecord } from './contract.js';
 import type { Action, BoardChanges, BoardCommand, BoardDelta, BoardFailure } from './model.js';
 import { planDetails } from './plans.js';
 import { project } from './projection.js';
+import { coverageFor } from './coverage.js';
 import { issueSearch } from './search.js';
 import { failure, version } from './values.js';
 
@@ -45,7 +46,11 @@ export function makeBoard(config: {
       const detail = planDetails(config.initialPlan, initial.snapshot);
       initial.snapshot = {
         ...initial.snapshot,
-        meta: { ...initial.snapshot.meta, currentPlanId: detail.attempt.id },
+        meta: {
+          ...initial.snapshot.meta,
+          currentPlanId: detail.attempt.id,
+          coverage: coverageFor(detail.entities.issues, !!input.observations.facts),
+        },
         entities: {
           ...initial.snapshot.entities,
           issues: detail.entities.issues,
@@ -127,7 +132,11 @@ export function makeBoard(config: {
           );
           next.snapshot = {
             ...next.snapshot,
-            meta: { ...next.snapshot.meta, currentPlanId: detail.attempt.id },
+            meta: {
+              ...next.snapshot.meta,
+              currentPlanId: detail.attempt.id,
+              coverage: coverageFor(detail.entities.issues, !!input.observations.facts),
+            },
             entities: {
               ...next.snapshot.entities,
               issues: detail.entities.issues,

@@ -1,7 +1,8 @@
 import type { ScheduleSnapshot } from '../observe/index.js';
 import { capacityOccupied } from '../plan/index.js';
 import { populateCards } from './cards.js';
-import { limit, projectionContext, reason } from './context.js';
+import { limit, projectionContext } from './context.js';
+import { coverageFor } from './coverage.js';
 import { populateIssues } from './issues.js';
 import { populateJobs } from './jobs.js';
 import { populateMaintenance } from './maintenance.js';
@@ -19,22 +20,7 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
   populateMaintenance(context);
   populateCards(context);
   const { tables, details, observed, facts } = context;
-  const unresolved = Object.values(tables.issues)
-    .filter((i) => i.metadata.state === 'unknown')
-    .map((i) => i.id);
-  const coverage = {
-    state: !facts
-      ? ('unavailable' as const)
-      : unresolved.length
-        ? ('partial' as const)
-        : ('complete' as const),
-    reasons: !facts
-      ? [reason('initial', 'Provider facts have not been observed.')]
-      : unresolved.length
-        ? [reason('missing-context', 'Some referenced issues have not been observed.')]
-        : [],
-    unresolvedIssueIds: unresolved,
-  };
+  const coverage = coverageFor(tables.issues, !!facts);
   const factory = entity({
     id: 'factory:local' as const,
     paused: input.state.paused,

@@ -1141,6 +1141,88 @@ it('preserves known historical plan threads through retained planner ownership',
   }
 });
 
+it.each(['startup', 'publication'])(
+  'qualifies unresolved plan context in board coverage during %s',
+  async (phase) => {
+    const { issueObservation } = await import('./fixtures/v2.js');
+    const plan: PlanningAttempt = {
+      id: '00000000-0000-4000-8000-000000000024',
+      revision: 1,
+      startedAt: 1000,
+      deadline: 5000,
+      finishedAt: 2000,
+      phase: 'succeeded',
+      result: {
+        kind: 'preview',
+        selected: [{ issue: 99, reason: 'Historical selection', dependsOn: [98], conflicts: [] }],
+        rejected: [{ issue: 100, reason: 'Not ready' }],
+        input: {
+          issues: [98, 99, 100].map((number) => ({
+            number,
+            title: `Historical ${number}`,
+            blockers: [],
+            parents: [],
+          })),
+        },
+      },
+    };
+    const input: ScheduleSnapshot = {
+      ...initial,
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 2000,
+        facts: { issues: [], pullRequests: [] },
+      },
+    };
+    const board = await liveBoard({
+      scopeId: 'test',
+      initial: input,
+      initialPlan: phase === 'startup' ? plan : undefined,
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      if (phase === 'publication') {
+        expect(
+          (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.coverage.state
+        ).toBe('complete');
+        await board.publish(input, plan);
+      }
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/99'].metadata.state).toBe(
+        'unknown'
+      );
+      expect(snapshot.meta.coverage.state).toBe('partial');
+      expect(snapshot.meta.coverage.unresolvedIssueIds).toHaveLength(3);
+      expect(snapshot.meta.coverage.unresolvedIssueIds).toEqual(
+        expect.arrayContaining([
+          'issue:rafaeltab/wallpaperdb/98',
+          'issue:rafaeltab/wallpaperdb/99',
+          'issue:rafaeltab/wallpaperdb/100',
+        ])
+      );
+      await board.publish(
+        {
+          ...input,
+          observations: {
+            ...input.observations,
+            facts: {
+              issues: [issueObservation(98), issueObservation(99), issueObservation(100)],
+              pullRequests: [],
+            },
+          },
+        },
+        plan
+      );
+      expect(
+        (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.coverage
+      ).toMatchObject({ state: 'complete', unresolvedIssueIds: [] });
+    } finally {
+      await app.close();
+    }
+  }
+);
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

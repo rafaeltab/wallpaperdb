@@ -564,9 +564,9 @@ export async function runProtocol(
           reply({ data: values });
         } else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
           const conn = (nodes: unknown[]) => ({ nodes, pageInfo: { hasNextPage: false } });
-          const nodes = config.planning.issues.map((issue: { labels: unknown[]; comments: unknown[] }) => ({
+          const nodes = config.planning.issues.map((issue: { parent?: unknown; labels: unknown[]; comments: unknown[] }) => ({
             ...issue,
-            parent: null,
+            parent: issue.parent ?? null,
             labels: conn(issue.labels),
             assignees: conn([]),
             comments: { totalCount: issue.comments.length },

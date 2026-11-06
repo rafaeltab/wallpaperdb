@@ -1326,6 +1326,7 @@ if(argv.includes('--lockfile-only')){
 		FAKE_WORKER: worker,
 		FAKE_SOURCE: root,
 		FAKE_CONTROL: control,
+		DOCKER_VALIDATION_LOCK_FILE: path.join(control, "docker-validation.lock"),
 		MAKEFLAGS: "",
 		MFLAGS: "",
 		MAKEOVERRIDES: "",
@@ -1671,6 +1672,7 @@ async function makeArgumentsCheckout(t, cacheShell) {
 			if (archive) {
 				const prefix = path.join(archive, String(invocation++));
 				fs.writeFileSync(`${prefix}.argv.json`, JSON.stringify(argv));
+				fs.writeFileSync(`${prefix}.last-output.txt`, command.output());
 				if (command.closed) {
 					const result = await command.done;
 					fs.writeFileSync(`${prefix}.stdout.raw`, result.stdout);

@@ -159,7 +159,9 @@ export function sourcePreparationFixture(
 			lifecycle: "fresh-after-stop",
 		}),
 	);
-	fs.writeFileSync(path.join(boat, "state.json"), JSON.stringify(state));
+	fs.writeFileSync(path.join(boat, "state.json"), JSON.stringify(state), {
+		mode: 0o600,
+	});
 	const external = path.join(
 		home,
 		".local/state/wallpaperdb-boat/557",
@@ -174,7 +176,7 @@ export function sourcePreparationFixture(
 		"cache-server.json",
 		"cache.json",
 	])
-		fs.writeFileSync(path.join(boat, name), "{}");
+		fs.writeFileSync(path.join(boat, name), "{}", { mode: 0o600 });
 	const calls = path.join(directory, "controlled-provider-calls.jsonl");
 	fs.writeFileSync(
 		path.join(root, ".mise/boat/boat"),

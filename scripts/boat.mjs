@@ -464,7 +464,10 @@ async function lock(
 			}
 			const selection = contended?.(pid);
 			if (selection !== undefined) return selection;
-			if (attempt > 600) throw new Error("Lifecycle lock timed out");
+			// Cold startup legitimately owns this lock through tool/dependency setup.
+			// Keep missing PID publication and all explicit caller deadlines unchanged.
+			if (attempt > (name === "lifecycle" ? 2400 : 600))
+				throw new Error("Lifecycle lock timed out");
 			await wait(
 				Math.max(
 					1,

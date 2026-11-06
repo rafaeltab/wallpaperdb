@@ -5,6 +5,7 @@ import type { BoardPlan } from './contract.js';
 import { planningIdentity } from './plan-basis.js';
 import { AttemptStore } from '../plan/index.js';
 import { actions } from './actions.js';
+import { retainFacts, retainFact } from './retention.js';
 import { entityChanges } from './changes.js';
 import { BoardCommands, BoardStore, type CommandRecord } from './contract.js';
 import type {
@@ -21,7 +22,12 @@ import { problem, version } from './values.js';
 
 /** Pure reads observe one committed revision. Effectful publication and command
  * responsibility use the store before publishing anything to the transport. */
-export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; epoch: string }) {
+export function makeBoard(config: {
+  scopeId: string;
+  initial: ScheduleSnapshot;
+  epoch: string;
+  initialPlan?: BoardPlan;
+}) {
   return Effect.gen(function* () {
     const store = yield* BoardStore,
       commands = yield* BoardCommands,
@@ -37,13 +43,26 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
       Buffer.from(JSON.stringify({ scope: config.scopeId, epoch, revision })).toString('base64url');
     const at = new Date(yield* time.now()).toISOString();
     const initial = project(input, at, config.scopeId, cursor());
+    if (config.initialPlan) {
+      const detail = planDetails(config.initialPlan, initial.snapshot);
+      initial.snapshot = {
+        ...initial.snapshot,
+        meta: { ...initial.snapshot.meta, currentPlanId: detail.attempt.id },
+        entities: {
+          ...initial.snapshot.entities,
+          issues: detail.entities.issues,
+          plans: { [detail.attempt.id]: detail.attempt },
+        },
+      };
+    }
     let current = { ...initial, snapshot: actions(initial.snapshot, input) };
     for (const detail of Object.values(current.details)) {
       const item = current.snapshot.entities.items[detail.itemId];
       if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
     }
     let history: readonly FactoryV2Delta[] = restored?.history ?? [];
-    let identity = restored?.inputVersion ?? version({ input: stable(input), plan: undefined });
+    let identity =
+      restored?.inputVersion ?? version({ input: stable(input), plan: config.initialPlan });
     if (restored) current = { snapshot: restored.snapshot, details: restored.details };
     else if (!(yield* store.save({ ...current, history, inputVersion: identity }, null))) {
       const winner = yield* store.read();
@@ -76,7 +95,7 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
         receipts.set(record.request.commandId, interrupted);
       } else receipts.set(record.request.commandId, record);
     }
-    let lastPlan: BoardPlan | undefined;
+    let lastPlan: BoardPlan | undefined = config.initialPlan;
     const publish = (nextInput: ScheduleSnapshot, plan?: BoardPlan) =>
       Effect.gen(function* () {
         lastPlan = plan ?? lastPlan;
@@ -90,6 +109,12 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           config.scopeId,
           cursor()
         );
+        next.snapshot = retainFacts(before, next.snapshot);
+        for (const [id, detail] of Object.entries(next.details))
+          next.details[id] = {
+            ...detail,
+            checkRuns: retainFact(current.details[id]?.checkRuns, detail.checkRuns),
+          };
         if (lastPlan) {
           const basis = [...receipts.values()].find(
             (r) =>
@@ -249,7 +274,7 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           receipts.set(record.request.commandId, completed);
         }
       }).pipe(worker.withPermits(1), Effect.withSpan('factory.board.commands'));
-    yield* publish(config.initial);
+    yield* publish(config.initial, config.initialPlan);
     return {
       snapshot: () => current.snapshot,
       publish,
@@ -273,7 +298,7 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           listeners.delete(listener);
         };
       },
-      receipt: (id: string) => receipts.get(id)?.receipt,
+      receipt: (id: string) => Effect.map(store.command(id), (record) => record?.receipt),
       hasPending: () => [...receipts.values()].some((r) => r.receipt.state === 'accepted'),
       search: issueSearch(() => current.snapshot),
       details: (id: string) => current.details[id],

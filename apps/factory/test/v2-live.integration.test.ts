@@ -385,6 +385,10 @@ it('searches the local issue index with generation-bound pages and publishes adv
     });
     const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
     expect(snapshot.meta.currentPlanId).toBe('plan:00000000-0000-4000-8000-000000000008');
+    expect(
+      Object.values(snapshot.entities.actions).find((a) => a.kind === 'preview-plan')?.availability
+        .state
+    ).toBe('available');
     const plan = (
       await app.inject('/api/v2/plans/plan%3A00000000-0000-4000-8000-000000000008')
     ).json();
@@ -688,6 +692,22 @@ it('keeps an interrupted accepted command uncertain and prevents its old worker 
       await first.execute();
       await reopened.idle();
       expect(executed).toBe(0);
+      const retained = await Effect.runPromise(store.command(command.commandId));
+      if (!retained) throw new Error('Lost command responsibility');
+      await Effect.runPromise(
+        store.finish({
+          ...retained,
+          receipt: {
+            ...retained.receipt,
+            state: 'rejected',
+            version: 'reconciled',
+            completedAt: new Date(2000).toISOString(),
+          },
+        })
+      );
+      expect((await second.inject(`/api/v2/commands/${command.commandId}`)).json()).toMatchObject({
+        state: 'rejected',
+      });
     } finally {
       await second.close();
     }
@@ -788,5 +808,161 @@ it('keeps shared replay history coherent when a second producer has a stale loca
   } finally {
     await Promise.all([app.close(), other.close()]);
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('updates source freshness without rewriting unchanged issue and PR versions', async () => {
+  const { issueObservation, pullObservation } = await import('./fixtures/v2.js');
+  const input = {
+    ...initial,
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [issueObservation(1)],
+        pullRequests: [pullObservation(42, { linkedIssues: [1] })],
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    await board.publish({ ...input, observations: { ...input.observations, observedAt: 3000 } });
+    const after = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(after.entities.issues['issue:rafaeltab/wallpaperdb/1'].version).toBe(
+      before.entities.issues['issue:rafaeltab/wallpaperdb/1'].version
+    );
+    expect(after.entities.pullRequests['pr:rafaeltab/wallpaperdb/42'].version).toBe(
+      before.entities.pullRequests['pr:rafaeltab/wallpaperdb/42'].version
+    );
+    expect(after.entities.sources['source:github'].observedAt).toBe(new Date(3000).toISOString());
+  } finally {
+    await app.close();
+  }
+});
+
+it('does not turn a retained publication assertion into readiness after current verification fails', async () => {
+  const { issueObservation, pullObservation } = await import('./fixtures/v2.js');
+  const intent = {
+    id: 'retained',
+    issue: 1,
+    issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/1',
+    base: 'b'.repeat(40),
+    context: '',
+    branch: 'feature',
+    createdAt: 1000,
+    expectedStage: 'implementation' as const,
+  };
+  const proof = {
+    url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+    commit: 'a'.repeat(40),
+    parent: 'b'.repeat(40),
+    base: 'main',
+  };
+  const input: ScheduleSnapshot = {
+    ...initial,
+    state: { ...initial.state, admissions: [{ issue: 1, base: intent.base, context: '' }] },
+    jobs: [
+      {
+        kind: 'job',
+        intent,
+        elapsedMs: 0,
+        prerequisite: proof,
+        execution: { kind: 'ambiguous' },
+        delivery: {
+          stage: 'ci',
+          commit: proof.commit,
+          ready: false,
+          landed: false,
+          activity: 'manual-recovery',
+        },
+      },
+    ],
+    localWork: [
+      { intent, control: { revision: 0, cancelled: false, claimed: [], prerequisite: proof } },
+    ],
+    observations: {
+      state: 'current',
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [issueObservation(1)],
+        pullRequests: [pullObservation(42, { linkedIssues: [1] })],
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: intent.base, run: Effect.runPromise, job, v2: board });
+  try {
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.pullRequests[
+        'pr:rafaeltab/wallpaperdb/42'
+      ].readiness.state
+    ).not.toBe('ready');
+    await board.publish({
+      ...input,
+      jobs: input.jobs.map((j) =>
+        j.kind === 'job' && j.delivery
+          ? { ...j, delivery: { ...j.delivery, ready: true, activity: undefined } }
+          : j
+      ),
+    });
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.pullRequests[
+        'pr:rafaeltab/wallpaperdb/42'
+      ].readiness.state
+    ).toBe('ready');
+    expect(
+      Object.values((await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items)[0]
+        .status.code
+    ).toBe('ready');
+  } finally {
+    await app.close();
+  }
+});
+
+it('accepts a bounded Unicode start context within the v2 body limit while preserving v1 limits', async () => {
+  const { issueObservation } = await import('./fixtures/v2.js');
+  const input = {
+    ...initial,
+    state: { ...initial.state, paused: false },
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: { issues: [issueObservation(1)], pullRequests: [] },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const action = snapshot.entities.actions['action:start/issue:rafaeltab/wallpaperdb/1'];
+    if (action.availability.state !== 'available') throw new Error('Start unavailable');
+    const context = '界'.repeat(16000);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: {
+            commandId: '00000000-0000-4000-8000-000000000010',
+            actionId: action.id,
+            precondition: action.availability.precondition,
+            kind: 'start',
+            payload: { context },
+          },
+        })
+      ).statusCode
+    ).toBe(202);
+    await board.idle();
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/job', payload: { issue: 1, context } }))
+        .statusCode
+    ).toBe(413);
+  } finally {
+    await app.close();
   }
 });

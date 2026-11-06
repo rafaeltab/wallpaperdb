@@ -73,6 +73,7 @@ export function attention(code: StatusCode): Attention {
         reasons: [{ code: 'needs-review', message: 'Human review is required.', actionIds: [] }],
       };
     case 'unknown':
+    case 'ci-failed':
     case 'conflict':
     case 'launching':
       return {

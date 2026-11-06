@@ -41,7 +41,7 @@ Mixed or uncertain verdicts follow that skill's decision handling. Finish indepe
 
 When an applicable CI check fails, is cancelled, or times out, read [CI failure handling](references/ci-failures.md) before fixing or rerunning it. Record the diagnosis, delivered fixes, retries, and issue links in the ledger. Resume monitoring after publishing verified fixes or recording an allowed rerun; return a blocker when the failure cannot be handled within the authorized scope and retry budget.
 
-The mutation pilot is advisory. Report its available outcome, including incomplete or failed analysis, and exclude it from completion and monitoring gates. Proceed without waiting, repair loops, or reruns merely to turn it green. This exception applies only to the mutation workflow. Preserve ordinary CI requirements. Build baselines in CI; local mutation execution requires a concrete diagnostic question and at most five minutes overall including shutdown. See [mutation guidance](../../../../scripts/mutation.mjs).
+The mutation pilot is advisory. Report its available outcome, including incomplete or failed analysis, and exclude it from completion and monitoring gates. Proceed without waiting, repair loops, or reruns merely to turn it green. This exception applies only to the mutation workflow. Preserve ordinary CI requirements. Build baselines in CI; local mutation execution requires a concrete diagnostic question and at most five minutes overall including shutdown. See [mutation guidance](../../../../scripts/mutation.ts).
 
 ## 4. Review repairs and assess advisory feedback
 

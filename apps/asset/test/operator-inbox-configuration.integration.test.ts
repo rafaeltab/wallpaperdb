@@ -49,8 +49,8 @@ it('mounts only the selected notification token into the actual Compose inbox an
       join(directory, 'infra/docker-compose.yml')
     );
     await copyFile(
-      resolve('../../scripts/operator-inbox.mjs'),
-      join(directory, 'scripts/operator-inbox.mjs')
+      resolve('../../scripts/operator-inbox.ts'),
+      join(directory, 'scripts/operator-inbox.ts')
     );
     const override = join(directory, 'infra/ports.json');
     await writeFile(

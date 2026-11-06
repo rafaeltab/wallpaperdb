@@ -7,12 +7,12 @@
         "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
     },
     "scripts": {
-        "postinstall": "test -f scripts/setup-worktree.mjs && node scripts/setup-worktree.mjs || true",
+        "postinstall": "test -f scripts/setup-worktree.ts && node scripts/setup-worktree.ts || true",
         "test": "vitest",
-        "architecture:workspaces": "node scripts/check-architecture-workspaces.mjs",
+        "architecture:workspaces": "node scripts/check-architecture-workspaces.ts",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
-        "coverage:merge": "node scripts/merge-coverage.mjs",
+        "coverage:merge": "node scripts/merge-coverage.ts",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check-types": "tsc --project tsconfig.tooling.json",
         "lint": "biome lint test",

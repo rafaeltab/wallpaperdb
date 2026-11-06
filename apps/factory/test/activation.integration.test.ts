@@ -31,7 +31,7 @@ it('rejects duplicate state assignments before changing the installed unit or co
   const activate = () =>
     execFileSync(
       process.execPath,
-      [resolve('scripts/activate.mjs'), release, config, state, unitName],
+      [resolve('scripts/activate.ts'), release, config, state, unitName],
       {
         encoding: 'utf8',
         env: { ...process.env, HOME: directory, PATH: `${bin}:${process.env.PATH}` },
@@ -75,7 +75,7 @@ it('checks physical state compatibility before activating through a directory al
   const activate = () =>
     execFileSync(
       process.execPath,
-      [resolve('scripts/activate.mjs'), release, config, selected, unitName],
+      [resolve('scripts/activate.ts'), release, config, selected, unitName],
       {
         encoding: 'utf8',
         env: { ...process.env, HOME: directory, PATH: `${bin}:${process.env.PATH}` },

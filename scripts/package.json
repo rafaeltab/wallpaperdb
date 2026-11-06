@@ -4,19 +4,19 @@
 	"private": true,
 	"type": "module",
 	"bin": {
-		"wallpaperdb-check-architecture": "./check-architecture.mjs",
+		"wallpaperdb-check-architecture": "./check-architecture.ts",
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
 		"format": "biome format --write .",
 		"lint": "biome lint .",
-		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.mjs",
-		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.mjs",
+		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.ts",
+		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.ts",
 		"test:unit": "cd .. && scripts/node_modules/.bin/vitest run",
-		"test:mutation": "node mutation.mjs",
-		"check-types": "tsc --project tsconfig.json",
+		"test:mutation": "node mutation.ts",
+		"check-types": "tsc --project tsconfig.json && tsc --project tsconfig.external.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.mjs"
+		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

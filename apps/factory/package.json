@@ -20,8 +20,8 @@
     "dev": "node --env-file=.env --import tsx src/main.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:browser:install": "playwright install --with-deps chromium",
-    "service:install": "node scripts/install.mjs",
-    "service:activate": "node scripts/activate.mjs",
+    "service:install": "node scripts/install.ts",
+    "service:activate": "node scripts/activate.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/main.ts --migrate-only",
     "dev:frontend": "vite --config frontend/vite.config.ts"

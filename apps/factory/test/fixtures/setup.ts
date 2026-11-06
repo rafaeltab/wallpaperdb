@@ -2,7 +2,8 @@ import { mkdtemp, mkdir, writeFile, chmod, readFile, rm, rename } from 'node:fs/
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { runProtocol } from './protocol.mjs';
+import { runProtocol } from './protocol.js';
+import { stripTypeScriptTypes } from 'node:module';
 export async function protocol() {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
@@ -48,7 +49,7 @@ export async function protocol() {
     await chmod(executable, 0o700);
     return executable;
   };
-  const source = await readFile(resolve('test/fixtures/protocol.mjs'), 'utf8');
+  const source = stripTypeScriptTypes(await readFile(resolve('test/fixtures/protocol.ts'), 'utf8'));
   for (const name of ['gh', 't3']) {
     await nodeCommand(name, source, { module: true });
   }

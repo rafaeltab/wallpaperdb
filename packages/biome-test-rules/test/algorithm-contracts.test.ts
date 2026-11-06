@@ -82,6 +82,28 @@ const assertion = (modifiers: string[] = [], args = [literal(1)]) => {
 const registration = (body: Input[]) =>
 	call(identifier("test"), [literal("case"), arrow(block(body))]);
 
+test("retry keys decode escaped spellings without rejecting unrelated keys", () => {
+	for (const [key, expected] of [
+		[String.raw`"re\u0074ry"`, ["retry"]],
+		[String.raw`"re\u{74}\x72y"`, ["retry"]],
+		['"re\\\ntry"', ["retry"]],
+		[String.raw`"re\ttry"`, []],
+	] as const) {
+		expect(
+			diagnose(noRetries, [
+				statement(
+					call(identifier("test"), [
+						literal("case"),
+						object([property(key, literal(3))]),
+						arrow(block([])),
+					]),
+				),
+			]),
+			key,
+		).toStrictEqual(expected);
+	}
+});
+
 function diagnose(rule: AdaptedRule, statements: Input[]) {
 	const tree = syntaxTree({
 		kind: "JS_MODULE",

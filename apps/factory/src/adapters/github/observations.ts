@@ -232,6 +232,11 @@ async function issueIndex(project: string, signal: AbortSignal) {
       i.state !== 'OPEN'
     )
       throw new Error('Invalid issue index identity');
+    if (
+      i.parent &&
+      i.parent.url !== `https://github.com/rafaeltab/wallpaperdb/issues/${i.parent.number}`
+    )
+      throw new Error('Unsupported foreign parent');
     return translateIssue(
       i,
       i.labels.nodes.some((l) => l.name === 'ready-for-agent'),

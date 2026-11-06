@@ -224,6 +224,46 @@ it.each(['parent', 'blocker'])(
     })
 );
 
+it.each(['wallpaperdb', 'other-repo'])(
+  'validates the repository of a non-ready indexed issue parent in %s',
+  async (repository) =>
+    withGithub(async (host) => {
+      await host.save({
+        planning: {
+          candidates: [],
+          issues: [
+            {
+              ...issue,
+              labels: [],
+              parent: {
+                number: 2,
+                url: `https://github.com/rafaeltab/${repository}/issues/2`,
+              },
+            },
+            {
+              ...issue,
+              number: 2,
+              url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+              labels: [],
+            },
+          ],
+        },
+      });
+      const result = Effect.runPromise(
+        githubObservations(host.repository, () => Effect.succeed([])).read()
+      );
+      if (repository === 'wallpaperdb') {
+        expect((await result).issues.find((value) => value.number === 1)).toMatchObject({
+          candidate: false,
+          nativeParent: 2,
+          parents: [2],
+        });
+      } else {
+        await expect(result).rejects.toMatchObject({ _tag: 'Unavailable' });
+      }
+    })
+);
+
 it('collects comparison-bound PR titles, drafts, mergeability, checks and reviewer identities', async () =>
   withGithub(async (host) => {
     const pull = {

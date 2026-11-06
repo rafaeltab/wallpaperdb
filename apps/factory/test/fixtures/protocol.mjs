@@ -500,7 +500,7 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
       const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
       const nodes = config.planning.issues.map((issue) => ({
         ...issue,
-        parent: null,
+        parent: issue.parent ?? null,
         labels: conn(issue.labels),
         assignees: conn([]),
         comments: { totalCount: issue.comments.length },

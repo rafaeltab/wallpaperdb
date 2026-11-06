@@ -57,7 +57,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
-        worktree-remove ci clean toolchain
+        worktree-remove ci clean toolchain lint-docs
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -255,3 +255,6 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning generated OpenAPI specs..."
 	@rm -f apps/ingestor/swagger.json apps/asset/swagger.json apps/user/swagger.json
 	@echo "✓ Clean complete"
+
+lint-docs: ## Check maintained documentation and skills (ARGS='--changed <base>' for edited imports)
+	@node scripts/check-documentation.mjs $(ARGS)

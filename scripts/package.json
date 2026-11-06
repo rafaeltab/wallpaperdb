@@ -16,7 +16,9 @@
 		"test:mutation": "node mutation.ts",
 		"check-types": "tsc --project tsconfig.json && tsc --project tsconfig.external.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts"
+		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts",
+		"test:files": "cd .. && scripts/node_modules/.bin/vitest run",
+		"lint:docs": "node check-documentation.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

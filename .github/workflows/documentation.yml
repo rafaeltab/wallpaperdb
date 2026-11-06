@@ -1,0 +1,24 @@
+name: Documentation integrity
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  documentation:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+      - run: make lint-docs
+      - name: Check edited documentation including imported skills
+        if: github.event_name == 'pull_request'
+        env:
+          DOCUMENTATION_BASE: ${{ github.event.pull_request.base.sha }}
+        run: make lint-docs ARGS="--changed $DOCUMENTATION_BASE"

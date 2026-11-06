@@ -1,546 +1,1063 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Action, WorkItem } from '../../../src/http/index.js';
 import {
-  type Board,
-  layout,
-  related,
-  relatedItems,
-  subject,
-  title,
-  expandAttention,
-} from './model';
-import { CardContent, Icon, External, Threads, actionLabel } from './presentation';
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as Pointer,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import type { Action, WorkItem } from '../../../src/http/index.js';
+import type { Board } from './model';
+import { createCanvasProjection } from './view-model';
+import { canvasLayout, relationshipHighlights, stages } from './geometry';
+import type {
+  Box,
+  CanvasFocus,
+  Stage,
+  TitleMode,
+  RelationshipMode,
+  RelationshipDirection,
+} from './geometry-types';
+import { routeCanvas } from './routing';
+import {
+  CanvasContext,
+  Icon,
+  Identity,
+  Fields,
+  Labels,
+  ParentTag,
+  Status,
+  StackSummary,
+  statusAppearance,
+  CanvasThread,
+  CanvasEvidence,
+} from './canvas-presentation';
+import { actionLabel } from './presentation';
+import './canvas.css';
 export function Canvas({
   board,
   native,
+  busy,
+  titleMode,
+  reach,
   onDetails,
   onStart,
   onCommand,
-  busy,
+  onSettings,
+  onPlan,
+  onStartIssue,
+  onPause,
+  canConfigure,
+  children,
 }: {
   board: Board;
   native: boolean;
+  busy: boolean;
+  titleMode: TitleMode;
+  reach: RelationshipMode;
   onDetails: (item: WorkItem) => void;
   onStart: (item: WorkItem) => void;
   onCommand: (item: WorkItem, action: Action) => void;
-  busy: boolean;
+  onSettings: () => void;
+  onPlan: () => void;
+  onStartIssue: () => void;
+  onPause: () => void;
+  canConfigure: boolean;
+  children?: ReactNode;
 }) {
+  const [projection] = useState(createCanvasProjection);
+  const fixture = useMemo(() => projection(board), [projection, board]);
+  const issueMetadata = fixture.metadata;
+  const highlightStyle = 'status-glow';
+  const [expandedNames, setExpandedNames] = useState<Set<string>>(new Set()),
+    [hoverName, setHoverName] = useState<string>();
+  const [hovered, setHovered] = useState<CanvasFocus>(),
+    [locked, setLocked] = useState<CanvasFocus>();
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [relationshipFilter, setRelationshipFilter] = useState<{
+    instance: string;
+    direction: Exclude<RelationshipDirection, 'both'>;
+  }>();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<WorkItem['id']>();
-  const [selectedGroup, setSelectedGroup] = useState<string>();
-  const [direction, setDirection] = useState<'prerequisites' | 'dependants' | 'both'>('both');
-  const [attention, setAttention] = useState(false);
-  const [view, setView] = useState({ x: 16, y: 16, scale: 0.8 });
-  const viewport = useRef<HTMLDivElement>(null),
-    drag = useRef<{ x: number; y: number; vx: number; vy: number } | undefined>(undefined);
-  const graph = useMemo(() => layout(board, collapsed), [board, collapsed]);
-  const item = selected ? board.entities.items[selected] : undefined;
-  const selectedSubject = item ? subject(board, item) : undefined;
-  const group = graph.groups.find((g) => g.key === selectedGroup);
-  const prerequisites = useMemo(
-    () =>
-      item
-        ? related(board, item, 'prerequisites')
-        : group
-          ? relatedItems(board, group.items, 'prerequisites')
-          : new Set<string>(),
-    [board, item, group]
+  const candidateFocus = locked ?? hovered;
+  const focus =
+      attentionOnly || !candidateFocus || !fixture.metadata[candidateFocus.id]
+        ? undefined
+        : candidateFocus,
+    active = focus?.id,
+    direction =
+      relationshipFilter?.instance === focus?.instance
+        ? (relationshipFilter?.direction ?? 'both')
+        : 'both';
+  const paused = board.meta.factory.paused;
+  const [tooltip, setTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    above: boolean;
+    labels?: number;
+  }>();
+  const tipAnchor = useRef<Element | null>(null);
+  const data = useMemo(
+    () => canvasLayout(fixture, { titleMode, expandedNames, hoverName, collapsed }),
+    [fixture, titleMode, expandedNames, hoverName, collapsed]
   );
-  const dependants = useMemo(
-    () =>
-      item
-        ? related(board, item, 'dependants')
-        : group
-          ? relatedItems(board, group.items, 'dependants')
-          : new Set<string>(),
-    [board, item, group]
-  );
-  const relatives =
-    direction === 'both'
-      ? new Set([...prerequisites, ...dependants])
-      : direction === 'prerequisites'
-        ? prerequisites
-        : dependants;
-  const seedIds = new Set<string>(item ? [item.id] : (group?.items.map((i) => i.id) ?? []));
-  const attentionItems = Object.values(board.entities.items).filter(
-    (i) => i.attention.state === 'required'
-  );
-  const unknown = Object.values(board.entities.items).filter(
-    (i) => i.attention.state === 'unknown'
-  ).length;
-  function fitCanvas(ids?: Set<string>) {
-    const el = viewport.current;
-    if (!el) return;
-    const candidates = [...graph.cards, ...graph.groups.filter((g) => g.collapsed)];
-    const nodes = ids
-      ? candidates.filter(
-          (c) => ids.has(c.id) || ('items' in c && c.items.some((i) => ids.has(i.id)))
-        )
-      : candidates;
-    const routes = ids
-      ? graph.routes.filter((r) => ids.has(r.source) && ids.has(r.target))
-      : graph.routes;
-    const bounds = [
-      ...nodes,
-      ...(!ids
-        ? graph.areas.map((area) => ({ x: 32, y: area.y - 20, width: 350, height: 30 }))
-        : []),
-      ...routes.flatMap((r) => r.points.map((p) => ({ ...p, width: 0, height: 0 }))),
-    ];
-    const x = bounds.length ? Math.min(...bounds.map((n) => n.x)) - 32 : 0,
-      y = bounds.length ? Math.min(...bounds.map((n) => n.y)) - 48 : 0;
-    const w = bounds.length ? Math.max(...bounds.map((n) => n.x + n.width)) - x + 48 : graph.width,
-      h = bounds.length ? Math.max(...bounds.map((n) => n.y + n.height)) - y + 48 : graph.height;
-    const scale = Math.min(
-      1.2,
-      Math.max(0.12, Math.min(el.clientWidth / w, (el.clientHeight - 60) / h))
+  const records = data.fixture.items;
+  const attentionItems = records.filter((item) => item.item.attention.state === 'required');
+  const attentionIds = new Set(attentionItems.map((item) => item.id));
+  const allParents: Record<number, number> = { ...data.fixture.parentOf };
+  for (const item of records) if (item.parent) allParents[item.id] = item.parent;
+  const expandedName = (key: string) =>
+    titleMode === 'expand' && (expandedNames.has(key) || hoverName === key);
+  function title(text: string, key: string, className = 'cc-title') {
+    return (
+      <span
+        className={className}
+        data-expanded={expandedName(key)}
+        data-expand-title={titleMode === 'expand' ? key : undefined}
+        data-tip={titleMode === 'expand' ? undefined : text}
+      >
+        {text}
+      </span>
     );
-    setView({ x: (el.clientWidth - w * scale) / 2 - x * scale, y: 24 - y * scale, scale });
   }
-  function toggle(key: string) {
-    setCollapsed((previous) => {
-      const next = new Set(previous);
+  const routes = useMemo(
+    () =>
+      routeCanvas(
+        [
+          ...data.boxes,
+          ...data.headerNodes,
+          ...data.aggregateNodes,
+          ...data.groups
+            .filter((g) => !g.parent)
+            .map((g, i) => ({
+              id: -4_000_000 - i,
+              x: g.x,
+              y: g.y,
+              width: g.collapsed ? g.headingWidth : g.width,
+              height: g.head,
+            })),
+          ...data.panels.map((p, i) => ({
+            id: -500 - i,
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: 32,
+          })),
+          ...data.areas.map((a, i) => ({
+            id: -100 - i,
+            x: 20,
+            y: a.y - 10,
+            width: 310,
+            height: 20,
+          })),
+          ...[...data.groups, ...data.panels].flatMap((g, i) =>
+            [
+              [g.x, g.y],
+              [g.x + g.width, g.y],
+              [g.x, g.y + g.height],
+              [g.x + g.width, g.y + g.height],
+            ].map(([x, y], j) => ({ id: -1000 - i * 4 - j, x, y, width: 0, height: 0 }))
+          ),
+        ],
+        data.routingConnections,
+        data.width,
+        data.height
+      ),
+    [data]
+  );
+  const { prerequisites, dependants, related, highlightedParents, activeEdges } =
+    relationshipHighlights(
+      active,
+      data.fixture.selectionConnections ?? data.connections,
+      allParents,
+      data.fixture.parentIds,
+      reach,
+      direction
+    );
+  const isActiveRoute = (r: { source: number; target: number }) =>
+    data.routeRelationships
+      .get(`${r.source}-${r.target}`)
+      ?.some((e) => activeEdges.has(`${e.source}-${e.target}`)) ?? false;
+  const [view, setView] = useState(() => ({
+      x: 12,
+      y:
+        new URLSearchParams(location.search).get('focus') === 'review'
+          ? 20 - (data.areas.find((a) => a.id === 'review')?.y ?? 0) * 0.9
+          : 12,
+      scale: 0.9,
+    })),
+    [dragging, setDragging] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null),
+    drag = useRef<
+      { id: number; x: number; y: number; vx: number; vy: number; moved: boolean } | undefined
+    >(undefined);
+  const suppressCanvasClick = useRef(false);
+  function lock(id: number, instance = `item:${id}`) {
+    setAttentionOnly(false);
+    setRelationshipFilter(undefined);
+    setLocked((current) => (current?.instance === instance ? undefined : { id, instance }));
+  }
+  function filterRelationships(next: Exclude<RelationshipDirection, 'both'>) {
+    if (!focus) return;
+    setLocked(focus);
+    setRelationshipFilter(
+      direction === next ? undefined : { instance: focus.instance, direction: next }
+    );
+  }
+  function toggleAttention() {
+    setAttentionOnly(!attentionOnly);
+    setLocked(undefined);
+    setHovered(undefined);
+    setRelationshipFilter(undefined);
+    setTooltip(undefined);
+    if (attentionOnly) return;
+    const keys = new Set(
+      data.fixture.stackSpecs
+        .filter((stack) => stack.ids.some((id) => attentionIds.has(id)))
+        .map((stack) => `stack:${stack.key}`)
+    );
+    for (const item of attentionItems) {
+      if (item.stage === 'review') continue;
+      keys.add(`${item.stage}-${item.parent ?? 'none'}`);
+      for (let parent = item.parent; parent !== undefined; parent = data.fixture.parentOf[parent])
+        keys.add(`${item.stage}-${parent}`);
+    }
+    setCollapsed((current) => new Set([...current].filter((key) => !keys.has(key))));
+  }
+  function toggleCollapsed(key: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+    setTooltip(undefined);
   }
+  function collapseAll() {
+    setCollapsed(
+      new Set([
+        ...['planned', 'working'].flatMap((stage) =>
+          [...data.fixture.parentIds, 'none'].map((id) => `${stage}-${id}`)
+        ),
+        ...data.fixture.stackSpecs.map((stack) => `stack:${stack.key}`),
+      ])
+    );
+    setTooltip(undefined);
+  }
+  function sectionKeys(stage: Stage) {
+    return stage === 'review'
+      ? data.fixture.stackSpecs.map((s) => `stack:${s.key}`)
+      : [...data.fixture.parentIds, 'none'].map((id) => `${stage}-${id}`);
+  }
+  function collapseSection(stage: Stage) {
+    setCollapsed((current) => new Set([...current, ...sectionKeys(stage)]));
+    setTooltip(undefined);
+  }
+  function expandSection(stage: Stage) {
+    const keys = new Set(sectionKeys(stage));
+    setCollapsed((current) => new Set([...current].filter((key) => !keys.has(key))));
+    setTooltip(undefined);
+  }
+  function expandAll() {
+    setCollapsed(new Set());
+    setTooltip(undefined);
+  }
+  function fit(rect?: { x: number; y: number; width: number; height: number }) {
+    const box = viewport.current?.getBoundingClientRect();
+    if (!box) return;
+    const r = rect ?? { x: 0, y: 0, width: data.width, height: data.height };
+    const scale = Math.min(
+      1,
+      (box.width - 60) / (r.width + 40),
+      (box.height - 110) / (r.height + 40)
+    );
+    setView({ scale, x: (box.width - r.width * scale) / 2 - r.x * scale, y: 20 - r.y * scale });
+  }
+  function fitActive() {
+    const ns = [...data.boxes, ...data.headerNodes].filter((n) => related.has(n.id));
+    if (!ns.length) return;
+    const x = Math.min(...ns.map((n) => n.x)),
+      y = Math.min(...ns.map((n) => n.y));
+    fit({
+      x: x - 20,
+      y: y - 20,
+      width: Math.max(...ns.map((n) => n.x + n.width)) - x + 40,
+      height: Math.max(...ns.map((n) => n.y + n.height)) - y + 40,
+    });
+  }
+  function jump(stage: Stage) {
+    const area = data.areas.find((a) => a.id === stage);
+    if (area) setView((v) => ({ ...v, x: 12, y: 20 - area.y * v.scale }));
+  }
+  const zoom = useCallback((factor: number, p?: { x: number; y: number }) => {
+    const el = viewport.current;
+    if (!el) return;
+    const point = p ?? { x: el.clientWidth / 2, y: el.clientHeight / 2 };
+    setView((v) => {
+      const scale = Math.min(1.8, Math.max(0.02, v.scale * factor));
+      return {
+        scale,
+        x: point.x - ((point.x - v.x) * scale) / v.scale,
+        y: point.y - ((point.y - v.y) * scale) / v.scale,
+      };
+    });
+  }, []);
   useEffect(() => {
     const el = viewport.current;
     if (!el) return;
-    function wheel(e: WheelEvent) {
-      e.preventDefault();
-      const rect = viewport.current?.getBoundingClientRect();
-      if (!rect) return;
-      setView((v) => {
-        const scale = Math.max(0.12, Math.min(1.6, v.scale * Math.exp(-e.deltaY * 0.001)));
-        const x = e.clientX - rect.left,
-          y = e.clientY - rect.top;
-        return {
-          scale,
-          x: x - ((x - v.x) * scale) / v.scale,
-          y: y - ((y - v.y) * scale) / v.scale,
-        };
-      });
+    const onWheel = (event: WheelEvent) => {
+      if ((event.target as Element).closest('.cc-controls,.cc-minimap,.cc-selection')) return;
+      event.preventDefault();
+      setTooltip(undefined);
+      if (event.ctrlKey || event.metaKey || (!event.shiftKey && Math.abs(event.deltaX) < 1)) {
+        const rect = el.getBoundingClientRect();
+        zoom(Math.exp(-event.deltaY * 0.002), {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+        });
+      } else
+        setView((v) => ({
+          ...v,
+          x: v.x - (event.shiftKey ? event.deltaY : event.deltaX),
+          y: v.y - (event.shiftKey ? 0 : event.deltaY),
+        }));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [zoom]);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAttentionOnly(false);
+        setLocked(undefined);
+        setHovered(undefined);
+        setRelationshipFilter(undefined);
+        setTooltip(undefined);
+      }
+      if ((event.target as Element).closest('input,textarea,select,button,a')) return;
+      if (event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        fit();
+      }
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        zoom(1.2);
+      }
+      if (event.key === '-') {
+        event.preventDefault();
+        zoom(1 / 1.2);
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
+  function pointerDown(e: Pointer<HTMLDivElement>) {
+    if (
+      (e.target as Element).closest(
+        '.cc-item,.cc-parent-head,.cc-selection,button,a,input,select,textarea,.cc-minimap'
+      ) ||
+      e.button !== 0
+    )
+      return;
+    suppressCanvasClick.current = false;
+    drag.current = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      vx: view.x,
+      vy: view.y,
+      moved: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function pointerMove(e: Pointer<HTMLDivElement>) {
+    const d = drag.current;
+    if (d && d.id === e.pointerId) {
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) d.moved = true;
+      if (!d.moved) return;
+      setDragging(true);
+      setView((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }));
     }
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
-  }, []);
-  return (
-    <section className="fc-canvas-shell" aria-label="Factory canvas">
-      <div className="fc-canvas-toolbar">
-        <button
-          type="button"
-          aria-pressed={attention}
-          onClick={() => {
-            if (!attention) setCollapsed((current) => expandAttention(board, current));
-            setSelected(undefined);
-            setSelectedGroup(undefined);
-            setDirection('both');
-            setAttention(!attention);
-          }}
-        >
-          {attentionItems.length}
-          {board.meta.coverage.state !== 'complete' ? '+' : ''} need attention
-        </button>
-        {unknown > 0 && <span>{unknown} attention unknown</span>}
-        <span className="fc-space" />
-        <button
-          type="button"
-          aria-label="Pan left"
-          onClick={() => setView((v) => ({ ...v, x: v.x + 80 }))}
-        >
-          ←
-        </button>
-        <button
-          type="button"
-          aria-label="Pan right"
-          onClick={() => setView((v) => ({ ...v, x: v.x - 80 }))}
-        >
-          →
-        </button>
-        <button
-          type="button"
-          aria-label="Pan up"
-          onClick={() => setView((v) => ({ ...v, y: v.y + 80 }))}
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          aria-label="Pan down"
-          onClick={() => setView((v) => ({ ...v, y: v.y - 80 }))}
-        >
-          ↓
-        </button>
-        <button type="button" onClick={() => fitCanvas()}>
-          Fit all
-        </button>
-        <button
-          type="button"
-          onClick={() => setView((v) => ({ ...v, scale: Math.min(1.6, v.scale * 1.2) }))}
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <span>{Math.round(view.scale * 100)}%</span>
-        <button
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => setView((v) => ({ ...v, scale: Math.max(0.12, v.scale / 1.2) }))}
-        >
-          −
-        </button>
-      </div>
+  }
+  function endDrag() {
+    if (drag.current) suppressCanvasClick.current = drag.current.moved;
+    drag.current = undefined;
+    setDragging(false);
+  }
+  function showTip(event: Pointer<HTMLDivElement>) {
+    const name =
+      (event.target as Element).closest('[data-expand-title]')?.getAttribute('data-expand-title') ??
+      undefined;
+    if (titleMode === 'expand') setHoverName((current) => (current === name ? current : name));
+    const anchor = (event.target as Element).closest('[data-tip],[data-label-list]');
+    if (anchor === tipAnchor.current) return;
+    tipAnchor.current = anchor;
+    if (!anchor) {
+      setTooltip(undefined);
+      return;
+    }
+    const labelId = anchor.getAttribute('data-label-list');
+    const text = labelId ? 'Labels' : anchor.getAttribute('data-tip');
+    if (!text) return;
+    const r = anchor.getBoundingClientRect();
+    setTooltip({
+      text,
+      x: Math.max(8, Math.min(window.innerWidth - 368, r.left)),
+      y: r.bottom + 7,
+      above: r.bottom > window.innerHeight - 110,
+      labels: labelId ? Number(labelId) : undefined,
+    });
+  }
+  function attributes(id: number, instance = `item:${id}`) {
+    return {
+      'data-card': id,
+      'data-focus-instance': instance,
+      tabIndex: 0,
+      role: 'group',
+      'aria-label': `Select ${issueMetadata[id].title}`,
+      onPointerEnter: () => setHovered({ id, instance }),
+      onPointerLeave: () =>
+        setHovered((current) => (current?.instance === instance ? undefined : current)),
+      onFocus: () => setHovered({ id, instance }),
+      onBlur: () => setHovered((current) => (current?.instance === instance ? undefined : current)),
+      onClick: (e: React.MouseEvent) => {
+        if (!(e.target as Element).closest('a,button')) {
+          const key = (e.target as Element)
+            .closest('[data-expand-title]')
+            ?.getAttribute('data-expand-title');
+          if (key && titleMode === 'expand')
+            setExpandedNames((current) => {
+              const next = new Set(current);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            });
+          lock(id, instance);
+        }
+      },
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          lock(id, instance);
+        }
+      },
+    };
+  }
+  function itemCard(box: Box) {
+    const { item } = box,
+      meta = issueMetadata[item.id],
+      itemStatus = item.status,
+      isActive = active === item.id,
+      isHighlighted = attentionOnly ? attentionIds.has(item.id) : isActive,
+      connected = attentionOnly ? attentionIds.has(item.id) : related.has(item.id),
+      isRelated = !attentionOnly && active !== undefined && connected && !isActive,
+      edge = routes.find(
+        (r) =>
+          isActiveRoute(r) &&
+          data.routeRelationships
+            .get(`${r.source}-${r.target}`)
+            ?.some((e) => e.source === item.id || e.target === item.id)
+      );
+    return (
       <div
-        className="fc-viewport"
-        ref={viewport}
-        onPointerDown={(e) => {
-          if (e.button !== 0 || (e.target as Element).closest('button,a,[data-card]')) return;
-          drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
-          e.currentTarget.setPointerCapture(e.pointerId);
+        key={item.id}
+        {...attributes(item.id)}
+        className={`cc-item ${item.pr ? `cc-pr-row ${box.stacked ? '' : 'cc-solo-pr'}` : 'cc-issue-card'} ${item.active ? 'cc-active-job' : ''} ${isHighlighted ? 'cc-selected' : ''} ${isRelated ? 'cc-related' : ''} ${(attentionOnly || active !== undefined) && !connected ? 'cc-dimmed' : ''} `}
+        style={
+          {
+            left: box.x,
+            top: box.y,
+            width: box.width,
+            height: box.height,
+            borderColor:
+              isHighlighted && item.active
+                ? undefined
+                : (item.pr && isHighlighted) || (attentionOnly && connected)
+                  ? highlightStyle === 'status-glow'
+                    ? statusAppearance(itemStatus).color
+                    : undefined
+                  : active !== undefined && connected
+                    ? highlightStyle === 'status-glow'
+                      ? statusAppearance(itemStatus).color
+                      : edge?.color
+                    : undefined,
+            '--cc-status-color': statusAppearance(itemStatus).color,
+          } as CSSProperties
+        }
+      >
+        {item.pr ? (
+          <>
+            <div className="cc-pr-top">
+              <Identity item={item} />
+              {<CanvasThread item={item} />}
+              {title(meta.title, `issue:${item.id}`)}
+              <Status status={itemStatus} active={item.active} />
+              <Fields id={item.id} />
+            </div>
+            <div className="cc-pr-bottom">
+              <Labels id={item.id} />
+              <ParentTag
+                parent={item.parent}
+                nameKey={`badge:${item.id}`}
+                mode={titleMode}
+                expanded={expandedName(`badge:${item.id}`)}
+                highlighted={!!item.parent && highlightedParents.has(item.parent)}
+              />
+              <CanvasEvidence item={item} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="cc-issue-top">
+              <Identity item={item} />
+              {<CanvasThread item={item} />}
+              <Status status={itemStatus} active={item.active} />
+              <Fields id={item.id} />
+            </div>
+            {title(meta.title, `issue:${item.id}`)}
+            {!!meta.labels.length && (
+              <div className="cc-issue-bottom">
+                <Labels id={item.id} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+  const activeGroup = data.groups.find((g) => g.key === focus?.instance);
+  const activeRecord = records.find((i) => i.id === active),
+    incident = routes.filter(isActiveRoute);
+  return (
+    <CanvasContext.Provider value={{ data: fixture, board, native }}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Background clicks clear canvas selection; Escape provides the keyboard action. */}
+      <div
+        role="presentation"
+        className={`cc-app cc-titles-${titleMode} cc-highlight-${highlightStyle}`}
+        style={{ '--cc-label-column': `${data.labelColumn}px` } as React.CSSProperties}
+        onPointerMove={showTip}
+        onPointerLeave={() => {
+          tipAnchor.current = null;
+          setTooltip(undefined);
+          setHoverName(undefined);
         }}
-        onPointerMove={(e) => {
-          const d = drag.current;
-          if (d) setView((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }));
-        }}
-        onPointerUp={() => {
-          drag.current = undefined;
-        }}
-        onPointerCancel={() => {
-          drag.current = undefined;
+        onClick={(e) => {
+          if (
+            !suppressCanvasClick.current &&
+            !(e.target as Element).closest(
+              '.cc-item,.cc-parent-head,.cc-selection,button,a,input,select,textarea,.cc-minimap'
+            )
+          ) {
+            setAttentionOnly(false);
+            setLocked(undefined);
+            setHovered(undefined);
+            setRelationshipFilter(undefined);
+          }
+          suppressCanvasClick.current = false;
         }}
       >
+        <header className="cc-toolbar">
+          <strong>Factory</strong>
+          <span
+            className={`cc-runtime ${paused ? 'cc-amber' : 'cc-green'}`}
+            data-tip={
+              paused
+                ? 'New admissions are paused. Existing jobs continue.'
+                : 'The factory can accept eligible work within its concurrency and admission limits.'
+            }
+          >
+            <i />
+            {paused ? 'Paused' : 'Running'}
+          </span>
+          <button
+            type="button"
+            className="cc-attention-toggle"
+            aria-label={`Highlight ${attentionIds.size} items needing human attention`}
+            aria-pressed={attentionOnly}
+            disabled={attentionIds.size === 0 && !attentionOnly}
+            data-tip="Highlight work the server identifies as needing human attention."
+            onClick={toggleAttention}
+          >
+            <Icon kind="attention" size={13} />
+            <span className="cc-attention-count">
+              {attentionIds.size}
+              {board.meta.coverage.state !== 'complete' ? '+' : ''}
+            </span>{' '}
+            need attention
+          </button>
+          {board.meta.dataMode === 'fake' && (
+            <span className="cc-fixture" data-tip="Fake v2 server · commands are simulated">
+              Fake data · commands are simulated
+            </span>
+          )}
+          {Object.values(board.entities.items).some((i) => i.attention.state === 'unknown') && (
+            <span className="cc-muted">Attention partly unknown</span>
+          )}
+          <span className="cc-toolbar-space" />
+          <button type="button" onClick={onPlan}>
+            ◇ Preview plan
+          </button>
+          <button type="button" onClick={onStartIssue}>
+            + Start issue
+          </button>
+          <button
+            type="button"
+            onClick={onPause}
+            disabled={busy || !canConfigure}
+            data-tip="Pause new admissions. Existing jobs continue."
+          >
+            {paused ? '▶ Resume' : 'Ⅱ Pause'}
+          </button>
+          <button
+            type="button"
+            className="cc-settings-button"
+            aria-label="Factory settings"
+            onClick={onSettings}
+          >
+            <Icon kind="gear" size={18} />
+          </button>
+        </header>
         <div
-          className="fc-world"
-          style={{
-            width: graph.width,
-            height: graph.height,
-            transform: `translate(${view.x}px,${view.y}px) scale(${view.scale})`,
-          }}
+          className={`cc-viewport ${dragging ? 'dragging' : ''}`}
+          ref={viewport}
+          onPointerDown={pointerDown}
+          onPointerMove={pointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onLostPointerCapture={endDrag}
         >
-          {graph.areas.map((area) => (
-            <section
-              className="fc-area"
-              key={area.id}
-              style={{ top: area.y, width: graph.width - 64, height: area.height }}
-              aria-label={area.name}
-            >
-              <h2>
-                {area.name}
-                <span>{area.count}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCollapsed(
-                      (prev) =>
-                        new Set([
-                          ...prev,
-                          ...graph.groups.filter((g) => g.stage === area.id).map((g) => g.key),
-                        ])
-                    )
-                  }
-                >
-                  <Icon kind="collapse" />
-                  Collapse all
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCollapsed(
-                      (prev) => new Set([...prev].filter((key) => !key.startsWith(`${area.id}:`)))
-                    )
-                  }
-                >
-                  <Icon kind="expand" />
-                  Expand all
-                </button>
-              </h2>
-            </section>
-          ))}
-          {graph.groups.map((group) => (
-            <div
-              key={group.key}
-              className={`fc-group${group.parent ? ' fc-parent' : ''}${group.stack ? ' fc-stack' : ''}${selectedGroup === group.key ? ' fc-selected-group' : ''}`}
-              style={{ left: group.x, top: group.y, width: group.width, height: group.height }}
-            >
-              <div className="fc-group-heading">
-                <button
-                  type="button"
-                  className="fc-collapse-button"
-                  aria-label={`${group.collapsed ? 'Expand' : 'Collapse'} ${group.name}`}
-                  aria-expanded={!group.collapsed}
-                  onClick={() => toggle(group.key)}
-                >
-                  <Icon kind={group.collapsed ? 'expand' : 'collapse'} />
-                </button>
-                <button
-                  type="button"
-                  className="fc-group-name"
-                  aria-pressed={selectedGroup === group.key}
-                  onClick={() => {
-                    setSelected(undefined);
-                    setSelectedGroup(group.key);
-                    setDirection('both');
-                    setAttention(false);
-                  }}
-                >
-                  <span>
-                    {group.parent && `#${group.parent.number} `}
-                    {group.name}
+          <div
+            className="cc-world"
+            style={{
+              width: data.width,
+              height: data.height,
+              transform: `translate(${view.x}px,${view.y}px) scale(${view.scale})`,
+            }}
+          >
+            {data.areas.map((area) => (
+              <section
+                className="cc-area"
+                data-area={area.id}
+                key={area.id}
+                style={{ left: 16, top: area.y, width: area.width - 16, height: area.height }}
+              >
+                <h2>
+                  <i className={`cc-stage-dot ${area.id}`} />
+                  {area.name}
+                  <span>{records.filter((i) => i.stage === area.id).length}</span>
+                  <button
+                    type="button"
+                    aria-label={`Collapse all ${area.name}`}
+                    onClick={() => collapseSection(area.id)}
+                  >
+                    <Icon kind="collapse" size={12} />
+                    Collapse all
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Expand all ${area.name}`}
+                    onClick={() => expandSection(area.id)}
+                  >
+                    <Icon kind="expand" size={12} />
+                    Expand all
+                  </button>
+                </h2>
+              </section>
+            ))}
+            {data.groups.map((group) => (
+              <section
+                className={`cc-parent-group ${group.parent ? '' : 'cc-unparented'} ${group.collapsed ? 'cc-collapsed' : ''} ${highlightedParents.has(group.parent ?? -1) ? 'cc-group-selected' : ''}`}
+                key={group.key}
+                data-group={group.key}
+                style={
+                  {
+                    left: group.x,
+                    top: group.y,
+                    width: group.width,
+                    height: group.height,
+                    zIndex: 1 + group.depth * 0.1,
+                    '--cc-parent-accent':
+                      group.parent === fixture.parentIds[0] ? '#62bea0' : '#b19ad8',
+                    borderColor: highlightedParents.has(group.parent ?? -1)
+                      ? routes.find(
+                          (r) =>
+                            (r.source === active && r.target === group.parent) ||
+                            (r.target === active && r.source === group.parent)
+                        )?.color
+                      : undefined,
+                  } as CSSProperties
+                }
+              >
+                {group.parent ? (
+                  <div
+                    {...attributes(group.parent, group.key)}
+                    className={`cc-parent-head ${focus?.instance === group.key ? 'cc-parent-focused' : ''}`}
+                    style={{ height: group.head - (group.collapsed ? 2 : 0) }}
+                  >
+                    <button
+                      type="button"
+                      className={`cc-collapse ${group.collapsed ? '' : 'cc-expanded'}`}
+                      aria-label={`${group.collapsed ? 'Expand' : 'Collapse'} parent #${issueMetadata[group.parent].number} in ${stages.find((s) => s.id === group.stage)?.name}`}
+                      aria-expanded={!group.collapsed}
+                      onClick={() => toggleCollapsed(group.key)}
+                    >
+                      <Icon kind={group.collapsed ? 'expand' : 'collapse'} size={14} />
+                    </button>
+                    <i
+                      className={
+                        group.parent === fixture.parentIds[0] ? 'cc-dot-green' : 'cc-dot-purple'
+                      }
+                    />
+                    <span className="cc-heading-text cc-parent-copy">
+                      {issueMetadata[group.parent].url ? (
+                        <a
+                          className="cc-parent-number"
+                          href={issueMetadata[group.parent].url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          #{issueMetadata[group.parent].number ?? '?'}
+                        </a>
+                      ) : (
+                        <span
+                          className="cc-synthetic-number cc-parent-number"
+                          data-tip="GitHub destination unavailable"
+                        >
+                          #{issueMetadata[group.parent].number ?? '?'}
+                        </span>
+                      )}
+                      {title(
+                        issueMetadata[group.parent].title,
+                        `parent:${group.stage}:${group.parent}`,
+                        'cc-parent-name'
+                      )}
+                      <span className="cc-group-count">{group.ids.length}</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className="cc-parent-head cc-no-parent-heading"
+                    style={{
+                      height: group.head,
+                      width: group.collapsed ? group.headingWidth : undefined,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`cc-collapse ${group.collapsed ? '' : 'cc-expanded'}`}
+                      aria-label={`${group.collapsed ? 'Expand' : 'Collapse'} unparented issues in ${stages.find((s) => s.id === group.stage)?.name}`}
+                      aria-expanded={!group.collapsed}
+                      onClick={() => toggleCollapsed(group.key)}
+                    >
+                      <Icon kind={group.collapsed ? 'expand' : 'collapse'} size={14} />
+                    </button>
+                    <span className="cc-heading-text cc-unparented-copy">
+                      <span>Unparented issues</span>
+                      <span className="cc-group-count">{group.ids.length}</span>
+                    </span>
+                  </div>
+                )}
+              </section>
+            ))}
+            {data.panels.map((panel) => (
+              <section
+                key={panel.key}
+                className={`cc-pr-panel ${panel.stacked ? 'cc-stacked' : 'cc-independent'} ${panel.collapsed ? 'cc-collapsed' : ''}`}
+                data-stack={panel.key}
+                style={
+                  {
+                    left: panel.x,
+                    top: panel.y,
+                    width: panel.width,
+                    height: panel.height,
+                  } as CSSProperties
+                }
+              >
+                <div className="cc-panel-title">
+                  <button
+                    type="button"
+                    className={`cc-collapse ${panel.collapsed ? '' : 'cc-expanded'}`}
+                    aria-label={`${panel.collapsed ? 'Expand' : 'Collapse'} ${panel.stacked ? 'stack' : 'independent PRs'} ${panel.key}`}
+                    aria-expanded={!panel.collapsed}
+                    onClick={() => toggleCollapsed(`stack:${panel.key}`)}
+                  >
+                    <Icon kind={panel.collapsed ? 'expand' : 'collapse'} size={14} />
+                  </button>
+
+                  <span className="cc-stack-heading">
+                    {!panel.stacked && panel.name}
+                    <StackSummary items={records.filter((i) => panel.ids.includes(i.id))} />
+                    {panel.stacked && !panel.collapsed && (
+                      <span className="cc-base-direction">tip ↑ · base ↓</span>
+                    )}
                   </span>
+                </div>
+              </section>
+            ))}
+            <svg className="cc-lines" width={data.width} height={data.height} aria-hidden="true">
+              <defs>
+                {routes.map((r) => (
+                  <marker
+                    id={`cc-arrow-${r.key}`}
+                    key={r.key}
+                    viewBox="0 0 10 10"
+                    refX="8"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="m2 2 6 3-6 3" fill="none" stroke={r.color} strokeWidth="1.8" />
+                  </marker>
+                ))}
+              </defs>
+              {[...routes]
+                .sort((a, b) => Number(isActiveRoute(a)) - Number(isActiveRoute(b)))
+                .map((r) => (
+                  <g
+                    key={r.key}
+                    className={
+                      attentionOnly || active ? (isActiveRoute(r) ? 'active' : 'muted') : ''
+                    }
+                  >
+                    <path className="cc-line-halo" d={r.d} />
+                    <path
+                      className="cc-line"
+                      data-edge={r.key}
+                      data-points={JSON.stringify(r.points)}
+                      data-failed={r.failed}
+                      d={r.d}
+                      stroke={r.color}
+                      markerStart={`url(#cc-arrow-${r.key})`}
+                    />
+                  </g>
+                ))}
+            </svg>
+            {data.boxes.map(itemCard)}
+            <svg
+              className="cc-endpoints"
+              width={data.width}
+              height={data.height}
+              aria-hidden="true"
+            >
+              {incident.flatMap((r) =>
+                [r.points[0], r.points[r.points.length - 1]].map((p) => (
+                  <g key={`${r.key}-${p.x}-${p.y}`} transform={`translate(${p.x},${p.y})`}>
+                    <circle r="3" fill="#111117" stroke={r.color} strokeWidth="1.5" />
+                  </g>
+                ))
+              )}
+            </svg>
+          </div>
+          {!records.length && (
+            <p className="cc-empty">
+              {board.meta.coverage.state === 'complete'
+                ? 'No work items.'
+                : 'Work items unavailable. Check source coverage.'}
+            </p>
+          )}
+          <nav className="cc-controls" aria-label="Canvas navigation">
+            <button type="button" aria-label="Collapse all sections" onClick={collapseAll}>
+              <Icon kind="collapse" size={13} />
+              Collapse all
+            </button>
+            <button type="button" aria-label="Expand all sections" onClick={expandAll}>
+              <Icon kind="expand" size={13} />
+              Expand all
+            </button>
+            <i />
+            {stages
+              .filter((s) => data.areas.some((area) => area.id === s.id))
+              .map((s) => (
+                <button type="button" key={s.id} onClick={() => jump(s.id)}>
+                  {s.name}
                 </button>
-                <small>{group.items.length}</small>
-                {group.stack && (
+              ))}
+            <i />
+            <button type="button" aria-label="Zoom out" onClick={() => zoom(1 / 1.2)}>
+              −
+            </button>
+            <span>{Math.round(view.scale * 100)}%</span>
+            <button type="button" aria-label="Zoom in" onClick={() => zoom(1.2)}>
+              +
+            </button>
+            <button type="button" aria-label="Fit all nodes" onClick={() => fit()}>
+              <Icon kind="fit" />
+            </button>
+          </nav>
+          {active && (
+            <div className="cc-selection" role="toolbar" aria-label="Selected item actions">
+              <div className="cc-selection-content">
+                <strong className="cc-selection-identity">
+                  {activeRecord ? (
+                    <Identity item={activeRecord} />
+                  ) : issueMetadata[active]?.url ? (
+                    <a href={issueMetadata[active].url} target="_blank" rel="noreferrer">
+                      #{issueMetadata[active].number ?? '?'}
+                    </a>
+                  ) : (
+                    <span data-tip="GitHub destination unavailable">
+                      #{issueMetadata[active].number ?? '?'}
+                    </span>
+                  )}
+                </strong>
+                {activeRecord && <CanvasThread item={activeRecord} />}
+                {activeGroup && <span>{stages.find((s) => s.id === activeGroup.stage)?.name}</span>}
+                <button
+                  type="button"
+                  className="cc-relationship-filter"
+                  aria-label="Highlight prerequisites"
+                  aria-pressed={direction === 'prerequisites'}
+                  data-tip="Highlight only prerequisites. Click again to show both directions."
+                  onClick={() => filterRelationships('prerequisites')}
+                >
+                  {prerequisites.size} prerequisites
+                </button>
+                <button
+                  type="button"
+                  className="cc-relationship-filter"
+                  aria-label="Highlight dependants"
+                  aria-pressed={direction === 'dependants'}
+                  data-tip="Highlight only dependants. Click again to show both directions."
+                  onClick={() => filterRelationships('dependants')}
+                >
+                  {dependants.size} dependants
+                </button>
+              </div>
+              <div className="cc-selection-actions">
+                <button
+                  type="button"
+                  aria-label="Fit connections"
+                  data-tip="Fit highlighted connections"
+                  onClick={fitActive}
+                >
+                  <Icon kind="eye" />
+                </button>
+                {activeRecord && (
                   <>
-                    <span className="fc-stack-summary" title={summarize(group.items)}>
-                      {summarize(group.items)}
-                    </span>
-                    <span className="fc-stack-count">
-                      <Icon kind="pr" />
-                      {
-                        group.items.filter((i) => {
-                          const s = i.subject;
-                          const meta =
-                            s.kind === 'pull-request'
-                              ? board.entities.pullRequests[s.pullRequestId]?.metadata
-                              : undefined;
-                          return meta?.state === 'known' && !meta.value.draft;
-                        }).length
-                      }
-                      <Icon kind="draft" />
-                      {
-                        group.items.filter((i) => {
-                          const s = i.subject;
-                          const meta =
-                            s.kind === 'pull-request'
-                              ? board.entities.pullRequests[s.pullRequestId]?.metadata
-                              : undefined;
-                          return meta?.state === 'known' && meta.value.draft;
-                        }).length
-                      }
-                    </span>
-                    <span className="fc-stack-direction">
-                      Tip ↑ · Base ↓ {group.stack.base.ref}
-                    </span>
+                    <button type="button" onClick={() => onDetails(activeRecord.item)}>
+                      Details
+                    </button>
+                    {activeRecord.item.actionIds.map((id) => {
+                      const action = board.entities.actions[id];
+                      if (!action || action.kind === 'configure' || action.kind === 'preview-plan')
+                        return null;
+                      const label = actionLabel(board, activeRecord.item, action);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className={`cc-action-${action.kind}`}
+                          aria-label={label}
+                          disabled={busy || action.availability.state !== 'available'}
+                          data-tip={
+                            action.availability.state === 'available'
+                              ? label
+                              : action.availability.reasons.map((r) => r.message).join(' ')
+                          }
+                          onClick={() =>
+                            action.kind === 'start'
+                              ? onStart(activeRecord.item)
+                              : onCommand(activeRecord.item, action)
+                          }
+                        >
+                          <Icon kind={action.kind === 'cancel' ? 'stop' : 'play'} />
+                        </button>
+                      );
+                    })}
                   </>
                 )}
               </div>
             </div>
-          ))}
-          <svg className="fc-routes" width={graph.width} height={graph.height} aria-hidden="true">
-            <defs>
-              <marker
-                id="fc-arrow"
-                markerWidth="7"
-                markerHeight="7"
-                refX="6"
-                refY="3"
-                orient="auto-start-reverse"
-              >
-                <path d="M0 0L6 3L0 6" fill="none" stroke="context-stroke" />
-              </marker>
-            </defs>
-            {graph.routes.map((route) => {
-              const highlighted =
-                !attention &&
-                (seedIds.has(route.source) || relatives.has(route.source)) &&
-                (seedIds.has(route.target) || relatives.has(route.target));
-              return (
-                <path
-                  key={route.key}
-                  d={route.d}
-                  fill="none"
-                  stroke={highlighted ? route.color : '#51515f'}
-                  strokeWidth={highlighted ? 2 : 1}
-                  opacity={attention ? 0.15 : (item || group) && !highlighted ? 0.15 : 0.7}
-                  markerEnd="url(#fc-arrow)"
-                />
-              );
-            })}
-          </svg>
-          {graph.cards.map((card) => {
-            const chosen = item?.id === card.item.id,
-              highlight = attention
-                ? card.item.attention.state === 'required'
-                : seedIds.has(card.item.id) || relatives.has(card.item.id),
-              dim = attention ? !highlight : !!(item || group) && !highlight;
-            return (
-              <article
-                key={card.id}
-                data-card
-                className={`fc-card${card.item.subject.kind === 'pull-request' ? ' fc-pr' : ''}${chosen ? ' fc-selected' : ''}${highlight ? ' fc-highlight' : ''}${dim ? ' fc-dimmed' : ''}${card.item.status.active ? ' fc-running' : ''}`}
-                style={{ left: card.x, top: card.y, width: card.width, height: card.height }}
-              >
-                <button
-                  className="fc-card-select"
-                  type="button"
-                  aria-label={`Select ${title(subject(board, card.item))}`}
-                  aria-pressed={chosen}
-                  onClick={() => {
-                    setSelectedGroup(undefined);
-                    setSelected(card.item.id);
-                    setDirection('both');
-                    setAttention(false);
-                  }}
-                />
-                <CardContent board={board} item={card.item} native={native} />
-              </article>
-            );
-          })}
-        </div>
-        {!Object.keys(board.entities.items).length && (
-          <p className="fc-empty">
-            {board.meta.coverage.state === 'complete'
-              ? 'No work items.'
-              : 'Work items unavailable. Check source coverage.'}
-          </p>
-        )}
-      </div>
-      {group && !item && (
-        <div className="fc-selection" role="toolbar" aria-label="Selected group actions">
-          <button
-            type="button"
-            aria-label="Clear selection"
-            onClick={() => setSelectedGroup(undefined)}
-          >
-            ×
-          </button>
-          <span>{group.name}</span>
-          <External
-            href={group.parent?.metadata.state === 'known' ? group.parent.metadata.value.url : null}
-          >
-            {group.parent ? `#${group.parent.number}` : ''}
-          </External>
-          <button
-            type="button"
-            aria-pressed={direction === 'prerequisites'}
-            title={
-              direction === 'prerequisites'
-                ? 'Click again to show both directions'
-                : 'Highlight prerequisites'
-            }
-            onClick={() =>
-              setDirection((current) => (current === 'prerequisites' ? 'both' : 'prerequisites'))
-            }
-          >
-            Prerequisites {relatedItems(board, group.items, 'prerequisites').size}
-          </button>
-          <button
-            type="button"
-            aria-pressed={direction === 'dependants'}
-            title={
-              direction === 'dependants'
-                ? 'Click again to show both directions'
-                : 'Highlight dependants'
-            }
-            onClick={() =>
-              setDirection((current) => (current === 'dependants' ? 'both' : 'dependants'))
-            }
-          >
-            Dependants {relatedItems(board, group.items, 'dependants').size}
-          </button>
-          <button
-            type="button"
-            title="Fit connections"
-            onClick={() => fitCanvas(new Set([...seedIds, ...relatives]))}
-          >
-            <Icon kind="eye" />
-          </button>
-        </div>
-      )}
-      {item && (
-        <div className="fc-selection" role="toolbar" aria-label="Selected work item actions">
-          <button
-            type="button"
-            aria-label="Clear selection"
-            onClick={() => {
-              setSelected(undefined);
-              setSelectedGroup(undefined);
+          )}
+          <svg
+            className="cc-minimap"
+            viewBox={`0 0 ${data.width} ${data.height}`}
+            preserveAspectRatio="none"
+            style={{ width: 144, height: Math.min(160, (144 * data.height) / data.width) }}
+            aria-label="Canvas minimap"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect(),
+                x = ((e.clientX - r.left) / r.width) * data.width,
+                y = ((e.clientY - r.top) / r.height) * data.height;
+              const el = viewport.current;
+              if (el)
+                setView((v) => ({
+                  ...v,
+                  x: el.clientWidth / 2 - x * v.scale,
+                  y: el.clientHeight / 2 - y * v.scale,
+                }));
             }}
           >
-            ×
-          </button>
-          <External
-            href={
-              selectedSubject?.metadata.state === 'known'
-                ? selectedSubject.metadata.value.url
-                : null
-            }
-          >
-            #{selectedSubject?.number}
-          </External>
-          <Threads board={board} item={item} native={native} />
-          <button type="button" onClick={() => onDetails(item)}>
-            Details
-          </button>
-          <button
-            type="button"
-            aria-pressed={direction === 'prerequisites'}
-            title={
-              direction === 'prerequisites'
-                ? 'Click again to show both directions'
-                : 'Highlight prerequisites'
-            }
-            onClick={() =>
-              setDirection((current) => (current === 'prerequisites' ? 'both' : 'prerequisites'))
-            }
-          >
-            Prerequisites {related(board, item, 'prerequisites').size}
-          </button>
-          <button
-            type="button"
-            aria-pressed={direction === 'dependants'}
-            title={
-              direction === 'dependants'
-                ? 'Click again to show both directions'
-                : 'Highlight dependants'
-            }
-            onClick={() =>
-              setDirection((current) => (current === 'dependants' ? 'both' : 'dependants'))
-            }
-          >
-            Dependants {related(board, item, 'dependants').size}
-          </button>
-          <button
-            type="button"
-            title="Fit connections"
-            onClick={() => fitCanvas(new Set([item.id, ...relatives]))}
-          >
-            <Icon kind="eye" />
-          </button>
-          {item.actionIds.map((id) => {
-            const a = board.entities.actions[id];
-            if (!a || a.kind === 'configure' || a.kind === 'preview-plan') return null;
-            return (
-              <button
-                type="button"
-                className={`fc-action-${a.kind}`}
-                key={id}
-                aria-label={actionLabel(board, item, a)}
-                disabled={busy || a.availability.state !== 'available'}
-                title={
-                  a.availability.state === 'available'
-                    ? actionLabel(board, item, a)
-                    : a.availability.reasons.map((r) => r.message).join(' ')
-                }
-                onClick={() => (a.kind === 'start' ? onStart(item) : onCommand(item, a))}
-              >
-                <Icon kind={a.kind === 'cancel' ? 'stop' : 'play'} />
-              </button>
-            );
-          })}
+            {data.areas.map((a) => (
+              <rect
+                key={a.id}
+                className="cc-map-area"
+                x="16"
+                y={a.y}
+                width={a.width - 32}
+                height={a.height}
+              />
+            ))}
+            {data.boxes.map((b) => (
+              <rect
+                className={`cc-map-card ${b.item.stage}`}
+                key={b.id}
+                x={b.x}
+                y={b.y}
+                width={b.width}
+                height={b.height}
+              />
+            ))}
+            <rect
+              className="cc-map-view"
+              x={-view.x / view.scale}
+              y={-view.y / view.scale}
+              width={(viewport.current?.clientWidth ?? 1280) / view.scale}
+              height={(viewport.current?.clientHeight ?? 800) / view.scale}
+            />
+          </svg>
         </div>
-      )}
-    </section>
+        {children}
+        {tooltip && (
+          <div
+            className="cc-tooltip"
+            role="tooltip"
+            style={{
+              left: tooltip.x,
+              top: tooltip.above ? undefined : tooltip.y,
+              bottom: tooltip.above ? window.innerHeight - tooltip.y + 20 : undefined,
+            }}
+          >
+            {tooltip.labels ? (
+              <>
+                <strong>Labels</strong>
+                <div className="cc-tooltip-labels">
+                  {issueMetadata[tooltip.labels].labels.map((l) => (
+                    <span
+                      className="cc-label"
+                      key={l.name}
+                      style={{
+                        color: `color-mix(in srgb,#${l.color} 45%,#edf2ef)`,
+                        borderColor: `#${l.color}80`,
+                        background: `#${l.color}25`,
+                      }}
+                    >
+                      {l.name}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              tooltip.text
+            )}
+          </div>
+        )}
+      </div>
+    </CanvasContext.Provider>
   );
-}
-
-function summarize(items: readonly WorkItem[]) {
-  const counts = new Map<string, number>();
-  for (const item of items) counts.set(item.status.label, (counts.get(item.status.label) ?? 0) + 1);
-  return [...counts]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([label, count]) => `${count} ${label}`)
-    .join(' · ');
 }

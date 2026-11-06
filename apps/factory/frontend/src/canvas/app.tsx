@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Action, WorkItem } from '../../../src/http/index.js';
 import { FactoryClient } from './client';
 import { useFactory } from './use-factory';
 import { Canvas } from './canvas';
+import type { TitleMode, RelationshipMode } from './geometry-types';
 import { subject } from './model';
 import { CommandFeedback } from './feedback';
 import { Controls, Details, Panel, Plan, Start } from './panels';
@@ -15,11 +16,20 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
   const [selected, setSelected] = useState<WorkItem['id']>();
   const [cancelAction, setCancelAction] = useState<Action>();
   const [native, setNative] = useState(false);
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 10000);
-    return () => clearInterval(timer);
-  }, []);
+  const [titleMode, setTitleMode] = useState<TitleMode>(() =>
+    new URLSearchParams(location.search).get('titles') === 'wrap'
+      ? 'wrap'
+      : new URLSearchParams(location.search).get('titles') === 'expand'
+        ? 'expand'
+        : 'ellipsis'
+  );
+  const [reach, setReach] = useState<RelationshipMode>(() =>
+    new URLSearchParams(location.search).get('reach') === 'all'
+      ? 'all'
+      : new URLSearchParams(location.search).get('reach') === 'transitive'
+        ? 'transitive'
+        : 'direct'
+  );
   const item = selected && board ? board.entities.items[selected] : undefined;
   const close = () => setPanel(undefined);
   const busy = factory.commandsBlocked;
@@ -32,101 +42,97 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
     }
     if (action.kind === 'resume') void factory.submit(action, { kind: 'resume', payload: {} });
   };
-  return (
-    <main className="fc-app">
-      <header className="fc-toolbar">
-        <strong>Factory</strong>
-        <span className={board?.meta.factory.paused ? 'fc-paused' : 'fc-live'}>
-          {board ? (board.meta.factory.paused ? 'Paused' : 'Running') : 'Connecting'}
-        </span>
-        {board?.meta.dataMode === 'fake' && (
-          <span className="fc-fake">Fake data · commands are simulated</span>
-        )}
-        <span className="fc-space" />
-        {board && (
-          <>
-            <span>
-              {board.meta.factory.concurrency.occupied} active ·{' '}
-              {board.meta.factory.admission.consumed} admitted
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setSelected(undefined);
-                setPanel('start');
-              }}
-            >
-              Start issue
-            </button>
-            <button type="button" onClick={() => setPanel('plan')}>
-              Plan preview
-            </button>
-            <button type="button" onClick={() => setPanel('settings')}>
-              Settings
-            </button>
-          </>
-        )}
-        <button type="button" onClick={factory.refresh}>
-          Refresh
-        </button>
-      </header>
+  const configure = board?.meta.factory.actionIds
+    .map((id) => board.entities.actions[id])
+    .find((a) => a?.kind === 'configure');
+  const panels = (
+    <>
       {factory.error && (
         <div className="fc-banner" role="alert">
           {factory.error}.{' '}
           {board
             ? 'Showing last-known board. Commands are disabled.'
             : 'The v2 server may be unavailable.'}{' '}
+          <button type="button" onClick={factory.refresh}>
+            Refresh
+          </button>{' '}
           <a href="?view=operations">Open operations UI</a>
         </div>
       )}
-      {board && (
-        <div className="fc-source-bar">
-          <span>Coverage {board.meta.coverage.state}</span>
-          {Object.values(board.entities.sources).map((source) => (
-            <span
-              key={source.id}
-              title={[source.observedAt ?? 'Never observed', source.failure?.message]
-                .filter(Boolean)
-                .join(' · ')}
-            >
-              {source.kind}: {source.refresh}
-              {source.staleAt && Date.parse(source.staleAt) <= now ? ' · stale' : ''} ·{' '}
-              {source.observedAt ?? 'unobserved'}
-            </span>
-          ))}
-          {board.meta.coverage.reasons.map((r) => (
-            <span key={r.code}>{r.message}</span>
-          ))}
-          {board.meta.diagnostics.map((r) => (
-            <span key={r.code}>{r.message}</span>
-          ))}
-        </div>
-      )}
-      {board ? (
-        <Canvas
-          key={board.scopeId}
-          board={board}
-          native={native}
-          busy={busy}
-          onDetails={(i) => {
-            setSelected(i.id);
-            setPanel('details');
-          }}
-          onStart={(i) => {
-            setSelected(i.id);
-            setPanel('start');
-          }}
-          onCommand={command}
-        />
-      ) : (
-        !factory.error && (
-          <p role="status" className="fc-empty">
-            Loading factory board…
-          </p>
-        )
-      )}
       {!panel && <CommandFeedback factory={factory} />}
-      {board && panel === 'settings' && <Controls board={board} factory={factory} close={close} />}
+      {board && panel === 'settings' && (
+        <Controls board={board} factory={factory} close={close}>
+          <label>
+            Long names
+            <select
+              aria-label="Long name behavior"
+              value={titleMode}
+              onChange={(e) =>
+                setTitleMode(
+                  e.target.value === 'wrap'
+                    ? 'wrap'
+                    : e.target.value === 'expand'
+                      ? 'expand'
+                      : 'ellipsis'
+                )
+              }
+            >
+              <option value="wrap">Wrap</option>
+              <option value="ellipsis">Ellipsis + tooltip</option>
+              <option value="expand">Expand in place</option>
+            </select>
+          </label>
+          <label>
+            Relationships
+            <select
+              aria-label="Relationship depth"
+              value={reach}
+              onChange={(e) =>
+                setReach(
+                  e.target.value === 'all'
+                    ? 'all'
+                    : e.target.value === 'transitive'
+                      ? 'transitive'
+                      : 'direct'
+                )
+              }
+            >
+              <option value="direct">Direct only</option>
+              <option value="transitive">Transitive, no parent highlight</option>
+              <option value="all">Transitive + parents</option>
+            </select>
+          </label>
+          <label>
+            T3 links
+            <select
+              aria-label="T3 link destination"
+              value={native ? 'native' : 'web'}
+              onChange={(e) => setNative(e.target.value === 'native')}
+            >
+              <option value="web">Website</option>
+              <option value="native">Native app</option>
+            </select>
+          </label>
+          <details className="fc-sources">
+            <summary>Source coverage: {board.meta.coverage.state}</summary>
+            {Object.values(board.entities.sources).map((source) => (
+              <p key={source.id}>
+                {source.kind}: {source.refresh} · {source.observedAt ?? 'unobserved'}{' '}
+                {source.failure?.message}
+              </p>
+            ))}
+            {board.meta.coverage.reasons.map((r) => (
+              <p key={r.code}>{r.message}</p>
+            ))}
+            {board.meta.diagnostics.map((r) => (
+              <p key={r.code}>{r.message}</p>
+            ))}
+            <button type="button" onClick={factory.refresh}>
+              Refresh observations
+            </button>
+          </details>
+        </Controls>
+      )}
       {board && panel === 'start' && (
         <Start
           initialQuery={item ? String(subject(board, item)?.number ?? '') : ''}
@@ -176,10 +182,52 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
           </button>
         </Panel>
       )}
-      <label className="fc-link-preference">
-        <input type="checkbox" checked={native} onChange={(e) => setNative(e.target.checked)} />{' '}
-        Open T3 links in app
-      </label>
+    </>
+  );
+  return board ? (
+    <Canvas
+      key={board.scopeId}
+      board={board}
+      native={native}
+      titleMode={titleMode}
+      reach={reach}
+      busy={busy}
+      onSettings={() => setPanel(panel === 'settings' ? undefined : 'settings')}
+      onPlan={() => setPanel(panel === 'plan' ? undefined : 'plan')}
+      onStartIssue={() => {
+        setSelected(undefined);
+        setPanel(panel === 'start' ? undefined : 'start');
+      }}
+      canConfigure={configure?.availability.state === 'available'}
+      onPause={() => {
+        if (configure)
+          void factory.submit(configure, {
+            kind: 'configure',
+            payload: {
+              paused: !board.meta.factory.paused,
+              concurrency: board.meta.factory.concurrency.limit,
+              admissionAllowance: board.meta.factory.admission.limit,
+            },
+          });
+      }}
+      onDetails={(i) => {
+        setSelected(i.id);
+        setPanel('details');
+      }}
+      onStart={(i) => {
+        setSelected(i.id);
+        setPanel('start');
+      }}
+      onCommand={command}
+    >
+      {panels}
+    </Canvas>
+  ) : (
+    <main className="cc-app">
+      <p className="cc-empty" role="status">
+        Loading factory board…
+      </p>
+      {panels}
     </main>
   );
 }

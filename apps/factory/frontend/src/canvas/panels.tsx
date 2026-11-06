@@ -31,19 +31,31 @@ export function Panel({
   feedback?: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef(close);
+  closeRef.current = close;
   useEffect(() => {
     const opener = document.activeElement;
     const dialog = ref.current;
-    dialog?.showModal();
+    dialog?.show();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeRef.current();
+    };
+    window.addEventListener('keydown', closeOnEscape);
     return () => {
+      window.removeEventListener('keydown', closeOnEscape);
       dialog?.close();
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
     };
   }, []);
   return (
-    <dialog className="fc-dialog" ref={ref} aria-label={name} onCancel={close}>
-      <header>
-        <h2>{name}</h2>
+    <dialog
+      className={`fc-dialog cc-floating ${name === 'Factory controls' ? 'cc-settings' : name === 'Start an issue' ? 'cc-start' : 'cc-plan'}`}
+      ref={ref}
+      aria-label={name}
+      onCancel={close}
+    >
+      <header className="cc-floating-title">
+        <strong>{name === 'Factory controls' ? 'Settings' : name}</strong>
         <button type="button" onClick={close} aria-label={`Close ${name}`}>
           ×
         </button>
@@ -84,10 +96,12 @@ export function Controls({
   board,
   factory,
   close,
+  children,
 }: {
   board: Board;
   factory: Factory;
   close: () => void;
+  children?: ReactNode;
 }) {
   const [base] = useState(board.meta.factory);
   const [baseScope] = useState(board.scopeId);
@@ -105,6 +119,7 @@ export function Controls({
     .find((a) => a?.kind === 'configure');
   return (
     <Panel name="Factory controls" close={close} feedback={<CommandFeedback factory={factory} />}>
+      {children}
       <form
         onSubmit={(event) => {
           event.preventDefault();

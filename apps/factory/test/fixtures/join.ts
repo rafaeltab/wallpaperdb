@@ -4,8 +4,10 @@ import { join } from 'node:path';
 import { githubIssues } from '../../src/adapters/github/index.js';
 import { initializeState } from '../../src/platform/index.js';
 import { protocol } from './setup.js';
+import { runProtocol } from './protocol.mjs';
 export async function joinFixture(
   options: {
+    inProcess?: boolean;
     conflict?: boolean;
     context?: string;
     owningThreadId?: string;
@@ -144,26 +146,46 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
         mcpAuthorizationFile: join(host.directory, 'mcp-auth'),
       }
     : {};
-  const issues = githubIssues({
-    project: host.repository,
-    base: host.base,
-    prerequisites: [
-      { issue: 3, pr: 103, commit: d },
-      {
-        issue: 4,
-        pr: 104,
-        commit: c,
-        context: options.context,
-        owningThreadId: options.owningThreadId,
+  const read = options.inProcess
+    ? async (args: string[], signal?: AbortSignal) => {
+        signal?.throwIfAborted();
+        const output: string[] = [];
+        const errors: string[] = [];
+        const code = await runProtocol(
+          { FACTORY_FIXTURE: host.configFile },
+          [process.execPath, 'gh', ...args],
+          { log: (text: string) => output.push(text), error: (text: string) => errors.push(text) },
+          signal
+        );
+        signal?.throwIfAborted();
+        if (code !== 0)
+          throw new Error(`Controlled GitHub protocol exited ${code}: ${errors.join('\n')}`);
+        return JSON.parse(output.join('\n'));
+      }
+    : undefined;
+  const issues = githubIssues(
+    {
+      project: host.repository,
+      base: host.base,
+      prerequisites: [
+        { issue: 3, pr: 103, commit: d },
+        {
+          issue: 4,
+          pr: 104,
+          commit: c,
+          context: options.context,
+          owningThreadId: options.owningThreadId,
+        },
+      ],
+      joins: {
+        directory: join(host.directory, 'joins'),
+        binary: host.binary,
+        projectId: 'project-id',
+        ...mcp,
       },
-    ],
-    joins: {
-      directory: join(host.directory, 'joins'),
-      binary: host.binary,
-      projectId: 'project-id',
-      ...mcp,
     },
-  });
+    read
+  );
   return {
     host,
     git,
@@ -171,26 +193,29 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
     c,
     issues,
     reopen: () =>
-      githubIssues({
-        project: host.repository,
-        base: host.base,
-        prerequisites: [
-          { issue: 3, pr: 103, commit: d },
-          {
-            issue: 4,
-            pr: 104,
-            commit: c,
-            context: options.context,
-            owningThreadId: options.owningThreadId,
+      githubIssues(
+        {
+          project: host.repository,
+          base: host.base,
+          prerequisites: [
+            { issue: 3, pr: 103, commit: d },
+            {
+              issue: 4,
+              pr: 104,
+              commit: c,
+              context: options.context,
+              owningThreadId: options.owningThreadId,
+            },
+          ],
+          joins: {
+            directory: join(host.directory, 'joins'),
+            binary: host.binary,
+            projectId: 'project-id',
+            ...mcp,
           },
-        ],
-        joins: {
-          directory: join(host.directory, 'joins'),
-          binary: host.binary,
-          projectId: 'project-id',
-          ...mcp,
         },
-      }),
+        read
+      ),
     close: async () => {
       process.env.PATH = previous;
       if (fixture === undefined) delete process.env.FACTORY_FIXTURE;

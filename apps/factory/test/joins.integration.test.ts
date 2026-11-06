@@ -136,7 +136,7 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
 });
 
 it('inspects a reserved comparison without preparing a pending join', async () => {
-  const f = await fixture();
+  const f = await fixture({ inProcess: true });
   try {
     expect(
       await Effect.runPromise(f.issues.inspect(5, { base: f.host.base, prBase: 'main' }))

@@ -65,7 +65,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 90s
     develop:
       watch:
         - action: sync
@@ -321,6 +321,9 @@ services:
         - action: sync
           path: ../apps/web/src
           target: /app/apps/web/src
+        - action: sync
+          path: ../apps/web/public
+          target: /app/apps/web/public
         - action: sync+restart
           path: ../packages
           target: /app/packages

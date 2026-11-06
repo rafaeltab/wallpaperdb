@@ -35,6 +35,10 @@ infra/.operator-inbox.json
 .mise
 .boat
 
+# Boat controllers run on the worker host, outside application containers.
+scripts/boat*.mjs
+scripts/lib/boat*.mjs
+
 # IDE
 .vscode
 .idea

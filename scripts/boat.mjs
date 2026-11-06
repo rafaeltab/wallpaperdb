@@ -313,7 +313,7 @@ function execute(
 				if (pending && !sourceAborted) line(pending);
 			});
 			if (!sourceObservation)
-				child.stderr.on("data", (bytes) => emit(bytes, true));
+				child.stderr.on("data", (bytes) => emit(bytes.toString("utf8"), true));
 		}
 		if (sourceObservation) {
 			// Local CLI diagnostics are not remote stderr frames or generator output.
@@ -623,6 +623,54 @@ async function ensure() {
 		if (s.id) {
 			const info = existingInfo ?? (await json(["info", s.id]));
 			const status = workerState(info);
+			const worker = info.sandbox ?? info;
+			if (["archived", "stopped"].includes(status)) {
+				const expectedName =
+					s.admission?.name ?? `wallpaperdb-557-${config.cohort}-${config.key}`;
+				if (
+					worker.id !== s.id ||
+					worker.name !== expectedName ||
+					worker.type !== config.size
+				)
+					throw new Error("Stopped worker ownership changed; no resume");
+				if (s.resumeAttempt?.status === "submitted")
+					throw new Error(
+						"Previous resume is unresolved; no repeated submission",
+					);
+				if (s.runningSince != null) {
+					await snapshots.stopCompute({
+						inspect: async () => info,
+						budget: shutdownBudget(config.shutdownBudgetMs),
+					});
+					s = read(stateFile);
+				}
+				const limits = await json(["limits"]);
+				if (!limits.canStart || limits.nextStartDollars > 0)
+					throw new Error(
+						"Resume refused: starts unavailable or paid bursting required",
+					);
+				if (s.resumeAttempt)
+					s.resumeHistory = [...(s.resumeHistory ?? []), s.resumeAttempt];
+				s.resumeAttempt = {
+					workerId: s.id,
+					status: "submitted",
+					at: new Date().toISOString(),
+				};
+				s.runningSince = Date.now();
+				save(s, true);
+				await json(["resume", s.id]);
+				s = snapshots.resumed(await json(["info", s.id]));
+				s.lastActivity = Date.now();
+				save(s);
+				event("resumed", { id: s.id });
+				await bootstrap(s.id);
+				return { id: s.id, resumed: true };
+			}
+			if (s.resumeAttempt?.status === "submitted") {
+				s = snapshots.resumed(info);
+				await bootstrap(s.id);
+				return { id: s.id, resumed: true };
+			}
 			s = snapshots.startup(info);
 			if (!["ready", "running", "idle"].includes(status))
 				throw new Error(
@@ -1070,15 +1118,36 @@ async function reconcileDevelopment(
 			state.developmentDependencies?.dependencies !== dependencies;
 		delete state.watcher;
 		save(state);
-		await ssh(
-			id,
-			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`,
-		);
+		const command = `export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`;
+		for (let attempt = 1; ; attempt++) {
+			let diagnostic = "";
+			try {
+				await boat(["--json", "ssh", id, "--", "bash", "-lc", command], {
+					streamFrames: true,
+					onOutput: (data) => {
+						diagnostic = (diagnostic + data).slice(-8192);
+					},
+				});
+				break;
+			} catch (error) {
+				if (
+					attempt >= 3 ||
+					!/container name .*already in use/is.test(diagnostic)
+				)
+					throw error;
+				event("restoration-conflict", { id, attempt });
+				console.log(
+					"Docker restoration raced startup; reconciling the owned project again.",
+				);
+				await wait(1000);
+			}
+		}
 		if (!foreground) await watchDevelopment(id);
 		const reconciled = read(stateFile);
 		reconciled.developmentDependencies = { id, dependencies };
 		delete reconciled.reconciliationPending;
 		save(reconciled);
+		return true;
 	});
 }
 
@@ -1314,9 +1383,15 @@ async function stop(
 						cleanup:
 							targets &&
 							(async (opts) => {
+								// Snapshot retention needs container references to retain built images.
+								// Explicit ordinary make stop still tears the project down.
+								const cleanupTargets =
+									preserveIntent && config.lifecycle === "snapshot"
+										? [...targets, "KEEP_CONTAINERS=1"]
+										: targets;
 								await ssh(
 									s.id,
-									`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+									`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${cleanupTargets.map(quote).join(" ")}`,
 									opts,
 								);
 								if (preserveIntent) return;
@@ -1771,6 +1846,7 @@ async function command() {
 	}
 	admit();
 	const { id, resumed } = await ensure();
+	if (resumed) console.log("Remote environment resumed from sleep");
 	const lease = path.join(dir, `command-${process.pid}.json`);
 	write(lease, {
 		pid: process.pid,
@@ -1969,9 +2045,11 @@ async function command() {
 			return;
 		}
 		await cache(id);
-		await reconcileDevelopment(id, dependencies, {
+		const reconciled = await reconcileDevelopment(id, dependencies, {
 			foreground: targets[0] === "dev",
 		});
+		if (reconciled && targets.length === 1 && targets[0] === "dev")
+			targets.push("ARGS=--no-up");
 		if (migration) {
 			const result = await runAssetMigration(
 				id,
@@ -2077,19 +2155,40 @@ function resourceSample() {
 }
 async function runDaemon() {
 	let extended = 0;
+	let extending = false;
 	const renew = async (selected, active) => {
 		const fresh = read(stateFile);
 		if (
+			!extending &&
 			fresh.id === selected &&
 			fresh.runningSince &&
 			fresh.snapshotRecovery?.status === "ACTIVE" &&
 			Date.now() - extended > 60000 &&
 			(active || Date.now() - fresh.lastActivity < 60000)
 		) {
-			await boat(["extend", selected, "--ttl", "2100"]);
-			extended = Date.now();
+			extending = true;
+			try {
+				await boat(["extend", selected, "--ttl", "2100"]);
+				extended = Date.now();
+			} finally {
+				extending = false;
+			}
 		}
 	};
+	// Cold builds can hold lifecycle/source locks longer than the provider TTL.
+	// Renew legitimate command activity independently; this never starts a VM.
+	setInterval(() => {
+		const selected = read(stateFile);
+		const active = fs.readdirSync(dir).some((name) => {
+			if (!/^command-\d+\.json$/.test(name)) return false;
+			const lease = read(path.join(dir, name));
+			return !lease.watcherOnly && liveOwnedProcess(root, lease);
+		});
+		void renew(selected.id, active).catch((error) =>
+			event("renewal-failed", { message: error.message }),
+		);
+	}, 10000).unref();
+	const busyOwner = (pid) => preparationOwner(pid) ?? { busy: true };
 	while (true) {
 		const s = read(stateFile);
 		if (!s.id || !s.runningSince) return;
@@ -2124,8 +2223,12 @@ async function runDaemon() {
 			"lifecycle",
 			Infinity,
 			undefined,
-			preparationOwner,
+			busyOwner,
 		);
+		if (selected?.busy) {
+			await wait(2000);
+			continue;
+		}
 		if (!selected) return;
 		const worker = selected.preparationPid ? selected.worker : selected;
 		const running = selected.preparationPid
@@ -2144,8 +2247,12 @@ async function runDaemon() {
 					"source",
 					Infinity,
 					undefined,
-					preparationOwner,
+					busyOwner,
 				);
+		if (running?.busy) {
+			await wait(2000);
+			continue;
+		}
 		if (running?.preparationPid) {
 			if (running.worker !== worker) continue;
 			if (preparationOwner(running.preparationPid)?.worker === worker)

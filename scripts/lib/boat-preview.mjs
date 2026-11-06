@@ -206,7 +206,7 @@ function listens(records, port) {
 				}
 			});
 		} catch (error) {
-			if (!absent(error)) throw error;
+			if (!absent(error) && error.code !== "EACCES") throw error;
 		}
 		return same(identity(record.pid), record) && found;
 	});
@@ -393,7 +393,16 @@ export async function runPreview({
 				if (!closed)
 					throw Error("Preview spawn closure unresolved; record retained");
 			}
-			while (!publicClosed && now() < disposalEnd) await pause();
+			while (!publicClosed && now() < disposalEnd) {
+				// Node can omit close after every transferred-socket receiver exits.
+				// A published listener has no pending bind; its closed handle and
+				// drained owned sockets prove retirement independently of that event.
+				if (published && !server.listening && sockets.size === 0) {
+					publicClosed = true;
+					break;
+				}
+				await pause();
+			}
 			if (!publicClosed)
 				throw Error("Preview listener disposal unresolved; record retained");
 			if (state.spawnedPid && !state.forward)

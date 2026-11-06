@@ -172,7 +172,7 @@ infra-start-admin: ## Start infrastructure including pgAdmin and OpenSearch Dash
 	@echo "  OpenSearch Dashboards: /opensearch-dashboards"
 
 infra-stop: ## Stop infrastructure
-	@$(INFRA_COMPOSE) --profile '*' down
+	@$(INFRA_COMPOSE) --profile '*' $(if $(filter 1,$(KEEP_CONTAINERS)),stop,down) $(ARGS)
 
 infra-reset: ## Delete infrastructure data after confirmation
 	@echo "WARNING: This will delete all data for project $(COMPOSE_PROJECT_NAME)!"
@@ -188,7 +188,7 @@ apps-start: ## Build and start app containers (optional SERVICE)
 	@$(APPS_COMPOSE) up -d $(if $(strip $(ARGS)),$(ARGS),--build) $(SERVICE)
 
 apps-stop: ## Stop apps; tear down app stack when SERVICE is omitted
-	@$(APPS_COMPOSE) $(if $(SERVICE),stop $(SERVICE),down)
+	@$(APPS_COMPOSE) $(if $(or $(SERVICE),$(filter 1,$(KEEP_CONTAINERS))),stop $(SERVICE),down) $(ARGS)
 
 apps-build: ## Build development app images (optional SERVICE)
 	@$(APPS_COMPOSE) build $(ARGS) $(SERVICE)

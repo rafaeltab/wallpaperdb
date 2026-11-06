@@ -121,6 +121,26 @@ function watches(configuration, app) {
 	}));
 }
 
+for (const [target, composeFile] of [
+	["apps-stop", "infra/docker-compose.apps.yml"],
+	["infra-stop", "infra/docker-compose.yml"],
+]) {
+	for (const preserve of [false, true]) {
+		test(`${target} ${preserve ? "retains snapshot image references" : "removes containers by default"}`, () => {
+			const output = run("make", [
+				target,
+				"BOAT_EXEC=local",
+				...(preserve ? ["KEEP_CONTAINERS=1"] : []),
+			]);
+			const command = output
+				.split("\n")
+				.find((line) => line.startsWith("docker compose "));
+			assert.ok(command?.includes(composeFile));
+			assert.match(command, preserve ? /\bstop\s*$/ : /\bdown\s*$/);
+		});
+	}
+}
+
 for (const mode of ["foreground", "managed"]) {
 	const initial_sync = mode === "managed";
 	for (const [source, target] of [
@@ -257,11 +277,11 @@ for (const mode of ["foreground", "managed"]) {
 					initial_sync: false,
 				},
 			];
-			// New Asset delivery directories are checked independently above. All
-			// pre-existing rules and every other app must retain their exact shape.
+			// Additional delivery directories are checked independently. All
+			// pre-existing rules retain their exact shape.
 			const existing = rules.filter(
 				(rule) =>
-					!["apps/asset/drizzle", "apps/asset/scripts"].some(
+					!["apps/asset/drizzle", "apps/asset/scripts", "apps/web/public"].some(
 						(directory) => rule.path === path.join(root, directory),
 					),
 			);
@@ -270,9 +290,24 @@ for (const mode of ["foreground", "managed"]) {
 				expected.map((rule) => ({ ...rule, exec: { command: null } })),
 				app,
 			);
-			assert.equal(rules.length, app === "asset" ? 6 : 4, app);
+			assert.equal(
+				rules.length,
+				app === "asset" ? 6 : app === "web" ? 5 : 4,
+				app,
+			);
 		});
 	}
+	test(`${mode} Web watch syncs public files without restarting the server`, () => {
+		const rules = watches(mode === "managed" ? managed : foreground, "web");
+		const matching = rules.filter(
+			(rule) => rule.path === path.join(root, "apps/web/public"),
+		);
+		assert.equal(matching.length, 1);
+		assert.equal(matching[0].action, "sync");
+		assert.equal(matching[0].target, "/app/apps/web/public");
+		assert.equal(matching[0].initial_sync, initial_sync);
+		assert.deepEqual(matching[0].ignore ?? [], []);
+	});
 	test(`${mode} preserves the application service set and unwatched ingress`, () => {
 		const configuration = mode === "managed" ? managed : foreground;
 		assert.deepEqual(

@@ -38,6 +38,31 @@ export function snapshotLifecycle({ load, persist }) {
 		return state;
 	}
 	return {
+		resumed(info) {
+			const state = load();
+			const worker = info?.sandbox ?? info;
+			if (
+				worker?.id !== state.id ||
+				state.resumeAttempt?.workerId !== state.id ||
+				state.resumeAttempt.status !== "submitted" ||
+				!["ready", "running", "idle"].includes(workerState(info))
+			)
+				throw new Error("Resume did not return the owned running worker");
+			if (state.shutdownAttempt) {
+				state.shutdownHistory = [
+					...(state.shutdownHistory ?? []),
+					state.shutdownAttempt,
+				];
+				delete state.shutdownAttempt;
+			}
+			delete state.cleanReceipt;
+			delete state.watcher;
+			state.snapshotRecovery = { status: "ACTIVE", workerId: state.id };
+			state.reconciliationPending = true;
+			state.resumeAttempt.status = "ready";
+			persist(state);
+			return state;
+		},
 		inspectIdentity({ info, error }) {
 			const state = load();
 			const worker = info?.sandbox ?? info;

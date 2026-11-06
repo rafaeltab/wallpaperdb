@@ -24,7 +24,8 @@
 		"check:generated": "node check-generated.mjs",
 		"check:migrations": "node check-migrations.mjs && node check-generated.mjs migrations",
 		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- node check-migration-replay.mjs",
-		"agent": "node agent-workflow.mjs"
+		"agent": "node agent-workflow.mjs",
+		"check:services": "node check-service-wiring.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

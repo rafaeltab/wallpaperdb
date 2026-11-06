@@ -1,0 +1,11 @@
+meta {
+  name: Health check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{variantGeneratorBaseUrl}}/health
+  body: none
+  auth: none
+}

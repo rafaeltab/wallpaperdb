@@ -688,6 +688,7 @@ function generateBrunoEnv(
 
 	const overrides: Record<string, string> = {
 		factoryBaseUrl: `http://localhost:${ports.FACTORY_PORT}`,
+		variantGeneratorBaseUrl: `http://localhost:${ingressPort}/variant-generator`,
 		baseUrl: `http://localhost:${ingressPort}/ingestor`,
 		assetBaseUrl: `http://localhost:${ingressPort}/asset`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,

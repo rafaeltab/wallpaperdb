@@ -1016,10 +1016,11 @@ it('bounds outstanding commands while replaying retries and admitting work after
     const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
     const configure = Object.values(snapshot.entities.actions).find((a) => a.kind === 'configure');
     if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
+    const precondition = configure.availability.precondition;
     const request = (number: number) => ({
       commandId: `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`,
       actionId: configure.id,
-      precondition: configure.availability.precondition,
+      precondition,
       kind: 'configure',
       payload: {
         paused: true,

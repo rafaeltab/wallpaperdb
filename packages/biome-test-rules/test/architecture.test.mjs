@@ -67,6 +67,22 @@ test("capability entries contain explicit reexports and contracts remain in cont
 		0,
 	);
 });
+test("capabilities reject qualified global configuration while preserving local objects", () => {
+	for (const root of ["globalThis", "global"]) {
+		for (const access of [".process.env.TOKEN", '["process"].env.TOKEN'])
+			assert.ok(
+				check(`${root}${access};`).some((d) =>
+					d.message.startsWith("capability-configuration:"),
+				),
+			);
+		assert.equal(
+			check(`function local(${root}) { return ${root}.process.env.TOKEN; }`)
+				.length,
+			0,
+		);
+		assert.equal(check(`${root}.Math.random();`).length, 0);
+	}
+});
 
 test("undeclared imports fail while declared dependencies and builtins pass", () => {
 	const files = {

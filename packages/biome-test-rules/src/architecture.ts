@@ -24,7 +24,16 @@ export const capabilityExecution = defineRule({
 	query: semantic("JS_REFERENCE_IDENTIFIER"),
 	run(node, context) {
 		const binding = context.model.binding(node);
-		if (!binding && node.text.trim() === "process") {
+		const parent = node.parent;
+		const member =
+			parent?.kind === "JS_IDENTIFIER_EXPRESSION" ? parent.parent : undefined;
+		const property = propertyName(member);
+		if (
+			!binding &&
+			(node.text.trim() === "process" ||
+				(/^(globalThis|global)$/.test(node.text.trim()) &&
+					property === "process"))
+		) {
 			registerDiagnostic(
 				node,
 				"error",
@@ -48,10 +57,6 @@ export const capabilityExecution = defineRule({
 			specifier?.kind === "JS_NAMED_IMPORT_SPECIFIER"
 				? specifier.name?.text.trim()
 				: declaration?.text.trim();
-		const parent = node.parent;
-		const member =
-			parent?.kind === "JS_IDENTIFIER_EXPRESSION" ? parent.parent : undefined;
-		const property = propertyName(member);
 		const namespaceRunner =
 			source === "effect" &&
 			specifier?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER" &&

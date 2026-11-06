@@ -117,7 +117,7 @@ async function fixture(
     join: state,
   };
   await host.save(config);
-  const issues = (selectedBase = base, selectedTarget = target, inProcess = false) =>
+  const issues = (selectedBase = base, selectedTarget = target, inProcess = true) =>
     githubIssues(
       {
         project: host.repository,

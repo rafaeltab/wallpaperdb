@@ -119,6 +119,78 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
     return call.args[1] === 'send' && !call.args.includes('--help') ? [String(call.args[3])] : [];
   });
 }
+
+it('resumes the parked question on the existing implementation job through v2', () =>
+  composed(async ({ running, host, save }) => {
+    await start(running);
+    await save({
+      activity: [
+        {
+          itemId: 'question-v2',
+          runId: 'run-1',
+          sourceThreadId: 'thread-live',
+          visibility: 'local',
+          type: 'user_input_request',
+          status: 'waiting',
+          text: 'Which approved behavior?',
+        },
+      ],
+      overrides: { status: 'waiting', pendingRequestCount: 1 },
+    });
+    const selectors = await action(running, 'resume', 'job:rafaeltab/wallpaperdb/577');
+    const owner = (await running.app.inject('/api/job')).json().intent;
+    await vi.waitFor(
+      async () =>
+        expect((await running.app.inject('/api/job')).json()).toMatchObject({
+          resume: { index: 0, questionId: 'question-v2' },
+          delivery: { stage: 'implementation', activity: 'awaiting-answer' },
+        }),
+      { timeout: 5000, interval: 40 }
+    );
+    await save({ activity: [], overrides: { status: 'completed', pendingRequestCount: 0 } });
+    const request = {
+      ...selectors,
+      commandId: '00000000-0000-4000-8000-000000000034',
+      kind: 'resume',
+      payload: {},
+    };
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+        .statusCode
+    ).toBe(202);
+    const result = await receipt(running, request.commandId);
+    await vi.waitFor(
+      async () =>
+        expect((await running.app.inject('/api/job')).json()).toMatchObject({
+          intent: owner,
+          delivery: { stage: 'implementation' },
+          execution: { threadId: 'thread-live', run: { id: 'run-2', ordinal: 2 } },
+        }),
+      { timeout: 5000, interval: 40 }
+    );
+    expect(
+      (await stageMessages(host)).filter(
+        (message) => message.includes('Stage 1 of factory') && message.includes('$implement')
+      )
+    ).toHaveLength(1);
+    const replay = await running.app.inject({
+      method: 'POST',
+      url: '/api/v2/commands',
+      payload: request,
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual(result);
+    expect(
+      (await stageMessages(host)).filter(
+        (message) => message.includes('Stage 1 of factory') && message.includes('$implement')
+      )
+    ).toHaveLength(1);
+    expect(
+      (await host.calls()).filter(
+        (c) => c.binary === 't3' && c.args[1] === 'start' && c.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+  }));
 it('starts one real composed job with the v2 context and replays its UUID after admission', () =>
   composed(async ({ running, host }) => {
     const { request, result } = await start(running);

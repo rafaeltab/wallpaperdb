@@ -20,19 +20,25 @@ export function sqliteObservations(directory: string): ObservationStore {
       operation(() =>
         stateConnection(directory, (db) => {
           const row = db.select().from(table).where(eq(table.id, 1)).get();
+          const rich = db
+            .select()
+            .from(githubRichFacts)
+            .where(eq(githubRichFacts.id, 1))
+            .get()?.value;
           return {
             startedAt: row?.startedAt ?? undefined,
             observedAt: row?.observedAt ?? undefined,
             failedAt: row?.failedAt ?? undefined,
             error: row?.error ?? undefined,
             facts:
-              db.select().from(githubRichFacts).where(eq(githubRichFacts.id, 1)).get()?.value ??
-              (row?.observedAt == null
-                ? undefined
-                : {
-                    issues: db.select().from(githubIssues).all(),
-                    pullRequests: db.select().from(githubPulls).all(),
-                  }),
+              rich?.observedAt != null && rich.observedAt === row?.observedAt
+                ? rich.facts
+                : row?.observedAt == null
+                  ? undefined
+                  : {
+                      issues: db.select().from(githubIssues).all(),
+                      pullRequests: db.select().from(githubPulls).all(),
+                    },
             jobs: row?.jobs ?? undefined,
             recoveries: row?.recoveries ?? undefined,
             jobsObservedAt: row?.jobsObservedAt ?? undefined,
@@ -53,9 +59,10 @@ export function sqliteObservations(directory: string): ObservationStore {
                 : {}),
             };
             if (value.facts) {
+              const rich = { observedAt: value.observedAt ?? 0, facts: value.facts };
               tx.insert(githubRichFacts)
-                .values({ id: 1, value: value.facts })
-                .onConflictDoUpdate({ target: githubRichFacts.id, set: { value: value.facts } })
+                .values({ id: 1, value: rich })
+                .onConflictDoUpdate({ target: githubRichFacts.id, set: { value: rich } })
                 .run();
               tx.delete(githubIssues).run();
               tx.delete(githubPulls).run();

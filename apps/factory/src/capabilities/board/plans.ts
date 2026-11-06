@@ -1,6 +1,26 @@
 import type { BoardPlan } from './contract.js';
 import type { PlanDetails, BoardSnapshot, PlanAttempt, Tables } from './model.js';
 import { entity, issueId, timestamp, unknown } from './values.js';
+import { coverageFor } from './coverage.js';
+export function includePlan(
+  snapshot: BoardSnapshot,
+  detail: PlanDetails,
+  providerAvailable: boolean
+): BoardSnapshot {
+  return {
+    ...snapshot,
+    meta: {
+      ...snapshot.meta,
+      currentPlanId: detail.attempt.id,
+      coverage: coverageFor(detail.entities.issues, providerAvailable),
+    },
+    entities: {
+      ...snapshot.entities,
+      issues: detail.entities.issues,
+      plans: { [detail.attempt.id]: detail.attempt },
+    },
+  };
+}
 export function planDetails(
   attempt: BoardPlan,
   snapshot: BoardSnapshot,

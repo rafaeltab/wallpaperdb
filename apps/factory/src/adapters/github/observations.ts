@@ -257,7 +257,7 @@ export async function observeIssue(
       'api',
       'graphql',
       '-f',
-      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title updatedAt body state author { login } parent { number url } labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } assignees(first:100) { nodes { ${userFields} } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { id title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
+      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { ${issueFields} closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
     ]),
     gh([
       'api',

@@ -1108,7 +1108,7 @@ async function reconcileDevelopment(
 		if (
 			config.mode !== "development" ||
 			(!state.developmentWanted && !requested) ||
-			!state.reconciliationPending
+			(!state.reconciliationPending && !(requested && !state.developmentWanted))
 		)
 			return;
 		if (!dependencies)
@@ -2143,9 +2143,12 @@ async function command() {
 			return;
 		}
 		await cache(id);
-		const reconciled = await reconcileDevelopment(id, dependencies, {
-			foreground: targets[0] === "dev",
-		});
+		const reconciled = ["apps-stop", "infra-stop"].includes(targets[0])
+			? false
+			: await reconcileDevelopment(id, dependencies, {
+					foreground: targets[0] === "dev",
+					requested: targets.length === 1 && targets[0] === "dev",
+				});
 		if (reconciled && targets.length === 1 && targets[0] === "dev")
 			targets.push("ARGS=--no-up");
 		if (migration) {

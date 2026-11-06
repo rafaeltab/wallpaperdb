@@ -128,6 +128,6 @@ export const v2Commands = sqliteTable('v2_commands', {
 export const githubRichFacts = sqliteTable('github_rich_facts', {
   id: integer('id').primaryKey(),
   value: text('value', { mode: 'json' })
-    .$type<import('../capabilities/observe/index.js').Facts>()
+    .$type<{ observedAt: number; facts: import('../capabilities/observe/index.js').Facts }>()
     .notNull(),
 });

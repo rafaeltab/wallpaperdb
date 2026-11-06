@@ -1,5 +1,5 @@
 import type { ObservedLabel, ObservedUser, ScheduleSnapshot } from '../observe/index.js';
-import type { Decision, Fact, FactoryV2ItemDetails, Source, Tables } from './model.js';
+import type { Decision, Fact, ItemDetails, Source, Tables } from './model.js';
 import { entity, issueId, known, timestamp, unknown } from './values.js';
 export const gh = 'source:github',
   local = 'source:factory',
@@ -64,7 +64,7 @@ export function projectionContext(input: ScheduleSnapshot, at: string) {
     actions: {},
     plans: {},
   };
-  const details: Record<string, FactoryV2ItemDetails> = {};
+  const details: Record<string, ItemDetails> = {};
   tables.repositories[repositoryId] = entity({
     id: repositoryId,
     owner: 'rafaeltab',

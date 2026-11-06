@@ -28,19 +28,10 @@ export const issueId = (n: number) => `issue:rafaeltab/wallpaperdb/${n}` as cons
 export const pullId = (n: number) => `pr:rafaeltab/wallpaperdb/${n}` as const;
 export const jobId = (n: number) => `job:rafaeltab/wallpaperdb/${n}` as const;
 export const threadId = (environment: string, id: string) => `thread:${environment}/${id}` as const;
-export function problem(
-  status: number,
-  code: import('./model.js').FactoryV2Problem['code'],
-  detail: string,
+export function failure(
+  reason: import('./model.js').BoardFailure['reason'],
+  message: string,
   commandId: string | null = null
-): import('./model.js').FactoryV2Problem {
-  return {
-    type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/factory-v2-${code}.md`,
-    status,
-    code,
-    title: code,
-    detail,
-    commandId,
-    retry: code === 'stale-action' ? 'refresh' : code === 'unavailable' ? 'later' : 'never',
-  };
+): import('./model.js').BoardFailure {
+  return { _tag: 'BoardFailure', reason, message, commandId };
 }

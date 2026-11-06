@@ -70,7 +70,6 @@ export function populateCards(context: ProjectionContext) {
     tables.items[id] = item;
     const p = pid ? (facts?.pullRequests ?? []).find((p) => pullId(p.number) === pid) : undefined;
     details[id] = {
-      apiVersion: 2,
       itemId: id,
       itemVersion: item.version,
       observedAt: at,

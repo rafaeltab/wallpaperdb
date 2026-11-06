@@ -119,10 +119,10 @@ export const v2Commands = sqliteTable('v2_commands', {
   id: text('id').primaryKey(),
   scope: text('scope').notNull(),
   request: text('request', { mode: 'json' })
-    .$type<import('../capabilities/board/index.js').FactoryV2Command>()
+    .$type<import('../capabilities/board/index.js').BoardCommand>()
     .notNull(),
   receipt: text('receipt', { mode: 'json' })
-    .$type<import('../capabilities/board/index.js').FactoryV2CommandReceipt>()
+    .$type<import('../capabilities/board/index.js').CommandReceipt>()
     .notNull(),
 });
 export const githubRichFacts = sqliteTable('github_rich_facts', {

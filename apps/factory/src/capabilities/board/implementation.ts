@@ -9,17 +9,11 @@ import { actions } from './actions.js';
 import { retainFacts, retainFact } from './retention.js';
 import { entityChanges } from './changes.js';
 import { BoardCommands, BoardStore, type CommandRecord } from './contract.js';
-import type {
-  Action,
-  FactoryV2Changes,
-  FactoryV2Command,
-  FactoryV2Delta,
-  FactoryV2Problem,
-} from './model.js';
+import type { Action, BoardChanges, BoardCommand, BoardDelta, BoardFailure } from './model.js';
 import { planDetails } from './plans.js';
 import { project } from './projection.js';
 import { issueSearch } from './search.js';
-import { problem, version } from './values.js';
+import { failure, version } from './values.js';
 
 /** Pure reads observe one committed revision. Effectful publication and command
  * responsibility use the store before publishing anything to the transport. */
@@ -61,7 +55,7 @@ export function makeBoard(config: {
       const item = current.snapshot.entities.items[detail.itemId];
       if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
     }
-    let history: readonly FactoryV2Delta[] = restored?.history ?? [];
+    let history: readonly BoardDelta[] = restored?.history ?? [];
     let identity =
       restored?.inputVersion ?? version({ input: stable(input), plan: config.initialPlan });
     if (restored) current = { snapshot: restored.snapshot, details: restored.details };
@@ -144,8 +138,7 @@ export function makeBoard(config: {
           const item = next.snapshot.entities.items[detail.itemId];
           if (item) next.details[detail.itemId] = { ...detail, itemVersion: item.version };
         }
-        const delta: FactoryV2Delta = {
-          apiVersion: 2,
+        const delta: BoardDelta = {
           scopeId: config.scopeId,
           fromCursor: before.cursor,
           toCursor: next.snapshot.cursor,
@@ -174,7 +167,7 @@ export function makeBoard(config: {
         history = nextHistory;
         for (const listener of listeners) listener();
       }).pipe(lock.withPermits(1), Effect.withSpan('factory.board.publish'));
-    const submit = (request: FactoryV2Command) =>
+    const submit = (request: BoardCommand) =>
       Effect.gen(function* () {
         const prior = yield* store.command(request.commandId);
         if (prior) return replay(request, prior);
@@ -207,15 +200,14 @@ export function makeBoard(config: {
           const winner = yield* store.command(request.commandId);
           return winner
             ? replay(request, winner)
-            : problem(
-                503,
-                'unavailable',
+            : failure(
+                'ledger-unavailable',
                 'Command responsibility unavailable. Observe before retrying.',
                 request.commandId
               );
         }
         receipts.set(request.commandId, record);
-        return { status: 202 as const, receipt: record.receipt };
+        return { kind: 'accepted' as const, receipt: record.receipt };
       }).pipe(lock.withPermits(1), Effect.withSpan('factory.board.submit'));
     const processPending = (commandId?: string) =>
       Effect.gen(function* () {
@@ -282,12 +274,12 @@ export function makeBoard(config: {
       publish,
       submit,
       processPending,
-      changes: (after: string): FactoryV2Changes | FactoryV2Problem => {
+      changes: (after: string): BoardChanges | BoardFailure => {
         if (after === current.snapshot.cursor) return { kind: 'unchanged', cursor: after };
         const index = history.findIndex((d) => d.fromCursor === after);
         if (index < 0) {
           const parsed = cursorPayload(after);
-          if (!parsed) return problem(400, 'invalid-request', 'Invalid change cursor.');
+          if (!parsed) return failure('invalid-input', 'Invalid change cursor.');
           if (parsed.scope !== config.scopeId)
             return { kind: 'resync-required', reason: 'different-scope' };
           const retained = [
@@ -335,7 +327,6 @@ export function makeBoard(config: {
           const { issues, repositories, labels, users, sources, threads } =
             current.snapshot.entities;
           return {
-            apiVersion: 2 as const,
             attempt,
             entities: { issues, repositories, labels, users, sources, threads },
           };
@@ -347,45 +338,30 @@ export function makeBoard(config: {
   });
 }
 export type Board = Effect.Success<ReturnType<typeof makeBoard>>;
-function replay(request: FactoryV2Command, prior: CommandRecord) {
+function replay(request: BoardCommand, prior: CommandRecord) {
   return version(request) === version(prior.request)
     ? {
-        status:
+        kind:
           prior.receipt.state === 'accepted' || prior.receipt.state === 'running'
-            ? (202 as const)
-            : (200 as const),
+            ? ('pending' as const)
+            : ('completed' as const),
         receipt: prior.receipt,
       }
-    : problem(
-        409,
-        'id-reused',
+    : failure(
+        'command-id-reused',
         'This command ID is bound to a different request.',
         request.commandId
       );
 }
-function validate(
-  request: FactoryV2Command,
-  action: Action | undefined
-): FactoryV2Problem | undefined {
-  if (!action) return problem(404, 'not-found', 'Unknown action.', request.commandId);
+function validate(request: BoardCommand, action: Action | undefined): BoardFailure | undefined {
+  if (!action) return failure('action-not-found', 'Unknown action.', request.commandId);
   if (action.kind !== request.kind)
-    return problem(
-      400,
-      'invalid-request',
-      'Command kind does not match its action.',
-      request.commandId
-    );
+    return failure('invalid-input', 'Command kind does not match its action.', request.commandId);
   if (action.availability.state !== 'available')
-    return problem(
-      422,
-      'command-rejected',
-      'The action is currently unavailable.',
-      request.commandId
-    );
+    return failure('action-unavailable', 'The action is currently unavailable.', request.commandId);
   if (action.availability.precondition !== request.precondition)
-    return problem(
-      412,
-      'stale-action',
+    return failure(
+      'action-changed',
       'The action changed. Refresh before retrying.',
       request.commandId
     );

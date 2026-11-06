@@ -1714,7 +1714,7 @@ it('reconciles a lost retarget response from durable landing intent after reopen
     await expect(Effect.runPromise(f.issues.reconcile())).rejects.toMatchObject({
       operation: 'reconcile-prerequisite-joins',
     });
-    const reopened = githubIssues(f.config);
+    const reopened = githubIssues(f.config, f.readGitHub);
     if (!reopened.reconcile) throw new Error('Missing reconciliation');
     await Effect.runPromise(reopened.reconcile());
     const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];

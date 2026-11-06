@@ -8,6 +8,10 @@ Use the [GitHub CLI manual](https://cli.github.com/manual/gh_issue) for issue op
 
 When reopening an issue, explain the recurrence in a comment and verify `OPEN` with `gh issue view --json state,url` before relying on it as active tracking. Report a failed mutation or verification.
 
+### Flaky-test labels
+
+Add the `flaky` label to every issue created to track flaky tests, alongside any other required labels. Include `--label flaky` in [gh issue create](https://cli.github.com/manual/gh_issue_create), then read back the issue with `gh issue view --json labels` and verify that `flaky` is present before reporting creation complete.
+
 ## Claiming an issue
 
 When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before planning or implementation. Use [gh issue edit](https://cli.github.com/manual/gh_issue_edit) with `<number-or-url> --add-assignee @me` and preserve existing assignees. Read back the issue with [gh issue view](https://cli.github.com/manual/gh_issue_view) using `<number-or-url> --json assignees` and verify the account is assigned.

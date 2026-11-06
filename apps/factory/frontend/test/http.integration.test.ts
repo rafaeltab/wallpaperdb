@@ -72,7 +72,7 @@ it('serves the real React app over Vite HMR, proxies same-origin browser POSTs a
     if (!origin) throw new Error('Missing dev URL');
     expect((await fetch(`${origin}@vite/client`)).status).toBe(200);
     const page = await context.newPage();
-    await page.goto(origin);
+    await page.goto(`${origin}/?view=operations`);
     await browserExpect(page.getByRole('heading', { name: 'Factory operations' })).toBeVisible();
     await browserExpect(page.getByText('GitHub: loading (stale).')).toBeVisible();
     await page.getByLabel('Concurrency').fill('3');
@@ -117,7 +117,7 @@ it('serves the real React app over Vite HMR, proxies same-origin browser POSTs a
     expect(commands).toBe(1);
     // Packaged same-origin assets run without the dev server.
     await vite.close();
-    await page.goto(backend);
+    await page.goto(`${backend}/?view=operations`);
     await browserExpect(page.getByRole('heading', { name: 'Factory operations' })).toBeVisible();
     await page.getByLabel('Concurrency').fill('4');
     await page.getByRole('button', { name: 'Save scheduler controls' }).click();

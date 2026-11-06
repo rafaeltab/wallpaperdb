@@ -96,7 +96,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
     const address = app.server.address();
     if (!address || typeof address === 'string') throw new Error('Missing listener');
     const page = await browser.newPage();
-    await page.goto(`http://127.0.0.1:${address.port}`);
+    await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
     await browserExpect(
       page.getByText('Issue #2 prerequisites: #1; admitted dependents: #3', { exact: false })
     ).toBeVisible();

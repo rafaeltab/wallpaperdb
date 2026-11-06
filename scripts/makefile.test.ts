@@ -546,6 +546,6 @@ test("all public targets are documented, phony, and advertised", () => {
 test("migration replay participates in the standard integration task graph", () => {
 	const task = plannedTask("test-integration", "scripts", "test:integration");
 	expect(task.command).toMatch(
-		/(?:^|&&\s*)node (?:scripts\/)?check-migration-replay\.mjs(?:\s*&&|$)/,
+		/(?:^|&&\s*)node (?:scripts\/)?check-migration-replay\.ts(?:\s*&&|$)/,
 	);
 });

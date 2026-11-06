@@ -23,11 +23,11 @@
 		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts",
 		"check:generated": "node check-generated.mjs",
 		"check:migrations": "node check-migrations.mjs && node check-generated.mjs migrations",
-		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- node check-migration-replay.mjs",
+		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- pnpm run test:integration",
 		"agent": "node agent-workflow.mjs",
 		"check:services": "node check-service-wiring.mjs",
 		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts...",
-		"test:integration": "node check-migration-replay.mjs"
+		"test:integration": "node --test check-migration-replay.integration.mjs && node check-migration-replay.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

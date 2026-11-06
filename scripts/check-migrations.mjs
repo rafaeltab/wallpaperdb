@@ -58,8 +58,27 @@ export function checkSchemaColumns(snapshot, actual) {
 			if (!observed.has(key)) errors.push(`Missing replayed column ${key}`);
 			else if (observed.get(key) !== column.notNull)
 				errors.push(`Replayed nullability differs for ${key}`);
+			observed.delete(key);
 		}
+	for (const key of observed.keys())
+		errors.push(`Unexpected replayed column ${key}`);
 	return errors;
+}
+export function checkSchemaDump(expected, actual) {
+	// PostgreSQL's random psql safety token is the only volatile dump content.
+	const normalize = (dump) =>
+		dump.replace(/^\\(?:un)?restrict .*\r?\n/gm, "").trim();
+	const wanted = normalize(expected).split("\n");
+	const found = normalize(actual).split("\n");
+	const line = Array.from(
+		{ length: Math.max(wanted.length, found.length) },
+		(_, index) => index,
+	).find((index) => wanted[index] !== found[index]);
+	return line === undefined
+		? []
+		: [
+				`schema differs from snapshot at dump line ${line + 1}: expected ${wanted[line] ?? "<end>"}; actual ${found[line] ?? "<end>"}`,
+			];
 }
 if (
 	process.argv[1] &&

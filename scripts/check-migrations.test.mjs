@@ -52,4 +52,15 @@ test("replayed columns retain snapshot nullability and membership", () => {
 		]).length,
 	);
 	assert.ok(checkSchemaColumns(snapshot, []).length);
+	assert.ok(
+		checkSchemaColumns(snapshot, [
+			{ schema: "public", table: "example", column: "id", notNull: true },
+			{
+				schema: "public",
+				table: "example",
+				column: "unexpected",
+				notNull: false,
+			},
+		]).length,
+	);
 });

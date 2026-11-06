@@ -26,7 +26,8 @@
 		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- node check-migration-replay.mjs",
 		"agent": "node agent-workflow.mjs",
 		"check:services": "node check-service-wiring.mjs",
-		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts..."
+		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts...",
+		"test:integration": "node check-migration-replay.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

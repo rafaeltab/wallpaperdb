@@ -60,7 +60,6 @@ jobs:
           make run PACKAGE=scripts SCRIPT=check:generated ARGS=openapi
           make run PACKAGE=scripts SCRIPT=check:services
           make run PACKAGE=scripts SCRIPT=check:migrations
-          make run PACKAGE=scripts SCRIPT=check:migration-replay
 
       - name: Use the public Ubuntu archive
         run: |

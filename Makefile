@@ -240,7 +240,6 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	node scripts/check-service-wiring.mjs; \
 	node scripts/check-migrations.mjs; \
 	node scripts/check-generated.mjs migrations; \
-	node scripts/docker-validation.ts --label migration-replay -- node scripts/check-migration-replay.mjs; \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \

@@ -102,7 +102,6 @@ const stages = [
 	"service-wiring",
 	"migration-metadata",
 	"generated-migrations",
-	"migration-replay",
 	"coverage",
 ];
 

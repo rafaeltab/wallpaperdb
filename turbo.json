@@ -415,6 +415,13 @@
                 "$TURBO_ROOT$/experiments/*/package.json",
                 "$TURBO_ROOT$/{apps,packages,experiments}/*/src/**"
             ]
+        },
+        "@wallpaperdb/scripts#test:integration": {
+            "cache": false,
+            "dependsOn": [
+                "^build"
+            ],
+            "outputs": []
         }
     }
 }

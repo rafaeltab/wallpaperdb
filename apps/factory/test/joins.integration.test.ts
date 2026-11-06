@@ -1985,7 +1985,7 @@ it.each(['valid', 'conflicting', 'retired-target'] as const)(
           merges: { 102: { merge: b.commit, head: b.commit } },
         },
       });
-      const current = githubIssues({ ...f.config, prerequisites: assertions });
+      const current = githubIssues({ ...f.config, prerequisites: assertions }, f.readGitHub);
       if (!current.reconcile) throw new Error('Missing current reconciliation');
       await Effect.runPromise(current.reconcile());
       if (kind === 'retired-target') {

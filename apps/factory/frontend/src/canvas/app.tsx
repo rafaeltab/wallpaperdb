@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { WorkItem } from '../../../src/http/index.js';
+import type { Action, WorkItem } from '../../../src/http/index.js';
 import { FactoryClient } from './client';
 import { useFactory } from './use-factory';
 import { Canvas } from './canvas';
@@ -13,6 +13,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
     board = factory.board;
   const [panel, setPanel] = useState<'settings' | 'start' | 'plan' | 'details' | 'cancel'>();
   const [selected, setSelected] = useState<WorkItem['id']>();
+  const [cancelAction, setCancelAction] = useState<Action>();
   const [native, setNative] = useState(false);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -21,21 +22,15 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
   }, []);
   const item = selected && board ? board.entities.items[selected] : undefined;
   const close = () => setPanel(undefined);
-  const busy =
-    factory.busy ||
-    !!factory.error ||
-    !!factory.uncertain ||
-    (!!factory.receipt && ['accepted', 'running', 'uncertain'].includes(factory.receipt.state));
-  const command = (selected: WorkItem, kind: 'resume' | 'cancel') => {
+  const busy = factory.commandsBlocked;
+  const command = (selected: WorkItem, action: Action) => {
     setSelected(selected.id);
-    if (kind === 'cancel') {
+    if (action.kind === 'cancel') {
+      setCancelAction(action);
       setPanel('cancel');
       return;
     }
-    const action = selected.actionIds
-      .map((id) => board?.entities.actions[id])
-      .find((a) => a?.kind === kind);
-    if (action) void factory.submit(action, { kind, payload: {} });
+    if (action.kind === 'resume') void factory.submit(action, { kind: 'resume', payload: {} });
   };
   return (
     <main className="fc-app">
@@ -172,10 +167,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
             type="button"
             disabled={busy}
             onClick={() => {
-              const a = item.actionIds
-                .map((id) => board.entities.actions[id])
-                .find((a) => a?.kind === 'cancel');
-              if (a) void factory.submit(a, { kind: 'cancel', payload: {} });
+              if (cancelAction) void factory.submit(cancelAction, { kind: 'cancel', payload: {} });
               close();
             }}
           >

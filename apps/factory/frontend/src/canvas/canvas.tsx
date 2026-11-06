@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { WorkItem } from '../../../src/http/index.js';
-import { type Board, layout, related, relatedToIssues, issueIds, subject, title } from './model';
-import { CardContent, Icon, External, Threads } from './presentation';
+import type { Action, WorkItem } from '../../../src/http/index.js';
+import { type Board, layout, related, relatedItems, subject, title } from './model';
+import { CardContent, Icon, External, Threads, actionLabel } from './presentation';
 export function Canvas({
   board,
   native,
@@ -14,7 +14,7 @@ export function Canvas({
   native: boolean;
   onDetails: (item: WorkItem) => void;
   onStart: (item: WorkItem) => void;
-  onCommand: (item: WorkItem, kind: 'resume' | 'cancel') => void;
+  onCommand: (item: WorkItem, action: Action) => void;
   busy: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -34,7 +34,7 @@ export function Canvas({
       item
         ? related(board, item, direction)
         : group
-          ? relatedToIssues(board, group.items.flatMap(issueIds), direction)
+          ? relatedItems(board, group.items, direction)
           : new Set<string>(),
     [board, item, group, direction]
   );
@@ -59,6 +59,9 @@ export function Canvas({
       : graph.routes;
     const bounds = [
       ...nodes,
+      ...(!ids
+        ? graph.areas.map((area) => ({ x: 32, y: area.y - 20, width: 350, height: 30 }))
+        : []),
       ...routes.flatMap((r) => r.points.map((p) => ({ ...p, width: 0, height: 0 }))),
     ];
     const x = bounds.length ? Math.min(...bounds.map((n) => n.x)) - 32 : 0,
@@ -377,15 +380,14 @@ export function Canvas({
             aria-pressed={direction === 'prerequisites'}
             onClick={() => setDirection('prerequisites')}
           >
-            Prerequisites{' '}
-            {relatedToIssues(board, group.items.flatMap(issueIds), 'prerequisites').size}
+            Prerequisites {relatedItems(board, group.items, 'prerequisites').size}
           </button>
           <button
             type="button"
             aria-pressed={direction === 'dependants'}
             onClick={() => setDirection('dependants')}
           >
-            Dependants {relatedToIssues(board, group.items.flatMap(issueIds), 'dependants').size}
+            Dependants {relatedItems(board, group.items, 'dependants').size}
           </button>
           <button
             type="button"
@@ -450,24 +452,14 @@ export function Canvas({
                 type="button"
                 className={`fc-action-${a.kind}`}
                 key={id}
-                aria-label={
-                  a.kind === 'start'
-                    ? 'Start issue'
-                    : a.kind === 'resume'
-                      ? 'Resume job'
-                      : 'Cancel job'
-                }
+                aria-label={actionLabel(board, item, a)}
                 disabled={busy || a.availability.state !== 'available'}
                 title={
                   a.availability.state === 'available'
-                    ? a.kind
+                    ? actionLabel(board, item, a)
                     : a.availability.reasons.map((r) => r.message).join(' ')
                 }
-                onClick={() =>
-                  a.kind === 'start'
-                    ? onStart(item)
-                    : onCommand(item, a.kind as 'resume' | 'cancel')
-                }
+                onClick={() => (a.kind === 'start' ? onStart(item) : onCommand(item, a))}
               >
                 <Icon kind={a.kind === 'cancel' ? 'stop' : 'play'} />
               </button>

@@ -24,9 +24,10 @@ export function useFactory(client: FactoryClient) {
   }, []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit refresh restarts this request lifetime.
   useEffect(() => {
-    let active = true,
+    let active = !document.hidden,
       timer: ReturnType<typeof setTimeout>;
     let controller = new AbortController();
+    let pageActive = true;
     let interval = 1000;
     let generation = 0;
     async function poll() {
@@ -59,18 +60,32 @@ export function useFactory(client: FactoryClient) {
       controller.abort();
     }
     function show() {
-      if (!active) {
+      if (!document.hidden && !active) {
         active = true;
         void poll();
       }
     }
-    window.addEventListener('pagehide', hide);
-    window.addEventListener('pageshow', show);
-    void poll();
+    function pageHide() {
+      pageActive = false;
+      hide();
+    }
+    function pageShow() {
+      pageActive = true;
+      show();
+    }
+    function visibility() {
+      if (document.hidden) hide();
+      else if (pageActive) show();
+    }
+    window.addEventListener('pagehide', pageHide);
+    window.addEventListener('pageshow', pageShow);
+    document.addEventListener('visibilitychange', visibility);
+    if (active) void poll();
     return () => {
       hide();
-      window.removeEventListener('pagehide', hide);
-      window.removeEventListener('pageshow', show);
+      window.removeEventListener('pagehide', pageHide);
+      window.removeEventListener('pageshow', pageShow);
+      document.removeEventListener('visibilitychange', visibility);
     };
   }, [client, revision]);
   useEffect(() => {
@@ -119,12 +134,16 @@ export function useFactory(client: FactoryClient) {
       if (mounted.current) setBusy(false);
     }
   }
+  const pending = busy || (!!receipt && ['accepted', 'running'].includes(receipt.state));
+  const commandsBlocked =
+    pending || !!error || !!client.uncertainCommand || receipt?.state === 'uncertain';
   return {
+    commandsBlocked,
     board,
     error,
     commandError,
     receipt,
-    busy: busy || (!!receipt && ['accepted', 'running'].includes(receipt.state)),
+    busy: pending,
     refresh,
     uncertain: client.uncertainCommand,
     submit: (action: Action, input: CommandInput) =>

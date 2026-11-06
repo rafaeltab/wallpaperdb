@@ -77,7 +77,7 @@ export interface IPlanner {
   ): Effect.Effect<PlannerOwnership | undefined, Unavailable>;
   propose(
     input: PlanningInput,
-    attempt?: { requestId: string; deadline: number }
+    attempt?: { requestId?: string; deadline: number }
   ): Effect.Effect<Proposal, Unavailable>;
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
@@ -91,7 +91,7 @@ export interface Plan {
   preview(attempt?: {
     requestId: string;
     deadline: number;
-    progress: (phase: 'discovery' | 'freshness') => Effect.Effect<void, Unavailable>;
+    progress: (phase: 'discovery' | 'handoff' | 'freshness') => Effect.Effect<void, Unavailable>;
   }): Effect.Effect<Preview, Unavailable>;
 }
 export const Plan = Context.Service<Plan>('wallpaperdb.factory.Plan');
@@ -195,7 +195,7 @@ export interface PlanningAttempt {
   revision: number;
   startedAt: number;
   deadline: number;
-  phase: 'discovery' | 'freshness' | 'succeeded' | 'failed';
+  phase: 'discovery' | 'handoff' | 'freshness' | 'succeeded' | 'failed';
   finishedAt?: number;
   detail?: string;
   result?: AttemptResult;

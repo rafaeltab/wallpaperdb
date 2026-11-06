@@ -28,7 +28,9 @@ export const planningAttempts = sqliteTable(
     revision: integer('revision').notNull(),
     startedAt: integer('started_at').notNull(),
     deadline: integer('deadline').notNull(),
-    phase: text('phase', { enum: ['discovery', 'freshness', 'succeeded', 'failed'] }).notNull(),
+    phase: text('phase', {
+      enum: ['discovery', 'handoff', 'freshness', 'succeeded', 'failed'],
+    }).notNull(),
     slot: integer('slot').notNull().default(1),
     finishedAt: integer('finished_at'),
     detail: text('detail'),
@@ -38,12 +40,12 @@ export const planningAttempts = sqliteTable(
     check('planning_attempt_slot', sql`${table.slot} = 1`),
     check(
       'planning_attempt_phase',
-      sql`${table.phase} in ('discovery', 'freshness', 'succeeded', 'failed')`
+      sql`${table.phase} in ('discovery', 'handoff', 'freshness', 'succeeded', 'failed')`
     ),
     check('planning_attempt_revision', sql`${table.revision} >= 0`),
     uniqueIndex('one_active_planning_attempt')
       .on(table.slot)
-      .where(sql`${table.phase} in ('discovery', 'freshness')`),
+      .where(sql`${table.phase} in ('discovery', 'handoff', 'freshness')`),
   ]
 );
 

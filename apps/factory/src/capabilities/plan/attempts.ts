@@ -53,7 +53,7 @@ export const AttemptsLive = Layer.effect(
             id,
             revision: 0,
             startedAt,
-            deadline: startedAt + 120000,
+            deadline: startedAt + 600000,
             phase: 'discovery',
           };
           const created = yield* store.create(attempt);
@@ -177,5 +177,7 @@ function deadlineDetail(phase: PlanningAttempt['phase'], ownership?: PlannerOwne
     return 'Overall planning deadline exceeded after the advisory run. Its launch ownership is retired; no validated preview is available.';
   if (ownership)
     return "Overall planning deadline exceeded before a planner run was bound. This attempt's launch ownership is retired; no launch reconciliation is required.";
+  if (phase === 'handoff')
+    return 'Overall planning deadline exceeded during handoff before recorded launch ownership. No planner launch was recorded; no launch reconciliation is required.';
   return 'Overall planning deadline exceeded during discovery before planner launch. No planner launch was recorded for this attempt; no launch reconciliation is required.';
 }

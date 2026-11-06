@@ -18,7 +18,7 @@ const input: PlanningInput = {
   job: { kind: 'empty' },
   capacity: { concurrency: 1, admission: 1 },
 };
-it.each(['discovery', 'freshness'] as const)(
+it.each(['discovery', 'handoff', 'freshness'] as const)(
   'bounds %s by the persisted overall deadline and cancels underlying work',
   async (phase) => {
     const store = controlledAttemptStore();
@@ -51,7 +51,16 @@ it.each(['discovery', 'freshness'] as const)(
     });
     const planner = Layer.succeed(IPlanner, {
       ownership: () => Effect.succeed(undefined),
-      propose: () => Effect.succeed({ selected: [], deferred: [] }),
+      propose: () =>
+        phase === 'handoff'
+          ? Effect.never.pipe(
+              Effect.ensuring(
+                Effect.sync(() => {
+                  cancelled = true;
+                })
+              )
+            )
+          : Effect.succeed({ selected: [], deferred: [] }),
     });
     const plan = PlanLive.pipe(Layer.provide(Layer.mergeAll(source, planner)));
     const runtime = ManagedRuntime.make(
@@ -129,6 +138,8 @@ it('distinguishes busy ownership, allows late bound completion, and never retrie
       kind: 'accepted',
       id: 'new',
     });
+    const fresh = await Effect.runPromise(store.get('new'));
+    expect((fresh?.deadline ?? 0) - (fresh?.startedAt ?? 0)).toBe(600000);
     expect(observed).toBe(3);
     expect(await runtime.runPromise(attempts.submit('other'))).toEqual({ kind: 'busy', id: 'new' });
     expect(observed).toBe(3);
@@ -499,3 +510,54 @@ it.each([false, true])(
     }
   }
 );
+
+it('starts the automatic planner deadline before discovery and emits handoff before waiting for the model', async () => {
+  const { vi } = await import('vitest');
+  let now = 1000;
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const phases: string[] = [];
+  const runtime = ManagedRuntime.make(
+    PlanLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(PlanningSource, {
+            read: () =>
+              Effect.sync(() => {
+                now = 31000;
+                return input;
+              }),
+          }),
+          Layer.succeed(IPlanner, {
+            ownership: () => Effect.succeed(undefined),
+            propose: (_input, attempt) =>
+              Effect.sync(() => {
+                expect(attempt?.deadline).toBe(601000);
+                expect(phases).toEqual(attempt?.requestId ? ['discovery', 'handoff'] : []);
+                return { selected: [], deferred: [] };
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const plan = await runtime.runPromise(Plan);
+    await runtime.runPromise(
+      plan.preview({
+        requestId: 'explicit',
+        deadline: 601000,
+        progress: (phase) =>
+          Effect.sync(() => {
+            phases.push(phase);
+          }),
+      })
+    );
+    expect(phases).toEqual(['discovery', 'handoff', 'freshness']);
+    now = 1000;
+    phases.length = 0;
+    await runtime.runPromise(plan.preview());
+  } finally {
+    clock.mockRestore();
+    await runtime.dispose();
+  }
+});

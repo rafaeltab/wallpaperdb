@@ -21,6 +21,22 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     const input = {
       issues: [
         {
+          metadata: {
+            number: 580,
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+            title: 'Preview',
+            open: true,
+            candidate: true,
+            labels: ['ready-for-agent'],
+            assignees: [],
+            projectStatus: null,
+            projectPriority: null,
+            projectSize: null,
+            commentCount: 1,
+            blockers: [],
+            parents: [],
+            pullRequests: [],
+          },
           number: 580,
           url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
           title: 'Large spec context',
@@ -55,9 +71,11 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     };
     await host.save({ planner: { proposal } });
     expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
-    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
-      input
-    );
+    expect(
+      JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).prompt
+    ).not.toContain('Preview only; preserve this scope');
+    const sent = JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).prompt;
+    expect(sent).toContain('# Running issues\n\n- #579: parked');
     for (const patch of [
       { role: 'user' },
       { malformed: true },
@@ -109,8 +127,8 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     await host.save({ planner: { proposal, status: 'completed' } });
     const changed = { ...input, capacity: { concurrency: 2, admission: 1 } };
     expect(await Effect.runPromise(adapter.propose(changed))).toEqual(proposal);
-    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
-      changed
+    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).capacity).toEqual(
+      changed.capacity
     );
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
       starts + 1
@@ -142,9 +160,9 @@ it('retains uncertain launch responsibility after a lost start response', async 
     await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
       _tag: 'Unavailable',
     });
-    expect(JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).input).toEqual(
-      input
-    );
+    expect(
+      JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).prompt
+    ).not.toContain('Preview only; preserve this scope');
     await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
     await expect(
       Effect.runPromise(
@@ -184,6 +202,22 @@ it('returns Unavailable when the planner exits before consuming large context', 
         adapter.propose({
           issues: [
             {
+              metadata: {
+                number: 580,
+                url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+                title: 'Preview',
+                open: true,
+                candidate: true,
+                labels: ['ready-for-agent'],
+                assignees: [],
+                projectStatus: null,
+                projectPriority: null,
+                projectSize: null,
+                commentCount: 1,
+                blockers: [],
+                parents: [],
+                pullRequests: [],
+              },
               number: 580,
               url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
               title: 'Large context',
@@ -365,10 +399,26 @@ it('rejects an oversized prompt before launch intent and retains a useful termin
     const input = {
       issues: [
         {
+          metadata: {
+            number: 580,
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+            title: 'Preview',
+            open: true,
+            candidate: true,
+            labels: ['ready-for-agent'],
+            assignees: [],
+            projectStatus: null,
+            projectPriority: null,
+            projectSize: null,
+            commentCount: 1,
+            blockers: [],
+            parents: [],
+            pullRequests: [],
+          },
           number: 580,
           url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
-          title: 'Large context',
-          body: 'x'.repeat(150000),
+          title: 'x'.repeat(120001),
+          body: 'Omitted body',
           author: 'rafaeltab',
           open: true,
           labels: ['ready-for-agent'],
@@ -543,6 +593,97 @@ it('reattaches an exact bound attempt when only incidental job elapsed time adva
       )
     ).toEqual({ selected: [], deferred: [] });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('sends the complete flat metadata index over stdin without bodies or duplicate jobs', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const makeIssue = (number: number, candidate: boolean) => ({
+      number,
+      url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+      title: `Full title ${number}: quotes " slash \\ newline\nUnicode café 🖼️`,
+      body: 'PRIVATE_BODY_SENTINEL',
+      author: 'rafaeltab',
+      open: true,
+      labels: ['ready-for-agent'],
+      comments: [{ author: 'rafaeltab', body: 'PRIVATE_COMMENT_SENTINEL' }],
+      blockers: number === 1 ? [2] : [],
+      parents: [3],
+      blockersReady: true,
+      prerequisiteEvidence: 'PRIVATE_EVIDENCE_SENTINEL',
+      metadata: {
+        number,
+        url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+        title: `Issue ${number}`,
+        open: true,
+        candidate,
+        labels: ['ready-for-agent'],
+        assignees: ['rafaeltab', 'zero-two-rafaeltab'],
+        projectStatus: candidate ? 'Planned' : null,
+        projectPriority: candidate ? 'P1' : null,
+        projectSize: candidate ? 'M' : null,
+        commentCount: 7,
+        parents: [3],
+        blockers: [],
+        pullRequests: [
+          {
+            number: 10,
+            url: 'https://github.com/rafaeltab/wallpaperdb/pull/10',
+            state: 'MERGED' as const,
+          },
+        ],
+      },
+    });
+    const input = {
+      issues: [makeIssue(1, true), makeIssue(2, true), makeIssue(3, false)],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 2, admission: 1 },
+    };
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    const config = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    await Effect.runPromise(t3Planner(config).propose(input));
+    const { prompt, requestId } = JSON.parse(
+      await readFile(`${host.directory}/planner.json`, 'utf8')
+    );
+    expect(prompt).toContain(`# Candidate issues\n\n## open 1 - ${input.issues[0]?.title}`);
+    expect(prompt).toContain('# Context issues\n\n## open 3 -');
+    expect(prompt.match(/^## open 2 -/gm)).toHaveLength(1);
+    expect(prompt).toContain('priority: P1\nsize: M');
+    expect(prompt).toContain('status: none\npriority: none\nsize: none');
+    expect(prompt).toContain('assignees: rafaeltab, zero-two-rafaeltab\nprs: 10 merged');
+    expect(prompt).toContain('comment count: 7\nblockers:\n- 2');
+    expect(prompt).toContain('blockers: none');
+    expect(prompt).toContain('# Running issues\n\nnone');
+    expect(prompt).toContain('fetch its full issue body and all trusted maintainer comments');
+    for (const omitted of [
+      'PRIVATE_BODY_SENTINEL',
+      'PRIVATE_COMMENT_SENTINEL',
+      'PRIVATE_EVIDENCE_SENTINEL',
+      '"job":',
+      '"jobs":',
+      'deadline',
+      'createdAt',
+    ])
+      expect(prompt).not.toContain(omitted);
+    expect(
+      await readFile(`${config.stateDirectory}/planner-message-${requestId}.txt`, 'utf8')
+    ).toBe(prompt);
+    const record = await (await import('../src/adapters/t3/index.js'))
+      .plannerState(config.stateDirectory)
+      .read();
+    expect((record?.deadline ?? 0) - Date.now()).toBeGreaterThan(590000);
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;

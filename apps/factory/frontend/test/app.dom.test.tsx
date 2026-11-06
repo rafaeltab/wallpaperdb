@@ -252,6 +252,8 @@ it('keeps stage progress visible through freshness validation, renders advisory 
   await user.click(screen.getByRole('button', { name: 'Generate plan preview' }));
   await screen.findByText('Gathering issues (3s)');
   expect(screen.getByRole<HTMLProgressElement>('progressbar').value).toBe(1);
+  phase = 'handoff';
+  await screen.findByText('Handing off to planner (3s)', {}, { timeout: 2000 });
   phase = 'freshness';
   await screen.findByText('Validating freshness (3s)', {}, { timeout: 2000 });
   phase = 'succeeded';

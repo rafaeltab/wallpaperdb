@@ -4,6 +4,7 @@ import type {
   ObservationSource,
   IssueObservation,
   PullObservation,
+  Facts,
 } from '../../capabilities/observe/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
@@ -142,6 +143,7 @@ function translateIssue(
     (p) => p.project.number === 7 && p.project.owner.login === 'rafaeltab'
   );
   return {
+    author: issue.author.login,
     updatedAt: issue.updatedAt,
     labelDetails: issue.labels.nodes.every((l) => l.id && l.color)
       ? issue.labels.nodes.map((l) => label.parse(l))
@@ -308,13 +310,19 @@ export async function observeIssue(
 }
 export function githubObservations(
   project: string,
-  admitted: () => Effect.Effect<readonly number[], Unavailable>
+  admitted: () => Effect.Effect<readonly number[], Unavailable>,
+  evaluate?: (
+    number: number
+  ) => Effect.Effect<
+    { allowed: boolean; blockersReady: boolean; verifiedAt: number; evidence?: string },
+    Unavailable
+  >
 ): ObservationSource {
   return {
     read: () =>
       Effect.gen(function* () {
         const retained = yield* admitted();
-        return yield* Effect.tryPromise({
+        const facts: Facts = yield* Effect.tryPromise({
           try: async (signal) => {
             const index = await issueIndex(project, signal);
             const candidates = index.filter((i) => i.candidate);
@@ -412,12 +420,60 @@ export function githubObservations(
             }
             return {
               issues: issues.sort((a, b) => a.number - b.number),
-              pullRequests: [...pulls.values()],
+              pullRequests: await checkRequirements(project, [...pulls.values()], signal),
               verifiedPrBases: await verifiedBases(project, [...pulls.values()], signal),
             };
           },
           catch: (cause) => new Unavailable({ operation: 'github-observations', cause }),
         }).pipe(Effect.tapError(Effect.logError), Effect.withSpan('factory.github.observations'));
+        if (!evaluate) return facts;
+        const issues = yield* Effect.all(
+          facts.issues.map((issue) =>
+            !issue.candidate
+              ? Effect.succeed(issue)
+              : evaluate(issue.number).pipe(
+                  Effect.flatMap((value) =>
+                    Effect.try({
+                      try: () => {
+                        const evidence = z
+                          .array(
+                            z.object({
+                              issue: number,
+                              pr: number,
+                              commit: z.string(),
+                              parent: z.string().optional(),
+                              prBase: z.string().optional(),
+                              tip: z.string().optional(),
+                              originalHead: z.string().optional(),
+                            })
+                          )
+                          .parse(JSON.parse(value.evidence ?? '[]'));
+                        return {
+                          ...issue,
+                          evaluation: {
+                            allowed: value.allowed,
+                            blockersReady: value.blockersReady,
+                            verifiedAt: value.verifiedAt,
+                            prerequisites: evidence.map((e) => ({
+                              ...e,
+                              commit: e.originalHead ?? e.commit,
+                              basis: e.tip
+                                ? ('verified-landed' as const)
+                                : ('verified-unmerged' as const),
+                            })),
+                          },
+                        };
+                      },
+                      catch: (cause) =>
+                        new Unavailable({ operation: 'observation-verification', cause }),
+                    })
+                  ),
+                  Effect.catch((error) => Effect.logError(error).pipe(Effect.as(issue)))
+                )
+          ),
+          { concurrency: 4 }
+        );
+        return { ...facts, issues };
       }),
   };
 }
@@ -574,4 +630,51 @@ async function verifiedBases(
       edges.push({ base: base.number, tip: tip.number });
   }
   return edges;
+}
+
+async function checkRequirements(
+  project: string,
+  pulls: readonly PullObservation[],
+  signal: AbortSignal
+): Promise<readonly PullObservation[]> {
+  const entries = pulls.flatMap((pr) =>
+    (pr.checkRuns ?? []).map((check) => ({ pr: pr.number, check }))
+  );
+  const requirements = new Map<string, boolean>();
+  for (let offset = 0; offset < entries.length; offset += 100) {
+    const batch = entries.slice(offset, offset + 100);
+    const fields = batch
+      .map(
+        (entry, index) =>
+          `c${index}:node(id:${JSON.stringify(entry.check.id)}) { ... on CheckRun { isRequired(pullRequestNumber:${entry.pr}) } ... on StatusContext { isRequired(pullRequestNumber:${entry.pr}) } }`
+      )
+      .join(' ');
+    const result = z
+      .object({ data: z.record(z.object({ isRequired: z.boolean() }).nullable()) })
+      .parse(
+        JSON.parse(
+          await command(
+            'gh',
+            ['api', 'graphql', '-f', `query=query { ${fields} }`],
+            project,
+            signal
+          )
+        )
+      );
+    for (const [index, entry] of batch.entries()) {
+      const value = result.data[`c${index}`];
+      if (value) requirements.set(`${entry.pr}/${entry.check.id}`, value.isRequired);
+    }
+  }
+  return pulls.map((pr) => ({
+    ...pr,
+    checkRuns: pr.checkRuns?.map((check) => ({
+      ...check,
+      requirement: requirements.has(`${pr.number}/${check.id}`)
+        ? requirements.get(`${pr.number}/${check.id}`)
+          ? ('required' as const)
+          : ('optional' as const)
+        : ('unknown' as const),
+    })),
+  }));
 }

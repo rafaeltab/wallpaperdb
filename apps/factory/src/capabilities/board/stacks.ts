@@ -1,4 +1,4 @@
-import type { Tables, SourceId } from './model.js';
+import type { SourceId, Tables } from './model.js';
 import { entity, known, pullId } from './values.js';
 export function stacks(
   tables: Tables,

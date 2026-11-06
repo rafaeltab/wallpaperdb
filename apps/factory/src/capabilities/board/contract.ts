@@ -1,12 +1,12 @@
 import { Context, type Effect } from 'effect';
+import type { Unavailable } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type { PlanningAttempt } from '../plan/index.js';
-import type { Unavailable } from '../job/index.js';
 import type {
-  FactoryV2Snapshot,
-  FactoryV2Delta,
   FactoryV2Command,
   FactoryV2CommandReceipt,
+  FactoryV2Delta,
+  FactoryV2Snapshot,
 } from './model.js';
 export interface BoardInput {
   schedule: ScheduleSnapshot;
@@ -19,6 +19,7 @@ export interface BoardRecord {
   history: readonly FactoryV2Delta[];
 }
 export interface CommandRecord {
+  basis?: import('./model.js').PlanAttempt['basis'] | null;
   request: FactoryV2Command;
   receipt: FactoryV2CommandReceipt;
 }
@@ -31,6 +32,7 @@ export interface BoardStore {
   save(record: BoardRecord): Effect.Effect<void, Unavailable>;
   command(id: string): Effect.Effect<CommandRecord | undefined, Unavailable>;
   accept(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
+  claim(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
   finish(record: CommandRecord): Effect.Effect<void, Unavailable>;
   commands(): Effect.Effect<readonly CommandRecord[], Unavailable>;
 }
@@ -50,3 +52,5 @@ export interface BoardCommands {
   >;
 }
 export const BoardCommands = Context.Service<BoardCommands>('wallpaperdb.factory.BoardCommands');
+
+export type BoardPlan = PlanningAttempt & { launch?: import('../plan/index.js').PlannerOwnership };

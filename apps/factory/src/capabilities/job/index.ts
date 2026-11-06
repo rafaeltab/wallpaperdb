@@ -30,3 +30,5 @@ export type {
   PullRequestObservation,
   Delivery,
 } from './contract.js';
+
+export { eligible, trustedAuthor } from './implementation.js';

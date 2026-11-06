@@ -369,6 +369,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await saveProgress(dir, {
         issue: saved.issue,
         active: false,
+        phase: 'manual-recovery' as const,
         progress: `Retained automatic conflict worktree changed; preserve edits and reconcile ${path} before resuming`,
       });
       return false;
@@ -580,7 +581,13 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ...result,
       issue: item.issue,
       pr: item.url,
-      ...(capacityPending ? { active: false, progress: 'Waiting for recovery capacity' } : {}),
+      ...(capacityPending
+        ? {
+            active: false,
+            phase: 'waiting-capacity' as const,
+            progress: 'Waiting for recovery capacity',
+          }
+        : {}),
     });
     return recordResolution(dir, item, value, result, reviewed, signal);
   };
@@ -595,6 +602,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await saveProgress(dir, {
         issue,
         active: false,
+        phase: 'manual-recovery' as const,
         threadId,
         progress: `Automatic conflict worktree changed or lacks a retained snapshot; preserve edits and reconcile ${value.worktree} before accepting the agent result`,
       });
@@ -736,6 +744,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await saveProgress(dir, {
         issue: item.issue,
         active: false,
+        phase: 'manual-recovery' as const,
         progress: `Automatic worktree now owns a branch; preserve it and reconcile ${path} before resuming`,
       });
       return false;
@@ -745,6 +754,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await saveProgress(dir, {
         issue: item.issue,
         active: false,
+        phase: 'manual-recovery' as const,
         progress: `Interrupted local conflict lacks a retained conflict snapshot; preserve edits and reconcile ${path} before resuming`,
       });
       return false;
@@ -757,6 +767,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await publish(dir, 'recovery-progress.json', {
         issue: item.issue,
         active: false,
+        phase: 'manual-recovery' as const,
         progress: `Interrupted local replay requires operator reconciliation at ${path}; preserve its edits and finish or abort the Git operation before resuming`,
       });
       return false;
@@ -1910,6 +1921,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         issue: limit.data.source.issue,
         pr: limit.data.source.url,
         active: false,
+        phase: 'manual-recovery' as const,
         progress:
           'Affected stack exceeds the 100-layer maintenance limit; manual recovery required',
       };
@@ -1918,6 +1930,18 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!saved) return null;
     const progress = z
       .object({
+        phase: z
+          .enum([
+            'resolving',
+            'reviewing',
+            'verifying',
+            'publishing',
+            'manual-recovery',
+            'waiting-capacity',
+            'awaiting-answer',
+            'complete',
+          ])
+          .optional(),
         progress: z.string().default('Automatic conflict recorded; recovery pending'),
         bindingAvailable: z.boolean().optional(),
         active: z.boolean().default(true),
@@ -1939,6 +1963,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ...progress,
       issue: item.issue,
       pr: item.url,
+      phase: verified ? ('complete' as const) : progress.phase,
       progress: verified ? 'Verified; downstream readiness may proceed' : progress.progress,
       active: settled ? false : progress.active,
     };
@@ -1966,6 +1991,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         issue: item.issue,
         pr: item.url,
         active: false,
+        phase: 'manual-recovery' as const,
         progress:
           'No verified containing boundary retains the operator pin and current landed facts; manual recovery required',
       }))
@@ -2024,7 +2050,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       const current = await prState(replay, signal);
       if (await verifiedRetiredReplay(current, replay, signal)) continue;
       const progress = publicationProblem(current, replay);
-      if (progress) result.push({ issue, pr: replay.url, progress, active: false });
+      if (progress)
+        result.push({
+          issue,
+          pr: replay.url,
+          progress,
+          active: false,
+          phase: 'manual-recovery' as const,
+        });
     }
     return result;
   };

@@ -27,6 +27,9 @@ export async function v2Producer(config: {
   read: () => Effect.Effect<ScheduleSnapshot, Unavailable>;
   submitPlan: () => Promise<AttemptSubmission>;
   signal: AbortSignal;
+  observePlan: (
+    id: string
+  ) => Promise<import('../capabilities/plan/index.js').PlannerOwnership | undefined>;
 }) {
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
@@ -44,7 +47,16 @@ export async function v2Producer(config: {
     )
   );
   const attemptStore = sqliteAttemptStore(config.directory);
-  const latestPlan = () => attemptStore.latest?.() ?? attemptStore.pending();
+  const latestPlan = () =>
+    Effect.gen(function* () {
+      const plan = yield* attemptStore.latest?.() ?? attemptStore.pending();
+      if (!plan) return undefined;
+      const launch = yield* Effect.tryPromise({
+        try: () => config.observePlan(plan.id),
+        catch: (cause) => new Unavailable({ operation: 'v2-plan-ownership', cause }),
+      });
+      return { ...plan, launch };
+    });
   await run(
     Effect.flatMap(latestPlan(), (plan) =>
       Effect.flatMap(config.read(), (input) => board.publish(input, plan))
@@ -69,6 +81,7 @@ export async function v2Producer(config: {
     working = run(board.processPending().pipe(Effect.catch(Effect.logError))).finally(() => {
       working = undefined;
       refresh();
+      if (board.hasPending()) pump();
     });
     void working.catch(() => undefined);
   };

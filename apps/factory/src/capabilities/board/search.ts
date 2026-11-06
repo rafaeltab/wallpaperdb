@@ -1,5 +1,5 @@
-import type { FactoryV2Snapshot, FactoryV2IssueSearch, FactoryV2Problem } from './model.js';
-import { version, problem } from './values.js';
+import type { FactoryV2IssueSearch, FactoryV2Problem, FactoryV2Snapshot } from './model.js';
+import { problem, version } from './values.js';
 /** Search is entirely local. Tokens expire when indexed issues/actions change. */
 export function issueSearch(read: () => FactoryV2Snapshot) {
   const pages = new Map<string, { generation: string; query: string; offset: number }>();

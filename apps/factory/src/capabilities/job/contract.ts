@@ -97,6 +97,15 @@ export interface Control {
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface RecoveryStatus {
+  readonly phase?:
+    | 'resolving'
+    | 'reviewing'
+    | 'verifying'
+    | 'publishing'
+    | 'manual-recovery'
+    | 'waiting-capacity'
+    | 'awaiting-answer'
+    | 'complete';
   readonly issue: number;
   readonly pr: string;
   readonly progress: string;

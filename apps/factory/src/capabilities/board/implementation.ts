@@ -218,9 +218,11 @@ export function makeBoard(config: {
         receipts.set(request.commandId, record);
         return { status: 202 as const, receipt: record.receipt };
       }).pipe(lock.withPermits(1), Effect.withSpan('factory.board.submit'));
-    const processPending = () =>
+    const processPending = (commandId?: string) =>
       Effect.gen(function* () {
-        for (const record of [...receipts.values()].filter((r) => r.receipt.state === 'accepted')) {
+        for (const record of [...receipts.values()].filter(
+          (r) => r.receipt.state === 'accepted' && (!commandId || r.request.commandId === commandId)
+        )) {
           const action = current.snapshot.entities.actions[record.request.actionId];
           const stale = validate(record.request, action);
           let result: Effect.Success<ReturnType<BoardCommands['execute']>>;

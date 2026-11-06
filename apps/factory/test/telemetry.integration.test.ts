@@ -13,6 +13,7 @@ import { once } from 'node:events';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
+import type { FactoryV2Snapshot } from '../src/http/index.js';
 it('exports telemetry with incoming trace context through the composed runtime and closes its exporter', async () => {
   const host = await protocol();
   const prior = process.env.FACTORY_FIXTURE;
@@ -46,6 +47,8 @@ it('exports telemetry with incoming trace context through the composed runtime a
       FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
     });
     const traceId = '12345678901234567890123456789012';
+    const commandTraceId = '22345678901234567890123456789012';
+    const receiptTraceId = '32345678901234567890123456789012';
     try {
       expect(
         (
@@ -55,11 +58,50 @@ it('exports telemetry with incoming trace context through the composed runtime a
           })
         ).statusCode
       ).toBe(200);
+      const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const configure = Object.values(board.entities.actions).find((a) => a.kind === 'configure');
+      if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
+      const commandId = '00000000-0000-4000-8000-000000000008';
+      expect(
+        (
+          await running.app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            headers: { traceparent: `00-${commandTraceId}-1234567890123456-01` },
+            payload: {
+              commandId,
+              actionId: configure.id,
+              precondition: configure.availability.precondition,
+              kind: 'configure',
+              payload: {
+                paused: true,
+                concurrency: { kind: 'limited', maximum: 2 },
+                admissionAllowance: { kind: 'limited', maximum: 4 },
+              },
+            },
+          })
+        ).statusCode
+      ).toBe(202);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (
+              await running.app.inject({
+                url: `/api/v2/commands/${commandId}`,
+                headers: { traceparent: `00-${receiptTraceId}-1234567890123456-01` },
+              })
+            ).json()
+          ).toMatchObject({ state: 'succeeded' }),
+        { timeout: 5000 }
+      );
     } finally {
       await running.close();
     }
     expect(payloads.length).toBeGreaterThan(0);
     expect(payloads.join('')).toContain(traceId);
+    // Context survives both the durable HTTP boundary and background execution.
+    expect(payloads.join('').split(commandTraceId).length - 1).toBeGreaterThan(1);
+    expect(payloads.join('')).toContain(receiptTraceId);
   } finally {
     collector.closeAllConnections();
     await new Promise<void>((resolve) => collector.close(() => resolve()));

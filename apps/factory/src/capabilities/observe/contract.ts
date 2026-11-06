@@ -138,7 +138,10 @@ export type ThreadSnapshot = ThreadState & {
   stale: boolean;
   browserOrigin?: string;
 };
-/** Replaceable metadata only, never execution or planner authority. */
+/** Local reads initially return {}. save atomically replaces the complete snapshot,
+ * removing fields omitted by the caller, including obsolete failure/loading state.
+ * Metadata is never execution or planner authority.
+ */
 export interface ThreadStore {
   read(): Effect.Effect<ThreadState, Unavailable>;
   save(value: ThreadState): Effect.Effect<void, Unavailable>;

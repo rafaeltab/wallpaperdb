@@ -1,3 +1,5 @@
+import { controlledThreads } from './fixtures/thread-store.js';
+import { threadStoreContract } from './fixtures/thread-store-contract.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { Time, Unavailable } from '../src/capabilities/job/index.js';
@@ -11,7 +13,7 @@ import {
   type ThreadState,
 } from '../src/capabilities/observe/index.js';
 it('keeps last-known thread metadata dated on failure and never calls T3 from reads', async () => {
-  let state: ThreadState = {};
+  const store = controlledThreads();
   let now = 100;
   let calls = 0;
   const runtime = ManagedRuntime.make(
@@ -31,13 +33,7 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
             jobs: () => Effect.void,
           }),
           Layer.succeed(Time, { now: () => Effect.succeed(now) }),
-          Layer.succeed(ThreadStore, {
-            read: () => Effect.succeed(state),
-            save: (value) =>
-              Effect.sync(() => {
-                state = value;
-              }),
-          }),
+          Layer.succeed(ThreadStore, store),
           Layer.succeed(ThreadSource, {
             read: () => {
               calls++;
@@ -91,7 +87,7 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
 });
 
 it('uses explicit PR evidence, leaves title-only issues absent, and does not invent branch ownership', async () => {
-  let state: ThreadState = {
+  const state: ThreadState = {
     observedAt: 10,
     facts: {
       environmentId: 'env',
@@ -126,6 +122,7 @@ it('uses explicit PR evidence, leaves title-only issues absent, and does not inv
       ],
     },
   };
+  const store = controlledThreads(state);
   const runtime = ManagedRuntime.make(
     ThreadsLive.pipe(
       Layer.provide(
@@ -165,13 +162,7 @@ it('uses explicit PR evidence, leaves title-only issues absent, and does not inv
             refresh: () => Effect.void,
             jobs: () => Effect.void,
           }),
-          Layer.succeed(ThreadStore, {
-            read: () => Effect.succeed(state),
-            save: (value) =>
-              Effect.sync(() => {
-                state = value;
-              }),
-          }),
+          Layer.succeed(ThreadStore, store),
           Layer.succeed(ThreadSource, {
             read: () => (state.facts ? Effect.succeed(state.facts) : Effect.die('Missing fixture')),
           })
@@ -216,7 +207,7 @@ it('retains loading data during a slow refresh and reports conflicting durable b
   };
   let entries = [{ intent, control: { revision: 0, cancelled: false, claimed: [] } }];
   let jobs = [{ kind: 'job' as const, intent, execution, elapsedMs: 0 }];
-  let state: ThreadState = {};
+  const store = controlledThreads();
   let now = 100;
   let release: (() => void) | undefined;
   let blocked = false;
@@ -237,13 +228,7 @@ it('retains loading data during a slow refresh and reports conflicting durable b
             refresh: () => Effect.void,
             jobs: () => Effect.void,
           }),
-          Layer.succeed(ThreadStore, {
-            read: () => Effect.succeed(state),
-            save: (value) =>
-              Effect.sync(() => {
-                state = value;
-              }),
-          }),
+          Layer.succeed(ThreadStore, store),
           Layer.succeed(ThreadSource, {
             read: () =>
               Effect.tryPromise({
@@ -279,7 +264,7 @@ it('retains loading data during a slow refresh and reports conflicting durable b
   try {
     const service = await runtime.runPromise(Threads);
     await runtime.runPromise(service.refresh());
-    expect(state.facts?.threads[0]).toMatchObject({
+    expect((await Effect.runPromise(store.read())).facts?.threads[0]).toMatchObject({
       branch: 'factory/648',
       worktree: '/bound',
       associationState: 'evidenced',
@@ -306,7 +291,7 @@ it('retains loading data during a slow refresh and reports conflicting durable b
     ];
     release?.();
     await refreshing;
-    expect(state.facts?.threads[0]).toMatchObject({
+    expect((await Effect.runPromise(store.read())).facts?.threads[0]).toMatchObject({
       branch: null,
       worktree: null,
       associationState: 'conflicting',
@@ -323,3 +308,8 @@ it('retains loading data during a slow refresh and reports conflicting durable b
     await runtime.dispose();
   }
 });
+
+threadStoreContract('Controlled T3 metadata store', async () => ({
+  store: controlledThreads(),
+  close: async () => {},
+}));

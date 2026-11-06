@@ -1,3 +1,4 @@
+import { threadStoreContract } from './fixtures/thread-store-contract.js';
 import { mkdtemp, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,4 +84,13 @@ console.log(JSON.stringify({structuredContent:value}));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+threadStoreContract('SQLite T3 metadata store', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-thread-contract-'));
+  initializeState(directory);
+  return {
+    store: sqliteThreads(directory),
+    close: () => rm(directory, { recursive: true, force: true }),
+  };
 });

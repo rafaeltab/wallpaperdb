@@ -1,6 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { chmod } from 'node:fs/promises';
 import { readFile, readdir, writeFile } from './fixtures/durable-state.js';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
@@ -38,22 +37,19 @@ for (const { boundary, edit } of scenarios) {
         boundary === 'local'
           ? join(host.repository, '.git/hooks/post-rewrite')
           : join(host.directory, 'remote.git/hooks/post-receive');
-      await writeFile(
-        hook,
-        `#!/bin/sh\n${JSON.stringify(process.execPath)} -e 'const fs=require("fs"); fs.writeFileSync(${JSON.stringify(marker)}, "${boundary}"); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){ if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20); } fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},"done");'\n`
+      await host.nodeCommand(
+        'hold-hook',
+        `const fs=require("fs"); fs.writeFileSync(${JSON.stringify(marker)}, "${boundary}"); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){ if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20); } fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},"done");`,
+        { path: hook }
       );
-      await chmod(hook, 0o700);
     }
     if (boundary === 'conflict') {
       const originalGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
-      const wrapper = join(host.directory, 'git');
-      await writeFile(
-        wrapper,
-        `#!/usr/bin/env node
-const fs=require('fs'); const args=process.argv.slice(2); const result=require('child_process').spawnSync(${JSON.stringify(originalGit)},args,{encoding:'utf8'}); if(args.includes('rebase')&&result.status!==0){fs.writeFileSync(${JSON.stringify(marker)},'conflict'); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);} fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},'done');} process.stdout.write(result.stdout??''); process.stderr.write(result.stderr??''); process.exit(result.status??1);
+      await host.nodeCommand(
+        'git',
+        `const fs=require('fs'); const args=process.argv.slice(2); const result=require('child_process').spawnSync(${JSON.stringify(originalGit)},args,{encoding:'utf8'}); if(args.includes('rebase')&&result.status!==0){fs.writeFileSync(${JSON.stringify(marker)},'conflict'); const end=Date.now()+20000; while(!fs.existsSync(${JSON.stringify(release)})){if(Date.now()>end)process.exit(1); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);} fs.writeFileSync(${JSON.stringify(join(host.directory, 'released'))},'done');} process.stdout.write(result.stdout??''); process.stderr.write(result.stderr??''); process.exit(result.status??1);
 `
       );
-      await chmod(wrapper, 0o700);
     }
     const socket = createServer().listen(0, '127.0.0.1');
     await once(socket, 'listening');

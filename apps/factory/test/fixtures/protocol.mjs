@@ -881,5 +881,10 @@ export async function runProtocol(environment, argv, output, signal) {
 }
 
 if (nodeProcess.argv[1] && import.meta.url === pathToFileURL(nodeProcess.argv[1]).href) {
-  nodeProcess.exitCode = await runProtocol(nodeProcess.env, nodeProcess.argv, console);
+  const argv = [
+    nodeProcess.argv[0],
+    basename(nodeProcess.argv[1], '.mjs'),
+    ...nodeProcess.argv.slice(2),
+  ];
+  nodeProcess.exitCode = await runProtocol(nodeProcess.env, argv, console);
 }

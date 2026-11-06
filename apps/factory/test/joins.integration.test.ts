@@ -2234,7 +2234,7 @@ it.each(['closed', 'head', 'base', 'base-default', 'base-default-parents'] as co
       if (kind.startsWith('base-default')) live.prs[104].base = 'main';
       if (kind === 'head') f.git('push', '--force', 'origin', `${f.d}:refs/heads/C`);
       await writeFile(join(f.host.directory, 'join-live.json'), JSON.stringify(live));
-      const issues = githubIssues({ ...f.config, prerequisites: assertions });
+      const issues = githubIssues({ ...f.config, prerequisites: assertions }, f.readGitHub);
       if (!issues.reconcile || !issues.recoveries) throw new Error('Missing reconciliation');
       const before = (await f.host.calls()).filter(
         (call) => call.args[0] === 'pr' && call.args[1] === 'edit'

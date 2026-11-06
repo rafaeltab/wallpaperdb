@@ -4,7 +4,7 @@ import { Time } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type { BoardPlan } from './contract.js';
 import { planningIdentity } from './plan-basis.js';
-import { AttemptStore } from '../plan/index.js';
+import { AttemptStore, IPlanner } from '../plan/index.js';
 import { actions } from './actions.js';
 import { retainFacts, retainFact } from './retention.js';
 import { entityChanges } from './changes.js';
@@ -32,6 +32,7 @@ export function makeBoard(config: {
     const lock = yield* Semaphore.make(1),
       worker = yield* Semaphore.make(1);
     const attempts = Option.getOrUndefined(yield* Effect.serviceOption(AttemptStore));
+    const planner = Option.getOrUndefined(yield* Effect.serviceOption(IPlanner));
     const restored = yield* store.read();
     const epoch = config.epoch;
     let revision = 0,
@@ -332,8 +333,14 @@ export function makeBoard(config: {
           if (!attempt) {
             const old =
               id.startsWith('plan:') && attempts ? yield* attempts.get(id.slice(5)) : undefined;
+            const ownership = old && planner ? yield* planner.ownership(false, old.id) : undefined;
             return old
-              ? planDetails(old, current.snapshot, planBasis(id), planningIdentity(input))
+              ? planDetails(
+                  { ...old, launch: ownership?.requestId === old.id ? ownership : undefined },
+                  current.snapshot,
+                  planBasis(id),
+                  planningIdentity(input)
+                )
               : undefined;
           }
           const { issues, repositories, labels, users, sources, threads } =

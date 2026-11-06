@@ -11,7 +11,7 @@ import {
 import { Time } from '../src/capabilities/job/index.js';
 import { liveV2Data } from '../src/http/index.js';
 import type { ScheduleSnapshot } from '../src/capabilities/observe/index.js';
-import { AttemptStore, type PlanningAttempt } from '../src/capabilities/plan/index.js';
+import { AttemptStore, IPlanner, type PlanningAttempt } from '../src/capabilities/plan/index.js';
 
 const initial: ScheduleSnapshot = {
   state: { revision: -1, paused: true, concurrency: 1, allowance: 3, admissions: [] },
@@ -276,6 +276,8 @@ async function liveBoard(config: {
   run?: typeof Effect.runPromise;
   autoExecute?: boolean;
   attempts?: AttemptStore;
+  planner?: IPlanner;
+  initialPlan?: import('../src/capabilities/board/index.js').BoardPlan;
 }) {
   let saved: BoardRecord | undefined;
   const records = new Map<string, CommandRecord>();
@@ -317,8 +319,13 @@ async function liveBoard(config: {
     ),
     Effect.provideService(Time, { now: () => Effect.succeed(config.now?.() ?? 1000) })
   );
+  const withAttempts = config.attempts
+    ? build.pipe(Effect.provideService(AttemptStore, config.attempts))
+    : build;
   const board = await Effect.runPromise(
-    config.attempts ? build.pipe(Effect.provideService(AttemptStore, config.attempts)) : build
+    config.planner
+      ? withAttempts.pipe(Effect.provideService(IPlanner, config.planner))
+      : withAttempts
   );
   let pending: Promise<void> | undefined;
   const data = liveV2Data(board, Effect.runPromise, () => {
@@ -331,7 +338,7 @@ async function liveBoard(config: {
     ...data,
     publish: (
       input: ScheduleSnapshot,
-      plan?: import('../src/capabilities/plan/index.js').PlanningAttempt
+      plan?: import('../src/capabilities/board/index.js').BoardPlan
     ) => Effect.runPromise(board.publish(input, plan)),
     idle: () => pending ?? Promise.resolve(),
     execute: () => Effect.runPromise(board.processPending()),
@@ -1047,6 +1054,88 @@ it('bounds outstanding commands while replaying retries and admitting work after
       (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request(65) }))
         .statusCode
     ).toBe(202);
+  } finally {
+    await app.close();
+  }
+});
+
+it('preserves known historical plan threads through retained planner ownership', async () => {
+  const old: PlanningAttempt = {
+    id: '00000000-0000-4000-8000-000000000021',
+    revision: 1,
+    startedAt: 1000,
+    deadline: 5000,
+    finishedAt: 2000,
+    phase: 'succeeded',
+  };
+  const legacy = { ...old, id: '00000000-0000-4000-8000-000000000022' };
+  const launch = {
+    requestId: old.id,
+    revision: 1,
+    deadline: 5000,
+    phase: 'succeeded' as const,
+    run: { threadId: 'planner-old', runId: 'run-old' },
+    retired: true,
+  };
+  const input: ScheduleSnapshot = {
+    ...initial,
+    threads: {
+      state: 'current',
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        environmentId: 'e',
+        projectId: 'p',
+        threads: [
+          {
+            threadId: 'planner-old',
+            title: 'Old preview',
+            createdAt: null,
+            updatedAt: null,
+            status: 'completed',
+            branch: null,
+            worktree: null,
+            pullRequests: [],
+          },
+        ],
+      },
+    },
+  };
+  const board = await liveBoard({
+    scopeId: 'test',
+    initial: input,
+    now: () => 3000,
+    attempts: {
+      pending: () => Effect.succeed(undefined),
+      get: (id) => Effect.succeed(id === old.id ? old : id === legacy.id ? legacy : undefined),
+      create: () => Effect.succeed(false),
+      save: () => Effect.succeed(false),
+    },
+    planner: {
+      ownership: (_reconcile, id) => Effect.succeed(id === old.id ? launch : undefined),
+      propose: () => Effect.die('Historical reads must not propose work'),
+    },
+  });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    await board.publish(input, { ...old, launch });
+    const url = `/api/v2/plans/${encodeURIComponent(`plan:${old.id}`)}`;
+    expect((await app.inject(url)).json().attempt.threadId).toBe('thread:e/planner-old');
+    await board.publish(input, {
+      ...old,
+      id: '00000000-0000-4000-8000-000000000023',
+      startedAt: 3000,
+    });
+    const historical = (await app.inject(url)).json();
+    expect(historical.attempt.threadId).toBe('thread:e/planner-old');
+    expect(historical.entities.threads['thread:e/planner-old'].metadata).toMatchObject({
+      state: 'known',
+      value: { title: 'Old preview' },
+    });
+    expect(
+      (await app.inject(`/api/v2/plans/${encodeURIComponent(`plan:${legacy.id}`)}`)).json().attempt
+        .threadId
+    ).toBeNull();
   } finally {
     await app.close();
   }

@@ -70,7 +70,8 @@ export interface Proposal {
 /** Preview only. No adapter may dispatch implementation work. */
 export interface IPlanner {
   /** Observe exact bound ownership, including late completion, before blocking retries.
-   * Unbound claims remain uncertain. Never launches a worker. */
+   * Unbound claims remain uncertain. Never launches a worker. With reconcile=false
+   * or an exact requestId, read retained ownership without provider calls or mutations. */
   ownership(
     reconcile?: boolean,
     requestId?: string

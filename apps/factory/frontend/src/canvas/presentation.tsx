@@ -119,11 +119,11 @@ export function Fields({ board, item }: { board: Board; item: WorkItem }) {
     </span>
   );
 }
-function comparisonLabel(
+export function comparisonLabel(
   pr: PullRequest,
   comparison: { headOid: string; baseOid: string | null; baseRef: string | null }
 ): string;
-function comparisonLabel(
+export function comparisonLabel(
   pr: PullRequest,
   comparison: { headOid: string; baseOid: string | null; baseRef: string | null }
 ) {

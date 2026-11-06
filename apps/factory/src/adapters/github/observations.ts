@@ -396,8 +396,9 @@ export function githubObservations(
                 pr.state !== 'OPEN'
               )
                 throw new Error('Mismatched open PR');
-              pulls.set(pr.number, translatePull(pr));
-              queue.push(...pr.closingIssuesReferences.nodes.map((i) => i.number));
+              const observed = translatePull(pr);
+              pulls.set(pr.number, observed);
+              queue.push(...observed.linkedIssues);
             }
             while (queue.length) {
               const batch = [...new Set(queue.splice(0, 4))].filter((n) => !seen.has(n));

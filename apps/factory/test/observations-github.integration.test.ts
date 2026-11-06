@@ -374,3 +374,29 @@ it('reports incomplete reviewer identities when GitHub requests review from a te
     );
     expect(facts.pullRequests[0]).toMatchObject({ reviewers: [], reviewersComplete: false });
   }));
+
+it('collects local closing issue context while ignoring foreign repository references', async () =>
+  withGithub(async (host) => {
+    await host.save({
+      planning: {
+        candidates: [],
+        issues: [{ ...issue, labels: [] }],
+        openPulls: [
+          {
+            ...pr(43, 'OPEN'),
+            closingIssuesReferences: connection([
+              { number: 1, url: issue.url },
+              { number: 9999, url: 'https://github.com/another/repository/issues/9999' },
+            ]),
+          },
+        ],
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]?.linkedIssues).toEqual([1]);
+    const calls = (await host.calls()).filter((c) => c.binary === 'gh');
+    expect(calls.some((c) => c.args.join(' ').includes('issue(number:1)'))).toBe(true);
+    expect(calls.some((c) => c.args.join(' ').includes('issue(number:9999)'))).toBe(false);
+  }));

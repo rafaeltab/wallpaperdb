@@ -29,7 +29,10 @@ export interface BoardStore {
   accept(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
   claim(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
   finish(record: CommandRecord): Effect.Effect<void, Unavailable>;
-  commands(): Effect.Effect<readonly CommandRecord[], Unavailable>;
+  interruptPending(reason: import('./model.js').Reason): Effect.Effect<void, Unavailable>;
+  planBasis(
+    id: string
+  ): Effect.Effect<import('./model.js').PlanAttempt['basis'] | undefined, Unavailable>;
 }
 export const BoardStore = Context.Service<BoardStore>('wallpaperdb.factory.BoardStore');
 export interface BoardCommands {

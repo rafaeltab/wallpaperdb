@@ -75,6 +75,7 @@ export interface PullObservation {
     startedAt: string | null;
     completedAt: string | null;
   }[];
+  reviewersComplete?: boolean;
   reviewers?: readonly {
     user: ObservedUser;
     state: 'requested' | 'approved' | 'changes-requested' | 'commented' | 'dismissed';

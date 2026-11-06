@@ -20,3 +20,30 @@ test("issue preflight rejects closed, unassigned, blocked and wrong-project work
 			issuePreflight({ ...ready(), ...change }, "agent", "In Progress").length,
 		);
 });
+
+import { prReadiness } from "./agent-workflow.mjs";
+test("PR readiness never treats absent, pending or unknown checks as passing", () => {
+	const pr = {
+		state: "OPEN",
+		mergeable: "MERGEABLE",
+		statusCheckRollup: [
+			{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
+		],
+	};
+	assert.deepEqual(prReadiness(pr, ["build"]), []);
+	assert.ok(prReadiness({ ...pr, statusCheckRollup: [] }, ["build"]).length);
+	assert.ok(prReadiness({ ...pr, mergeable: "UNKNOWN" }, ["build"]).length);
+	assert.ok(prReadiness(pr, null).length);
+	assert.ok(
+		prReadiness(
+			{
+				...pr,
+				statusCheckRollup: [
+					...pr.statusCheckRollup,
+					{ name: "extra", status: "IN_PROGRESS" },
+				],
+			},
+			["build"],
+		).length,
+	);
+});

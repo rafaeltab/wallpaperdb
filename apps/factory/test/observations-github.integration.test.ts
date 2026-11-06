@@ -361,3 +361,16 @@ it('collects a shared related PR once without nesting check/review connections i
         .every((c) => !c.args.join(' ').includes('reviews(first:'))
     ).toBe(true);
   }));
+
+it('reports incomplete reviewer identities when GitHub requests review from a team', async () =>
+  withGithub(async (host) => {
+    const pull = {
+      ...pr(43, 'OPEN'),
+      reviewRequests: connection([{ requestedReviewer: { __typename: 'Team', id: 'TEAM1' } }]),
+    };
+    await host.save({ planning: { candidates: [], issues: [], openPulls: [pull] } });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]).toMatchObject({ reviewers: [], reviewersComplete: false });
+  }));

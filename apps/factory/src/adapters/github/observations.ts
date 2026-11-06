@@ -518,6 +518,10 @@ function translatePull(pr: z.infer<typeof pull>): PullObservation {
             completedAt: c.completedAt ?? null,
           }))
         : undefined,
+    reviewersComplete: pr.reviewRequests
+      ? pr.reviews.nodes.every((r) => !!r.author) &&
+        pr.reviewRequests.nodes.every((r) => user.safeParse(r.requestedReviewer).success)
+      : undefined,
     reviewers: pr.reviewRequests
       ? [
           ...pr.reviews.nodes.flatMap((r) =>

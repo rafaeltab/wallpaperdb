@@ -122,7 +122,7 @@ export function registerV2Routes(
     if ('code' in initial || initial.kind !== 'unchanged' || waitMs === 0)
       return sendChanges(reply, initial);
     if (waiting.size >= 64)
-      return sendProblem(reply, problem(503, 'unavailable', 'Too many sample update connections.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'Too many update connections.'));
     await new Promise<void>((resolve) => {
       let done = false;
       let unsubscribe = () => {};
@@ -158,7 +158,7 @@ export function registerV2Routes(
     const initial = data.changes(after);
     if ('code' in initial || initial.kind === 'resync-required') return sendChanges(reply, initial);
     if (waiting.size >= 64)
-      return sendProblem(reply, problem(503, 'unavailable', 'Too many sample update connections.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'Too many update connections.'));
     reply.hijack();
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',

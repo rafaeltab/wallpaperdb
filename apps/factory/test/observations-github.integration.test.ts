@@ -270,7 +270,9 @@ it('collects comparison-bound PR titles, drafts, mergeability, checks and review
         ],
       },
     };
-    await host.save({ planning: { candidates: [], issues: [], openPulls: [pull] } });
+    await host.save({
+      planning: { candidates: [], issues: [], openPulls: [pull], requiredChecks: { C1: true } },
+    });
     const facts = await Effect.runPromise(
       githubObservations(host.repository, () => Effect.succeed([])).read()
     );
@@ -279,7 +281,15 @@ it('collects comparison-bound PR titles, drafts, mergeability, checks and review
       draft: true,
       mergeability: 'CONFLICTING',
       labelDetails: [{ id: 'L1', name: 'backend', color: 'abcdef' }],
-      checkRuns: [{ id: 'C1', name: 'typecheck', state: 'passed', head: 'a'.repeat(40) }],
+      checkRuns: [
+        {
+          id: 'C1',
+          name: 'typecheck',
+          state: 'passed',
+          head: 'a'.repeat(40),
+          requirement: 'required',
+        },
+      ],
       reviewers: [{ user: { login: 'reviewer' }, state: 'requested', head: null }],
     });
   }));

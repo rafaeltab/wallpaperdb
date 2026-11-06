@@ -158,7 +158,7 @@ function validCommand(command: Start): boolean {
     /^[a-f0-9]{40}$/.test(command.base)
   );
 }
-function eligible(issue: {
+export function eligible(issue: {
   open: boolean;
   author: string;
   labels: readonly string[];
@@ -166,7 +166,7 @@ function eligible(issue: {
 }): boolean {
   return (
     issue.open &&
-    ['rafaeltab', 'zero-two-rafaeltab'].includes(issue.author) &&
+    trustedAuthor(issue.author) &&
     issue.labels.includes('ready-for-agent') &&
     !issue.labels.some((label) => ['future-work', 'spec'].includes(label)) &&
     issue.blockersReady
@@ -257,4 +257,8 @@ function retainPrerequisite(
 function verifiedPublication(delivery: Delivery | undefined) {
   if (!(delivery?.ready || delivery?.landed)) return null;
   return delivery.pr?.kind === 'found' ? delivery.pr : null;
+}
+
+export function trustedAuthor(author: string) {
+  return ['rafaeltab', 'zero-two-rafaeltab'].includes(author);
 }

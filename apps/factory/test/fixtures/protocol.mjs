@@ -479,7 +479,15 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           },
         ]
       );
-    else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
+    else if (args.join(' ').includes('c0:node(id:')) {
+      const values = {};
+      for (const match of args.join(' ').matchAll(/(c\d+):node\(id:"([^"]+)"/g))
+        values[match[1]] =
+          typeof config.planning.requiredChecks?.[match[2]] === 'boolean'
+            ? { isRequired: config.planning.requiredChecks[match[2]] }
+            : null;
+      reply({ data: values });
+    } else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
       const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
       const nodes = config.planning.issues.map((issue) => ({
         ...issue,

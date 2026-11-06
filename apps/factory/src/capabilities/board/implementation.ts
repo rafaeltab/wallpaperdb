@@ -1,22 +1,23 @@
-import { Effect, Semaphore, Option } from 'effect';
-import { AttemptStore } from '../plan/index.js';
+import { Effect, Option, Semaphore } from 'effect';
 import { Time } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
-import type {
-  FactoryV2Delta,
-  FactoryV2Changes,
-  FactoryV2Problem,
-  FactoryV2Command,
-  Action,
-} from './model.js';
-import { BoardStore, BoardCommands, type CommandRecord } from './contract.js';
-import { version, problem } from './values.js';
-import { project } from './projection.js';
-import { issueSearch } from './search.js';
-import { planDetails } from './plans.js';
-import type { PlanningAttempt } from '../plan/index.js';
+import type { BoardPlan } from './contract.js';
+import { planningIdentity } from './plan-basis.js';
+import { AttemptStore } from '../plan/index.js';
 import { actions } from './actions.js';
 import { entityChanges } from './changes.js';
+import { BoardCommands, BoardStore, type CommandRecord } from './contract.js';
+import type {
+  Action,
+  FactoryV2Changes,
+  FactoryV2Command,
+  FactoryV2Delta,
+  FactoryV2Problem,
+} from './model.js';
+import { planDetails } from './plans.js';
+import { project } from './projection.js';
+import { issueSearch } from './search.js';
+import { problem, version } from './values.js';
 
 /** Pure reads observe one committed revision. Effectful publication and command
  * responsibility use the store before publishing anything to the transport. */
@@ -37,6 +38,10 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
     const at = new Date(yield* time.now()).toISOString();
     const initial = project(input, at, config.scopeId, cursor());
     let current = { ...initial, snapshot: actions(initial.snapshot, input) };
+    for (const detail of Object.values(current.details)) {
+      const item = current.snapshot.entities.items[detail.itemId];
+      if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
+    }
     let history: readonly FactoryV2Delta[] = restored?.history ?? [];
     let identity = restored?.inputVersion ?? version({ input: stable(input), plan: undefined });
     if (restored) current = { snapshot: restored.snapshot, details: restored.details };
@@ -64,8 +69,8 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
         receipts.set(record.request.commandId, interrupted);
       } else receipts.set(record.request.commandId, record);
     }
-    let lastPlan: PlanningAttempt | undefined;
-    const publish = (nextInput: ScheduleSnapshot, plan?: PlanningAttempt) =>
+    let lastPlan: BoardPlan | undefined;
+    const publish = (nextInput: ScheduleSnapshot, plan?: BoardPlan) =>
       Effect.gen(function* () {
         lastPlan = plan ?? lastPlan;
         const nextIdentity = version({ input: stable(nextInput), plan: lastPlan });
@@ -79,7 +84,18 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           cursor()
         );
         if (lastPlan) {
-          const detail = planDetails(lastPlan, next.snapshot);
+          const basis = [...receipts.values()].find(
+            (r) =>
+              r.receipt.result &&
+              'planId' in r.receipt.result &&
+              r.receipt.result.planId === `plan:${lastPlan?.id}`
+          )?.basis;
+          const detail = planDetails(
+            lastPlan,
+            next.snapshot,
+            basis ?? undefined,
+            planningIdentity(input)
+          );
           next.snapshot = {
             ...next.snapshot,
             meta: { ...next.snapshot.meta, currentPlanId: detail.attempt.id },
@@ -121,6 +137,14 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
         if (rejected) return rejected;
         const record: CommandRecord = {
           request,
+          basis:
+            request.kind === 'preview-plan'
+              ? {
+                  boardCursor: current.snapshot.cursor,
+                  inputVersion: planningIdentity(input),
+                  controlVersion: current.snapshot.meta.factory.version,
+                }
+              : undefined,
           receipt: {
             commandId: request.commandId,
             version: '1',
@@ -166,7 +190,11 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
               ...record,
               receipt: { ...record.receipt, state: 'running' as const, version: '2' },
             };
-            yield* store.finish(running);
+            if (!(yield* store.claim(running))) {
+              const winner = yield* store.command(record.request.commandId);
+              if (winner) receipts.set(record.request.commandId, winner);
+              continue;
+            }
             receipts.set(record.request.commandId, running);
             result = yield* commands.execute(record.request, action, input).pipe(
               Effect.catchCause((cause) =>
@@ -225,6 +253,7 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
         };
       },
       receipt: (id: string) => receipts.get(id)?.receipt,
+      hasPending: () => [...receipts.values()].some((r) => r.receipt.state === 'accepted'),
       search: issueSearch(() => current.snapshot),
       details: (id: string) => current.details[id],
       plan: (id: string) =>
@@ -234,7 +263,9 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           if (!attempt) {
             const old =
               id.startsWith('plan:') && attempts ? yield* attempts.get(id.slice(5)) : undefined;
-            return old ? planDetails(old, current.snapshot) : undefined;
+            return old
+              ? planDetails(old, current.snapshot, undefined, planningIdentity(input))
+              : undefined;
           }
           const { issues, repositories, labels, users, sources, threads } =
             current.snapshot.entities;

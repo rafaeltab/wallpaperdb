@@ -5,6 +5,7 @@ export function issueObservation(
 ): IssueObservation {
   return {
     number,
+    author: 'rafaeltab',
     url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
     title: `Issue ${number}`,
     updatedAt: '2026-11-06T12:00:00Z',

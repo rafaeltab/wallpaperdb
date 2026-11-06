@@ -19,6 +19,7 @@ import {
   Issues,
   Job,
   JobLive,
+  eligible,
   JobStore,
   Time,
   Unavailable,
@@ -291,8 +292,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
         Layer.succeed(
           ObservationSource,
-          githubObservations(project, () =>
-            Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue))
+          githubObservations(
+            project,
+            () => Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
+            (number) =>
+              Effect.gen(function* () {
+                const issues = yield* Issues;
+                const observed = yield* issues.inspect(number);
+                return {
+                  allowed: eligible(observed),
+                  blockersReady: observed.blockersReady,
+                  verifiedAt: yield* systemTime.now(),
+                  evidence: observed.prerequisite?.evidence,
+                };
+              }).pipe(Effect.provide(deps))
           )
         )
       )
@@ -371,6 +384,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         }))
       ),
     submitPlan: () => attempts.submit(),
+    observePlan: async (id) => (await attempts.observe(id))?.launch,
     signal: requests.signal,
   });
   const app = operationsServer({
@@ -397,6 +411,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       await app.close();
     } finally {
       requests.abort();
+      await v2.close();
+      await attempts.close();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }

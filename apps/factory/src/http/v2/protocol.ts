@@ -94,7 +94,7 @@ export function problem(
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
     status,
     code,
-    title: 'Fake factory v2 request rejected',
+    title: 'Factory v2 request rejected',
     detail,
     retry: code === 'stale-action' ? 'refresh' : code === 'unavailable' ? 'later' : 'never',
     commandId,

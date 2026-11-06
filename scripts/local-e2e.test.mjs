@@ -1135,10 +1135,11 @@ test("test-runner dry flags cannot bypass a lock held by another worktree", asyn
 });
 
 test("occupied worktree ingress fails early without altering the existing listener or any stack", async (t) => {
-	const f = await browserFixture(t);
 	const listener = createServer();
 	await new Promise((resolve) => listener.listen(0, "0.0.0.0", resolve));
 	t.onTestFinished(() => listener.close());
+	// Keep this port occupied while the fixture chooses its other distinct ports.
+	const f = await browserFixture(t);
 	const worktree = join(f.root, ".worktree");
 	writeFileSync(
 		worktree,

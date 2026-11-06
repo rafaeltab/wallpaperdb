@@ -50,7 +50,7 @@ it('routes each renewed Source quarantine to the durable operator inbox while pr
     const directory = await mkdtemp(join(tmpdir(), 'source-quarantine-receipts-'));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
     const { createOperatorInbox } = await import(
-      new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+      new URL('../../../scripts/operator-inbox.ts', import.meta.url).href
     );
     async function startReceiver() {
       const server: Server = await createOperatorInbox({

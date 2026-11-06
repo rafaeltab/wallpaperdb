@@ -394,7 +394,7 @@ it('renews exhausted publication notices through the durable deduplicating inbox
     const directory = await mkdtemp(join(tmpdir(), 'wallpaper-quarantine-receipts-'));
     defer(() => rm(directory, { recursive: true, force: true }));
     const { createOperatorInbox } = await import(
-      new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+      new URL('../../../scripts/operator-inbox.ts', import.meta.url).href
     );
     const openInbox = async () => {
       const inbox: Server = await createOperatorInbox({ directory, token: 'test' });

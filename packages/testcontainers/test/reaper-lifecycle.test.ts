@@ -52,7 +52,7 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
         expect((await exited).StatusCode).toBe(0);
       }
     );
-    const child = fork(new URL('./fixtures/start-container.mjs', import.meta.url), [], {
+    const child = fork(new URL('./fixtures/start-container.ts', import.meta.url), [], {
       silent: true,
       execArgv: [],
       timeout: 45000,

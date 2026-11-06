@@ -1,0 +1,13 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"module": "ESNext",
+		"moduleResolution": "Bundler"
+	},
+	"include": [
+		"../apps/*/scripts/**/*.ts",
+		"../apps/factory/test/fixtures/protocol.ts",
+		"../packages/testcontainers/test/fixtures/start-container.ts",
+		"../.agents/skills/**/*.ts"
+	]
+}

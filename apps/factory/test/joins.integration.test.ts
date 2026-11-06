@@ -28,10 +28,14 @@ import { fileStore } from '../src/adapters/store/index.js';
 import { t3Execution, t3Restacker } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
-import { joinFixture as fixture } from './fixtures/join.js';
+import { joinFixture } from './fixtures/join.js';
+
+const fixture = (options: Parameters<typeof joinFixture>[0] = {}) =>
+  joinFixture({ inProcess: true, ...options });
 
 it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', async () => {
-  const f = await fixture();
+  // Retain a complete CLI path alongside the protocol-driven behavioral matrix.
+  const f = await fixture({ inProcess: false });
   const { host, git, d, c, issues } = f;
   try {
     expect(await Effect.runPromise(issues.inspect(5))).toMatchObject({

@@ -991,3 +991,58 @@ it('distinguishes malformed, different-scope and expired live change cursors', a
     other.close();
   }
 });
+
+it('does not date older rich metadata with a later legacy-only observation after rollback', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { eq } = await import('drizzle-orm');
+  const { sqliteObservations } = await import('../src/adapters/store/index.js');
+  const { stateConnection, observationRefresh } = await import('../src/platform/index.js');
+  const { issueObservation } = await import('./fixtures/v2.js');
+  const directory = await mkdtemp(join(tmpdir(), 'v2-legacy-observation-'));
+  const store = sqliteObservations(directory);
+  const facts = { issues: [issueObservation(1)], pullRequests: [] };
+  await Effect.runPromise(store.refresh({ observedAt: 1000, facts }));
+  const load = async () => ({
+    ...initial,
+    observations: {
+      ...(await Effect.runPromise(store.read())),
+      state: 'current' as const,
+      stale: false,
+    },
+  });
+  const board = await liveBoard({ scopeId: 'test', initial: await load() });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.issues[
+        'issue:rafaeltab/wallpaperdb/1'
+      ].metadata.state
+    ).toBe('known');
+    // A previous release updates the original observation tables, without the new rich cache.
+    stateConnection(directory, (db) =>
+      db
+        .update(observationRefresh)
+        .set({ observedAt: 2000 })
+        .where(eq(observationRefresh.id, 1))
+        .run()
+    );
+    await board.publish(await load());
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.issues[
+        'issue:rafaeltab/wallpaperdb/1'
+      ].metadata.state
+    ).toBe('unknown');
+    await Effect.runPromise(store.refresh({ observedAt: 3000, facts }));
+    await board.publish(await load());
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.issues[
+        'issue:rafaeltab/wallpaperdb/1'
+      ].metadata.state
+    ).toBe('known');
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

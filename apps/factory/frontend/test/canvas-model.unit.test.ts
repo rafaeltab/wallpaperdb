@@ -65,3 +65,23 @@ it('distinguishes current, previous, and head-only provider evidence', async () 
     'Head-only evidence; tested base unknown'
   );
 });
+it('packs sibling issues into two lanes inside their parent namespace', async () => {
+  const board = await sample(),
+    graph = layout(board, new Set());
+  const left = graph.cards.find((c) => c.id === 'item:1001'),
+    right = graph.cards.find((c) => c.id === 'item:1007');
+  if (!left || !right) throw new Error('Expected planned sibling issues');
+  expect(left.x).not.toBe(right.x);
+  expect(left.y).toBe(right.y);
+  expect(Math.abs(left.x - right.x)).toBeGreaterThanOrEqual(left.width);
+});
+it('highlights verified PR-base relationships in the selected direction', async () => {
+  const board = await sample();
+  expect([...related(board, board.entities.items['item:1004'], 'prerequisites')]).toEqual([
+    'item:1003',
+  ]);
+  expect([...related(board, board.entities.items['item:1003'], 'dependants')]).toEqual([
+    'item:1004',
+  ]);
+  expect(related(board, board.entities.items['item:1004'], 'dependants').size).toBe(0);
+});

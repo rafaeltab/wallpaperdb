@@ -45,7 +45,14 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
     let history: readonly FactoryV2Delta[] = restored?.history ?? [];
     let identity = restored?.inputVersion ?? version({ input: stable(input), plan: undefined });
     if (restored) current = { snapshot: restored.snapshot, details: restored.details };
-    else yield* store.save({ ...current, history, inputVersion: identity });
+    else if (!(yield* store.save({ ...current, history, inputVersion: identity }, null))) {
+      const winner = yield* store.read();
+      if (winner) {
+        current = { snapshot: winner.snapshot, details: { ...winner.details } };
+        history = winner.history;
+        identity = winner.inputVersion;
+      }
+    }
     const listeners = new Set<() => void>();
     const receipts = new Map<string, CommandRecord>();
     for (const record of yield* store.commands()) {
@@ -122,7 +129,21 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; 
           meta: next.snapshot.meta,
         };
         const nextHistory = [...history, delta].slice(-64);
-        yield* store.save({ ...next, history: nextHistory, inputVersion: nextIdentity });
+        if (
+          !(yield* store.save(
+            { ...next, history: nextHistory, inputVersion: nextIdentity },
+            before.cursor
+          ))
+        ) {
+          const winner = yield* store.read();
+          if (winner) {
+            current = { snapshot: winner.snapshot, details: { ...winner.details } };
+            history = winner.history;
+            identity = winner.inputVersion;
+            for (const listener of listeners) listener();
+          }
+          return;
+        }
         current = next;
         identity = nextIdentity;
         history = nextHistory;

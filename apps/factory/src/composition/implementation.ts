@@ -386,6 +386,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     submitPlan: () => attempts.submit(),
     observePlan: async (id) => (await attempts.observe(id))?.launch,
     signal: requests.signal,
+  }).catch(async (cause) => {
+    requests.abort();
+    await Promise.allSettled([
+      attempts.close(),
+      runtime.dispose(),
+      ...[...workers.values()].map((worker) => worker.dispose()),
+    ]);
+    throw cause;
   });
   const app = operationsServer({
     v2: v2.data,
@@ -487,15 +495,22 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       try {
         await app.close();
       } finally {
-        clearTimeout(deadline);
-        requests.abort();
-        await v2.close();
-        await attempts.close();
-        await observing?.catch(() => undefined);
-        await refreshing?.catch(() => undefined);
-        await refreshingThreads?.catch(() => undefined);
-        await runtime.dispose();
-        await Promise.all([...workers.values()].map((worker) => worker.dispose()));
+        try {
+          await Promise.allSettled([
+            v2.close(),
+            attempts.close(),
+            observing,
+            refreshing,
+            refreshingThreads,
+          ]);
+        } finally {
+          clearTimeout(deadline);
+          requests.abort();
+          await Promise.allSettled([
+            runtime.dispose(),
+            ...[...workers.values()].map((worker) => worker.dispose()),
+          ]);
+        }
       }
     })());
   return { app, close };

@@ -17,14 +17,26 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
           (db) => db.select().from(v2Board).where(eq(v2Board.scope, scope)).get()?.value
         )
       ),
-    save: (value) =>
+    save: (value, expectedCursor) =>
       operation(() =>
-        stateConnection(directory, (db) => {
-          db.insert(v2Board)
-            .values({ scope, value })
-            .onConflictDoUpdate({ target: v2Board.scope, set: { value } })
-            .run();
-        })
+        stateConnection(directory, (db) =>
+          db.transaction(
+            (tx) => {
+              const previous = tx
+                .select()
+                .from(v2Board)
+                .where(eq(v2Board.scope, scope))
+                .get()?.value;
+              if ((previous?.snapshot.cursor ?? null) !== expectedCursor) return false;
+              tx.insert(v2Board)
+                .values({ scope, value })
+                .onConflictDoUpdate({ target: v2Board.scope, set: { value } })
+                .run();
+              return true;
+            },
+            { behavior: 'immediate' }
+          )
+        )
       ),
     command: (id) =>
       operation(() =>

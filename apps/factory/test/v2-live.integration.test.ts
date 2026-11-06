@@ -279,9 +279,11 @@ async function liveBoard(config: {
   const records = new Map<string, CommandRecord>();
   const store = config.store ?? {
     read: () => Effect.succeed(saved),
-    save: (record: BoardRecord) =>
+    save: (record: BoardRecord, expectedCursor: string | null) =>
       Effect.sync(() => {
+        if ((saved?.snapshot.cursor ?? null) !== expectedCursor) return false;
         saved = record;
+        return true;
       }),
     command: (id: string) => Effect.succeed(records.get(id)),
     accept: (record: CommandRecord) =>
@@ -756,5 +758,35 @@ it('invalidates item details when individual checks change without changing the 
     ).toMatchObject({ checkRuns: { state: 'known', value: [{ name: 'build' }] } });
   } finally {
     await app.close();
+  }
+});
+
+it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { sqliteBoard } = await import('../src/adapters/store/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'v2-shared-'));
+  const store = sqliteBoard(directory);
+  const first = await liveBoard({ scopeId: 'test', initial, store }),
+    second = await liveBoard({ scopeId: 'test', initial, store });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: first });
+  const other = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: second });
+  try {
+    const start = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    await first.publish({ ...initial, state: { ...initial.state, revision: 0, concurrency: 2 } });
+    const middle = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    await second.publish({ ...initial, state: { ...initial.state, revision: 1, concurrency: 3 } });
+    const replay = (
+      await other.inject(`/api/v2/board/changes?after=${encodeURIComponent(middle.cursor)}`)
+    ).json();
+    expect(replay.kind).not.toBe('resync-required');
+    const prior = (
+      await other.inject(`/api/v2/board/changes?after=${encodeURIComponent(start.cursor)}`)
+    ).json();
+    expect(prior.batches[0]).toMatchObject({ fromCursor: start.cursor, toCursor: middle.cursor });
+  } finally {
+    await Promise.all([app.close(), other.close()]);
+    await rm(directory, { recursive: true, force: true });
   }
 });

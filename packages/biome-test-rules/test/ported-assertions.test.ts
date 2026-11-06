@@ -28,8 +28,12 @@ test("pinned valid-expect rejects its default async matcher without awaiting", (
 for (const [rule, group] of Object.entries(fixtures))
 	test(`configured upstream ${rule} fixtures`, () => {
 		const failures = [];
-		for (const fixture of group.cases) {
-			const diagnostics = lint(fixture.source).filter((d) =>
+		const batch =
+			rule === "valid-expect"
+				? lint(group.cases.map((fixture) => fixture.source))
+				: undefined;
+		for (const [index, fixture] of group.cases.entries()) {
+			const diagnostics = (batch?.[index] ?? lint(fixture.source)).filter((d) =>
 				d.message.startsWith(`${rule}:`),
 			);
 			if (diagnostics.length !== (fixture.valid ? 0 : fixture.messages.length))

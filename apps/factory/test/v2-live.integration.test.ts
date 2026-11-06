@@ -781,6 +781,32 @@ it('invalidates item details when individual checks change without changing the 
   }
 });
 
+it('keeps a parked owning job visible when its bound PR is closed', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42, { state: 'CLOSED', linkedIssues: [1] }), true);
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const card = snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/42'];
+    expect(card).toMatchObject({
+      attention: { state: 'required' },
+      jobIds: ['job:rafaeltab/wallpaperdb/1'],
+    });
+    expect(card.actionIds).toContain('action:resume/job:rafaeltab/wallpaperdb/1');
+    expect(
+      (
+        await app.inject({
+          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+          headers: { 'if-match': `"${card.version}"` },
+        })
+      ).json()
+    ).toMatchObject({ questions: [{ id: 'q1', text: 'Choose a behavior' }] });
+  } finally {
+    await app.close();
+  }
+});
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

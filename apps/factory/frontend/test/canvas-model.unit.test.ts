@@ -153,3 +153,54 @@ it('uses PR ancestry for selection while stack ordering supplies its visual conn
   expect(data.selectionConnections).toContainEqual({ source: base.id, target: tip.id });
   expect(data.connections).not.toContainEqual({ source: base.id, target: tip.id });
 });
+
+it('displays a cyclic prerequisite component beside another dependency chain', async () => {
+  const seed = await sample(),
+    edge = Object.values(seed.entities.relationships).find((r) => r.kind === 'prerequisite');
+  if (!edge || edge.kind !== 'prerequisite') throw new Error('Expected prerequisite fixture');
+  const items = { ...seed.entities.items };
+  for (const item of Object.values(items)) {
+    if (['item:1001', 'item:1002', 'item:1005', 'item:1007'].includes(item.id))
+      items[item.id] = {
+        ...item,
+        section: 'planned',
+        jobIds: [],
+        threadIds: [],
+        actionIds: [],
+        status: { code: 'ready', label: 'Ready', active: false, since: null },
+      };
+    else delete items[item.id];
+  }
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      items,
+      relationships: {
+        'relationship:cycle-a': {
+          ...edge,
+          id: 'relationship:cycle-a',
+          prerequisiteIssueId: 'issue:1001',
+          dependantIssueId: 'issue:1002',
+        },
+        'relationship:cycle-b': {
+          ...edge,
+          id: 'relationship:cycle-b',
+          prerequisiteIssueId: 'issue:1002',
+          dependantIssueId: 'issue:1001',
+        },
+        'relationship:chain': {
+          ...edge,
+          id: 'relationship:chain',
+          prerequisiteIssueId: 'issue:1005',
+          dependantIssueId: 'issue:1007',
+        },
+      },
+    },
+  };
+  const graph = layout(board, new Set());
+  expect(new Set(graph.boxes.map((box) => box.item.item.id))).toEqual(new Set(Object.keys(items)));
+  expect(
+    graph.boxes.every((box) => [box.x, box.y, box.width, box.height].every(Number.isFinite))
+  ).toBe(true);
+});

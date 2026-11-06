@@ -18,6 +18,7 @@ export function boardProblem(failure: BoardFailure): FactoryV2Problem {
   > = {
     'invalid-input': { status: 400, code: 'invalid-request' },
     'ledger-unavailable': { status: 503, code: 'unavailable' },
+    'command-capacity': { status: 503, code: 'unavailable' },
     'action-not-found': { status: 404, code: 'not-found' },
     'action-changed': { status: 412, code: 'stale-action' },
     'command-id-reused': { status: 409, code: 'id-reused' },

@@ -321,6 +321,66 @@ test("promise algorithm keeps ordinary promise work and helper contracts valid",
 	).toStrictEqual([]);
 });
 
+test("promise algorithm tracks whether an assigned assertion promise is consumed", () => {
+	const chain = call(member(identifier("work"), "then"), [arrow(assertion())]);
+	const declaration: Input = {
+		kind: "JS_VARIABLE_DECLARATION",
+		text: `const pending=${chain.text};`,
+		declarators: [
+			{
+				kind: "JS_VARIABLE_DECLARATOR",
+				text: `pending=${chain.text}`,
+				id: { kind: "JS_IDENTIFIER_BINDING", text: "pending" },
+				initializer: { expression: chain },
+			},
+		],
+	};
+	for (const [consumption, expected] of [
+		[[], ["expectInFloatingPromise"]],
+		[[statement(awaited(identifier("pending")))], []],
+		[[returned(identifier("pending"))], []],
+		[
+			[
+				returned(
+					call(member(identifier("Promise"), "resolve"), [
+						identifier("pending"),
+					]),
+				),
+			],
+			[],
+		],
+		[[returned(identifier("unrelated"))], ["expectInFloatingPromise"]],
+		...(
+			[
+				["pending", []],
+				["unrelated", ["expectInFloatingPromise"]],
+			] as const
+		).map(
+			([name, expected]) =>
+				[
+					[
+						returned(
+							call(member(identifier("Promise"), "all"), [
+								{
+									kind: "JS_ARRAY_EXPRESSION",
+									text: `[${name}]`,
+									elements: [identifier(name)],
+								},
+							]),
+						),
+					],
+					expected,
+				] as const,
+		),
+	] as const) {
+		expect(
+			diagnose(validExpectInPromise, [
+				statement(registration([declaration, ...consumption])),
+			]),
+		).toStrictEqual(expected);
+	}
+});
+
 test("retry algorithm rejects registration overrides while accepting application options", () => {
 	const options = () => object([property("retry", literal(3))]);
 	expect(

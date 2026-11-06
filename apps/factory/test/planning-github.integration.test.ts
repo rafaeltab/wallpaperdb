@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { githubIssues, githubPlanning } from '../src/adapters/github/index.js';
 import { joinFixture } from './fixtures/join.js';
-import { readFile, writeFile, chmod } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { protocol } from './fixtures/setup.js';
 it('collects full trusted scope, fallback blockers, parent context and job state', async () => {
@@ -151,15 +151,13 @@ it.each([undefined, false, true])(
       });
       // Separate controlled discovery data from the actual join protocol. Both
       // use the same public CLI boundary and preserve the caller's async context.
-      await writeFile(
-        join(metadata.directory, 'gh'),
-        `#!/usr/bin/env node
-const { spawnSync } = require('node:child_process');
-const result = spawnSync(process.execPath, [${JSON.stringify(join(f.host.directory, 'gh'))}, ...process.argv.slice(2)], { env: { ...process.env, FACTORY_FIXTURE: process.cwd() === ${JSON.stringify(metadata.repository)} ? ${JSON.stringify(metadata.configFile)} : ${JSON.stringify(f.host.configFile)} }, stdio: 'inherit' });
+      await metadata.nodeCommand(
+        'gh',
+        `const { spawnSync } = require('node:child_process');
+const result = spawnSync(${JSON.stringify(join(f.host.directory, 'gh'))}, process.argv.slice(2), { env: { ...process.env, FACTORY_FIXTURE: process.cwd() === ${JSON.stringify(metadata.repository)} ? ${JSON.stringify(metadata.configFile)} : ${JSON.stringify(f.host.configFile)} }, stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `
       );
-      await chmod(join(metadata.directory, 'gh'), 0o700);
       process.env.PATH = `${metadata.directory}:${priorPath}`;
       const source = githubPlanning(
         {

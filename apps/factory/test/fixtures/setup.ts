@@ -1,6 +1,6 @@
-import { mkdtemp, writeFile, chmod, copyFile, readFile, rm, rename } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, chmod, readFile, rm, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { runProtocol } from './protocol.mjs';
 export async function protocol() {
@@ -25,9 +25,32 @@ export async function protocol() {
   const configFile = join(directory, 'config.json');
   const config = { directory, repository, lost: true };
   await writeFile(configFile, JSON.stringify(config));
+  const commands = join(directory, 'commands');
+  const fixtureCoverage = join(directory, 'fixture-coverage');
+  await mkdir(commands);
+  await mkdir(fixtureCoverage);
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  // Only controlled fixture programs use this launcher. Application children
+  // keep their inherited coverage destination and the stock provider unchanged.
+  const nodeCommand = async (
+    name: string,
+    source: string,
+    options: { path?: string; module?: boolean } = {}
+  ) => {
+    const script = join(commands, `${name}.${options.module ? 'mjs' : 'cjs'}`);
+    const executable = options.path ?? join(directory, name);
+    await writeFile(script, source);
+    await mkdir(dirname(executable), { recursive: true });
+    await writeFile(
+      executable,
+      `#!/bin/sh\nif [ -n "\${NODE_V8_COVERAGE:-}" ]; then\n  export NODE_V8_COVERAGE=${quote(fixtureCoverage)}\nfi\nexec ${quote(process.execPath)} ${quote(script)} "$@"\n`
+    );
+    await chmod(executable, 0o700);
+    return executable;
+  };
+  const source = await readFile(resolve('test/fixtures/protocol.mjs'), 'utf8');
   for (const name of ['gh', 't3']) {
-    await copyFile(resolve('test/fixtures/protocol.mjs'), join(directory, name));
-    await chmod(join(directory, name), 0o700);
+    await nodeCommand(name, source, { module: true });
   }
   return {
     directory,
@@ -35,6 +58,8 @@ export async function protocol() {
     base,
     configFile,
     config,
+    fixtureCoverage,
+    nodeCommand,
     binary: join(directory, 't3'),
     readGitHub: async (args: string[], signal?: AbortSignal) => {
       signal?.throwIfAborted();

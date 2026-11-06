@@ -133,12 +133,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       await page.getByRole('link', { name: 'Refresh observation' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
       await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
-      await browserExpect
-        .poll(async () => {
-          await page.reload();
-          return page.getByText('Ready for manual merge', { exact: true }).count();
-        })
-        .toBe(1);
+      await browserExpect(page.getByText('Ready for manual merge', { exact: true })).toBeVisible();
       await browserExpect(page.getByText('Not landed.', { exact: false })).toBeVisible();
       await browserExpect(page.getByRole('link', { name: 'Open pull request' })).toHaveAttribute(
         'href',
@@ -153,12 +148,9 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         prs: [{ ...pr, state: 'MERGED' }],
         landing: { pr: 999, merge: host.base, head: host.base },
       });
-      await browserExpect
-        .poll(async () => {
-          await page.reload();
-          return page.getByText('Landed on the default branch', { exact: true }).count();
-        })
-        .toBe(1);
+      await browserExpect(
+        page.getByText('Landed on the default branch', { exact: true })
+      ).toBeVisible();
       await browserExpect(
         page.getByText('Linked issue closed; project Done', { exact: false })
       ).toBeVisible();
@@ -170,12 +162,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         waitingForGithub: true,
         overrides: { status: 'completed' },
       });
-      await browserExpect
-        .poll(async () => {
-          await page.reload();
-          return page.getByText('waiting-for-github', { exact: true }).count();
-        })
-        .toBe(1);
+      await browserExpect(page.getByText('waiting-for-github', { exact: true })).toBeVisible();
       await browserExpect(
         page.getByRole('heading', { name: 'Babysitting', exact: true })
       ).toBeVisible();

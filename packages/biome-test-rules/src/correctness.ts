@@ -3,6 +3,7 @@ import validExpectRule from "./ported/valid-expect.ts";
 import validExpectInPromiseRule from "./ported/valid-expect-in-promise.ts";
 import requireAwaitedExpectPollRule from "./ported/require-awaited-expect-poll.ts";
 import retryRule from "./retry.ts";
+import { isFixedWait } from "./guideline-policy.ts";
 import { port } from "./port.ts";
 
 export const validExpect = port(validExpectRule, [
@@ -18,11 +19,7 @@ export const noTestRetries = port(retryRule);
 export const fixedWait = defineRule({
 	query: ast("JS_CALL_EXPRESSION"),
 	run(node) {
-		const callee = node.callee;
-		if (
-			callee?.kind === "JS_STATIC_MEMBER_EXPRESSION" &&
-			callee.member?.text.trim() === "waitForTimeout"
-		) {
+		if (isFixedWait(node)) {
 			registerDiagnostic(
 				node,
 				"warning",

@@ -13,7 +13,43 @@ const page = z.object({ hasNextPage: z.literal(false) });
 const connection = <T extends z.ZodTypeAny>(node: T) =>
   z.object({ nodes: z.array(node), pageInfo: page });
 const ref = z.object({ number, url: z.string().url() });
+const user = z.object({
+  id: z.string(),
+  login: z.string(),
+  name: z.string().nullable().default(null),
+  avatarUrl: z.string().url().nullable(),
+  url: z.string().url(),
+});
+const label = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string().regex(/^[a-f0-9]{6}$/i),
+});
+const choice = z.object({ name: z.string(), optionId: z.string().optional() });
+const check = z.object({
+  __typename: z.string(),
+  id: z.string(),
+  name: z.string().optional(),
+  context: z.string().optional(),
+  status: z.string().optional(),
+  state: z.string().optional(),
+  conclusion: z.string().nullable().optional(),
+  detailsUrl: z.string().nullable().optional(),
+  targetUrl: z.string().nullable().optional(),
+  startedAt: z.string().nullable().optional(),
+  completedAt: z.string().nullable().optional(),
+});
+const userFields = 'id login name avatarUrl url';
+const labelFields = 'id name color';
 const pull = ref.extend({
+  title: z.string().optional(),
+  isDraft: z.boolean().optional(),
+  updatedAt: z.string().optional(),
+  mergeable: z.enum(['MERGEABLE', 'CONFLICTING', 'UNKNOWN']).optional(),
+  labels: connection(label).optional(),
+  reviewRequests: connection(
+    z.object({ requestedReviewer: z.object({ __typename: z.string() }).passthrough().nullable() })
+  ).optional(),
   __typename: z.literal('PullRequest'),
   state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
   headRefOid: z.string().regex(/^[a-f0-9]{40}$/),
@@ -21,7 +57,12 @@ const pull = ref.extend({
   baseRefOid: z.string().regex(/^[a-f0-9]{40}$/),
   baseRefName: z.string(),
   reviews: connection(
-    z.object({ state: z.string(), commit: z.object({ oid: z.string() }).nullable() })
+    z.object({
+      state: z.string(),
+      commit: z.object({ oid: z.string() }).nullable(),
+      author: user.nullable().optional(),
+      submittedAt: z.string().nullable().optional(),
+    })
   ),
   reviewDecision: z.enum(['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED']).nullable(),
   closingIssuesReferences: connection(ref),
@@ -30,7 +71,9 @@ const pull = ref.extend({
       z.object({
         commit: z.object({
           oid: z.string(),
-          statusCheckRollup: z.object({ state: z.string() }).nullable(),
+          statusCheckRollup: z
+            .object({ state: z.string(), contexts: connection(check).optional() })
+            .nullable(),
         }),
       })
     ),
@@ -43,23 +86,35 @@ const schema = z.object({
         number,
         url: z.string().url(),
         title: z.string(),
+        updatedAt: z.string().optional(),
         body: z.string(),
         state: z.enum(['OPEN', 'CLOSED']),
         parent: ref.nullable(),
         author: z.object({ login: z.string() }),
-        labels: connection(z.object({ name: z.string() })),
-        assignees: connection(z.object({ login: z.string() })),
+        labels: connection(
+          z.object({ name: z.string(), id: z.string().optional(), color: z.string().optional() })
+        ),
+        assignees: connection(
+          z.object({
+            login: z.string(),
+            id: z.string().optional(),
+            name: z.string().nullable().optional(),
+            avatarUrl: z.string().nullable().optional(),
+            url: z.string().optional(),
+          })
+        ),
         comments: z.object({ totalCount: z.number().int().nonnegative() }),
         projectItems: connection(
           z.object({
             project: z.object({
               title: z.string(),
+              id: z.string().optional(),
               number: z.number(),
               owner: z.object({ login: z.string() }),
             }),
-            priority: z.object({ name: z.string() }).nullable(),
-            size: z.object({ name: z.string() }).nullable(),
-            fieldValueByName: z.object({ name: z.string() }).nullable(),
+            priority: choice.nullable(),
+            size: choice.nullable(),
+            fieldValueByName: choice.nullable(),
           })
         ),
         closedByPullRequestsReferences: connection(pull),
@@ -70,7 +125,7 @@ const schema = z.object({
     }),
   }),
 });
-const pullFields = `__typename number url state headRefOid headRefName baseRefOid baseRefName reviewDecision reviews(first:100) { nodes { state commit { oid } } pageInfo { hasNextPage } } closingIssuesReferences(first:100) { nodes { number url } pageInfo { hasNextPage } } commits(last:1) { nodes { commit { oid statusCheckRollup { state } } } }`;
+const pullFields = `__typename number url title isDraft updatedAt mergeable labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } reviewRequests(first:100) { nodes { requestedReviewer { __typename ... on User { ${userFields} } ... on Team { id } } } pageInfo { hasNextPage } } state headRefOid headRefName baseRefOid baseRefName reviewDecision reviews(first:100) { nodes { state submittedAt author { login avatarUrl url ... on User { id name } ... on Bot { id } } commit { oid } } pageInfo { hasNextPage } } closingIssuesReferences(first:100) { nodes { number url } pageInfo { hasNextPage } } commits(last:1) { nodes { commit { oid statusCheckRollup { state contexts(first:100) { nodes { __typename ... on CheckRun { id name status conclusion detailsUrl startedAt completedAt } ... on StatusContext { id context state targetUrl } } pageInfo { hasNextPage } } } } } }`;
 export async function observeIssue(
   project: string,
   n: number,
@@ -85,7 +140,7 @@ export async function observeIssue(
       'api',
       'graphql',
       '-f',
-      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title body state author { login } parent { number url } labels(first:100) { nodes { name } pageInfo { hasNextPage } } assignees(first:100) { nodes { login } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${pullFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${pullFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
+      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title updatedAt body state author { login } parent { number url } labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } assignees(first:100) { nodes { ${userFields} } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { id title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${pullFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${pullFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
     ]),
     gh([
       'api',
@@ -142,6 +197,25 @@ export async function observeIssue(
     (p) => p.project.number === 7 && p.project.owner.login === 'rafaeltab'
   );
   const metadata: IssueObservation = {
+    updatedAt: issue.updatedAt,
+    labelDetails: issue.labels.nodes.every((l) => l.id && l.color)
+      ? issue.labels.nodes.map((l) => label.parse(l))
+      : undefined,
+    assigneeDetails: issue.assignees.nodes.every((a) => a.id && a.url)
+      ? issue.assignees.nodes.map((a) => user.parse(a))
+      : undefined,
+    projectDetails: projectItem?.project.id
+      ? {
+          projectId: projectItem.project.id,
+          status: selectedChoice(projectItem.fieldValueByName),
+          priority: selectedChoice(projectItem.priority, ['P0', 'P1', 'P2', 'P3', 'P4']),
+          size: selectedChoice(projectItem.size, ['XS', 'S', 'M', 'L', 'XL']),
+        }
+      : issue.projectItems.nodes.length === 0
+        ? { projectId: null, status: null, priority: null, size: null }
+        : undefined,
+    nativeParent: issue.parent?.number ?? null,
+    nativeBlockers: native.map((b) => b.number),
     number: n,
     url: issue.url,
     title: issue.title,
@@ -294,6 +368,45 @@ function translatePull(pr: z.infer<typeof pull>): PullObservation {
   const commit = pr.commits.nodes[0]?.commit;
   const ci = commit?.oid === pr.headRefOid ? commit.statusCheckRollup?.state : undefined;
   return {
+    title: pr.title,
+    draft: pr.isDraft,
+    updatedAt: pr.updatedAt,
+    mergeability: pr.mergeable,
+    labelDetails: pr.labels?.nodes,
+    checkRuns:
+      commit?.oid === pr.headRefOid
+        ? commit.statusCheckRollup?.contexts?.nodes.map((c) => ({
+            id: c.id,
+            name: c.name ?? c.context ?? 'Unknown check',
+            state: checkState(c.conclusion ?? c.state ?? c.status),
+            url: c.detailsUrl ?? c.targetUrl ?? null,
+            head: commit.oid,
+            startedAt: c.startedAt ?? null,
+            completedAt: c.completedAt ?? null,
+          }))
+        : undefined,
+    reviewers: pr.reviewRequests
+      ? [
+          ...pr.reviews.nodes.flatMap((r) =>
+            r.author
+              ? [
+                  {
+                    user: r.author,
+                    state: reviewState(r.state),
+                    submittedAt: r.submittedAt ?? null,
+                    head: r.commit?.oid ?? null,
+                  },
+                ]
+              : []
+          ),
+          ...pr.reviewRequests.nodes.flatMap((r) => {
+            const parsed = user.safeParse(r.requestedReviewer);
+            return parsed.success
+              ? [{ user: parsed.data, state: 'requested' as const, submittedAt: null, head: null }]
+              : [];
+          }),
+        ]
+      : undefined,
     number: pr.number,
     url: pr.url,
     state: pr.state,
@@ -320,4 +433,50 @@ function translatePull(pr: z.infer<typeof pull>): PullObservation {
             : 'UNKNOWN',
     evidenceHead: pr.headRefOid,
   };
+}
+
+function selectedChoice(value: z.infer<typeof choice> | null, order: string[] = []) {
+  if (!value?.optionId) return null;
+  const rank = order.indexOf(value.name);
+  return { id: value.optionId, name: value.name, rank: rank < 0 ? null : rank };
+}
+function checkState(
+  value: string | null | undefined
+): NonNullable<PullObservation['checkRuns']>[number]['state'] {
+  switch (value) {
+    case 'SUCCESS':
+      return 'passed';
+    case 'FAILURE':
+    case 'ERROR':
+    case 'TIMED_OUT':
+    case 'CANCELLED':
+    case 'ACTION_REQUIRED':
+      return 'failed';
+    case 'IN_PROGRESS':
+    case 'PENDING':
+      return 'running';
+    case 'QUEUED':
+    case 'WAITING':
+    case 'REQUESTED':
+    case 'EXPECTED':
+      return 'queued';
+    case 'SKIPPED':
+      return 'skipped';
+    case 'NEUTRAL':
+      return 'neutral';
+    default:
+      return 'unknown';
+  }
+}
+function reviewState(value: string): NonNullable<PullObservation['reviewers']>[number]['state'] {
+  switch (value) {
+    case 'APPROVED':
+      return 'approved';
+    case 'CHANGES_REQUESTED':
+      return 'changes-requested';
+    case 'DISMISSED':
+      return 'dismissed';
+    default:
+      return 'commented';
+  }
 }

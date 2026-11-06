@@ -12,3 +12,5 @@ export type { AttemptSubmission } from './contract.js';
 export { planningInputIdentity } from './implementation.js';
 
 export { ScheduleObservations } from './contract.js';
+
+export { holdsSlot, capacityOccupied } from './scheduler.js';

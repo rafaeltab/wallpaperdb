@@ -17,7 +17,7 @@ import {
 import { validate, locallyBlocked } from './implementation.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
 const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
-function holdsSlot(job: Status, resuming: boolean): boolean {
+export function holdsSlot(job: Status, resuming: boolean): boolean {
   if (job.kind === 'empty') return true;
   if (finished(job)) return false;
   return job.delivery?.active !== false || resuming;
@@ -451,4 +451,8 @@ function resumeIdentity(command: import('../job/index.js').Resume) {
   return 'questionId' in command
     ? { index: command.index, questionId: command.questionId }
     : { index: command.index, runId: command.runId };
+}
+
+export function capacityOccupied(snapshot: ScheduleStatus) {
+  return slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot);
 }

@@ -65,7 +65,7 @@ jobs:
         run: make run PACKAGE=web SCRIPT=test:browser:install
 
       - name: Build, lint, type-check, and test
-        run: make ci CI_CONCURRENCY=2
+        run: make ci
 
       - name: Merge coverage reports
         run: pnpm coverage:merge

@@ -20,7 +20,8 @@
 		"test:files": "cd .. && scripts/node_modules/.bin/vitest run",
 		"lint:docs": "node check-documentation.mjs",
 		"lint:workspaces": "node check-workspaces.mjs",
-		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts"
+		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts",
+		"check:generated": "node check-generated.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

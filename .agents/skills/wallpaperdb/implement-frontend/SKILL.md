@@ -9,7 +9,7 @@ Read the relevant [coding guidelines](../../../../CODING_STANDARDS.md) and $do-w
 
 - Inspect nearby routes, UI components, data hooks, and tests before introducing another pattern. The source and package configuration describe the installed stack.
 - Check existing UI components before installing one. Consult upstream documentation for the installed version when adding framework or authentication behavior.
-- Use the route generator; do not edit generated route files.
+- After route changes, run `make run PACKAGE=scripts SCRIPT=check:generated ARGS=routes`. Regenerate stale output with the workspace route generator.
 - Exercise loading, empty, error, and success states through the public UI. Use $testing for commands and infrastructure.
 
 Keep new framework examples and inventories out of repository docs. Record only a project-specific decision or constraint that a future reader could not infer from the implementation.

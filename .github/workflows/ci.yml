@@ -54,6 +54,11 @@ jobs:
       - name: Build, lint, and type-check
         run: make check
 
+      - name: Verify generated routes and public schemas
+        run: |
+          make run PACKAGE=scripts SCRIPT=check:generated ARGS=routes
+          make run PACKAGE=scripts SCRIPT=check:generated ARGS=openapi
+
       - name: Use the public Ubuntu archive
         run: |
           # Hosted runners select Azure through this mirror list as well as direct URLs.

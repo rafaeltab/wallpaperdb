@@ -1791,7 +1791,7 @@ it.each([false, true])(
           merges: { 102: { merge: mergedB, head: b.commit } },
         },
       });
-      const current = githubIssues({ ...f.config, prerequisites: assertions });
+      const current = githubIssues({ ...f.config, prerequisites: assertions }, f.readGitHub);
       if (!current.reconcile) throw new Error('Missing reconciliation');
       expect(await Effect.runPromise(current.recoveries?.() ?? Effect.succeed([]))).toEqual([]);
       expect(await Effect.runPromise(current.pullRequest(intent(3, 'D', f.b, 'B')))).toMatchObject({

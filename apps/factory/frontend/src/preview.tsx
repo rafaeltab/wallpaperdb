@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { commands, read, stage, type Attempt, type AttemptResult } from './api';
-import { ExternalLink, Issues } from './links';
-export function PlanResult({ result }: { result: AttemptResult }) {
+import {
+  commands,
+  read,
+  stage,
+  type Attempt,
+  type AttemptResult,
+  type ScheduleSnapshot,
+} from './api';
+import { Issues, ThreadLinks } from './links';
+export function PlanResult({
+  result,
+  threads,
+}: {
+  result: AttemptResult;
+  threads?: ScheduleSnapshot['threads'];
+}) {
   return (
     <>
       <h3>
@@ -28,11 +41,11 @@ export function PlanResult({ result }: { result: AttemptResult }) {
               </p>
               {issue.recovery.question && <p>Question: {issue.recovery.question}</p>}
               {issue.recovery.threadId && (
-                <ExternalLink
-                  href={`t3-thread://v1/${encodeURIComponent(issue.recovery.threadId)}`}
-                >
-                  Open recovery thread
-                </ExternalLink>
+                <ThreadLinks
+                  threadId={issue.recovery.threadId}
+                  environmentId={threads?.facts?.environmentId}
+                  browserOrigin={threads?.browserOrigin}
+                />
               )}
             </>
           )}
@@ -64,7 +77,7 @@ export function PlanResult({ result }: { result: AttemptResult }) {
     </>
   );
 }
-export function Preview() {
+export function Preview({ threads }: { threads?: ScheduleSnapshot['threads'] } = {}) {
   const [attempt, setAttempt] = useState<Attempt>();
   const [result, setResult] = useState<AttemptResult>();
   const [message, setMessage] = useState('');
@@ -146,7 +159,7 @@ export function Preview() {
           </>
         )}
         {message}
-        {result && <PlanResult result={result} />}
+        {result && <PlanResult result={result} threads={threads} />}
       </div>
     </section>
   );

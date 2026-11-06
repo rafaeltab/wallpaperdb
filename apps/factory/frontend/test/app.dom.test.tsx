@@ -59,6 +59,63 @@ it('retains a newer observed revision when an earlier save response arrives late
   expect(screen.getByLabelText<HTMLInputElement>('Concurrency').value).toBe('7');
 });
 
+it.each([true, false])(
+  'uses observed T3 identity for planner recovery links, identity available: %s',
+  async (available) => {
+    const snapshot: ScheduleSnapshot = {
+      ...base(),
+      threads: {
+        state: 'current',
+        stale: false,
+        browserOrigin: 'https://app.t3.codes',
+        facts: available
+          ? { environmentId: 'env /é', projectId: 'project', threads: [] }
+          : undefined,
+      },
+    };
+    vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) =>
+      json(
+        options?.method
+          ? {
+              kind: 'preview',
+              input: {
+                issues: [
+                  {
+                    number: 12,
+                    title: 'Recover work',
+                    blockers: [],
+                    parents: [],
+                    recovery: { progress: 'Waiting', threadId: 'mcp:a/b%' },
+                  },
+                ],
+              },
+              selected: [],
+              rejected: [],
+            }
+          : snapshot
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByLabelText('Concurrency');
+    await user.click(screen.getByRole('button', { name: 'Generate plan preview' }));
+    await screen.findByText('Recover work');
+    if (available) {
+      expect(screen.getByRole('link', { name: 'Open in T3 app' }).getAttribute('href')).toBe(
+        't3code://threads/env%20%2F%C3%A9/mcp%3Aa%2Fb%25'
+      );
+      expect(screen.getByRole('link', { name: 'Open in browser' }).getAttribute('href')).toBe(
+        'https://app.t3.codes/env%20%2F%C3%A9/mcp%3Aa%2Fb%25'
+      );
+    } else {
+      expect(screen.queryByRole('link', { name: 'Open in T3 app' })).toBeNull();
+      expect(
+        screen.getByText('T3 links unavailable. Environment or thread identity unknown.')
+      ).toBeTruthy();
+    }
+  }
+);
+
 it('adopts saved controls and their revision before a slow observation completes', async () => {
   const initial = base();
   const submitted: unknown[] = [];

@@ -49,6 +49,12 @@ it('exports telemetry with incoming trace context through the composed runtime a
     const traceId = '12345678901234567890123456789012';
     const commandTraceId = '22345678901234567890123456789012';
     const receiptTraceId = '32345678901234567890123456789012';
+    const readTraceIds = [
+      '42345678901234567890123456789012',
+      '52345678901234567890123456789012',
+      '62345678901234567890123456789012',
+      '72345678901234567890123456789012',
+    ];
     try {
       expect(
         (
@@ -59,6 +65,21 @@ it('exports telemetry with incoming trace context through the composed runtime a
         ).statusCode
       ).toBe(200);
       const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const reads = [
+        { url: '/api/v2/board', status: 200 },
+        { url: `/api/v2/board/changes?after=${encodeURIComponent(board.cursor)}`, status: 200 },
+        { url: '/api/v2/issues/search?q=trace', status: 200 },
+        { url: '/api/v2/items/item%3Amissing', status: 404 },
+      ];
+      for (const [index, read] of reads.entries())
+        expect(
+          (
+            await running.app.inject({
+              url: read.url,
+              headers: { traceparent: `00-${readTraceIds[index]}-1234567890123456-01` },
+            })
+          ).statusCode
+        ).toBe(read.status);
       const configure = Object.values(board.entities.actions).find((a) => a.kind === 'configure');
       if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
       const commandId = '00000000-0000-4000-8000-000000000008';
@@ -102,6 +123,7 @@ it('exports telemetry with incoming trace context through the composed runtime a
     // Context survives both the durable HTTP boundary and background execution.
     expect(payloads.join('').split(commandTraceId).length - 1).toBeGreaterThan(1);
     expect(payloads.join('')).toContain(receiptTraceId);
+    for (const id of readTraceIds) expect(payloads.join('')).toContain(id);
   } finally {
     collector.closeAllConnections();
     await new Promise<void>((resolve) => collector.close(() => resolve()));

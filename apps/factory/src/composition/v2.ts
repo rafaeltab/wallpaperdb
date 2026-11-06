@@ -29,6 +29,7 @@ export async function v2Producer(config: {
   read: () => Effect.Effect<ScheduleSnapshot, Unavailable>;
   submitPlan: (parent?: Tracer.Span) => Promise<AttemptSubmission>;
   run: <A>(effect: Effect.Effect<A, Unavailable>) => Promise<A>;
+  runSync: <A>(effect: Effect.Effect<A>) => A;
   observePlan: (
     id: string
   ) => Promise<import('../capabilities/plan/index.js').PlannerOwnership | undefined>;
@@ -90,10 +91,15 @@ export async function v2Producer(config: {
   };
   const timer = setInterval(refresh, 1000);
   return {
-    data: liveV2Data(board, run, (id, parent) => {
-      queue.push({ id, parent });
-      pump();
-    }),
+    data: liveV2Data(
+      board,
+      run,
+      (id, parent) => {
+        queue.push({ id, parent });
+        pump();
+      },
+      config.runSync
+    ),
     close: async () => {
       closed = true;
       clearInterval(timer);

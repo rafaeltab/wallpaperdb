@@ -545,7 +545,16 @@ export async function runProtocol(
               },
             ]
           );
-        else if (args.join(' ').includes('c0:node(id:')) {
+        else if (/pullRequest\(number:\d+\)/.test(args.join(' '))) {
+          const n = Number(args.join(' ').match(/pullRequest\(number:(\d+)\)/)![1]);
+          const pr =
+            config.planning.hydratedPulls?.[n] ??
+            [
+              ...(config.planning.openPulls ?? []),
+              ...Object.values(config.planning.nativePulls ?? {}).flat(),
+            ].find((pr: { number: number }) => pr.number === n);
+          reply({ data: { repository: { pullRequest: pr ?? null } } });
+        } else if (args.join(' ').includes('c0:node(id:')) {
           const values: Record<string, { isRequired: boolean } | null> = {};
           for (const match of args.join(' ').matchAll(/(c\d+):node\(id:"([^"]+)"/g))
             values[match[1]] =

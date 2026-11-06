@@ -16,6 +16,8 @@ import { protocol } from './fixtures/setup.js';
 it('exports telemetry with incoming trace context through the composed runtime and closes its exporter', async () => {
   const host = await protocol();
   const prior = process.env.FACTORY_FIXTURE;
+  const previousPath = process.env.PATH;
+  process.env.PATH = host.directory + ':' + previousPath;
   process.env.FACTORY_FIXTURE = host.configFile;
   const payloads: string[] = [];
   const collector = createServer((request, response) => {
@@ -61,6 +63,7 @@ it('exports telemetry with incoming trace context through the composed runtime a
   } finally {
     collector.closeAllConnections();
     await new Promise<void>((resolve) => collector.close(() => resolve()));
+    process.env.PATH = previousPath;
     if (prior === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = prior;
     await host.cleanup();

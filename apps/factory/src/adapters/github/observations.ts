@@ -80,6 +80,16 @@ const pull = ref.extend({
     ),
   }),
 });
+const associationPull = ref.extend({
+  __typename: z.literal('PullRequest'),
+  state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+});
+type AssociatedPull = z.infer<typeof associationPull> & {
+  linkedIssues: readonly number[];
+  crossReferencedIssues: readonly number[];
+};
+// Rich PR connections beneath issue timelines multiply GraphQL cost. Hydrate each PR once.
+const associationFields = '__typename number url state';
 const schema = z.object({
   data: z.object({
     repository: z.object({
@@ -118,9 +128,11 @@ const schema = z.object({
             fieldValueByName: choice.nullable(),
           })
         ),
-        closedByPullRequestsReferences: connection(pull),
+        closedByPullRequestsReferences: connection(associationPull),
         timelineItems: connection(
-          z.object({ source: z.union([pull, z.object({ __typename: z.literal('Issue') })]) })
+          z.object({
+            source: z.union([associationPull, z.object({ __typename: z.literal('Issue') })]),
+          })
         ),
       }),
     }),
@@ -245,7 +257,7 @@ export async function observeIssue(
       'api',
       'graphql',
       '-f',
-      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title updatedAt body state author { login } parent { number url } labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } assignees(first:100) { nodes { ${userFields} } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { id title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${pullFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${pullFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
+      `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { number url title updatedAt body state author { login } parent { number url } labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } assignees(first:100) { nodes { ${userFields} } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { id title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
     ]),
     gh([
       'api',
@@ -281,12 +293,11 @@ export async function observeIssue(
       ].map((m) => Number(m[1])),
     ]),
   ];
-  const linked = new Map<number, PullObservation>();
+  const linked = new Map<number, AssociatedPull>();
   for (const pr of issue.closedByPullRequestsReferences.nodes) {
     if (pr.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${pr.number}`)
       throw new Error('Unsupported foreign linked PR');
-    const value = translatePull(pr);
-    linked.set(pr.number, { ...value, linkedIssues: [...new Set([...value.linkedIssues, n])] });
+    linked.set(pr.number, { ...pr, linkedIssues: [n], crossReferencedIssues: [] });
   }
   for (const { source: pr } of issue.timelineItems.nodes) {
     if (
@@ -295,7 +306,10 @@ export async function observeIssue(
     )
       continue;
     const previous = linked.get(pr.number);
-    linked.set(pr.number, { ...(previous ?? translatePull(pr)), crossReferencedIssues: [n] });
+    linked.set(pr.number, {
+      ...(previous ?? { ...pr, linkedIssues: [], crossReferencedIssues: [] }),
+      crossReferencedIssues: [n],
+    });
   }
   const prs = [...linked.values()];
   const metadata = translateIssue(
@@ -404,9 +418,14 @@ export function githubObservations(
                 if (existing >= 0) issues.splice(existing, 1);
                 issues.push(value.metadata);
                 for (const pr of value.pullRequests) {
-                  const previous = pulls.get(pr.number);
+                  const cached = pulls.get(pr.number);
+                  const previous =
+                    cached && cached.state === pr.state
+                      ? cached
+                      : await readPull(project, pr.number, signal);
                   pulls.set(pr.number, {
-                    ...pr,
+                    ...previous,
+                    linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
                     crossReferencedIssues: [
                       ...new Set([
                         ...(previous?.crossReferencedIssues ?? []),
@@ -677,4 +696,35 @@ async function checkRequirements(
         : ('unknown' as const),
     })),
   }));
+}
+
+async function readPull(
+  project: string,
+  number: number,
+  signal: AbortSignal
+): Promise<PullObservation> {
+  const response = z
+    .object({ data: z.object({ repository: z.object({ pullRequest: pull }) }) })
+    .parse(
+      JSON.parse(
+        await command(
+          'gh',
+          [
+            'api',
+            'graphql',
+            '-f',
+            `query=query {repository(owner:"rafaeltab",name:"wallpaperdb"){pullRequest(number:${number}){${pullFields}}}}`,
+          ],
+          project,
+          signal
+        )
+      )
+    );
+  const value = response.data.repository.pullRequest;
+  if (
+    value.number !== number ||
+    value.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
+  )
+    throw new Error('Invalid related PR identity');
+  return translatePull(value);
 }

@@ -32,6 +32,8 @@ it.each(['{"format":2}', 'null', '{broken'])(
 it('adopts pre-manifest state without discarding controls or reservations', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
+  const previousPath = process.env.PATH;
+  process.env.PATH = host.directory + ':' + previousPath;
   process.env.FACTORY_FIXTURE = host.configFile;
   const state = join(host.directory, 'state');
   await mkdir(state);
@@ -62,6 +64,7 @@ it('adopts pre-manifest state without discarding controls or reservations', asyn
       await running.close();
     }
   } finally {
+    process.env.PATH = previousPath;
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;
     await host.cleanup();

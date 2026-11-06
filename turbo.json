@@ -398,6 +398,23 @@
                 "build"
             ],
             "cache": false
+        },
+        "@wallpaperdb/scripts#lint": {
+            "dependsOn": [
+                "^build"
+            ],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/biome.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/test-correctness.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/src/**",
+                "$TURBO_ROOT$/pnpm-workspace.yaml",
+                "$TURBO_ROOT$/turbo.json",
+                "$TURBO_ROOT$/apps/*/package.json",
+                "$TURBO_ROOT$/packages/*/package.json",
+                "$TURBO_ROOT$/experiments/*/package.json",
+                "$TURBO_ROOT$/{apps,packages,experiments}/*/src/**"
+            ]
         }
     }
 }

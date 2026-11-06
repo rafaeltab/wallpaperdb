@@ -19,6 +19,6 @@ Scope: authority and maintenance of the coding guidelines across the repository.
 - Place testing guidance with the subject being tested. Keep only broadly applicable testing principles in a shared section.
 - State scope explicitly. Keep project-wide organization separate from backend requirements, and develop frontend guidance on its own terms.
 - Preserve rule meaning when reorganizing or improving readability. Identify substantive policy changes explicitly; do not present them as reorganization or readability edits. Moving text must not silently change requirements.
-- Formatting, import ordering, type strictness, and other mechanically checkable syntax belong in tool configuration. Semantic design constraints belong in the guidelines even when mechanically enforced.
+- Formatting, import ordering, type strictness, and other mechanically checkable syntax belong in tool configuration. Keep judgment-dependent design constraints in the guidelines. For deterministic enforcement, keep the rule in code or configuration and retain only its reading or execution trigger and necessary rationale in Markdown.
 
 For the current topic map, return to the [guideline index](../../CODING_STANDARDS.md).

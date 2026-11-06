@@ -36,20 +36,23 @@ describe('Picture animation', () => {
     expect(Array.from(frames[0].pixels)).toEqual([0, 255, 0, 255, 0, 255, 0].flatMap((color) => [color, color, color, 255]));
   });
   it('decodes a large clear-code image stream without allocating another source-sized buffer', () => {
-    const header = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002', 'hex');
-    const clearBytes = 3 * Math.ceil(4 * 1024 * 1024 / 3);
-    const imageBytes = clearBytes + 2;
+    const header = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000008', 'hex');
+    // Eight 9-bit clear codes per block. The larger stream still exercises the
+    // allocation guard and checkpoints, with fewer decoder iterations than 3-bit codes.
+    const clearBytes = 9 * Math.ceil(6 * 1024 * 1024 / 9);
+    const clearCodes = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80];
+    // Clear (256), black pixel (0), end (257), packed least-significant bit first.
+    const finalCodes = [0x00, 0x01, 0x04, 0x04];
+    const imageBytes = clearBytes + finalCodes.length;
     const input = Buffer.alloc(header.length + imageBytes + Math.ceil(imageBytes / 255) + 2);
     input.set(header);
-    const clearCodes = [0x24, 0x49, 0x92];
-    const finalCodes = [0x44, 0x01];
     let offset = header.length;
     let position = 0;
     while (position < imageBytes) {
       const size = Math.min(255, imageBytes - position);
       input[offset++] = size;
       for (let i = 0; i < size; i++, position++)
-        input[offset++] = position < clearBytes ? clearCodes[position % 3] : finalCodes[position - clearBytes];
+        input[offset++] = position < clearBytes ? clearCodes[position % clearCodes.length] : finalCodes[position - clearBytes];
     }
     input[offset++] = 0;
     input[offset] = 0x3b;

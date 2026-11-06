@@ -1,3 +1,4 @@
+import { recordCheck, sourceSnapshot } from "./record-check.mjs";
 import { videoReferences, verifyVideo } from "./verify-video.mjs";
 import { guardedPush } from "./guarded-push.mjs";
 import { githubFeedback } from "./collect-feedback.mjs";
@@ -311,6 +312,23 @@ async function main() {
 		)
 			throw new Error("Passing validation evidence is required");
 		const head = command("git", ["rev-parse", "HEAD"]).trim();
+		if (
+			validation.expectationMet !== true ||
+			validation.stable !== true ||
+			validation.sourceDigest !== sourceSnapshot().sourceDigest
+		)
+			throw new Error(
+				"Validation is incomplete or does not match the current source",
+			);
+		for (const check of validation.checks) {
+			if (
+				!check.artifact ||
+				createHash("sha256")
+					.update(fs.readFileSync(check.artifact.path))
+					.digest("hex") !== check.artifact.sha256
+			)
+				throw new Error("Validation log is missing or changed");
+		}
 		if (command("git", ["status", "--porcelain"]).trim())
 			throw new Error("Commit or preserve local changes before publication");
 		const result = guardedPush(
@@ -333,6 +351,10 @@ async function main() {
 		for (const url of videoReferences(body ?? ""))
 			videos.push(await verifyVideo(url));
 		console.log(JSON.stringify({ pr: pr.url, videos }, null, 2));
+	} else if (action === "record-check") {
+		const result = recordCheck(JSON.parse(fs.readFileSync(subject, "utf8")));
+		console.log(JSON.stringify(result, null, 2));
+		if (!result.expectationMet) process.exitCode = 1;
 	} else
 		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }

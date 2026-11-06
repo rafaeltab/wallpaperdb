@@ -255,6 +255,7 @@
             "outputs": []
         },
         "@wallpaperdb/scripts#test:unit": {
+            "dependsOn": ["^build"],
             "cache": false
         },
         "@wallpaperdb/scripts#check-types": {
@@ -317,6 +318,7 @@
             "outputs": []
         },
         "@wallpaperdb/biome-test-rules#test:unit": {
+            "dependsOn": ["^build"],
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/crap.config.mts",

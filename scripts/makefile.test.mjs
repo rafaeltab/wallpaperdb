@@ -171,6 +171,12 @@ test("workspace actions support optional package scoping", () => {
 test("repository scripts participate in the unit task graph", () => {
 	const task = plannedTask("test-unit", "scripts", "test:unit");
 	expect(task.resolvedTaskDefinition.cache).toBe(false);
+	expect(task.dependencies).toContain("@wallpaperdb/vitest-config#build");
+});
+
+test("Biome rule tests build their shared Vitest policy before execution", () => {
+	const task = plannedTask("test-unit", "biome-test-rules", "test:unit");
+	expect(task.dependencies).toContain("@wallpaperdb/vitest-config#build");
 });
 
 test("Ingestor caches distinguish scheduling modes only for instrumentation tasks", () => {

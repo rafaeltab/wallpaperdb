@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 const diagnostics = (source, rule) =>
@@ -12,30 +11,27 @@ test("assertions in parameter and destructuring defaults are visited", () => {
 		"const { value: renamed = expect(1) } = {};",
 	]) {
 		const source = `import { expect } from 'vitest'; ${declaration}`;
-		assert.equal(diagnostics(source, "valid-expect").length, 1, declaration);
-		assert.deepEqual(
+		expect(diagnostics(source, "valid-expect").length, declaration).toBe(1);
+		expect(
 			diagnostics(
 				source.replace("expect(1)", "expect(1).toBe(1)"),
 				"valid-expect",
 			),
-			[],
-		);
+		).toStrictEqual([]);
 	}
 });
 
 test("poll assertions in defaults retain upstream await validation", () => {
-	assert.equal(
+	expect(
 		diagnostics(
 			"import { expect } from 'vitest'; const check = (value = expect.poll(() => 1).toBe(1)) => {}; check();",
 			"require-awaited-expect-poll",
 		).length,
-		1,
-	);
-	assert.deepEqual(
+	).toBe(1);
+	expect(
 		diagnostics(
 			"const check = (value = application.poll(() => 1).toBe(1)) => {}; check();",
 			"require-awaited-expect-poll",
 		),
-		[],
-	);
+	).toStrictEqual([]);
 });

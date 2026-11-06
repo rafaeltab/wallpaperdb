@@ -1,6 +1,5 @@
-import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 const fixtures = JSON.parse(
@@ -10,10 +9,10 @@ test("pinned valid-expect rejects its default async matcher without awaiting", (
 	const diagnostics = lint(
 		'test("valid-expect", () => { expect(Promise.resolve(2)).toResolve(); });',
 	);
-	assert.ok(
+	expect(
 		diagnostics.some((d) => d.message.startsWith("valid-expect:")),
 		JSON.stringify(diagnostics),
-	);
+	).toBeTruthy();
 });
 
 for (const [rule, group] of Object.entries(fixtures))
@@ -26,5 +25,5 @@ for (const [rule, group] of Object.entries(fixtures))
 			if (diagnostics.length !== (fixture.valid ? 0 : fixture.messages.length))
 				failures.push({ ...fixture, diagnostics });
 		}
-		assert.deepEqual(failures, []);
+		expect(failures).toStrictEqual([]);
 	});

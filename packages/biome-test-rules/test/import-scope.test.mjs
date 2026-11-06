@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 const diagnostics = (source, rule) =>
@@ -7,103 +6,92 @@ const diagnostics = (source, rule) =>
 
 test("the pinned parser recognizes destructured dynamic and require imports", () => {
 	for (const module of ["await import('vitest')", "require('vitest')"])
-		assert.equal(
+		expect(
 			diagnostics(
 				`const { expect: check } = ${module}; check(1);`,
 				"valid-expect",
 			).length,
-			1,
 			module,
-		);
-	assert.deepEqual(
+		).toBe(1);
+	expect(
 		diagnostics(
 			"const { expect: check } = require('application'); check(1);",
 			"valid-expect",
 		),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 test("an unrelated nested function parameter is not a test callback context", () => {
-	assert.deepEqual(
+	expect(
 		diagnostics(
 			"test('case', () => { const helper = (expect) => { expect(1); }; helper(() => {}); });",
 			"valid-expect",
 		),
-		[],
-	);
-	assert.equal(
+	).toStrictEqual([]);
+	expect(
 		diagnostics("test('case', (expect) => { expect(1); });", "valid-expect")
 			.length,
-		1,
-	);
+	).toBe(1);
 });
 
 test("static template import sources retain the pinned raw module value", () => {
 	for (const loader of ["require", "await import"]) {
 		const declaration = `const { expect: check } = ${loader}(\`vitest\`);`;
-		assert.equal(
+		expect(
 			diagnostics(`${declaration} check(1);`, "valid-expect").length,
-			1,
 			loader,
-		);
-		assert.deepEqual(
+		).toBe(1);
+		expect(
 			diagnostics(`${declaration} check(1).toBe(1);`, "valid-expect"),
-			[],
-		);
+		).toStrictEqual([]);
 		for (const source of ["`application`", "`vi${name}`", "`vi\\u0074est`"])
-			assert.deepEqual(
+			expect(
 				diagnostics(
 					`const { expect: check } = ${loader}(${source}); check(1);`,
 					"valid-expect",
 				),
-				[],
 				source,
-			);
+			).toStrictEqual([]);
 	}
 });
 
 test("static template destructuring keys retain upstream imported names", () => {
 	for (const loader of ["require('vitest')", "await import('vitest')"])
-		assert.equal(
+		expect(
 			diagnostics(
 				`const { [\`expect\`]: check } = ${loader}; check(1);`,
 				"valid-expect",
 			).length,
-			1,
 			loader,
-		);
+		).toBe(1);
 	for (const key of ["`application`", "`ex${name}`", "`ex\\u0070ect`"])
-		assert.deepEqual(
+		expect(
 			diagnostics(
 				`const { [${key}]: check } = await import('vitest'); check(1);`,
 				"valid-expect",
 			),
-			[],
 			key,
-		);
-	assert.deepEqual(
+		).toStrictEqual([]);
+	expect(
 		diagnostics(
 			"const { [`expect`]: check } = await import('application'); check(1);",
 			"valid-expect",
 		),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 test("escaped require identifiers retain the pinned loader identity", () => {
 	for (const loader of [String.raw`requ\u0069re`, String.raw`requ\u{69}re`]) {
-		assert.equal(
+		expect(
 			diagnostics(
 				`const { expect: check } = ${loader}('vitest'); check(1);`,
 				"valid-expect",
 			).length,
-			1,
-		);
+		).toBe(1);
 		for (const source of [
 			`const { expect: check } = ${loader}('vitest'); check(1).toBe(1);`,
 			`const { expect: check } = ${loader}('application'); check(1);`,
 		])
-			assert.deepEqual(diagnostics(source, "valid-expect"), [], source);
+			expect(diagnostics(source, "valid-expect"), source).toStrictEqual([]);
 	}
 });

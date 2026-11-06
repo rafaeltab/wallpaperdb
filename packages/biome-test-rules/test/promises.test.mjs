@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 test("Biome rejects unhandled directly imported helper promises", () => {
@@ -7,17 +6,15 @@ test("Biome rejects unhandled directly imported helper promises", () => {
 		"helper.ts":
 			"export function load(): Promise<string> { return Promise.resolve('done'); }",
 	};
-	assert.ok(
+	expect(
 		lint("import { load } from './helper'; load();", files).some((d) =>
 			d.category.endsWith("noFloatingPromises"),
 		),
-	);
-	assert.deepEqual(
+	).toBeTruthy();
+	expect(
 		lint("import { load } from './helper'; await load();", files),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		lint("import { load } from './helper'; load().catch(() => {});", files),
-		[],
-	);
+	).toStrictEqual([]);
 });

@@ -11,5 +11,6 @@ export type {
 export { ObservationsLive } from './implementation.js';
 
 export { observationRefreshIntervalMs, observationStaleAfterMs } from './contract.js';
-export { Threads, ThreadsLive, ThreadSource, ThreadStore } from './threads.js';
-export type { ThreadMetadata, ThreadFacts, ThreadState, ThreadSnapshot } from './threads.js';
+export { Threads, ThreadSource, ThreadStore } from './contract.js';
+export { ThreadsLive } from './threads.js';
+export type { ThreadMetadata, ThreadFacts, ThreadState, ThreadSnapshot } from './contract.js';

@@ -81,7 +81,7 @@ export interface LocalWork {
   control: import('../job/index.js').Control;
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
-  threads?: import('./threads.js').ThreadSnapshot;
+  threads?: ThreadSnapshot;
   observations: ObservationSnapshot;
   localWork: readonly LocalWork[];
   relationships?: readonly { issue: number; blockers: readonly number[] }[];
@@ -103,3 +103,53 @@ export interface LocalSnapshot {
   >;
 }
 export const LocalSnapshot = Context.Service<LocalSnapshot>('wallpaperdb.factory.LocalSnapshot');
+
+export interface ThreadMetadata {
+  threadId: string;
+  title: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  status: string;
+  branch: string | null;
+  worktree: string | null;
+  associations?: readonly {
+    issue: number;
+    evidence: 'factory-binding' | 'github-closing-reference';
+    observedAt: number | null;
+  }[];
+  associationState?: 'absent' | 'evidenced' | 'conflicting' | 'unavailable';
+  pullRequests: readonly { repository: string; number: number; url: string }[];
+}
+export interface ThreadFacts {
+  environmentId: string;
+  projectId: string;
+  threads: readonly ThreadMetadata[];
+}
+export interface ThreadState {
+  startedAt?: number;
+  observedAt?: number;
+  failedAt?: number;
+  error?: string;
+  facts?: ThreadFacts;
+}
+export type ThreadSnapshot = ThreadState & {
+  state: 'initial' | 'loading' | 'current' | 'stale' | 'error';
+  ageMs?: number;
+  stale: boolean;
+  browserOrigin?: string;
+};
+/** Replaceable metadata only, never execution or planner authority. */
+export interface ThreadStore {
+  read(): Effect.Effect<ThreadState, Unavailable>;
+  save(value: ThreadState): Effect.Effect<void, Unavailable>;
+}
+export const ThreadStore = Context.Service<ThreadStore>('wallpaperdb.factory.ThreadStore');
+export interface ThreadSource {
+  read(): Effect.Effect<ThreadFacts, Unavailable>;
+}
+export const ThreadSource = Context.Service<ThreadSource>('wallpaperdb.factory.ThreadSource');
+export interface Threads {
+  snapshot(): Effect.Effect<ThreadSnapshot, Unavailable>;
+  refresh(): Effect.Effect<void, Unavailable>;
+}
+export const Threads = Context.Service<Threads>('wallpaperdb.factory.Threads');

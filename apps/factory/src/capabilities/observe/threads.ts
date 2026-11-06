@@ -1,55 +1,14 @@
-import { Context, Effect, Layer, Semaphore } from 'effect';
-import { Time, type Unavailable } from '../job/index.js';
-import { LocalSnapshot, ObservationStore, observationStaleAfterMs } from './contract.js';
-export interface ThreadMetadata {
-  threadId: string;
-  title: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-  status: string;
-  branch: string | null;
-  worktree: string | null;
-  associations?: readonly {
-    issue: number;
-    evidence: 'factory-binding' | 'github-closing-reference';
-    observedAt: number | null;
-  }[];
-  associationState?: 'absent' | 'evidenced' | 'conflicting' | 'unavailable';
-  pullRequests: readonly { repository: string; number: number; url: string }[];
-}
-export interface ThreadFacts {
-  environmentId: string;
-  projectId: string;
-  threads: readonly ThreadMetadata[];
-}
-export interface ThreadState {
-  startedAt?: number;
-  observedAt?: number;
-  failedAt?: number;
-  error?: string;
-  facts?: ThreadFacts;
-}
-export type ThreadSnapshot = ThreadState & {
-  state: 'initial' | 'loading' | 'current' | 'stale' | 'error';
-  ageMs?: number;
-  stale: boolean;
-  browserOrigin?: string;
-};
-/** Replaceable metadata only, never execution or planner authority. */
-export interface ThreadStore {
-  read(): Effect.Effect<ThreadState, Unavailable>;
-  save(value: ThreadState): Effect.Effect<void, Unavailable>;
-}
-export const ThreadStore = Context.Service<ThreadStore>('wallpaperdb.factory.ThreadStore');
-export interface ThreadSource {
-  read(): Effect.Effect<ThreadFacts, Unavailable>;
-}
-export const ThreadSource = Context.Service<ThreadSource>('wallpaperdb.factory.ThreadSource');
-export interface Threads {
-  snapshot(): Effect.Effect<ThreadSnapshot, Unavailable>;
-  refresh(): Effect.Effect<void, Unavailable>;
-}
-export const Threads = Context.Service<Threads>('wallpaperdb.factory.Threads');
+import { Effect, Layer, Semaphore } from 'effect';
+import { Time } from '../job/index.js';
+import {
+  Threads,
+  ThreadStore,
+  ThreadSource,
+  LocalSnapshot,
+  ObservationStore,
+  observationStaleAfterMs,
+  type ThreadFacts,
+} from './contract.js';
 export const ThreadsLive = Layer.effect(
   Threads,
   Effect.gen(function* () {

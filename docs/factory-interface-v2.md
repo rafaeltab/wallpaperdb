@@ -1,8 +1,32 @@
 # Factory public interface v2
 
-Status: proposed contract, with no implementation. The declarations are in [the v2 contract](../apps/factory/src/http/v2/contract.ts), exposed as types through [the public HTTP entry](../apps/factory/src/http/index.ts). No handlers, collectors, storage, streams, client, migrations or deployment changes accompany this proposal. Existing HTTP behavior remains v1.
+Status: proposed live contract with runnable fake HTTP transports. The declarations are in [the v2 contract](../apps/factory/src/http/v2/contract.ts). [The public HTTP entry](../apps/factory/src/http/index.ts) exports those types and `fakeV2Server`. The fake server implements the routes below against an isolated, process-local sample. The production factory still serves v1. There is no live v2 producer, collector, persistent command ledger, UI migration or deployment change.
 
 The target is the selected [canvas prototype at ecd35afb5](https://github.com/rafaeltab/wallpaperdb/blob/ecd35afb51aab61bb9132690d26330c36165ec99/apps/factory/frontend/src/factory-canvas-prototype.tsx), preserved in [PR #677](https://github.com/rafaeltab/wallpaperdb/pull/677). The audited factory baseline is merged `main` at [7e6f0dcab](https://github.com/rafaeltab/wallpaperdb/tree/7e6f0dcab791b28ab6cb6d59d0a087c8861605ac).
+
+## Run the fake transports
+
+From the repository root:
+
+```sh
+make run PACKAGE=factory SCRIPT=dev:interface-v2
+```
+
+[The standalone entry point](../apps/factory/src/http/v2/demo.ts) listens at `http://127.0.0.1:9402`. Set `FACTORY_V2_DEMO_PORT` to select another port. It does not load the production factory configuration. SIGINT or SIGTERM closes its streams and pending polls. Tests and embedded clients can construct `fakeV2Server` directly and own its `listen`/`close` lifetime.
+
+[The server](../apps/factory/src/http/v2/server.ts) implements conditional snapshots, immediate/long polling, replayable SSE, item details, paginated issue search, plan details, command submission and receipt lookup. `/health` reports `dataMode: "fake"`. Responses have `X-Factory-Data: fake`, and snapshots have `meta.dataMode: "fake"` plus a diagnostic. The sample uses `.invalid` links and contains planned/working issues, draft/open stacked PRs, checks, human review, manual recovery and automatic conflict recovery.
+
+[The simulator](../apps/factory/src/http/v2/fake-state.ts) accepts the advertised configure, start, resume, cancel and preview-plan commands. It updates only the in-memory sample and publishes an atomic change batch. Submit a command using the `actionId` and opaque precondition from the latest board, then observe its receipt and the changes feed. Commands drive updates; reads and heartbeats do not advance the sample. No GitHub/T3 request, worker, database or real factory command is connected.
+
+All sample state, receipts and history disappear on restart. Each startup uses a new cursor generation. Fake acceptance is process-local, so the durable acceptance and 24-hour receipt retention described for the live contract below do not apply to this server. Replaying an identical command is safe only within that process lifetime. The fake ledger retains at most 512 commands, then rejects new commands with `503` until restart. It retains at most 32 sample plans.
+
+The server defaults to 64 retained change batches, returns at most 32 batches per polling page, and permits at most 64 simultaneous SSE/long-poll connections. SSE uses 15-second heartbeat comments and a 64 KiB frame limit. An oversized batch or write backpressure signals `resync-required` and closes the stream. Long polls wait at most 25 seconds. JSON bodies are limited to 128 KiB, with the contract's separate 16000-character context limit. Constructor options can lower replay retention or frame size for recovery tests.
+
+[The HTTP contract tests](../apps/factory/test/v2-http.unit.test.ts) cover validators, version preconditions, commands, receipts, search and replay. [The loopback HTTP tests](../apps/factory/test/v2-http.integration.test.ts) cover actual SSE framing/replay, live updates, long polls and stream cleanup. Run them with:
+
+```sh
+make test-focused PACKAGE=factory ARGS='test/v2-http.unit.test.ts test/v2-http.integration.test.ts'
+```
 
 ## What the UI needs and what exists
 
@@ -105,12 +129,12 @@ The UI owns layout, approximation of priority/size order, two-column packing, st
 
 ## HTTP surface
 
-All paths are relative to the existing maintainer-only factory origin. This version does not introduce public Internet access or a separate identity provider. Preserve the current origin checks and independently enforce command policy; an action descriptor is not authorization. Source credentials stay on the factory host.
+The live paths are relative to the existing maintainer-only factory origin. The standalone fake serves the same paths on its loopback origin. This version does not introduce public Internet access or a separate identity provider. Preserve the current origin checks and independently enforce command policy; an action descriptor is not authorization. Source credentials stay on the factory host.
 
 | Method and path | Request | Response |
 | --- | --- | --- |
 | `GET /api/v2/board` | Optional `If-None-Match` | `200 FactoryV2Snapshot`, or `304` with no body |
-| `GET /api/v2/board/changes` | Required opaque `after`; optional `waitMs` from 0 to 25000 | `200 FactoryV2Changes`; invalid/reset cursor uses `409` and `resync-required` |
+| `GET /api/v2/board/changes` | Required opaque `after`; optional `waitMs` from 0 to 25000 | `200 FactoryV2Changes`; malformed cursor uses `400`; expired/reset/different-scope cursor uses `409` and `resync-required` |
 | `GET /api/v2/board/events` | Initial `after`; reconnect `Last-Event-ID` | `text/event-stream` carrying `FactoryV2Event`; optional capability |
 | `GET /api/v2/items/{itemId}` | Required `If-Match` entity version | `200 FactoryV2ItemDetails`; `412` if detail no longer matches the card; `404` if absent |
 | `GET /api/v2/issues/search` | `q` up to 200 characters, `limit` from 1 to 50, optional `pageToken` | `200 FactoryV2IssueSearch` |
@@ -158,7 +182,7 @@ An uncertain external outcome remains `uncertain` with reconciliation instructio
 
 Keep v1 paths and existing clients working. Add v2 as a read projection over current journals, observations and planning attempts, translating private records at the HTTP seam. Do not make the UI import capability internals or replace execution policy with the presentation model. Public v2 response types are independent of Effect, Fastify, React and storage schemas. Unknown native states have explicit public fallbacks; additions to closed public unions or removals require a new major contract version.
 
-The first producer can support conditional snapshots and changes polling; SSE is advertised only when implemented. Missing collectors must produce unknown/partial facts, not placeholders that look successful. Do not switch the chosen UI from fixtures until these scenarios can be demonstrated through the public interface:
+The fake server advertises both polling and SSE. A first live producer can support conditional snapshots and changes polling; SSE is advertised only when that producer implements it. Missing collectors must produce unknown/partial facts, not placeholders that look successful. Do not switch the chosen UI to live data until these scenarios can be demonstrated through the public interface:
 
 - The same projection supplies all labels, rankings, parent copies, PR/draft markers, reviewer avatars, CI tooltips, stack summaries, links and action decisions without provider requests per card.
 - Native/fallback parent and prerequisite edges remain distinct. A verified unmerged prerequisite is satisfied; an older passing head, ambiguous stack or missing PR remains unknown/blocked. A fork does not duplicate PR cards in two display stacks.
@@ -170,4 +194,4 @@ The first producer can support conditional snapshots and changes polling; SSE is
 - Conflicting commands, expired action tokens and duplicate command IDs cannot start or resume work twice. An uncertain response remains observable without creating another admission. A GET cannot advance execution.
 - Benchmark initial compressed snapshot size, single-PR delta size, publication-to-client delay, provider refresh lag and graph recomputation separately for 100/300-item boards. No unmeasured latency claim is part of this proposal.
 
-These are acceptance scenarios for the later implementation, not behavior supplied by these declarations.
+The fake transports exercise the wire protocol and simulated state changes. The scenarios involving actual factory policy, provider evidence, persistence and performance remain acceptance criteria for the live producer.

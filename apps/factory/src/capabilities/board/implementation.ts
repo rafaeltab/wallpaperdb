@@ -1,3 +1,4 @@
+import { cursorPayload } from './cursors.js';
 import { Effect, Option, Semaphore } from 'effect';
 import { Time } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
@@ -283,7 +284,24 @@ export function makeBoard(config: {
       changes: (after: string): FactoryV2Changes | FactoryV2Problem => {
         if (after === current.snapshot.cursor) return { kind: 'unchanged', cursor: after };
         const index = history.findIndex((d) => d.fromCursor === after);
-        if (index < 0) return { kind: 'resync-required', reason: 'reset' };
+        if (index < 0) {
+          const parsed = cursorPayload(after);
+          if (!parsed) return problem(400, 'invalid-request', 'Invalid change cursor.');
+          if (parsed.scope !== config.scopeId)
+            return { kind: 'resync-required', reason: 'different-scope' };
+          const retained = [
+            current.snapshot.cursor,
+            ...history.flatMap((delta) => [delta.fromCursor, delta.toCursor]),
+          ].flatMap((value) => {
+            const cursor = cursorPayload(value);
+            return cursor?.epoch === parsed.epoch ? [cursor.revision] : [];
+          });
+          return {
+            kind: 'resync-required',
+            reason:
+              retained.length && parsed.revision <= Math.max(...retained) ? 'expired' : 'reset',
+          };
+        }
         const batches = history.slice(index, index + 32);
         return {
           kind: 'changes',

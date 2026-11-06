@@ -195,3 +195,14 @@ describe('feature dependency enforcement', () => {
     expect(check({ 'components/lazy.tsx': 'import(variable);' })).toEqual([]);
   });
 });
+
+it('checks private dependencies and cycles expressed with emitted JavaScript extensions', () => {
+  expect(check({
+    'features/editor/index.ts': 'import "../management/private.js";',
+    'features/management/private.ts': '',
+  }).join('\n')).toContain('entry point');
+  expect(check({
+    'features/editor/index.ts': 'import "../management/index.js";',
+    'features/management/index.ts': 'import "../editor/index.js";',
+  }).join('\n')).toContain('cycle');
+});

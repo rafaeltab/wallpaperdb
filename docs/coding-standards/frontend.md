@@ -10,8 +10,7 @@ Scope: browser application code and shared frontend/UI modules. The [project-wid
 
 ## Feature interfaces
 
-- Cross-feature dependencies use deliberately public entries. Keep private implementation details private and feature dependencies acyclic.
-- Designate effectful adapter entries explicitly. A file's placement in an adapter directory does not make it public.
+Feature entry points, public adapters, and dependency cycles are enforced by the [feature architecture check](../../apps/web/test/features/feature-architecture.ts). Run its owning suite when changing feature dependencies.
 
 ## Command coordination
 

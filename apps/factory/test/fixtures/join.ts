@@ -192,6 +192,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
     d,
     c,
     issues,
+    readGitHub: read,
     reopen: () =>
       githubIssues(
         {

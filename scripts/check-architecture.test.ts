@@ -5,6 +5,55 @@ import path from "node:path";
 import { expect, test, type TestContext } from "vitest";
 import { fileURLToPath } from "node:url";
 
+for (const [label, entry, implementation, barrel] of [
+	[
+		"type wildcard",
+		"export type { Search } from './barrel.js';",
+		"export interface Search { query(): string }",
+		"export type * from './implementation.js';",
+	],
+	[
+		"value wildcard",
+		"export { Search } from './barrel.js';",
+		"export class Search {}",
+		"export * from './implementation.js';",
+	],
+	[
+		"default reexport",
+		"export type { default as Search } from './implementation.js';",
+		"export default interface Search { query(): string }",
+		"",
+	],
+	[
+		"default import",
+		"import type Search from './implementation.js'; export type { Search };",
+		"export default interface Search { query(): string }",
+		"",
+	],
+])
+	test(`public contracts resolve through ${label} without restricting private barrels`, (t) => {
+		const project = fixture(t);
+		project.source("capabilities/search/index.ts", entry);
+		project.source("capabilities/search/implementation.ts", implementation);
+		project.source("capabilities/search/barrel.ts", barrel);
+		const rejected = project.run();
+		assert.equal(rejected.status, 1, rejected.stdout);
+		assert.match(
+			rejected.stderr,
+			/public contract Search must be declared in contract.ts/,
+		);
+		project.source(
+			"capabilities/search/contract.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export { type Search, type Search as default } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
+		);
+		const allowed = project.run();
+		assert.equal(allowed.status, 0, allowed.stderr);
+	});
+
 test("public capability contracts originate in contract.ts through aliases and barrels", (t) => {
 	for (const entry of [
 		"export type { Search } from './implementation.js';",

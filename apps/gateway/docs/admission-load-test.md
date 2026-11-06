@@ -12,7 +12,7 @@ These are initial development defaults, not production capacity certification. R
 
 Measured on 2026-09-29 through the worktree's Caddy ingress and rebuilt gateway, using real OpenSearch and Redis. The shared Linux development host exposed 32 CPUs and 28.5 GiB memory, with other development stacks running. The client used Node 22.22.3. All requests used one client IP. The catalogue contained three wallpapers; the expensive operation requested a page of 100, so this measures query inspection and real search but not full-page response serialization.
 
-The [load script](../scripts/load-admission.mjs) defines the cheap missing-wallpaper lookup and expensive wallpaper search. Each row sends 128 requests. Concurrency is the number of client workers; it is not a claim that every worker reaches backend execution simultaneously. The table includes rejected requests in throughput and latency. All responses were either successful GraphQL responses or `503 GATEWAY_OVERLOADED`; no quota denials or unexpected errors occurred.
+The [load script](../scripts/load-admission.ts) defines the cheap missing-wallpaper lookup and expensive wallpaper search. Each row sends 128 requests. Concurrency is the number of client workers; it is not a claim that every worker reaches backend execution simultaneously. The table includes rejected requests in throughput and latency. All responses were either successful GraphQL responses or `503 GATEWAY_OVERLOADED`; no quota denials or unexpected errors occurred.
 
 | Phase | Query | Concurrency | Requests/s | p95 ms | p99 ms | Overload responses |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -105,7 +105,7 @@ The script measured all five shipped web query-only JSON envelopes at 237 to 674
 
 ### Reproduce and verify the deployment
 
-The [package script](../package.json) and [load implementation](../scripts/load-admission.mjs) own invocation and workload definitions. Run through Make, replacing the URL with the isolated stack's endpoint:
+The [package script](../package.json) and [load implementation](../scripts/load-admission.ts) own invocation and workload definitions. Run through Make, replacing the URL with the isolated stack's endpoint:
 
 ```sh
 make run PACKAGE=gateway SCRIPT=load:admission ARGS='http://localhost:8470/gateway/graphql 128 healthy burst'

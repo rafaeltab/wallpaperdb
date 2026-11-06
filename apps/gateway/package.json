@@ -16,11 +16,11 @@
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
     "test": "vitest run",
-    "test:mutation": "node ../../scripts/mutation.mjs --package gateway",
+    "test:mutation": "node ../../scripts/mutation.ts --package gateway",
     "test:unit": "vitest run --project=gateway-unit --coverage --coverage.reportsDirectory=coverage/unit",
     "test:integration": "vitest run --project=gateway-integration --project=gateway-search --project=gateway-instrumentation --coverage",
     "test:watch": "vitest",
-    "load:admission": "node scripts/load-admission.mjs"
+    "load:admission": "node scripts/load-admission.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

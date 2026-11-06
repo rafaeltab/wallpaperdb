@@ -27,6 +27,6 @@ esac
 
 export WALLPAPERDB_DOCKER_SOURCE_CONFIG="$source_config"
 export BUILDX_CONFIG=${BUILDX_CONFIG:-$source_config/buildx}
-DOCKER_CONFIG=$(node "$(dirname "$0")/../docker-config.mjs" "$source_config")
+DOCKER_CONFIG=$(node "$(dirname "$0")/../docker-config.ts" "$source_config")
 export DOCKER_CONFIG
 exec "$(mise where docker-cli)/docker/docker" --config "$DOCKER_CONFIG" "${args[@]}"

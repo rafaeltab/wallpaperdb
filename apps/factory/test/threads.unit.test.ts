@@ -86,105 +86,125 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
   }
 });
 
-it('uses explicit PR evidence, leaves title-only issues absent, and does not invent branch ownership', async () => {
-  const state: ThreadState = {
-    observedAt: 10,
-    facts: {
-      environmentId: 'env',
-      projectId: 'project',
-      threads: [
-        {
-          threadId: 't',
-          title: 'Implement #999',
-          createdAt: null,
-          updatedAt: null,
-          status: 'completed',
-          branch: null,
-          worktree: null,
-          pullRequests: [
-            {
-              repository: 'rafaeltab/wallpaperdb',
-              number: 672,
-              url: 'https://github.com/rafaeltab/wallpaperdb/pull/672',
-            },
-          ],
-        },
-        {
-          threadId: 'unbound',
-          title: 'Implement #648',
-          createdAt: null,
-          updatedAt: null,
-          status: 'running',
-          branch: null,
-          worktree: null,
-          pullRequests: [],
-        },
-      ],
-    },
-  };
-  const store = controlledThreads(state);
-  const runtime = ManagedRuntime.make(
-    ThreadsLive.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(Time, { now: () => Effect.succeed(20) }),
-          Layer.succeed(LocalSnapshot, {
-            read: () =>
-              Effect.succeed({
-                state: { revision: 0, concurrency: 1, allowance: 0, paused: true, admissions: [] },
-                entries: [],
-              }),
-          }),
-          Layer.succeed(ObservationStore, {
-            read: () =>
-              Effect.succeed({
-                observedAt: 12,
-                facts: {
-                  issues: [],
-                  pullRequests: [
-                    {
-                      number: 672,
-                      url: 'https://github.com/rafaeltab/wallpaperdb/pull/672',
-                      state: 'OPEN',
-                      head: 'a',
-                      headBranch: 'b',
-                      base: 'c',
-                      baseBranch: 'main',
-                      linkedIssues: [648],
-                      crossReferencedIssues: [999],
-                      review: 'UNKNOWN',
-                      ci: 'UNKNOWN',
-                      evidenceHead: 'a',
-                    },
-                  ],
-                },
-              }),
-            refresh: () => Effect.void,
-            jobs: () => Effect.void,
-          }),
-          Layer.succeed(ThreadStore, store),
-          Layer.succeed(ThreadSource, {
-            read: () => (state.facts ? Effect.succeed(state.facts) : Effect.die('Missing fixture')),
-          })
+it.each([
+  { observed: true, linkedIssues: [648], expected: 'evidenced' },
+  { observed: true, linkedIssues: [], expected: 'absent' },
+  { observed: false, linkedIssues: [], expected: 'unavailable' },
+])(
+  'classifies explicit PR evidence as $expected and leaves title-only issues absent',
+  async ({ observed, linkedIssues, expected }) => {
+    const state: ThreadState = {
+      observedAt: 10,
+      facts: {
+        environmentId: 'env',
+        projectId: 'project',
+        threads: [
+          {
+            threadId: 't',
+            title: 'Implement #999',
+            createdAt: null,
+            updatedAt: null,
+            status: 'completed',
+            branch: null,
+            worktree: null,
+            pullRequests: [
+              {
+                repository: 'rafaeltab/wallpaperdb',
+                number: 672,
+                url: 'https://github.com/rafaeltab/wallpaperdb/pull/672',
+              },
+            ],
+          },
+          {
+            threadId: 'unbound',
+            title: 'Implement #648',
+            createdAt: null,
+            updatedAt: null,
+            status: 'running',
+            branch: null,
+            worktree: null,
+            pullRequests: [],
+          },
+        ],
+      },
+    };
+    const store = controlledThreads(state);
+    const runtime = ManagedRuntime.make(
+      ThreadsLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Time, { now: () => Effect.succeed(20) }),
+            Layer.succeed(LocalSnapshot, {
+              read: () =>
+                Effect.succeed({
+                  state: {
+                    revision: 0,
+                    concurrency: 1,
+                    allowance: 0,
+                    paused: true,
+                    admissions: [],
+                  },
+                  entries: [],
+                }),
+            }),
+            Layer.succeed(ObservationStore, {
+              read: () =>
+                Effect.succeed({
+                  observedAt: 12,
+                  facts: {
+                    issues: [],
+                    pullRequests: observed
+                      ? [
+                          {
+                            number: 672,
+                            url: 'https://github.com/rafaeltab/wallpaperdb/pull/672',
+                            state: 'OPEN',
+                            head: 'a',
+                            headBranch: 'b',
+                            base: 'c',
+                            baseBranch: 'main',
+                            linkedIssues,
+                            crossReferencedIssues: [999],
+                            review: 'UNKNOWN',
+                            ci: 'UNKNOWN',
+                            evidenceHead: 'a',
+                          },
+                        ]
+                      : [],
+                  },
+                }),
+              refresh: () => Effect.void,
+              jobs: () => Effect.void,
+            }),
+            Layer.succeed(ThreadStore, store),
+            Layer.succeed(ThreadSource, {
+              read: () =>
+                state.facts ? Effect.succeed(state.facts) : Effect.die('Missing fixture'),
+            })
+          )
         )
       )
-    )
-  );
-  try {
-    const service = await runtime.runPromise(Threads);
-    await runtime.runPromise(service.refresh());
-    const facts = (await runtime.runPromise(service.snapshot())).facts;
-    expect(facts?.threads[0]).toMatchObject({
-      branch: null,
-      worktree: null,
-      associationState: 'evidenced',
-      associations: [{ issue: 648, evidence: 'github-closing-reference', observedAt: 12 }],
-    });
-    expect(facts?.threads[1]).toMatchObject({ associationState: 'absent', associations: [] });
-  } finally {
-    await runtime.dispose();
+    );
+    try {
+      const service = await runtime.runPromise(Threads);
+      await runtime.runPromise(service.refresh());
+      const facts = (await runtime.runPromise(service.snapshot())).facts;
+      expect(facts?.threads[0]).toMatchObject({
+        branch: null,
+        worktree: null,
+        associationState: expected,
+        associations: linkedIssues.map((issue) => ({
+          issue,
+          evidence: 'github-closing-reference',
+          observedAt: 12,
+        })),
+      });
+      expect(facts?.threads[1]).toMatchObject({ associationState: 'absent', associations: [] });
+    } finally {
+      await runtime.dispose();
+    }
   }
-});
+);
 
 it('retains loading data during a slow refresh and reports conflicting durable bindings without changing ownership', async () => {
   const intent = {

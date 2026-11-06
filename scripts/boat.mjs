@@ -57,6 +57,11 @@ import {
 	provenOwnedSourceExit,
 } from "./lib/boat-source-command.mjs";
 import { observeEngineBaseline } from "./lib/boat-engine-baseline.mjs";
+import {
+	artifactCommand,
+	artifactDestination,
+	acceptArtifact,
+} from "./lib/boat-artifact.mjs";
 
 const root = process.cwd();
 const dir = path.join(root, ".boat");
@@ -1977,9 +1982,14 @@ async function command() {
 			process.exitCode = result.status;
 			return;
 		}
+		const artifact = artifactCommand(root, targets);
 		const expected = await sync(
 			id,
-			migration ? (source) => captureAssetMigration(root, source) : undefined,
+			migration
+				? (source) => captureAssetMigration(root, source)
+				: artifact
+					? (source) => ({ source, destination: artifactDestination(root) })
+					: undefined,
 		);
 		if (targets[0] === "boat-prepare-toolchain") {
 			let completed = false;
@@ -2178,6 +2188,17 @@ async function command() {
 			!developmentWantedAfterCommand(true, targets, 0)
 		)
 			await retireWatchers(id);
+		let artifactToken;
+		if (artifact) {
+			const prepared = await ssh(
+				id,
+				`${workerEnvironment}; cd ${remote} && mise exec -- node scripts/lib/boat-artifact.mjs prepare`,
+				{ capture: true },
+			);
+			artifactToken = JSON.parse(prepared.out).token;
+			if (!/^[a-f0-9]{24}$/.test(artifactToken ?? ""))
+				throw new Error("Invalid artifact preparation receipt");
+		}
 		const result = await boat(
 			[
 				"exec",
@@ -2211,6 +2232,35 @@ async function command() {
 			local: resourceSample(),
 		});
 		process.exitCode = result.status;
+		if (artifact)
+			await lock(async () => {
+				startupWorker(id);
+				const unchanged = () => {
+					if (JSON.stringify(manifest()) !== JSON.stringify(expected.source))
+						throw new Error(
+							"Artifact generation inputs changed; worker output retained",
+						);
+				};
+				unchanged();
+				const collected = await ssh(
+					id,
+					`${workerEnvironment}; cd ${remote} && mise exec -- node scripts/lib/boat-artifact.mjs collect ${artifactToken}`,
+					{ capture: true, maxCaptureBytes: 2 * 1024 * 1024 },
+				);
+				const encoded = JSON.parse(collected.out);
+				if (encoded.token !== artifactToken)
+					throw new Error("Artifact generation ownership changed");
+				unchanged();
+				const returned = acceptArtifact(root, expected.destination, encoded);
+				write(
+					path.join(dir, "artifacts/553-animation.json"),
+					{ ...returned, workerId: id, commandStatus: result.status, targets },
+					true,
+				);
+				console.log(
+					`Generated artifact returned to ${returned.path} (${returned.bytes} bytes, SHA256 ${returned.sha256})`,
+				);
+			}, "source");
 		const s = read(stateFile);
 		// Only the unqualified full-stack command guarantees the default build.
 		// Partial services and custom arguments cannot acknowledge all images.

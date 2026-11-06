@@ -1223,6 +1223,7 @@ async function lockGenerationCheckout(
 		"scripts/lib/boat-shutdown.mjs",
 		"scripts/lib/boat-preview.mjs",
 		"scripts/lib/boat-source-generation.mjs",
+		"scripts/lib/boat-artifact.mjs",
 		"scripts/lib/boat-source-command.mjs",
 		"scripts/lib/boat-asset-migration.mjs",
 		"scripts/lib/boat-engine-baseline.mjs",

@@ -23,6 +23,36 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('adopts saved controls and their revision before a slow observation completes', async () => {
+  const initial = base();
+  const submitted: unknown[] = [];
+  let reads = 0;
+  vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) => {
+    if (!options?.method) {
+      if (reads++ === 0) return json(initial);
+      return new Promise<Response>(() => {});
+    }
+    const body = JSON.parse(String(options.body));
+    submitted.push(body);
+    return json({ state: { ...initial.state, ...body, revision: body.revision + 1 } });
+  });
+  const user = userEvent.setup();
+  render(<App />);
+  const field = await screen.findByLabelText<HTMLInputElement>('Concurrency');
+  await user.clear(field);
+  await user.type(field, '3');
+  await user.click(screen.getByRole('button', { name: 'Save scheduler controls' }));
+  await screen.findByText(/Editing revision 2\. Latest observed revision 2/);
+  expect(field.value).toBe('3');
+  await user.clear(field);
+  await user.type(field, '4');
+  await user.click(screen.getByRole('button', { name: 'Save scheduler controls' }));
+  expect(submitted).toEqual([
+    { revision: 1, concurrency: 3, allowance: 1, paused: true },
+    { revision: 2, concurrency: 4, allowance: 1, paused: true },
+  ]);
+});
+
 it('sends the selected issue/context and continues/cancels the same observed job explicitly', async () => {
   let snapshot = base();
   const commands: { path: string; body: unknown }[] = [];

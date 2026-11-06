@@ -181,6 +181,8 @@ export function App() {
     try {
       const accepted = await send.current<{ state?: ScheduleSnapshot['state'] }>(path, body);
       if (mounted.current) {
+        const state = accepted.state;
+        if (state) setSnapshot((current) => (current ? { ...current, state } : current));
         setResult('Command accepted. Awaiting observation.');
         setRefresh((value) => value + 1);
       }

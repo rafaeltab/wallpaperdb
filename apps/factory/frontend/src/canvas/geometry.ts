@@ -172,7 +172,7 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
         ? Math.min(2, linesFor(issueMetadata[id].title, width, size))
         : 1;
   const issueHeight = (item: Item) =>
-    (issueMetadata[item.id].labels.length ? 64 : 40) +
+    (issueMetadata[item.id].labels.length || !issueMetadata[item.id].labelsKnown ? 64 : 40) +
     18 * titleLines(item.id, CARD_W - 24, 13, `issue:${item.id}`);
   const labelColumn =
     Math.ceil(
@@ -181,6 +181,7 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
         ...records
           .filter((i) => i.pr)
           .map((i) => {
+            if (!issueMetadata[i.id].labelsKnown) return textWidth('Labels unavailable', 9);
             const ls = issueMetadata[i.id].labels,
               shown = ls.slice(0, 2);
             return (

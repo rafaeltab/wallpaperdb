@@ -8,6 +8,7 @@ export interface CanvasMetadata {
   title: string;
   url?: string;
   labels: { name: string; color: string }[];
+  labelsKnown: boolean;
   priority: string | null;
   size: string | null;
   priorityRank?: number;
@@ -65,6 +66,7 @@ export function createCanvasProjection() {
         number: entity?.number ?? null,
         title: title(entity),
         url: entity?.metadata.state === 'known' ? entity.metadata.value.url : undefined,
+        labelsKnown: labels?.state === 'known',
         labels:
           labels?.state === 'known'
             ? labels.value.labelIds.flatMap((id) => {

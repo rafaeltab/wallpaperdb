@@ -5,6 +5,7 @@ import { useFactory } from './use-factory';
 import { Canvas } from './canvas';
 import type { TitleMode, RelationshipMode } from './geometry-types';
 import { subject } from './model';
+import { SourceCoverage } from './sources';
 import { CommandFeedback } from './feedback';
 import { Controls, Details, Panel, Plan, Start } from './panels';
 import './style.css';
@@ -113,24 +114,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
               <option value="native">Native app</option>
             </select>
           </label>
-          <details className="fc-sources">
-            <summary>Source coverage: {board.meta.coverage.state}</summary>
-            {Object.values(board.entities.sources).map((source) => (
-              <p key={source.id}>
-                {source.kind}: {source.refresh} · {source.observedAt ?? 'unobserved'}{' '}
-                {source.failure?.message}
-              </p>
-            ))}
-            {board.meta.coverage.reasons.map((r) => (
-              <p key={r.code}>{r.message}</p>
-            ))}
-            {board.meta.diagnostics.map((r) => (
-              <p key={r.code}>{r.message}</p>
-            ))}
-            <button type="button" onClick={factory.refresh}>
-              Refresh observations
-            </button>
-          </details>
+          <SourceCoverage board={board} refresh={factory.refresh} />
         </Controls>
       )}
       {board && panel === 'start' && (

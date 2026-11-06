@@ -8,7 +8,7 @@ import {
   type SearchSelection,
 } from '../../src/capabilities/catalogue/index.js';
 import { acquireSearchFixture, createSearchFixture } from '../search-fixture.js';
-import utilitiesReference from '../fixtures/prototype/utilities.json';
+import utilitiesReference from '../helpers/color-reference.js';
 import { rankingCases as references } from '../helpers/color-ranking.js';
 
 const referenceQuery = Schema.decodeUnknownSync(

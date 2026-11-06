@@ -38,13 +38,36 @@ export function prReadiness(pr, expectedChecks) {
 		if (!checks.some((check) => (check.name ?? check.context) === name))
 			errors.push(`Missing expected check ${name}`);
 	for (const check of checks) {
-		if (check.workflowName === "Mutation pilot") continue;
+		if (check.advisory === true) continue;
 		if ((check.conclusion ?? check.state) !== "SUCCESS")
 			errors.push(
 				`Check ${check.name ?? check.context} is ${check.conclusion || check.state || check.status || "unknown"}`,
 			);
 	}
 	return errors;
+}
+export function markAdvisoryChecks(pr, repo, policy, lookup = github) {
+	const runs = new Map();
+	const pilotExists = policy.some(
+		(file) => file.path === ".github/workflows/mutation.yml",
+	);
+	for (const check of pr.statusCheckRollup ?? []) {
+		if (!check.detailsUrl) continue;
+		const parsed = new URL(check.detailsUrl);
+		const match = parsed.pathname.match(
+			/^\/([^/]+\/[^/]+)\/actions\/runs\/(\d+)\/job\/\d+$/,
+		);
+		if (parsed.origin !== "https://github.com" || match?.[1] !== repo) continue;
+		const id = match[2];
+		if (!runs.has(id))
+			runs.set(id, lookup(["api", `repos/${repo}/actions/runs/${id}`]));
+		const run = runs.get(id);
+		check.advisory =
+			pilotExists &&
+			run.path?.split("@")[0] === ".github/workflows/mutation.yml" &&
+			run.head_sha === pr.headRefOid;
+	}
+	return pr;
 }
 export function readPr(subject) {
 	if (!subject || subject.startsWith("-"))
@@ -215,6 +238,7 @@ async function main() {
 		let assessment = args[0]
 			? JSON.parse(fs.readFileSync(args[0], "utf8"))
 			: null;
+		markAdvisoryChecks(pr, repo.nameWithOwner, policy);
 		const errors = prReadiness(pr, assessment?.expectedChecks);
 		if (
 			assessment &&

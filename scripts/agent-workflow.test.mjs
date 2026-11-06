@@ -127,3 +127,55 @@ test("Markdown publication passes hostile body text as a file and verifies exact
 		/readback/,
 	);
 });
+
+test("a workflow display name cannot grant a CI exemption", () => {
+	const pr = {
+		state: "OPEN",
+		mergeable: "MERGEABLE",
+		statusCheckRollup: [
+			{
+				name: "critical",
+				workflowName: "Mutation pilot",
+				conclusion: "FAILURE",
+			},
+		],
+	};
+	assert.ok(prReadiness(pr, ["critical"]).length);
+	assert.deepEqual(
+		prReadiness(
+			{
+				...pr,
+				statusCheckRollup: [{ ...pr.statusCheckRollup[0], advisory: true }],
+			},
+			[],
+		),
+		[],
+	);
+});
+
+import { markAdvisoryChecks } from "./agent-workflow.mjs";
+test("advisory status is bound to the authenticated pilot path and current head", () => {
+	const head = "a".repeat(40);
+	const pr = {
+		headRefOid: head,
+		statusCheckRollup: [1, 2].map((id) => ({
+			name: "pilot",
+			detailsUrl: `https://github.com/owner/repo/actions/runs/${id}/job/10`,
+		})),
+	};
+	markAdvisoryChecks(
+		pr,
+		"owner/repo",
+		[{ path: ".github/workflows/mutation.yml" }],
+		(args) => ({
+			path: args[1].endsWith("/1")
+				? ".github/workflows/mutation.yml"
+				: ".github/workflows/critical.yml",
+			head_sha: head,
+		}),
+	);
+	assert.deepEqual(
+		pr.statusCheckRollup.map((c) => c.advisory),
+		[true, false],
+	);
+});

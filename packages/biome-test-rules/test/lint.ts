@@ -49,7 +49,7 @@ export function lint(
 		const config = JSON.parse(
 			readFileSync(join(workspace, "test-correctness.json"), "utf8"),
 		);
-		config.linter = { rules: { preset: "none" } };
+		config.linter = { rules: { preset: "none", correctness: { noUndeclaredDependencies: "error" } } };
 		config.plugins = config.plugins.map((plugin: { path: string }) => ({
 			...plugin,
 			path: join(workspace, plugin.path),

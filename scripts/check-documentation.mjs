@@ -17,7 +17,7 @@ function walk(directory) {
 function prose(source) {
 	return source
 		.replace(/^(`{3,}|~{3,}).*\n[\s\S]*?^\1\s*$/gm, "")
-		.replace(/<!--[^]*?-->/g, "");
+		.replace(/<!--[\s\S]*?-->/g, "");
 }
 function anchors(source) {
 	const result = new Set();

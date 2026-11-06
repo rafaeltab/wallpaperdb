@@ -418,8 +418,8 @@ async function preflightBrowser() {
 				`Missing ${key}. Configure secrets and run make install.`,
 			);
 	}
-	const require = createRequire(resolve("apps/web-e2e/package.json"));
-	const { chromium } = require("@playwright/test");
+	const browserRequire = createRequire(resolve("apps/web-e2e/package.json"));
+	const { chromium } = browserRequire("@playwright/test");
 	if (!existsSync(chromium.executablePath()))
 		throw new Error(
 			"Chromium is missing. Run make run PACKAGE=web-e2e SCRIPT=test:browser:install.",

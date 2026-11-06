@@ -39,3 +39,9 @@ test("capability entries contain explicit reexports and contracts remain in cont
 		0,
 	);
 });
+
+test("undeclared imports fail while declared dependencies and builtins pass", () => {
+ const files = { 'package.json': JSON.stringify({ dependencies: { declared: '1.0.0' } }) };
+ assert.ok(lint("import 'undeclared';", files).some(d => d.category === 'lint/correctness/noUndeclaredDependencies'));
+ assert.equal(lint("import 'declared'; import 'node:fs';", files).filter(d => d.category === 'lint/correctness/noUndeclaredDependencies').length, 0);
+});

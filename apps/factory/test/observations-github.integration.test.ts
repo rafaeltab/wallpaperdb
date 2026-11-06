@@ -223,3 +223,63 @@ it.each(['parent', 'blocker'])(
       ).rejects.toMatchObject({ _tag: 'Unavailable' });
     })
 );
+
+it('collects comparison-bound PR titles, drafts, mergeability, checks and reviewer identities', async () =>
+  withGithub(async (host) => {
+    const pull = {
+      ...pr(43, 'OPEN'),
+      title: 'Public v2 board',
+      isDraft: true,
+      updatedAt: '2026-11-06T12:00:00Z',
+      mergeable: 'CONFLICTING',
+      labels: connection([{ id: 'L1', name: 'backend', color: 'abcdef' }]),
+      reviewRequests: connection([
+        {
+          requestedReviewer: {
+            __typename: 'User',
+            id: 'U1',
+            login: 'reviewer',
+            name: null,
+            avatarUrl: 'https://github.com/avatar.png',
+            url: 'https://github.com/reviewer',
+          },
+        },
+      ]),
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: 'a'.repeat(40),
+              statusCheckRollup: {
+                state: 'SUCCESS',
+                contexts: connection([
+                  {
+                    __typename: 'CheckRun',
+                    id: 'C1',
+                    name: 'typecheck',
+                    status: 'COMPLETED',
+                    conclusion: 'SUCCESS',
+                    detailsUrl: 'https://github.com/check/1',
+                    startedAt: '2026-11-06T11:00:00Z',
+                    completedAt: '2026-11-06T11:01:00Z',
+                  },
+                ]),
+              },
+            },
+          },
+        ],
+      },
+    };
+    await host.save({ planning: { candidates: [], issues: [], openPulls: [pull] } });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]).toMatchObject({
+      title: 'Public v2 board',
+      draft: true,
+      mergeability: 'CONFLICTING',
+      labelDetails: [{ id: 'L1', name: 'backend', color: 'abcdef' }],
+      checkRuns: [{ id: 'C1', name: 'typecheck', state: 'passed', head: 'a'.repeat(40) }],
+      reviewers: [{ user: { login: 'reviewer' }, state: 'requested', head: null }],
+    });
+  }));

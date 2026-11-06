@@ -268,6 +268,47 @@ test("source reset in-place effect receipt binds the actual held-fd payload", (t
 	);
 });
 
+test("source reset refuses a receipt when the native write stores different bytes", (t) => {
+	const f = fixture(t);
+	const write = fs.writeSync;
+	let substitutions = 0;
+	t.mock.method(fs, "writeSync", (fd, bytes, ...args) => {
+		const held = fs.fstatSync(fd, { bigint: true });
+		if (
+			held.dev.toString() === f.expected.device &&
+			held.ino.toString() === f.expected.inode
+		) {
+			substitutions++;
+			return write(fd, Buffer.from("REJECTED\n"), ...args);
+		}
+		return write(fd, bytes, ...args);
+	});
+	let effect;
+	let failure;
+	try {
+		effect = resetOwnedSource(f.expected, Buffer.from("APPROVED\n"));
+	} catch (error) {
+		failure = error;
+	} finally {
+		t.mock.restoreAll();
+	}
+	const actual = fs.readFileSync(f.file, "utf8");
+	retainResetResult("native-write-payload-refusal", {
+		substitutions,
+		effect: effect ?? null,
+		failure: failure?.message ?? null,
+		actualPayload: actual,
+	});
+	assert.equal(substitutions, 1);
+	assert.equal(actual, "REJECTED\n");
+	assert.equal(
+		effect,
+		undefined,
+		"Unobserved approved bytes cannot become a receipt",
+	);
+	assert.match(failure?.message ?? "", /Actual restored payload changed/);
+});
+
 test("source reset deletion effect receipt retains the unlinked fd and no entry", (t) => {
 	const f = fixture(t);
 	const observer = fs.openSync(

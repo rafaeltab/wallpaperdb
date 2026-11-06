@@ -121,3 +121,28 @@ test("the actual Git lease rejects a stale remote head", (t) => {
 		guardedPush({ pr, head, expectedHead, validatedHead: head }, run, () => pr),
 	);
 });
+
+test("rewrite authorization must be an explicit boolean", () => {
+	const pr = {
+		state: "OPEN",
+		headRefOid: expected,
+		headRefName: "selected",
+		headRepository: { name: "repo" },
+		headRepositoryOwner: { login: "owner" },
+	};
+	assert.throws(
+		() =>
+			guardedPush(
+				{
+					pr,
+					expectedHead: expected,
+					head,
+					validatedHead: head,
+					rewriteAuthorized: "false",
+				},
+				() => "",
+				() => pr,
+			),
+		/boolean/,
+	);
+});

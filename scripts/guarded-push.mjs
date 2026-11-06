@@ -3,6 +3,11 @@ const oid = (value) =>
 	typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
 export function guardedPush(input, run = command, refresh) {
 	const { pr, expectedHead, head, validatedHead } = input;
+	if (
+		input.rewriteAuthorized !== undefined &&
+		typeof input.rewriteAuthorized !== "boolean"
+	)
+		throw new Error("Rewrite authorization must be a boolean");
 	if (!oid(expectedHead) || !oid(head))
 		throw new Error("Expected full hexadecimal commit IDs");
 	if (head !== validatedHead)

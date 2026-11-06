@@ -234,12 +234,13 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@set -e; \
 	start_time=$$(date +%s); \
 	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
+	node scripts/check-documentation.mjs; \
 	node scripts/check-generated.mjs routes; \
 	node scripts/check-generated.mjs openapi; \
 	node scripts/check-service-wiring.mjs; \
 	node scripts/check-migrations.mjs; \
 	node scripts/check-generated.mjs migrations; \
-	node scripts/docker-validation.mjs --label migration-replay -- node scripts/check-migration-replay.mjs; \
+	node scripts/docker-validation.ts --label migration-replay -- node scripts/check-migration-replay.mjs; \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \

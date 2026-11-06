@@ -39,6 +39,22 @@ test coverage != "$CI_TEST_FAILURE"
 `,
 			{ mode: 0o700 },
 		);
+		writeFileSync(
+			join(directory, "node"),
+			`#!/bin/sh
+case "$1" in
+ scripts/check-documentation.mjs) stage=documentation ;;
+ scripts/check-generated.mjs) stage=generated-$2 ;;
+ scripts/check-service-wiring.mjs) stage=service-wiring ;;
+ scripts/check-migrations.mjs) stage=migration-metadata ;;
+ scripts/check-migration-replay.mjs) stage=migration-replay ;;
+ *) exec "$CI_TEST_NODE" "$@" ;;
+esac
+echo "$stage" >> "$CI_TEST_LOG"
+test "$stage" != "$CI_TEST_FAILURE"
+`,
+			{ mode: 0o700 },
+		);
 		const log = join(directory, "calls.log");
 		writeFileSync(log, "");
 		const result = spawnSync(
@@ -60,6 +76,7 @@ test coverage != "$CI_TEST_FAILURE"
 					MAKEFLAGS: "",
 					MFLAGS: "",
 					CI_TEST_LOG: log,
+					CI_TEST_NODE: process.execPath,
 					DOCKER_VALIDATION_LOCK_FILE: join(directory, "host.lock"),
 					DOCKER_VALIDATION_TIMEOUT: "5",
 					CI_TEST_FAILURE: failingStage,
@@ -77,11 +94,25 @@ test coverage != "$CI_TEST_FAILURE"
 	}
 }
 
+const stages = [
+	"workspace",
+	"documentation",
+	"generated-routes",
+	"generated-openapi",
+	"service-wiring",
+	"migration-metadata",
+	"generated-migrations",
+	"migration-replay",
+	"coverage",
+];
+
 describe.each(["", "1"])("ci FORCE=%s failure propagation", (force) => {
-	it.each([
-		{ stage: "workspace", calls: ["workspace"] },
-		{ stage: "coverage", calls: ["workspace", "coverage"] },
-	])(
+	it.each(
+		stages.map((stage, index) => ({
+			stage,
+			calls: stages.slice(0, index + 1),
+		})),
+	)(
 		"stops after $stage fails and does not report success",
 		({ stage, calls }) => {
 			const result = runCi(force, stage);
@@ -95,7 +126,7 @@ describe.each(["", "1"])("ci FORCE=%s failure propagation", (force) => {
 	it("reports success only after every stage succeeds", () => {
 		const result = runCi(force, "none");
 		expect(result.status).toBe(0);
-		expect(result.calls).toEqual(["workspace", "coverage"]);
+		expect(result.calls).toEqual(stages);
 		expect(result.output).toMatch(/All local CI checks passed in \d+s/);
 		expect(result.output).toContain("Coverage report: coverage/lcov.info");
 		expect(result.output).toContain("E2E excluded");

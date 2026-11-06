@@ -200,4 +200,6 @@ it('rejects a context-only issue even when it otherwise passes every candidate p
   const result = await preview([context]);
   expect(result.selected).toEqual([]);
   expect(result.rejected).toContainEqual({ issue: 580, reason: 'Context-only issue' });
+  const candidate = { ...context, metadata: { ...context.metadata, candidate: true } };
+  expect((await preview([candidate])).selected).toEqual(proposal.selected);
 });

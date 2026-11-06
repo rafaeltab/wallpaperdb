@@ -8,7 +8,7 @@ import {
   type BoardRecord,
   type CommandRecord,
 } from '../src/capabilities/board/index.js';
-import { Time } from '../src/capabilities/job/index.js';
+import { Time, Unavailable } from '../src/capabilities/job/index.js';
 import { liveV2Data } from '../src/http/index.js';
 import type { ScheduleSnapshot } from '../src/capabilities/observe/index.js';
 import { AttemptStore, IPlanner, type PlanningAttempt } from '../src/capabilities/plan/index.js';
@@ -25,6 +25,46 @@ const job = {
   resume: () => Effect.succeed({ kind: 'rejected' as const }),
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
+it.each([
+  { error: () => new Error('private-cause'), status: 500, type: 'generic-server' },
+  {
+    error: () => new Unavailable({ operation: 'private-operation', cause: 'private-cause' }),
+    status: 503,
+    type: 'factory-unavailable',
+  },
+])(
+  'translates live read failure to $status $type without diagnostic disclosure',
+  async (scenario) => {
+    const board = await liveBoard({ scopeId: 'test', initial });
+    let broken = false;
+    const app = operationsServer({
+      base: 'a'.repeat(40),
+      run: Effect.runPromise,
+      job,
+      v2: {
+        ...board,
+        snapshot: (headers) => {
+          if (broken) throw scenario.error();
+          return board.snapshot(headers);
+        },
+      },
+    });
+    try {
+      expect((await app.inject('/api/v2/board')).statusCode).toBe(200);
+      broken = true;
+      const response = await app.inject('/api/v2/board');
+      expect(response.statusCode).toBe(scenario.status);
+      expect(response.json()).toMatchObject({
+        status: scenario.status,
+        code: 'unavailable',
+        type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${scenario.type}.md`,
+      });
+      expect(response.body).not.toContain('private');
+    } finally {
+      await app.close();
+    }
+  }
+);
 it('serves a stable live board with explicit unavailable provider evidence without provider calls on reads', async () => {
   const board = await liveBoard({ scopeId: 'test', initial, now: () => 1000 });
   const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });

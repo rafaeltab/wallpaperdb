@@ -81,15 +81,17 @@ export function problem(
   commandId: string | null = null
 ): FactoryV2Problem {
   const type =
-    code === 'origin-rejected'
-      ? 'factory-origin'
-      : code === 'invalid-request' || code === 'unsupported'
-        ? 'factory-request'
-        : code === 'unavailable'
-          ? 'factory-unavailable'
-          : code === 'not-found'
-            ? 'factory-not-found'
-            : 'factory-command';
+    status === 500
+      ? 'generic-server'
+      : code === 'origin-rejected'
+        ? 'factory-origin'
+        : code === 'invalid-request' || code === 'unsupported'
+          ? 'factory-request'
+          : code === 'unavailable'
+            ? 'factory-unavailable'
+            : code === 'not-found'
+              ? 'factory-not-found'
+              : 'factory-command';
   return {
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
     status,

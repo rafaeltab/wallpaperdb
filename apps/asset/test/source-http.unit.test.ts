@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
@@ -221,6 +222,7 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       headers: { authorization: 'Bearer owner' },
       payload: { sourceId: 'missing', expectedSourceSetRevision: '3' },
     });
+    assertHttpErrorContract(missing);
     expect(missing.statusCode).toBe(404);
     calls.pop();
     const created = await app.inject({
@@ -264,6 +266,7 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       headers: { authorization: 'Bearer owner' },
       payload: { operation: 'add', expectedSourceSetRevision: '0' },
     });
+    assertHttpErrorContract(conflict);
     expect(conflict.statusCode).toBe(409);
     expect(conflict.json()).toMatchObject({
       status: 409,
@@ -291,6 +294,7 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       headers: { authorization: 'Bearer owner' },
       payload: pictureIntent,
     });
+    assertHttpErrorContract(pictureConflict);
     expect(pictureConflict.statusCode).toBe(409);
     expect(calls.at(-1)).toMatchObject({
       owner: { namespace: 'clerk', subject: 'owner' },
@@ -320,6 +324,7 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       headers: { authorization: 'Bearer owner' },
       payload: { owner: 'attacker', operation: 'add', expectedSourceSetRevision: 0 },
     });
+    assertHttpErrorContract(malformed);
     expect(malformed.statusCode).toBe(400);
   } finally {
     await app.close();

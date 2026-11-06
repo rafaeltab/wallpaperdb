@@ -1,0 +1,43 @@
+import { expect, it } from "vitest";
+import { assertHttpErrorContract } from "../src/http-contracts/index.js";
+const response = (
+	body: unknown,
+	contentType = "application/problem+json",
+	statusCode = 400,
+) => ({
+	statusCode,
+	headers: { "content-type": contentType },
+	json: () => body,
+});
+it("requires explicit Problem Details types, matching statuses and safe error structure", () => {
+	expect(() =>
+		assertHttpErrorContract(
+			response({
+				type: "https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-request.md",
+				status: 400,
+				title: "Invalid request",
+			}),
+		),
+	).not.toThrow();
+	for (const body of [
+		{ type: "about:blank", status: 400, title: "Invalid" },
+		{ type: "https://example.com/type", status: 500, title: "Invalid" },
+		{
+			type: "https://example.com/type",
+			status: 400,
+			title: "Invalid",
+			stack: "private",
+		},
+	])
+		expect(() => assertHttpErrorContract(response(body))).toThrow();
+});
+it("retains GraphQL error envelopes without treating REST errors as GraphQL", () => {
+	const result = response(
+		{
+			errors: [{ message: "Invalid request", extensions: { code: "INVALID" } }],
+		},
+		"application/json",
+	);
+	expect(() => assertHttpErrorContract(result, "graphql")).not.toThrow();
+	expect(() => assertHttpErrorContract(result)).toThrow();
+});

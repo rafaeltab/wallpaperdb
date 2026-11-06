@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
@@ -69,6 +70,7 @@ it('authenticates Owner inspection and translates unavailable Assets without rev
       url: '/assets/other/sources',
       headers: { authorization: 'Bearer verified-token' },
     });
+    assertHttpErrorContract(absent);
     expect(absent.statusCode).toBe(404);
     expect(absent.headers['content-type']).toContain('application/problem+json');
     expect(
@@ -119,6 +121,7 @@ it.each([
       url: '/assets/asset_one/sources',
       headers: { authorization: 'Bearer test-token' },
     });
+    assertHttpErrorContract(response);
     expect(response.statusCode).toBe(503);
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(response.headers['cache-control']).toBe('no-store');

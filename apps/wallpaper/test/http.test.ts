@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
 import { Effect, Layer } from 'effect';
@@ -83,6 +84,7 @@ it('translates unavailable readiness into Problem Details with its safe reason',
   );
   apps.push(app);
   const response = await app.inject('/ready');
+  assertHttpErrorContract(response);
   expect(response.statusCode).toBe(503);
   expect(response.headers['content-type']).toContain('application/problem+json');
   expect(response.json()).toEqual({
@@ -147,6 +149,7 @@ it('returns safe Problem Details for malformed URL components', async () => {
   const app = await createHttpApp({ nodeEnv: 'test', port: 3010 }, services);
   apps.push(app);
   const response = await app.inject('/%zz');
+  assertHttpErrorContract(response);
   expect(response.statusCode).toBe(400);
   expect(response.headers['content-type']).toContain('application/problem+json');
   expect(response.json()).toEqual({
@@ -201,6 +204,7 @@ it.each([
   const app = await createHttpApp({ nodeEnv: 'development', port: 3010 }, services);
   apps.push(app);
   const response = await app.inject({ method: 'OPTIONS', url: '/health', headers });
+  assertHttpErrorContract(response);
   expect(response.statusCode).toBe(400);
   expect(response.headers['content-type']).toContain('application/problem+json');
   expect(response.json()).toEqual({

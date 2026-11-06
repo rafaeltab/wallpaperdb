@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
@@ -85,6 +86,7 @@ describe('upload HTTP contract', () => {
         headers,
         payload: 'not a file',
       });
+      assertHttpErrorContract(response);
       expect(response.statusCode).toBe(401);
       expect(response.json().type).toContain('/docs/problems/unauthorized.md');
     }
@@ -100,6 +102,7 @@ describe('upload HTTP contract', () => {
       url: '/upload?source=web',
       payload: 'invalid body',
     });
+    assertHttpErrorContract(response);
     expect(response.statusCode).toBe(401);
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(response.json().type).toContain('/docs/problems/unauthorized.md');
@@ -184,6 +187,7 @@ it('rejects quota denial with reset headers without reading an upload', async ()
     reset: 3000,
   });
   const response = await app.inject({ method: 'POST', url: '/upload', ...multipart() });
+  assertHttpErrorContract(response);
   expect(response.statusCode).toBe(429);
   expect(response.headers['retry-after']).toBe('3');
   expect(response.headers['x-ratelimit-remaining']).toBe('0');
@@ -193,6 +197,7 @@ it('rejects quota denial with reset headers without reading an upload', async ()
 it('hides infrastructure diagnostic causes in a typed unavailable response', async () => {
   const { app } = await fixture(undefined, undefined, true);
   const response = await app.inject({ method: 'POST', url: '/upload', ...multipart() });
+  assertHttpErrorContract(response);
   expect(response.statusCode).toBe(503);
   expect(response.json().type).toContain('service-unavailable.md');
   expect(response.body).not.toContain('private-secret');
@@ -209,6 +214,7 @@ it('serves public health, readiness, and OpenAPI with duplicate status documente
   expect((await app.inject('/ready')).json()).toMatchObject({ ready: true });
   app.connectionsState.isShuttingDown = true;
   const health = await app.inject('/health');
+  assertHttpErrorContract(health);
   expect(health.statusCode).toBe(503);
   expect(health.json()).toMatchObject({ healthStatus: 'shutting_down', status: 503 });
   expect(
@@ -225,6 +231,7 @@ it('returns safe Problem Details for malformed authentication and transport erro
     ).toBe(401);
   }
   const missing = await app.inject('/missing');
+  assertHttpErrorContract(missing);
   expect(missing.statusCode).toBe(404);
   expect(missing.json().type).toContain('/not-found.md');
   const invalid = await app.inject({
@@ -233,6 +240,7 @@ it('returns safe Problem Details for malformed authentication and transport erro
     headers: { authorization, 'content-type': 'application/json' },
     payload: '{',
   });
+  assertHttpErrorContract(invalid);
   expect(invalid.statusCode).toBe(400);
   expect(invalid.json().type).toContain('/invalid-request.md');
 });
@@ -244,6 +252,7 @@ it('rejects missing and multiple files before invoking ingestion', async () => {
     headers: { authorization, 'content-type': 'multipart/form-data; boundary=empty' },
     payload: '--empty--\r\n',
   });
+  assertHttpErrorContract(empty);
   expect(empty.statusCode).toBe(400);
   const part =
     '--files\r\nContent-Disposition: form-data; name="file"; filename="x.png"\r\nContent-Type: image/png\r\n\r\nimage\r\n';
@@ -253,6 +262,7 @@ it('rejects missing and multiple files before invoking ingestion', async () => {
     headers: { authorization, 'content-type': 'multipart/form-data; boundary=files' },
     payload: `${part}${part}--files--\r\n`,
   });
+  assertHttpErrorContract(extra);
   expect(extra.statusCode).toBe(413);
   expect(uploads).toEqual([]);
 });

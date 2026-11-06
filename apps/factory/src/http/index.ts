@@ -1,4 +1,5 @@
 export { operationsServer } from './implementation.js';
+export { fakeV2Server } from './v2/server.js';
 export type {
   Action,
   Attention,

@@ -1,3 +1,4 @@
+import { guardedPush } from "./guarded-push.mjs";
 import { githubFeedback } from "./collect-feedback.mjs";
 import { publishMarkdown } from "./publish-markdown.mjs";
 export { publishMarkdown };
@@ -297,6 +298,26 @@ async function main() {
 			JSON.stringify({ head: pr.headRefOid, ...feedback, errors }, null, 2),
 		);
 		if (errors.length) process.exitCode = 1;
+	} else if (action === "push") {
+		const input = JSON.parse(fs.readFileSync(subject, "utf8"));
+		const pr = readPr(input.pr);
+		const validation = JSON.parse(
+			fs.readFileSync(input.validationFile, "utf8"),
+		);
+		if (
+			!validation.checks?.length ||
+			validation.checks.some((check) => check.exitCode !== 0)
+		)
+			throw new Error("Passing validation evidence is required");
+		const head = command("git", ["rev-parse", "HEAD"]).trim();
+		if (command("git", ["status", "--porcelain"]).trim())
+			throw new Error("Commit or preserve local changes before publication");
+		const result = guardedPush(
+			{ ...input, pr, head, validatedHead: validation.head },
+			command,
+			() => readPr(input.pr),
+		);
+		console.log(JSON.stringify(result, null, 2));
 	} else
 		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }

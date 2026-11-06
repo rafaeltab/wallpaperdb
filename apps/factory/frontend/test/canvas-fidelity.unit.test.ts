@@ -27,6 +27,7 @@ it.each(['varied', 'nested', 'scale100', 'scale200', 'scale300'] as const)(
           {
             ...meta,
             projectKnown: true,
+            labelsKnown: true,
             priorityRank: meta.priority
               ? ['P0', 'P1', 'P2', 'P3', 'P4'].indexOf(meta.priority)
               : undefined,

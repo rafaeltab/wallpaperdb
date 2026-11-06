@@ -1,4 +1,5 @@
-/** Proposed v2 wire contract. Declarations only; no v2 routes or producers exist.
+/** V2 wire contract. A separate fake server implements the transports;
+ * the live factory producer is not implemented.
  * Semantics, collection scope, transport and migration: docs/factory-interface-v2.md.
  * JSON only. IDs and versions are opaque; timestamps are RFC 3339 UTC strings.
  */
@@ -405,6 +406,7 @@ export interface Coverage {
   readonly unresolvedIssueIds: readonly IssueId[];
 }
 export interface BoardMeta {
+  readonly dataMode: 'fake' | 'live';
   readonly coverage: Coverage;
   readonly diagnostics: readonly Reason[];
   readonly factory: FactoryControl;

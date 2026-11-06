@@ -524,8 +524,8 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
     console.error(JSON.stringify({ code: -32602, message: 'message: maximum length 120000' }));
     process.exit(1);
   }
-  const request = JSON.parse(prompt.split('Request: ')[1]);
-  writeFileSync(join(config.directory, 'planner.json'), JSON.stringify(request));
+  const request = JSON.parse(prompt.split('Request: ')[1].split('\n')[0]);
+  writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ ...request, prompt }));
   if (config.planner.lostStart) process.exit(1);
   reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
 } else if (config.planner && args[1] === 'show' && args[2] === 'planner-thread') {

@@ -10,6 +10,7 @@ import {
 } from './contract.js';
 const trusted = (author: string) => author === 'rafaeltab' || author === 'zero-two-rafaeltab';
 function exclusion(issue: PlanningIssue): string | undefined {
+  if (issue.metadata?.candidate === false) return 'Context-only issue';
   if (!issue.open) return 'Closed issue';
   if (!trusted(issue.author)) return 'Untrusted author';
   if (!issue.labels.includes('ready-for-agent')) return 'Not ready for agent';
@@ -112,9 +113,14 @@ export const PlanLive = Layer.effect(
             return yield* Effect.fail(new Unavailable({ operation: 'plan-busy', cause: null }));
           pending = true;
           return yield* Effect.gen(function* () {
+            const deadline = attempt?.deadline ?? Date.now() + 600000;
             if (attempt) yield* attempt.progress('discovery');
             const input = yield* source.read();
-            const proposal = yield* planner.propose(input, attempt);
+            if (attempt) yield* attempt.progress('handoff');
+            const proposal = yield* planner.propose(input, {
+              requestId: attempt?.requestId,
+              deadline,
+            });
             if (attempt) yield* attempt.progress('freshness');
             const current = yield* source.read();
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
@@ -134,7 +140,14 @@ export const PlanLive = Layer.effect(
               })
             )
           );
-        }).pipe(Effect.withSpan('factory.plan.preview')),
+        }).pipe(
+          Effect.timeoutOrElse({
+            duration: 600000,
+            orElse: () =>
+              Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
+          }),
+          Effect.withSpan('factory.plan.preview')
+        ),
     };
   })
 );

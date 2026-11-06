@@ -5,7 +5,9 @@ export function controlledAttemptStore(): AttemptStore {
   return {
     pending: () =>
       Effect.sync(() =>
-        [...rows.values()].find((row) => row.phase === 'discovery' || row.phase === 'freshness')
+        [...rows.values()].find(
+          (row) => row.phase === 'discovery' || row.phase === 'handoff' || row.phase === 'freshness'
+        )
       ),
     get: (id) => Effect.sync(() => rows.get(id)),
     create: (attempt) =>

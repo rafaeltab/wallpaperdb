@@ -17,9 +17,13 @@ export async function attemptStoreContract(store: AttemptStore) {
   expect(await Effect.runPromise(store.save({ ...first, revision: 1, deadline: 122000 }))).toBe(
     false
   );
+  const handoff = { ...first, revision: 1, phase: 'handoff' as const };
+  expect(await Effect.runPromise(store.save(handoff))).toBe(true);
+  expect(await Effect.runPromise(store.pending())).toEqual(handoff);
+  expect(await Effect.runPromise(store.create(second))).toBe(false);
   expect(
     await Effect.runPromise(
-      store.save({ ...first, revision: 1, phase: 'failed', finishedAt: 1100 })
+      store.save({ ...first, revision: 2, phase: 'failed', finishedAt: 1100 })
     )
   ).toBe(true);
   expect(await Effect.runPromise(store.save({ ...first, revision: 1, phase: 'freshness' }))).toBe(

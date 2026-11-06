@@ -53,7 +53,7 @@ const schema = z
     revision: z.number().int().nonnegative(),
     startedAt: z.number().finite(),
     deadline: z.number().finite(),
-    phase: z.enum(['discovery', 'freshness', 'succeeded', 'failed']),
+    phase: z.enum(['discovery', 'handoff', 'freshness', 'succeeded', 'failed']),
     finishedAt: z.number().finite().optional(),
     detail: z.string().max(1000).optional(),
     result: resultSchema.optional(),
@@ -89,7 +89,7 @@ export function sqliteAttemptStore(directory: string): AttemptStore {
             db
               .select()
               .from(table)
-              .where(inArray(table.phase, ['discovery', 'freshness']))
+              .where(inArray(table.phase, ['discovery', 'handoff', 'freshness']))
               .get()
           )
         )

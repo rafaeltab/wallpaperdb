@@ -211,7 +211,9 @@ it('deduplicates converging parents, blockers and cycles and retains PRs without
         issues: [
           issue(1, 'Parent: #3\nBlocked by: #3'),
           issue(2, 'Parent: #3\nBlocked by: #3'),
-          issue(3, 'Parent: #1'),
+          issue(3, 'Parent: #4'),
+          issue(4, 'Parent: #1\nBlocked by: #5\nArbitrary mention #99'),
+          issue(5, 'Ancestor blocker'),
         ],
         openPulls: [
           {
@@ -240,7 +242,25 @@ it('deduplicates converging parents, blockers and cycles and retains PRs without
     const result = await Effect.runPromise(
       githubObservations(host.repository, () => Effect.succeed([])).read()
     );
-    expect(result.issues.map((i) => i.number)).toEqual([1, 2, 3]);
+    expect(result.issues.map((i) => i.number)).toEqual([1, 2, 3, 4, 5]);
+    const planning = await Effect.runPromise(
+      githubPlanning(
+        { project: host.repository, base: host.base, prerequisites: [] },
+        {
+          status: () => Effect.succeed({ kind: 'empty' }),
+          start: () => Effect.succeed({ kind: 'rejected' }),
+          resume: () => Effect.succeed({ kind: 'rejected' }),
+          cancel: () => Effect.succeed({ kind: 'rejected' }),
+        }
+      ).read()
+    );
+    expect(planning.issues.map((i) => [i.number, i.metadata?.candidate])).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+      [4, false],
+      [5, false],
+    ]);
     expect(result.pullRequests).toMatchObject([
       {
         number: 42,

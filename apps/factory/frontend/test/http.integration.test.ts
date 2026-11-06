@@ -90,6 +90,8 @@ it('serves the real React app over Vite HMR, proxies same-origin browser POSTs a
     await page.getByRole('button', { name: 'Generate plan preview' }).click();
     await browserExpect(page.getByText('Gathering issues (3s)')).toBeVisible();
     await browserExpect(page.getByRole('progressbar')).toHaveAttribute('value', '1');
+    phase = 'handoff';
+    await browserExpect(page.getByText('Handing off to planner (3s)')).toBeVisible();
     phase = 'freshness';
     await browserExpect(page.getByText('Validating freshness (3s)')).toBeVisible();
     phase = 'succeeded';

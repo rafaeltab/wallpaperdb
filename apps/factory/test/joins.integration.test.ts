@@ -1355,7 +1355,16 @@ async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
       projectId: 'project-id',
     },
   };
-  return { ...f, a, b, merged, config, issues: githubIssues(config), joinState, initial };
+  return {
+    ...f,
+    a,
+    b,
+    merged,
+    config,
+    issues: githubIssues(config, f.readGitHub),
+    joinState,
+    initial,
+  };
 }
 it('maintains issue-only descendants after a rebase merge without replaying landed A', async () => {
   const f = await landedFixture();
@@ -1375,7 +1384,7 @@ it('maintains issue-only descendants after a rebase merge without replaying land
     expect(live.members).toEqual(
       [102, 103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
     );
-    const reopened = githubIssues(f.config);
+    const reopened = githubIssues(f.config, f.readGitHub);
     if (!reopened.reconcile) throw new Error('Missing reconciliation');
     await Effect.runPromise(reopened.reconcile());
     expect(git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(head);

@@ -99,7 +99,10 @@ export function populateCards(context: ProjectionContext) {
     const raw = facts?.pullRequests.find((p) => p.number === pr.number);
     if (
       raw?.state !== 'OPEN' &&
-      !jobs.some((j) => j.occupiesCapacity) &&
+      !jobs.some(
+        (j) =>
+          j.occupiesCapacity || (!j.cancelled && !!j.question) || j.activity === 'manual-recovery'
+      ) &&
       !Object.values(tables.maintenance).some((m) => m.pullRequestId === pr.id)
     )
       continue;

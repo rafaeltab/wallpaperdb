@@ -21,7 +21,9 @@
 		"lint:docs": "node check-documentation.mjs",
 		"lint:workspaces": "node check-workspaces.mjs",
 		"lockfile:update": "cd .. && pnpm install --lockfile-only --ignore-scripts",
-		"check:generated": "node check-generated.mjs"
+		"check:generated": "node check-generated.mjs",
+		"check:migrations": "node check-migrations.mjs && node check-generated.mjs migrations",
+		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- node check-migration-replay.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

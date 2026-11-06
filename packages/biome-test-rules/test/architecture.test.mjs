@@ -84,3 +84,15 @@ test("production capability restrictions do not apply to colocated test executio
 		0,
 	);
 });
+
+test("capability entries allow imported contract names but reject private behavior", () => {
+	const file = "apps/example/src/capabilities/search/index.ts";
+	assert.equal(
+		check(
+			"import type { Search } from './contract.js'; export type { Search };",
+			file,
+		).length,
+		0,
+	);
+	assert.ok(check("const hidden = () => 1; export { hidden };", file).length);
+});

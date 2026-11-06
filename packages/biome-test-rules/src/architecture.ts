@@ -62,21 +62,23 @@ export const capabilityExecution = defineRule({
 	},
 });
 export const capabilityEntry = defineRule({
-	query: ast(
-		"JS_EXPORT",
-		"TS_INTERFACE_DECLARATION",
-		"TS_TYPE_ALIAS_DECLARATION",
-	),
+	query: ast("JS_MODULE", "JS_SCRIPT"),
 	run(node, context) {
 		if (!/\/capabilities\/[^/]+\/index\.ts$/.test(context.filePath)) return;
-		if (
-			node.kind !== "JS_EXPORT" ||
-			node.exportClause?.kind !== "JS_EXPORT_NAMED_FROM_CLAUSE"
-		) {
+		const statements = node.kind === "JS_MODULE" ? node.items : node.statements;
+		for (const statement of statements) {
+			if (statement.kind === "JS_IMPORT") continue;
+			if (
+				statement.kind === "JS_EXPORT" &&
+				["JS_EXPORT_NAMED_FROM_CLAUSE", "JS_EXPORT_NAMED_CLAUSE"].includes(
+					statement.exportClause?.kind ?? "",
+				)
+			)
+				continue;
 			registerDiagnostic(
-				node,
+				statement,
 				"error",
-				"capability-entry: use explicit named reexports; declare public contracts in contract.ts.",
+				"capability-entry: use explicit named exports of imported contracts; declare contracts in contract.ts and behavior in private implementation files.",
 			);
 		}
 	},

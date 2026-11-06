@@ -116,7 +116,8 @@ function arrangeIssues(
         columns,
         height: up,
         connected: items.some((i) => connected.has(i.id)),
-        first: items.filter((i) => rank(i) === 0).sort(compare)[0],
+        // Cyclic source data has no rank-zero member, but every card stays displayable.
+        first: items.filter((i) => rank(i) === 0).sort(compare)[0] ?? [...items].sort(compare)[0],
       };
     })
     .sort((a, b) => Number(b.connected) - Number(a.connected) || compare(a.first, b.first));

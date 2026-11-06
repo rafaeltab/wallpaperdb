@@ -77,7 +77,7 @@ export function populatePulls(context: ProjectionContext) {
                   : p.review === 'REVIEW_REQUIRED'
                     ? ('required' as const)
                     : ('unknown' as const),
-            complete: true,
+            complete: p.reviewersComplete ?? false,
             reviewers: p.reviewers.map((r) => ({
               userId: addUser(r.user),
               state: r.state,

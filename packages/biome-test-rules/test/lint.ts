@@ -55,6 +55,10 @@ export function lint(
 			path: join(workspace, plugin.path),
 		}));
 		writeFileSync(join(directory, "biome.json"), JSON.stringify(config));
+		writeFileSync(
+			join(directory, "package.json"),
+			JSON.stringify({ devDependencies: { vitest: "5.0.2" } }),
+		);
 		symlinkSync(
 			join(workspace, "node_modules"),
 			join(directory, "node_modules"),

@@ -479,7 +479,16 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           },
         ]
       );
-    else if (args.join(' ').includes('c0:node(id:')) {
+    else if (/pullRequest\(number:\d+\)/.test(args.join(' '))) {
+      const n = Number(args.join(' ').match(/pullRequest\(number:(\d+)\)/)[1]);
+      const pr =
+        config.planning.hydratedPulls?.[n] ??
+        [
+          ...(config.planning.openPulls ?? []),
+          ...Object.values(config.planning.nativePulls ?? {}).flat(),
+        ].find((pr) => pr.number === n);
+      reply({ data: { repository: { pullRequest: pr ?? null } } });
+    } else if (args.join(' ').includes('c0:node(id:')) {
       const values = {};
       for (const match of args.join(' ').matchAll(/(c\d+):node\(id:"([^"]+)"/g))
         values[match[1]] =

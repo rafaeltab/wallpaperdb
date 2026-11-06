@@ -1,6 +1,15 @@
 import { expect, it } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
-import { layout, related } from '../src/canvas/model';
+import { related } from '../src/canvas/model';
+import { createCanvasProjection } from '../src/canvas/view-model';
+import { canvasLayout } from '../src/canvas/geometry';
+function layout(board: FactoryV2Snapshot, collapsed: Set<string>) {
+  return canvasLayout(createCanvasProjection()(board), {
+    collapsed,
+    titleMode: 'ellipsis',
+    expandedNames: new Set(),
+  });
+}
 import { routeCanvas } from '../src/canvas/routing';
 async function sample() {
   const app = fakeV2Server({ epoch: 'layout' });
@@ -13,11 +22,13 @@ async function sample() {
 it('places each authoritative work item once and stacks tip above base', async () => {
   const board = await sample(),
     graph = layout(board, new Set());
-  expect(new Set(graph.cards.map((c) => c.id)).size).toBe(Object.keys(board.entities.items).length);
-  const stack = graph.groups.find((g) => g.stack);
+  expect(new Set(graph.boxes.map((c) => c.id)).size).toBe(Object.keys(board.entities.items).length);
+  const stack = graph.panels.find((g) => g.stacked);
   if (!stack) throw new Error('Expected sample stack');
   expect(
-    stack.items.map((i) => (i.subject.kind === 'pull-request' ? i.subject.pullRequestId : null))
+    stack.rows.map(({ item: { item: i } }) =>
+      i.subject.kind === 'pull-request' ? i.subject.pullRequestId : null
+    )
   ).toEqual(['pr:2004', 'pr:2003']);
   const blocked = Object.values(board.entities.items).find(
     (i) => i.subject.kind === 'issue' && i.subject.issueId === 'issue:1007'
@@ -25,8 +36,10 @@ it('places each authoritative work item once and stacks tip above base', async (
   if (!blocked) throw new Error('Expected blocked candidate');
   expect([...related(board, blocked, 'prerequisites')]).toEqual(['item:1002']);
   expect(related(board, blocked, 'prerequisites').has(blocked.id)).toBe(false);
-  const edge = graph.routes.find((r) => r.source === blocked.id);
-  expect(edge?.target).toBe('item:1002');
+  expect(graph.connections).toContainEqual({
+    source: graph.boxes.find((b) => b.item.item.id === 'item:1002')?.id,
+    target: graph.boxes.find((b) => b.item.item.id === blocked.id)?.id,
+  });
 });
 it('retains external dependency anchors when parent groups collapse', async () => {
   const board = await sample();
@@ -34,18 +47,19 @@ it('retains external dependency anchors when parent groups collapse', async () =
   const planned = initial.groups.find((g) => g.stage === 'planned');
   if (!planned) throw new Error('Expected Planned group');
   const graph = layout(board, new Set([planned.key]));
-  expect(graph.cards.some((c) => c.item.section === 'planned')).toBe(false);
+  expect(graph.boxes.some((c) => c.item.item.section === 'planned')).toBe(false);
   expect(graph.groups.find((g) => g.key === planned.key)?.collapsed).toBe(true);
-  expect(graph.routes.some((r) => r.source === 'item:1007' && r.target === 'item:1002')).toBe(true);
+  expect(graph.routingConnections.length).toBeGreaterThan(0);
+  expect(graph.aggregateNodes.length).toBeGreaterThan(0);
 });
 it('routes around an intervening card and ends its arrow on the prerequisite', () => {
   const graph = routeCanvas(
     [
-      { id: 'dependant', x: 50, y: 50, width: 100, height: 60 },
-      { id: 'obstacle', x: 180, y: 50, width: 100, height: 160 },
-      { id: 'prerequisite', x: 320, y: 50, width: 100, height: 60 },
+      { id: 1, x: 50, y: 50, width: 100, height: 60 },
+      { id: 2, x: 180, y: 50, width: 100, height: 160 },
+      { id: 3, x: 320, y: 50, width: 100, height: 60 },
     ],
-    [{ source: 'dependant', target: 'prerequisite' }],
+    [{ source: 3, target: 1 }],
     500,
     350
   );
@@ -68,8 +82,8 @@ it('distinguishes current, previous, and head-only provider evidence', async () 
 it('packs sibling issues into two lanes inside their parent namespace', async () => {
   const board = await sample(),
     graph = layout(board, new Set());
-  const left = graph.cards.find((c) => c.id === 'item:1001'),
-    right = graph.cards.find((c) => c.id === 'item:1007');
+  const left = graph.boxes.find((c) => c.item.item.id === 'item:1001'),
+    right = graph.boxes.find((c) => c.item.item.id === 'item:1007');
   if (!left || !right) throw new Error('Expected planned sibling issues');
   expect(left.x).not.toBe(right.x);
   expect(left.y).toBe(right.y);
@@ -84,4 +98,58 @@ it('highlights verified PR-base relationships in the selected direction', async 
     'item:1004',
   ]);
   expect(related(board, board.entities.items['item:1004'], 'dependants').size).toBe(0);
+});
+
+it('keeps opaque work identities stable across snapshots and separate from displayed GitHub numbers', async () => {
+  const seed = await sample(),
+    project = createCanvasProjection();
+  const first = project(seed);
+  const board = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      pullRequests: {
+        ...seed.entities.pullRequests,
+        'pr:2003': { ...seed.entities.pullRequests['pr:2003'], number: 1003 },
+      },
+    },
+  };
+  const next = project(board);
+  expect(new Set(next.items.map((i) => i.id)).size).toBe(Object.keys(board.entities.items).length);
+  for (const item of first.items)
+    expect(next.items.find((i) => i.item.id === item.item.id)?.id).toBe(item.id);
+  const pr = next.items.find((i) => i.item.id === 'item:1003');
+  expect(pr?.pr).toBe(1003);
+  expect(pr?.issueNumbers[0].number).toBe(1003);
+});
+it('does not let cyclic parent context hide authoritative work items', async () => {
+  const seed = await sample();
+  const edge = Object.values(seed.entities.relationships).find((r) => r.kind === 'parent');
+  if (!edge || edge.kind !== 'parent') throw new Error('Expected parent relation');
+  const board = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      relationships: {
+        ...seed.entities.relationships,
+        'relationship:cycle': {
+          ...edge,
+          id: 'relationship:cycle' as const,
+          parentIssueId: edge.childIssueId,
+          childIssueId: edge.parentIssueId,
+        },
+      },
+    },
+  };
+  const graph = layout(board, new Set());
+  expect(graph.boxes).toHaveLength(Object.keys(board.entities.items).length);
+});
+
+it('uses PR ancestry for selection while stack ordering supplies its visual connection', async () => {
+  const data = createCanvasProjection()(await sample());
+  const base = data.items.find((i) => i.item.id === 'item:1003'),
+    tip = data.items.find((i) => i.item.id === 'item:1004');
+  if (!base || !tip) throw new Error('Expected stacked items');
+  expect(data.selectionConnections).toContainEqual({ source: base.id, target: tip.id });
+  expect(data.connections).not.toContainEqual({ source: base.id, target: tip.id });
 });

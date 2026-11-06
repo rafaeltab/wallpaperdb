@@ -27,7 +27,47 @@ export function title(entity?: Issue | PullRequest) {
   return entity?.metadata.state === 'known' ? entity.metadata.value.title : 'Title unavailable';
 }
 export function related(board: Board, item: WorkItem, direction: 'prerequisites' | 'dependants') {
-  return relatedToIssues(board, issueIds(item), direction);
+  return relatedItems(board, [item], direction);
+}
+export function relatedItems(
+  board: Board,
+  seeds: readonly WorkItem[],
+  direction: 'prerequisites' | 'dependants'
+) {
+  const seedIds = new Set(seeds.map((item) => item.id)),
+    found = new Set<WorkItem['id']>(),
+    queue = [...seeds];
+  const allItems = Object.values(board.entities.items),
+    edges = Object.values(board.entities.relationships);
+  function add(item: WorkItem) {
+    if (!seedIds.has(item.id) && !found.has(item.id)) {
+      found.add(item.id);
+      queue.push(item);
+    }
+  }
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    for (const id of relatedToIssues(board, issueIds(current), direction)) {
+      const match = board.entities.items[id];
+      if (match) add(match);
+    }
+    if (current.subject.kind !== 'pull-request') continue;
+    const prs = new Set<string>([current.subject.pullRequestId]),
+      pending = [current.subject.pullRequestId as string];
+    for (let at = 0; at < pending.length; at++)
+      for (const edge of edges) {
+        if (edge.kind !== 'pr-base') continue;
+        const from = direction === 'prerequisites' ? edge.tipPullRequestId : edge.basePullRequestId;
+        const to = direction === 'prerequisites' ? edge.basePullRequestId : edge.tipPullRequestId;
+        if (from !== pending[at] || prs.has(to)) continue;
+        prs.add(to);
+        pending.push(to);
+        for (const match of allItems)
+          if (match.subject.kind === 'pull-request' && match.subject.pullRequestId === to)
+            add(match);
+      }
+  }
+  return found;
 }
 export function relatedToIssues(
   board: Board,
@@ -174,10 +214,14 @@ export function layout(board: Board, collapsed: ReadonlySet<string>): Layout {
     }
     const allItems = (s: Spec): WorkItem[] => [...s.items, ...s.children.flatMap(allItems)];
     function groupWidth(spec: Spec): number {
-      const base = stage.id === 'in-review' ? 760 : 400;
-      return collapsed.has(spec.key)
-        ? base
-        : Math.max(base, ...spec.children.map((child) => groupWidth(child) + 24));
+      const hasPr = spec.items.some((item) => item.subject.kind === 'pull-request');
+      const base = hasPr || spec.stack ? 760 : 400;
+      if (collapsed.has(spec.key))
+        return !spec.parent && !spec.stack
+          ? Math.min(base, Math.max(180, spec.name.length * 7 + 60))
+          : base;
+      const packed = !hasPr && spec.items.length > 1 ? 808 : base;
+      return Math.max(packed, ...spec.children.map((child) => groupWidth(child) + 24));
     }
     function place(spec: Spec, x: number, at: number, depth: number): number {
       const all = allItems(spec),
@@ -203,21 +247,31 @@ export function layout(board: Board, collapsed: ReadonlySet<string>): Layout {
       if (isCollapsed) {
         for (const item of all) anchors.set(item.id, { ...group, header: true });
       } else {
-        for (const item of spec.stack ? spec.items : order(spec.items)) {
+        const rows = spec.stack ? spec.items : order(spec.items);
+        const columns =
+          rows.length > 1 && rows.every((item) => item.subject.kind === 'issue') ? 2 : 1;
+        let rowHeight = 0;
+        for (const [index, item] of rows.entries()) {
+          const column = index % columns;
+          if (column === 0 && index > 0) {
+            next += rowHeight + 32;
+            rowHeight = 0;
+          }
           const height = item.subject.kind === 'pull-request' ? 82 : 112;
           const card: Card = {
             id: item.id,
             item,
-            x: x + 12,
+            x: x + 12 + column * 408,
             y: next,
-            width: w - 24,
+            width: item.subject.kind === 'pull-request' ? w - 24 : 376,
             height,
             stacked: !!spec.stack,
           };
           cards.push(card);
           anchors.set(item.id, card);
-          next += height + 32;
+          rowHeight = Math.max(rowHeight, height);
         }
+        if (rows.length) next += rowHeight + 32;
         for (const child of spec.children) next += place(child, x + 12, next, depth + 1) + 32;
         group.height = Math.max(46, next - at - 16);
       }

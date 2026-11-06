@@ -25,6 +25,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 it('retains last-known items when refresh fails and disables command controls', async () => {
   const board = await sample();
@@ -164,4 +165,226 @@ it('keeps uncertain commands recoverable inside the originating dialog without c
   await screen.findByText('Command succeeded');
   expect(bodies).toHaveLength(2);
   expect(bodies[1]).toBe(bodies[0]);
+});
+
+it('keeps failed checks and detail check names visible without URLs', async () => {
+  let board = await sample();
+  const pr = board.entities.pullRequests['pr:2003'];
+  if (pr.checks.state !== 'known') throw new Error('Expected known sample checks');
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      pullRequests: {
+        ...board.entities.pullRequests,
+        [pr.id]: {
+          ...pr,
+          checks: {
+            ...pr.checks,
+            value: {
+              ...pr.checks.value,
+              state: 'failed',
+              groups: [{ ...pr.checks.value.groups[0], state: 'failed', url: null }],
+            },
+          },
+        },
+      },
+    },
+  };
+  const client = new FactoryClient(async (path) =>
+    String(path).includes('/items/')
+      ? json({
+          apiVersion: 2,
+          itemId: 'item:1003',
+          itemVersion: '1',
+          observedAt: board.committedAt,
+          questions: [],
+          checkRuns: {
+            state: 'known',
+            sourceId: 'source:github',
+            observedAt: board.committedAt,
+            value: [
+              {
+                id: 'check-no-url',
+                groupId: 'ci',
+                name: 'Check without a provider link',
+                url: null,
+                comparison: { headOid: 'previous-head', baseOid: null, baseRef: null },
+                state: 'failed',
+                startedAt: null,
+                completedAt: null,
+              },
+            ],
+          },
+        })
+      : json(board)
+  );
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  const checks = await screen.findByLabelText('Checks: failed. Current comparison');
+  expect(checks.textContent).toContain('×');
+  await user.click(screen.getByRole('button', { name: 'Select Expose observation metadata' }));
+  await user.click(screen.getByRole('button', { name: 'Details' }));
+  await screen.findByText('Check without a provider link');
+});
+
+it('retains supported browser links when native T3 links are unavailable', async () => {
+  const board = await sample(),
+    client = new FactoryClient(async () => json(board));
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await screen.findByText('Implement the command centre');
+  const initial = screen.getAllByRole('link', { name: /T3 ·/ }).map((a) => a.getAttribute('href'));
+  await user.click(screen.getByLabelText('Open T3 links in app'));
+  const fallback = screen.getAllByRole('link', { name: /T3 ·/ }).map((a) => a.getAttribute('href'));
+  expect(fallback).toEqual(initial);
+});
+
+it('rejects zero controls before POST while preserving the unlimited option', async () => {
+  const board = await sample(),
+    posts: string[] = [];
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method === 'POST') {
+      posts.push(String(init.body));
+      return json({ commandId: 'receipt', state: 'succeeded', reasons: [] });
+    }
+    return json(board);
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await screen.findByText('Implement the command centre');
+  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  const input = screen.getByLabelText('Concurrency');
+  await user.clear(input);
+  await user.type(input, '0');
+  await user.click(screen.getByRole('button', { name: 'Apply controls' }));
+  expect(posts).toHaveLength(0);
+  await screen.findByText(/positive whole numbers/);
+  await user.clear(input);
+  await user.click(screen.getByRole('button', { name: 'Apply controls' }));
+  expect(JSON.parse(posts[0]).payload.concurrency).toEqual({ kind: 'unlimited' });
+});
+
+it('pauses hidden-tab polling and immediately refreshes when visible again', async () => {
+  const board = await sample();
+  let reads = 0,
+    hidden = false;
+  vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
+  const client = new FactoryClient(async () => {
+    reads++;
+    return json(board);
+  });
+  vi.useFakeTimers();
+  await act(async () => {
+    render(<FactoryApp client={client} />);
+  });
+  expect(reads).toBe(1);
+  act(() => {
+    hidden = true;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(reads).toBe(1);
+  await act(async () => {
+    hidden = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  expect(reads).toBe(2);
+});
+
+async function multiJobBoard(kind: 'resume' | 'cancel'): Promise<FactoryV2Snapshot> {
+  const board = await sample(),
+    item = board.entities.items['item:1006'];
+  if (item.subject.kind !== 'pull-request') throw new Error('Expected PR item');
+  const first = board.entities.actions[`action:${kind}-1005`];
+  return {
+    ...board,
+    entities: {
+      ...board.entities,
+      jobs: {
+        ...board.entities.jobs,
+        'job:second': {
+          ...board.entities.jobs['job:1005'],
+          id: 'job:second',
+          issueId: 'issue:1006',
+          pullRequestId: 'pr:2006',
+          progress: 'Second worker',
+        },
+      },
+      actions: {
+        ...board.entities.actions,
+        [`action:${kind}-second`]: {
+          ...first,
+          id: `action:${kind}-second`,
+          targetId: 'job:second',
+          availability: { state: 'available', precondition: 'second-original', validUntil: null },
+        },
+      },
+      items: {
+        ...board.entities.items,
+        [item.id]: {
+          ...item,
+          subject: { ...item.subject, issueIds: ['issue:1005', 'issue:1006'] },
+          jobIds: ['job:1005', 'job:second'],
+          actionIds: [first.id, `action:${kind}-second`],
+        },
+      },
+    },
+  };
+}
+it('submits the exact clicked resume action on a multi-job PR', async () => {
+  const board = await multiJobBoard('resume'),
+    posts: string[] = [];
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method === 'POST') {
+      posts.push(String(init.body));
+      return json({ commandId: 'receipt', state: 'succeeded', reasons: [] });
+    }
+    return json(board);
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await user.click(await screen.findByRole('button', { name: 'Select Recover conflicts' }));
+  await user.click(screen.getAllByRole('button', { name: /^Resume job/ })[1]);
+  expect(JSON.parse(posts[0])).toMatchObject({
+    actionId: 'action:resume-second',
+    precondition: 'second-original',
+  });
+});
+it('preserves the chosen cancel action and precondition while confirmation is open', async () => {
+  let board = await multiJobBoard('cancel');
+  const posts: string[] = [];
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method === 'POST') {
+      posts.push(String(init.body));
+      return json({ commandId: 'receipt', state: 'succeeded', reasons: [] });
+    }
+    return json(board);
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await user.click(await screen.findByRole('button', { name: 'Select Recover conflicts' }));
+  await user.click(screen.getAllByRole('button', { name: /^Cancel job/ })[1]);
+  const item = board.entities.items['item:1006'];
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      items: {
+        ...board.entities.items,
+        [item.id]: { ...item, version: 'new', actionIds: ['action:cancel-1005'] },
+      },
+    },
+  };
+  act(() => window.dispatchEvent(new Event('pagehide')));
+  await act(async () => {
+    window.dispatchEvent(new Event('pageshow'));
+  });
+  await user.click(screen.getByRole('button', { name: 'Confirm cancellation' }));
+  expect(JSON.parse(posts[0])).toMatchObject({
+    actionId: 'action:cancel-second',
+    precondition: 'second-original',
+  });
 });

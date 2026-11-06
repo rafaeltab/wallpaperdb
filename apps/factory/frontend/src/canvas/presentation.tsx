@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { pullRequestIcons } from './octicons';
-import type { WorkItem } from '../../../src/http/index.js';
+import type { Action, WorkItem } from '../../../src/http/index.js';
 import { type Board, type PullRequest, metadataIssue, subject, title } from './model';
 export function Icon({
   kind,
@@ -48,7 +48,7 @@ export function External({
   children: React.ReactNode;
 }) {
   // Only resolved links are accepted; provider text never supplies executable URLs.
-  if (!href || !/^(https?:|t3code:|t3-thread:)/i.test(href)) return null;
+  if (!href || !/^(https?:|t3code:|t3-thread:)/i.test(href)) return <span>{children}</span>;
   return (
     <a href={href} target="_blank" rel="noreferrer">
       {children} ↗
@@ -72,8 +72,10 @@ export function Threads({
         if (thread.association.state !== 'confirmed')
           return <span key={id}>T3 association {thread.association.state}</span>;
         const meta = thread.metadata.value;
+        const href = native ? (meta.nativeUrl ?? meta.webUrl) : (meta.webUrl ?? meta.nativeUrl);
+        if (!href) return <span key={id}>T3 link unavailable · {meta.title}</span>;
         return (
-          <External key={id} href={native ? meta.nativeUrl : meta.webUrl}>
+          <External key={id} href={href}>
             T3 · {meta.title}
           </External>
         );
@@ -252,4 +254,19 @@ export function CardContent({
       </div>
     </>
   );
+}
+
+export function actionLabel(board: Board, item: WorkItem, action: Action) {
+  const names = {
+    configure: 'Configure factory',
+    start: 'Start issue',
+    resume: 'Resume job',
+    cancel: 'Cancel job',
+    'preview-plan': 'Generate plan preview',
+  };
+  const name = names[action.kind];
+  if (item.actionIds.filter((id) => board.entities.actions[id]?.kind === action.kind).length < 2)
+    return name;
+  const job = Object.values(board.entities.jobs).find((job) => job.id === action.targetId);
+  return job ? `${name}: ${job.stage} · ${job.progress}` : name;
 }

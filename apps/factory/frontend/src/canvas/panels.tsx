@@ -10,7 +10,7 @@ import type { FactoryClient } from './client';
 import type { Factory } from './use-factory';
 import { CommandFeedback } from './feedback';
 import { type Board, type Issue, subject, title, metadataIssue, issueIds } from './model';
-import { Checks, External, Reviews, Threads, comparisonLabel } from './presentation';
+import { Checks, External, Reviews, Threads, comparisonLabel, actionLabel } from './presentation';
 export function Panel({
   name,
   close,
@@ -104,10 +104,8 @@ export function Controls({
           const limit = (value: string) => {
             if (!value.trim()) return { kind: 'unlimited' } as const;
             const maximum = Number(value);
-            if (!Number.isSafeInteger(maximum) || maximum < 0)
-              throw new Error(
-                'Limits must be whole numbers of zero or greater. Leave blank for unlimited.'
-              );
+            if (!Number.isSafeInteger(maximum) || maximum <= 0)
+              throw new Error('Limits must be positive whole numbers. Leave blank for unlimited.');
             return { kind: 'limited', maximum } as const;
           };
           try {
@@ -159,13 +157,7 @@ export function Controls({
         {error && <p role="alert">{error}</p>}
         <button
           type="submit"
-          disabled={
-            action?.availability.state !== 'available' ||
-            stale ||
-            factory.busy ||
-            !!factory.error ||
-            !!factory.uncertain
-          }
+          disabled={action?.availability.state !== 'available' || stale || factory.commandsBlocked}
         >
           Apply controls
         </button>
@@ -289,7 +281,7 @@ export function Start({
           </p>
           <ActionButton
             action={picked.action}
-            busy={factory.busy || !!factory.error || !!factory.uncertain}
+            busy={factory.commandsBlocked}
             label="Start selected issue"
             onClick={() =>
               void factory.submit(picked.action, { kind: 'start', payload: { context } })
@@ -473,8 +465,8 @@ export function Details({
               <ActionButton
                 key={id}
                 action={a}
-                busy={factory.busy || !!factory.error || !!factory.uncertain}
-                label={a.kind === 'resume' ? 'Resume job' : 'Cancel job'}
+                busy={factory.commandsBlocked}
+                label={actionLabel(board, item, a)}
                 onClick={() =>
                   void factory.submit(a, {
                     kind: a.kind === 'resume' ? 'resume' : 'cancel',
@@ -538,7 +530,7 @@ export function Plan({
       <p>This proposal is advisory. Generating it does not start work.</p>
       <ActionButton
         action={action}
-        busy={factory.busy || !!factory.error || !!factory.uncertain}
+        busy={factory.commandsBlocked}
         label="Generate plan preview"
         onClick={() => {
           if (action) void factory.submit(action, { kind: 'preview-plan', payload: {} });
@@ -555,13 +547,17 @@ export function Plan({
           <p>
             Started {attempt.startedAt} · Deadline {attempt.deadline}
           </p>
-          <External
-            href={
-              plannerThread?.metadata.state === 'known' ? plannerThread.metadata.value.webUrl : null
-            }
-          >
-            Planner in T3
-          </External>
+          {plannerThread && (
+            <External
+              href={
+                plannerThread.metadata.state === 'known'
+                  ? plannerThread.metadata.value.webUrl
+                  : null
+              }
+            >
+              Planner in T3
+            </External>
+          )}
           {result && (
             <>
               <h3>Proposed work</h3>

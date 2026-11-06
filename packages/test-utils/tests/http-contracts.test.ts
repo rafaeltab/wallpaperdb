@@ -41,3 +41,21 @@ it("retains GraphQL error envelopes without treating REST errors as GraphQL", ()
 	expect(() => assertHttpErrorContract(result, "graphql")).not.toThrow();
 	expect(() => assertHttpErrorContract(result)).toThrow();
 });
+
+it("validates HEAD error headers without requiring a response body", () => {
+	const head = {
+		statusCode: 404,
+		headers: { "content-type": "application/problem+json" },
+		raw: { req: { method: "HEAD" } },
+		json: () => {
+			throw new Error("HEAD has no body");
+		},
+	};
+	expect(() => assertHttpErrorContract(head)).not.toThrow();
+	expect(() =>
+		assertHttpErrorContract({
+			...head,
+			headers: { "content-type": "text/html" },
+		}),
+	).toThrow();
+});

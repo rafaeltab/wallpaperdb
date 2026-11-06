@@ -3,6 +3,7 @@ interface Response {
 	readonly headers: {
 		readonly [key: string]: string | string[] | number | undefined;
 	};
+	readonly raw?: { readonly req?: { readonly method?: string } };
 	json(): unknown;
 }
 function record(value: unknown): value is Record<string, unknown> {
@@ -13,11 +14,19 @@ export function assertHttpErrorContract(
 	protocol: "http" | "graphql" = "http",
 ): void {
 	if (response.statusCode < 400) return;
-	const body = response.json();
-	if (!record(body)) throw new Error("HTTP error body must be an object");
 	const contentType = String(response.headers["content-type"] ?? "").split(
 		";",
 	)[0];
+	const graphql = protocol === "graphql";
+	const validContentType = graphql
+		? ["application/json", "application/graphql-response+json"].includes(
+				contentType,
+			)
+		: contentType === "application/problem+json";
+	if (!validContentType) throw new Error("Invalid HTTP error content type");
+	if (response.raw?.req?.method === "HEAD") return;
+	const body = response.json();
+	if (!record(body)) throw new Error("HTTP error body must be an object");
 	if (protocol === "graphql") {
 		if (
 			!["application/json", "application/graphql-response+json"].includes(

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyReply } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { FactoryV2Changes, FactoryV2Delta, FactoryV2Problem } from './contract.js';
 import { fakeState } from './fake-state.js';
@@ -39,6 +39,23 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     });
   const data = fakeState(config.epoch, options.now ?? Date.now, config.historyLimit);
   const app = Fastify({ bodyLimit: 131072, forceCloseConnections: 'idle' });
+  registerV2Routes(app, data, config, 'fake');
+  app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
+  return app;
+}
+export type V2Data = Omit<ReturnType<typeof fakeState>, 'submit'> & {
+  submit(
+    command: import('./contract.js').FactoryV2Command
+  ):
+    | ReturnType<ReturnType<typeof fakeState>['submit']>
+    | Promise<ReturnType<ReturnType<typeof fakeState>['submit']>>;
+};
+export function registerV2Routes(
+  app: FastifyInstance,
+  data: V2Data,
+  config = { heartbeatMs: 15000, maxFrameBytes: 65536 },
+  mode: 'fake' | 'live' = 'live'
+) {
   const waiting = new Set<() => void>();
   let closing = false;
   const sendProblem = (reply: FastifyReply, value: FactoryV2Problem) =>
@@ -50,9 +67,9 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   const invalid = (reply: FastifyReply, detail = 'Invalid request.') =>
     sendProblem(reply, problem(400, 'invalid-request', detail));
   app.addHook('onRequest', async (request, reply) => {
-    reply.header('x-factory-data', 'fake').header('cache-control', 'private, no-cache');
+    reply.header('x-factory-data', mode).header('cache-control', 'private, no-cache');
     if (closing)
-      return sendProblem(reply, problem(503, 'unavailable', 'The sample server is closing.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'The v2 server is closing.'));
     const origin = request.headers.origin;
     if (
       request.method === 'POST' &&
@@ -72,19 +89,18 @@ export function fakeV2Server(options: FakeV2Options = {}) {
       problem(
         code,
         code === 415 ? 'unsupported' : code === 500 ? 'unavailable' : 'invalid-request',
-        code === 500 ? 'Unexpected sample server failure.' : 'Invalid or unsupported request.'
+        code === 500 ? 'Unexpected v2 server failure.' : 'Invalid or unsupported request.'
       )
     );
   });
   app.setNotFoundHandler((_request, reply) =>
-    sendProblem(reply, problem(404, 'not-found', 'Unknown sample resource.'))
+    sendProblem(reply, problem(404, 'not-found', 'Unknown resource.'))
   );
   app.addHook('preClose', async () => {
     closing = true;
     for (const stop of [...waiting]) stop();
     data.close();
   });
-  app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
   app.get('/api/v2/board', (request, reply) => {
     const snapshot = data.snapshot();
     const etag = `"${snapshot.cursor}"`;
@@ -124,7 +140,7 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     });
     if (reply.raw.destroyed) return reply;
     return closing
-      ? sendProblem(reply, problem(503, 'unavailable', 'The sample server is closing.'))
+      ? sendProblem(reply, problem(503, 'unavailable', 'The v2 server is closing.'))
       : sendChanges(reply, data.changes(after));
   });
   app.get('/api/v2/board/events', (request, reply) => {
@@ -144,7 +160,7 @@ export function fakeV2Server(options: FakeV2Options = {}) {
       'cache-control': 'private, no-cache, no-transform',
       connection: 'keep-alive',
       'x-accel-buffering': 'no',
-      'x-factory-data': 'fake',
+      'x-factory-data': mode,
     });
     let position = after,
       stopped = false;
@@ -230,7 +246,7 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     const result = data.details(parsed.data.id);
-    if (!result) return sendProblem(reply, problem(404, 'not-found', 'Unknown sample item.'));
+    if (!result) return sendProblem(reply, problem(404, 'not-found', 'Unknown item.'));
     if (!request.headers['if-match'])
       return invalid(reply, 'If-Match with the item version is required.');
     const etag = `"${result.itemVersion}"`;
@@ -245,22 +261,22 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     const result = data.plan(parsed.data.id);
-    return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown sample plan.'));
+    return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown plan.'));
   });
   app.get('/api/v2/commands/:id', (request, reply) => {
     const parsed = receiptParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     return (
       data.receipt(parsed.data.id) ??
-      sendProblem(reply, problem(404, 'not-found', 'Unknown sample command.'))
+      sendProblem(reply, problem(404, 'not-found', 'Unknown command.'))
     );
   });
-  app.post('/api/v2/commands', (request, reply) => {
+  app.post('/api/v2/commands', async (request, reply) => {
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
       return sendProblem(reply, problem(415, 'unsupported', 'JSON required.'));
     const parsed = commandSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, 'Invalid command payload.');
-    const result = data.submit(parsed.data);
+    const result = await data.submit(parsed.data);
     return 'code' in result
       ? sendProblem(reply, result)
       : reply

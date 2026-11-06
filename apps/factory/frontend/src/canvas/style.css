@@ -290,3 +290,5 @@ body {
 @media(max-width:700px) { .fc-dialog.cc-floating { top:80px; right:8px; max-height:calc(100dvh - 95px); } }
 
 fieldset.cc-checks { padding:0; margin:0; border:0; min-width:0; }
+
+.cc-labels>.cc-unavailable { font-size:9px; line-height:14px; }

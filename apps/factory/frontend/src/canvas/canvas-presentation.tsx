@@ -352,6 +352,9 @@ export function Labels({ id }: { id: number }) {
   const labels = issueMetadata[id].labels;
   return (
     <span className="cc-labels">
+      {!issueMetadata[id].labelsKnown && (
+        <span className="cc-unavailable cc-muted">Labels unavailable</span>
+      )}
       {labels.slice(0, 2).map((l) => (
         <span
           className="cc-label"

@@ -100,6 +100,12 @@ export function Canvas({
     labels?: number;
   }>();
   const tipAnchor = useRef<Element | null>(null);
+  useEffect(() => {
+    if (tooltip?.labels && !issueMetadata[tooltip.labels]) {
+      tipAnchor.current = null;
+      setTooltip(undefined);
+    }
+  }, [issueMetadata, tooltip]);
   const data = useMemo(
     () => canvasLayout(fixture, { titleMode, expandedNames, hoverName, collapsed }),
     [fixture, titleMode, expandedNames, hoverName, collapsed]
@@ -237,14 +243,7 @@ export function Canvas({
     setTooltip(undefined);
   }
   function collapseAll() {
-    setCollapsed(
-      new Set([
-        ...['planned', 'working'].flatMap((stage) =>
-          [...data.fixture.parentIds, 'none'].map((id) => `${stage}-${id}`)
-        ),
-        ...data.fixture.stackSpecs.map((stack) => `stack:${stack.key}`),
-      ])
-    );
+    setCollapsed(new Set(data.areas.flatMap((area) => sectionKeys(area.id))));
     setTooltip(undefined);
   }
   function sectionKeys(stage: Stage) {
@@ -518,7 +517,7 @@ export function Canvas({
               <Fields id={item.id} />
             </div>
             {title(meta.title, `issue:${item.id}`)}
-            {!!meta.labels.length && (
+            {(!!meta.labels.length || !meta.labelsKnown) && (
               <div className="cc-issue-bottom">
                 <Labels id={item.id} />
               </div>
@@ -1023,7 +1022,7 @@ export function Canvas({
           </svg>
         </div>
         {children}
-        {tooltip && (
+        {tooltip && (!tooltip.labels || issueMetadata[tooltip.labels]) && (
           <div
             className="cc-tooltip"
             role="tooltip"

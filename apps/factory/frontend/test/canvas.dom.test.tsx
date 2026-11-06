@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
@@ -514,3 +514,123 @@ it.each([
     expect(link.getAttribute('href')).toBe('t3code://threads/env/planner');
   }
 );
+
+it('dismisses an open labels tooltip when its work item disappears from a fresh snapshot', async () => {
+  let board = await sample();
+  const issue = board.entities.issues['issue:1002'];
+  if (issue.metadata.state !== 'known') throw new Error('Expected issue metadata');
+  const label = board.entities.labels['label:infrastructure'];
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      issues: {
+        ...board.entities.issues,
+        [issue.id]: {
+          ...issue,
+          metadata: {
+            ...issue.metadata,
+            value: {
+              ...issue.metadata.value,
+              labelIds: ['label:infrastructure', 'label:second', 'label:third'],
+            },
+          },
+        },
+      },
+      labels: {
+        ...board.entities.labels,
+        'label:second': { ...label, id: 'label:second', name: 'Second label' },
+        'label:third': { ...label, id: 'label:third', name: 'Third label' },
+      },
+    },
+  };
+  const user = userEvent.setup();
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  const overflow = await screen.findByText('+1');
+  await user.hover(overflow);
+  await screen.findByRole('tooltip');
+  const items = { ...board.entities.items };
+  delete items['item:1002'];
+  board = { ...board, entities: { ...board.entities, items } };
+  await act(async () => {
+    window.dispatchEvent(new Event('pagehide'));
+    window.dispatchEvent(new Event('pageshow'));
+  });
+  expect(screen.queryByRole('tooltip')).toBeNull();
+  expect(screen.getByText('Add a searchable issue list')).toBeTruthy();
+});
+it('collapses and expands Unclassified work through the global canvas controls', async () => {
+  const seed = await sample(),
+    board = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        items: {
+          ...seed.entities.items,
+          'item:1007': { ...seed.entities.items['item:1007'], section: 'unclassified' as const },
+        },
+      },
+    };
+  const user = userEvent.setup();
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  await screen.findByRole('group', { name: 'Select Publish after prerequisites' });
+  await user.click(screen.getByRole('button', { name: 'Collapse all sections' }));
+  expect(screen.queryByRole('group', { name: 'Select Publish after prerequisites' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Expand all sections' }));
+  expect(screen.getByRole('group', { name: 'Select Publish after prerequisites' })).toBeTruthy();
+});
+
+it('keeps unknown labels distinct from an observed empty list on a known PR', async () => {
+  const seed = await sample(),
+    issue = seed.entities.issues['issue:1003'];
+  const board = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      issues: {
+        ...seed.entities.issues,
+        [issue.id]: {
+          ...issue,
+          metadata: {
+            state: 'unknown' as const,
+            sourceId: issue.metadata.sourceId,
+            reason: 'Temporarily unavailable',
+          },
+        },
+      },
+    },
+  };
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  const card = await screen.findByRole('group', { name: 'Select Expose observation metadata' });
+  expect(card.textContent).toContain('Labels unavailable');
+});
+it('marks sources stale as time passes even when board requests return not-modified', async () => {
+  const seed = await sample(),
+    source = Object.values(seed.entities.sources)[0];
+  const now = Date.now(),
+    board = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        sources: {
+          ...seed.entities.sources,
+          [source.id]: { ...source, staleAt: new Date(now + 5000).toISOString() },
+        },
+      },
+    };
+  vi.useFakeTimers({ now });
+  let reads = 0;
+  const client = new FactoryClient(async () =>
+    ++reads === 1 ? json(board) : new Response(null, { status: 304 })
+  );
+  await act(async () => {
+    render(<FactoryApp client={client} />);
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Factory settings' }));
+  fireEvent.click(screen.getByText('Source coverage: complete'));
+  expect(screen.queryByText(/ · stale/)).toBeNull();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(screen.getByText(/ · stale/)).toBeTruthy();
+});

@@ -19,6 +19,7 @@ export function factoryStatus(
     return 'manual-recovery';
   if (question || jobs.some((j) => j.question)) return 'awaiting-answer';
   if (jobs.some((j) => j.cancelled)) return 'cancelled';
+  if (maintenance.some((m) => m.phase === 'unknown')) return 'unknown';
   if (maintenance.length) return 'restacking';
   if (jobs.some((j) => j.activity === 'continuation-pending' || j.activity === 'resume-pending'))
     return 'continuation-pending';

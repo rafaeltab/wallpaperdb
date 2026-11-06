@@ -830,6 +830,53 @@ it('shows an unbound parked job alongside another PR associated with its issue',
   }
 });
 
+it('keeps attention unknown for historical recovery without structured progress', async () => {
+  const { pullObservation } = await import('./fixtures/v2.js');
+  const input: ScheduleSnapshot = {
+    ...initial,
+    observations: {
+      state: 'current',
+      stale: false,
+      observedAt: 2000,
+      facts: { issues: [], pullRequests: [pullObservation(42)] },
+    },
+    recoveries: [
+      {
+        issue: 1,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+        progress: 'Retained historical recovery',
+        active: false,
+      },
+    ],
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[
+        'item:pr:rafaeltab/wallpaperdb/42'
+      ]
+    ).toMatchObject({
+      status: { code: 'unknown', active: false },
+      attention: { state: 'unknown' },
+    });
+    await board.publish({
+      ...input,
+      recoveries: input.recoveries?.map((r) => ({ ...r, active: true, phase: 'resolving' })),
+    });
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[
+        'item:pr:rafaeltab/wallpaperdb/42'
+      ]
+    ).toMatchObject({
+      status: { code: 'restacking', active: true },
+      attention: { state: 'none' },
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

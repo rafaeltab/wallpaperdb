@@ -382,6 +382,14 @@ test("typecheck cache inputs include test files compiled by the workspace", () =
 	).toBeTruthy();
 });
 
+test("script typecheck cache tracks imported root configuration", () => {
+	const task = plannedTask("check-types", "scripts", "check-types");
+	expect(
+		Object.keys(task.inputs).some((file) => file.endsWith("crap.config.mts")),
+		"changes to imported root configuration must invalidate the script typecheck",
+	).toBeTruthy();
+});
+
 test("root workspace checks use the shared Turbo commands", () => {
 	expect(output("test-integration", "PACKAGE=root")).toMatch(
 		/run test:integration .*--filter=\/\/.*--concurrency=1/,

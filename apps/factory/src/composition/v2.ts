@@ -39,63 +39,68 @@ export async function v2Producer(config: {
       Layer.succeed(AttemptStore, sqliteAttemptStore(config.directory))
     )
   );
-  const run = <A>(effect: Effect.Effect<A, Unavailable>) =>
-    runtime.runPromise(effect, { signal: config.signal });
-  const board = await runtime.runPromise(
-    Effect.flatMap(config.read(), (initial) =>
-      makeBoard({ scopeId: config.scopeId, epoch: randomUUID(), initial })
-    )
-  );
-  const attemptStore = sqliteAttemptStore(config.directory);
-  const latestPlan = () =>
-    Effect.gen(function* () {
-      const plan = yield* attemptStore.latest?.() ?? attemptStore.pending();
-      if (!plan) return undefined;
-      const launch = yield* Effect.tryPromise({
-        try: () => config.observePlan(plan.id),
-        catch: (cause) => new Unavailable({ operation: 'v2-plan-ownership', cause }),
+  try {
+    const run = <A>(effect: Effect.Effect<A, Unavailable>) =>
+      runtime.runPromise(effect, { signal: config.signal });
+    const board = await runtime.runPromise(
+      Effect.flatMap(config.read(), (initial) =>
+        makeBoard({ scopeId: config.scopeId, epoch: randomUUID(), initial })
+      )
+    );
+    const attemptStore = sqliteAttemptStore(config.directory);
+    const latestPlan = () =>
+      Effect.gen(function* () {
+        const plan = yield* attemptStore.latest?.() ?? attemptStore.pending();
+        if (!plan) return undefined;
+        const launch = yield* Effect.tryPromise({
+          try: () => config.observePlan(plan.id),
+          catch: (cause) => new Unavailable({ operation: 'v2-plan-ownership', cause }),
+        });
+        return { ...plan, launch };
       });
-      return { ...plan, launch };
-    });
-  await run(
-    Effect.flatMap(latestPlan(), (plan) =>
-      Effect.flatMap(config.read(), (input) => board.publish(input, plan))
-    )
-  );
-  let publishing: Promise<void> | undefined,
-    working: Promise<void> | undefined,
-    closed = false;
-  const refresh = () => {
-    if (publishing || closed) return;
-    publishing = run(
+    await run(
       Effect.flatMap(latestPlan(), (plan) =>
         Effect.flatMap(config.read(), (input) => board.publish(input, plan))
-      ).pipe(Effect.catch(Effect.logError))
-    ).finally(() => {
-      publishing = undefined;
-    });
-    void publishing.catch(() => undefined);
-  };
-  const pump = () => {
-    if (working || closed) return;
-    working = run(board.processPending().pipe(Effect.catch(Effect.logError))).finally(() => {
-      working = undefined;
-      refresh();
-      if (board.hasPending()) pump();
-    });
-    void working.catch(() => undefined);
-  };
-  const timer = setInterval(refresh, 1000);
-  return {
-    data: liveV2Data(board, run, pump),
-    close: async () => {
-      closed = true;
-      clearInterval(timer);
-      board.close();
-      await Promise.all([publishing?.catch(() => undefined), working?.catch(() => undefined)]);
-      await runtime.dispose();
-    },
-  };
+      )
+    );
+    let publishing: Promise<void> | undefined,
+      working: Promise<void> | undefined,
+      closed = false;
+    const refresh = () => {
+      if (publishing || closed) return;
+      publishing = run(
+        Effect.flatMap(latestPlan(), (plan) =>
+          Effect.flatMap(config.read(), (input) => board.publish(input, plan))
+        ).pipe(Effect.catch(Effect.logError))
+      ).finally(() => {
+        publishing = undefined;
+      });
+      void publishing.catch(() => undefined);
+    };
+    const pump = () => {
+      if (working || closed) return;
+      working = run(board.processPending().pipe(Effect.catch(Effect.logError))).finally(() => {
+        working = undefined;
+        refresh();
+        if (board.hasPending()) pump();
+      });
+      void working.catch(() => undefined);
+    };
+    const timer = setInterval(refresh, 1000);
+    return {
+      data: liveV2Data(board, run, pump),
+      close: async () => {
+        closed = true;
+        clearInterval(timer);
+        board.close();
+        await Promise.all([publishing?.catch(() => undefined), working?.catch(() => undefined)]);
+        await runtime.dispose();
+      },
+    };
+  } catch (cause) {
+    await runtime.dispose();
+    throw cause;
+  }
 }
 function commandAdapter(config: {
   base: string;

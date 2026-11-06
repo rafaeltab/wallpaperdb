@@ -29,7 +29,7 @@ export interface CommandRecord {
  */
 export interface BoardStore {
   read(): Effect.Effect<BoardRecord | undefined, Unavailable>;
-  save(record: BoardRecord): Effect.Effect<void, Unavailable>;
+  save(record: BoardRecord, expectedCursor: string | null): Effect.Effect<boolean, Unavailable>;
   command(id: string): Effect.Effect<CommandRecord | undefined, Unavailable>;
   accept(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
   claim(record: CommandRecord): Effect.Effect<boolean, Unavailable>;

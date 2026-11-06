@@ -108,6 +108,17 @@ async function start(running: Running) {
   expect(result.result).toEqual({ jobId: 'job:rafaeltab/wallpaperdb/577' });
   return { request, result };
 }
+async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
+  return (await host.calls()).flatMap((call) => {
+    if (call.binary !== 't3') return [];
+    if (call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send') {
+      const { message } = JSON.parse(call.args[2]);
+      if (typeof message !== 'string') throw new Error('Missing stage message');
+      return [message];
+    }
+    return call.args[1] === 'send' && !call.args.includes('--help') ? [String(call.args[3])] : [];
+  });
+}
 it('starts one real composed job with the v2 context and replays its UUID after admission', () =>
   composed(async ({ running, host }) => {
     const { request, result } = await start(running);
@@ -185,3 +196,64 @@ it('cancels the composed owning job without refunding its admission and replays 
     expect(replay.statusCode).toBe(200);
     expect(replay.json()).toEqual(result);
   }));
+
+it('resumes the exact failed review run through v2 without starting another owning job', () =>
+  composed(
+    async ({ running, host, save }) => {
+      await start(running);
+      await vi.waitFor(
+        async () =>
+          expect((await running.app.inject('/api/job')).json()).toMatchObject({
+            delivery: { stage: 'review' },
+            execution: { run: { id: 'run-2', ordinal: 2 } },
+          }),
+        { timeout: 10000, interval: 40 }
+      );
+      const owner = (await running.app.inject('/api/job')).json().intent;
+      await save({ overrides: { status: 'failed', pendingRequestCount: 0 } });
+      const request = {
+        ...(await action(running, 'resume', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000033',
+        kind: 'resume',
+        payload: {},
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      const result = await receipt(running, request.commandId);
+      await vi.waitFor(
+        async () =>
+          expect((await running.app.inject('/api/job')).json()).toMatchObject({
+            intent: owner,
+            delivery: { stage: 'review' },
+            execution: { threadId: 'thread-live', run: { id: 'run-3', ordinal: 3 } },
+          }),
+        { timeout: 5000, interval: 40 }
+      );
+      const messages = await stageMessages(host);
+      expect(
+        messages.filter(
+          (message) => message.includes('Stage 2 of factory') && message.includes('$review-loop')
+        )
+      ).toHaveLength(1);
+      const replay = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: request,
+      });
+      expect(replay.statusCode).toBe(200);
+      expect(replay.json()).toEqual(result);
+      expect(
+        (await stageMessages(host)).filter(
+          (message) => message.includes('Stage 2 of factory') && message.includes('$review-loop')
+        )
+      ).toHaveLength(1);
+      expect(
+        (await host.calls()).filter(
+          (c) => c.binary === 't3' && c.args[1] === 'start' && c.args.includes('--worktree')
+        )
+      ).toHaveLength(1);
+    },
+    { complete: true, holdReview: true }
+  ));

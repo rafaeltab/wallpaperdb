@@ -12,6 +12,10 @@ const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
   .strict();
 export function operationsServer(config: {
+  threads?: () => Effect.Effect<
+    import('../capabilities/observe/index.js').ThreadSnapshot,
+    Unavailable
+  >;
   base: string;
   run: <A>(
     effect: import('effect').Effect.Effect<A, import('../capabilities/job/index.js').Unavailable>
@@ -257,6 +261,11 @@ export function operationsServer(config: {
     });
   }
   app.get('/health', () => ({ status: 'ok' }));
+  app.get('/api/threads', (request) =>
+    config.threads
+      ? execute(request, 'factory.http.threads', config.threads())
+      : { state: 'initial', stale: false }
+  );
   app.get('/api/observations', (request) =>
     config.snapshot
       ? execute(

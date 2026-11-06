@@ -1,4 +1,8 @@
 import {
+  Threads,
+  ThreadsLive,
+  ThreadSource,
+  ThreadStore,
   Observations,
   ObservationsLive,
   ObservationStore,
@@ -26,6 +30,7 @@ import {
   fileStore,
   fileScheduleStore,
   sqliteAttemptStore,
+  sqliteThreads,
   sqliteObservations,
   sqliteLocalSnapshot,
   sqliteScheduleObservations,
@@ -49,7 +54,7 @@ import {
   githubObservations,
   type VerifiedPrerequisite,
 } from '../adapters/github/index.js';
-import { t3Execution, t3Planner } from '../adapters/t3/index.js';
+import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
@@ -68,6 +73,21 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         .optional(),
       FACTORY_T3_MCP_ENDPOINT: z.string().url().optional(),
       FACTORY_T3_MCP_AUTHORIZATION_FILE: z.string().startsWith('/').optional(),
+      FACTORY_T3_CONNECT_ORIGIN: z
+        .string()
+        .url()
+        .refine((value) => {
+          const url = new URL(value);
+          return (
+            url.protocol === 'https:' &&
+            !url.username &&
+            !url.password &&
+            url.pathname === '/' &&
+            !url.search &&
+            !url.hash
+          );
+        })
+        .optional(),
       FACTORY_T3_PROJECT_ID: z.string().min(1),
       FACTORY_PR_BASE: z
         .string()
@@ -277,6 +297,26 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       )
     )
   );
+  const threadLayer = ThreadsLive.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(Time, systemTime),
+        Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
+        Layer.succeed(ObservationStore, observationStore),
+        Layer.succeed(ThreadStore, sqliteThreads(configuration.FACTORY_STATE)),
+        Layer.succeed(
+          ThreadSource,
+          t3Metadata({
+            binary: configuration.FACTORY_T3_BINARY,
+            project,
+            projectId: configuration.FACTORY_T3_PROJECT_ID,
+            mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+            mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+          })
+        )
+      )
+    )
+  );
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
       Layer.provideMerge(
@@ -289,6 +329,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       ),
       Layer.provideMerge(schedulerDeps),
       Layer.provideMerge(observationLayer),
+      Layer.provideMerge(threadLayer),
       Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
     )
   );
@@ -307,11 +348,24 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
   const observations = await runtime.runPromise(Observations);
+  const threadService = await runtime.runPromise(Threads);
+  const threads = {
+    ...threadService,
+    snapshot: () =>
+      Effect.map(threadService.snapshot(), (value) => ({
+        ...value,
+        browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
+      })),
+  };
   const app = operationsServer({
+    threads: threads.snapshot,
     base: configuration.FACTORY_BASE,
     job,
     scheduler,
-    snapshot: observations.schedule,
+    snapshot: () =>
+      Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
+        Effect.map(({ schedule, threads }) => ({ ...schedule, threads }))
+      ),
     attempts,
     run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
@@ -373,11 +427,26 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   };
   refresh();
   const refreshTimer = setInterval(refresh, observationRefreshIntervalMs);
+  let refreshingThreads: Promise<unknown> | undefined;
+  const refreshThreads = () => {
+    if (refreshingThreads) return;
+    refreshingThreads = runtime
+      .runPromise(threads.refresh().pipe(Effect.catch(Effect.logError)), {
+        signal: requests.signal,
+      })
+      .finally(() => {
+        refreshingThreads = undefined;
+      });
+    void refreshingThreads.catch(() => undefined);
+  };
+  refreshThreads();
+  const threadTimer = setInterval(refreshThreads, observationRefreshIntervalMs);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
       clearInterval(observationTimer);
       clearInterval(refreshTimer);
+      clearInterval(threadTimer);
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
@@ -390,6 +459,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         await attempts.close();
         await observing?.catch(() => undefined);
         await refreshing?.catch(() => undefined);
+        await refreshingThreads?.catch(() => undefined);
         await runtime.dispose();
         await Promise.all([...workers.values()].map((worker) => worker.dispose()));
       }

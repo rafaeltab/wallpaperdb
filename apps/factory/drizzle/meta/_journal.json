@@ -43,6 +43,13 @@
       "when": 1793927111939,
       "tag": "0005_outgoing_eddie_brock",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793929891897,
+      "tag": "0006_worried_archangel",
+      "breakpoints": true
     }
   ]
 }

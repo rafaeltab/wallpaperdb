@@ -98,3 +98,10 @@ export const observationRefresh = sqliteTable('observation_refresh', {
   >(),
   jobsObservedAt: integer('jobs_observed_at'),
 });
+
+export const t3Observations = sqliteTable('t3_observations', {
+  id: integer('id').primaryKey(),
+  value: text('value', { mode: 'json' })
+    .$type<import('../capabilities/observe/index.js').ThreadState>()
+    .notNull(),
+});

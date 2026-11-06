@@ -11,6 +11,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
   const fixture = process.env.FACTORY_FIXTURE;
   process.env.PATH = host.directory + ':' + path;
   process.env.FACTORY_FIXTURE = host.configFile;
+  await writeFile(join(host.directory, 'metadata-auth'), 'controlled-only', { mode: 0o600 });
   const browser = await chromium.launch({ headless: true });
   try {
     const running = await startFactory({
@@ -18,11 +19,16 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
+      FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
+      FACTORY_T3_MCP_AUTHORIZATION_FILE: join(host.directory, 'metadata-auth'),
+      FACTORY_T3_CONNECT_ORIGIN: 'https://app.t3.codes',
       FACTORY_STATE: host.directory + '/state',
       FACTORY_PORT: '0',
     });
     try {
-      const page = await browser.newPage();
+      const page = await browser.newPage({
+        recordVideo: { dir: process.env.FACTORY_DEMO_DIRECTORY ?? '/tmp/648-browser-video' },
+      });
       const address = running.app.server.address();
       if (!address || typeof address === 'string') throw new Error('Missing listener');
       await page.goto(`http://127.0.0.1:${address.port}`);
@@ -56,10 +62,47 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         'href',
         'https://github.com/rafaeltab/wallpaperdb/issues/576'
       );
-      await browserExpect(page.getByRole('link', { name: 'Open T3 thread' })).toHaveAttribute(
+      await browserExpect(page.getByRole('link', { name: 'Open in T3 app' })).toHaveAttribute(
         'href',
-        't3-thread://v1/thread-live'
+        't3code://threads/controlled-environment/thread-live'
       );
+      const metadataCalls = () =>
+        host
+          .calls()
+          .then(
+            (calls) =>
+              calls.filter(
+                (call) =>
+                  call.args[0] === 'acp-mcp-call' &&
+                  ['t3_environment_read', 't3_thread_list'].includes(call.args[1])
+              ).length
+          );
+      const beforeMetadataReads = await metadataCalls();
+      for (let index = 0; index < 5; index++) {
+        const response = await fetch(`http://127.0.0.1:${address.port}/api/threads`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          state: 'current',
+          facts: { environmentId: 'controlled-environment' },
+          browserOrigin: 'https://app.t3.codes',
+        });
+      }
+      expect(await metadataCalls()).toBe(beforeMetadataReads);
+      await page.context().route('https://app.t3.codes/**', (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: '<h1>Controlled Connect destination</h1>',
+        })
+      );
+      const popupPromise = page.waitForEvent('popup');
+      await page.getByRole('link', { name: 'Open in browser' }).click();
+      const popup = await popupPromise;
+      await browserExpect(popup).toHaveURL(
+        'https://app.t3.codes/controlled-environment/thread-live'
+      );
+      await browserExpect(popup.getByRole('heading')).toHaveText('Controlled Connect destination');
+      await popup.close();
+
       await browserExpect(page.getByText(/Elapsed: \d+ seconds/)).toBeVisible();
       const cancelControl = page.getByRole('button', { name: 'Cancel job' });
       const focusedRefresh = page.waitForResponse(
@@ -140,7 +183,10 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       await browserExpect(page.getByText('Ready for manual merge', { exact: true })).toHaveCount(0);
       expect(
         (await host.calls()).filter(
-          (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+          (call) =>
+            call.binary === 't3' &&
+            ((call.args[1] === 'send' && !call.args.includes('--help')) ||
+              (call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send'))
         )
       ).toHaveLength(3);
       expect(
@@ -209,9 +255,9 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
       await browserExpect(page.getByText('Which approved option?', { exact: true })).toBeVisible();
       await browserExpect(page.getByText(/Active capacity released/)).toBeVisible();
       await browserExpect(page.getByRole('button', { name: 'Resume existing job' })).toBeDisabled();
-      await browserExpect(page.getByRole('link', { name: 'Open T3 thread' })).toHaveAttribute(
+      await browserExpect(page.getByRole('link', { name: 'Open in T3 app' })).toHaveAttribute(
         'href',
-        't3-thread://v1/thread-live'
+        't3code://threads/controlled-environment/thread-live'
       );
       await host.save({ activity: [], overrides: { pendingRequestCount: 0, status: 'completed' } });
       await page.reload();
@@ -376,10 +422,7 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
       await page.reload();
       await browserExpect(page.getByLabel('Concurrency')).toHaveValue('3');
       await browserExpect(page.getByLabel('Pause admissions')).toBeChecked();
-      await browserExpect(page.getByRole('link', { name: 'Open T3 thread' })).toHaveAttribute(
-        'href',
-        't3-thread://v1/thread-live'
-      );
+      await browserExpect(page.getByText('T3 links unavailable.', { exact: false })).toBeVisible();
       await page.getByLabel('Concurrency').fill('-1');
       await page.getByLabel('Pause admissions').uncheck();
       await page.getByRole('button', { name: 'Save scheduler controls' }).click();
@@ -435,10 +478,7 @@ it('shows conflict classification and pending questions with a recovery-thread l
     await page.getByRole('heading', { name: 'Conflict recovery #4' }).scrollIntoViewIfNeeded();
     await browserExpect(page.getByText('Classification: COMPLEX')).toBeVisible();
     await browserExpect(page.getByText('Awaiting independent review-loop')).toBeVisible();
-    await browserExpect(page.getByRole('link', { name: 'Open recovery thread' })).toHaveAttribute(
-      'href',
-      't3-thread://v1/restacker'
-    );
+    await browserExpect(page.getByText('T3 links unavailable.', { exact: false })).toBeVisible();
     // Questions remain owned by T3. A later observation must still be incomplete.
     const resourcePath = join(f.host.directory, 'restacker.json');
     const resource = JSON.parse(await readFile(resourcePath, 'utf8'));

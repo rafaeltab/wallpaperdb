@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 const retries = (source) =>
@@ -17,7 +16,7 @@ describe('suite', { retry: 2 }, () => it('nested', check));
 const options = { retry: 4 };
 it.each([1])('shared options', { ...options }, check);
 `);
-	assert.equal(diagnostics.length, 5, JSON.stringify(diagnostics));
+	expect(diagnostics.length, JSON.stringify(diagnostics)).toBe(5);
 });
 
 test("the pinned retry rule follows initializer aliases and terminates cycles", () => {
@@ -28,19 +27,18 @@ test("the pinned retry rule follows initializer aliases and terminates cycles", 
 		"const scenario = checks.test;",
 		"const group = checks; const scenario = group.it;",
 	])
-		assert.equal(
+		expect(
 			retries(
 				`import { it } from 'vitest'; import * as checks from 'vitest'; ${alias} scenario('case', { retry: 3 }, () => {});`,
 			).length,
-			1,
 			alias,
-		);
+		).toBe(1);
 	for (const source of [
 		"const request = () => {}; const scenario = request; scenario('request', { retry: 3 }, () => {});",
 		"const first = second; const second = first; first('cycle', { retry: 3 }, () => {});",
 		"import { it } from 'vitest'; const options = { retry: 3 }; it.each([{ retry: 2 }])('data', value => value.retry); it('application', () => options);",
 	])
-		assert.deepEqual(retries(source), [], source);
+		expect(retries(source), source).toStrictEqual([]);
 });
 
 test("retry translation retains initializer-only syntax instead of adding flow analysis", () => {
@@ -49,5 +47,5 @@ test("retry translation retains initializer-only syntax instead of adding flow a
 		"import { it } from 'vitest'; it('case', flag ? { retry: 3 } : {}, () => {});",
 		"import { it } from 'vitest'; const key = 'retry'; it('case', { [key]: 3 }, () => {});",
 	])
-		assert.deepEqual(retries(source), [], source);
+		expect(retries(source), source).toStrictEqual([]);
 });

@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+import { expect } from "vitest";
 import { spawnSync } from "node:child_process";
 import {
 	mkdirSync,
@@ -59,15 +59,18 @@ export function lint(
 				timeout: 30_000,
 			},
 		);
-		assert.equal(result.error, undefined);
-		assert.ok(result.status === 0 || result.status === 1, result.stderr);
+		expect(result.error).toBe(undefined);
+		expect(
+			result.status === 0 || result.status === 1,
+			result.stderr,
+		).toBeTruthy();
 		if (reporter !== "json") return result.stdout + result.stderr;
-		assert.ok(result.stdout, result.stderr);
+		expect(result.stdout, result.stderr).toBeTruthy();
 		const report = JSON.parse(result.stdout);
-		assert.ok(
+		expect(
 			!report.diagnostics.some((d) => /Rule .* errored:/.test(d.message)),
 			JSON.stringify(report.diagnostics),
-		);
+		).toBeTruthy();
 		return report.diagnostics;
 	} finally {
 		rmSync(directory, { recursive: true, force: true });

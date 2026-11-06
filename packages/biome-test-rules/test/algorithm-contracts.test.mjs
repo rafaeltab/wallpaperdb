@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { syntaxTree, visitSyntax } from "../src/syntax.js";
 import validExpect from "../src/ported/valid-expect.js";
 import validExpectInPromise from "../src/ported/valid-expect-in-promise.js";
@@ -116,32 +115,28 @@ test("syntax locations retain UTF-16 columns and LF-only line boundaries", () =>
 		text: "\ufeff/*😀*/one;\r\n\n  two;\r\u2028one;",
 		items: ["one", "two", "one"].map((name) => statement(identifier(name))),
 	});
-	assert.deepEqual(tree.loc, {
+	expect(tree.loc).toStrictEqual({
 		start: { line: 1, column: 0 },
 		end: { line: 3, column: 12 },
 	});
-	assert.deepEqual(
-		tree.body.map((node) => node.loc),
-		[
-			{ start: { line: 1, column: 7 }, end: { line: 1, column: 11 } },
-			{ start: { line: 3, column: 2 }, end: { line: 3, column: 6 } },
-			{ start: { line: 3, column: 8 }, end: { line: 3, column: 12 } },
-		],
-	);
-	assert.deepEqual(
-		tree.body.map((node) => node.expression.loc),
-		[
-			{ start: { line: 1, column: 7 }, end: { line: 1, column: 10 } },
-			{ start: { line: 3, column: 2 }, end: { line: 3, column: 5 } },
-			{ start: { line: 3, column: 8 }, end: { line: 3, column: 11 } },
-		],
-	);
+	expect(tree.body.map((node) => node.loc)).toStrictEqual([
+		{ start: { line: 1, column: 7 }, end: { line: 1, column: 11 } },
+		{ start: { line: 3, column: 2 }, end: { line: 3, column: 6 } },
+		{ start: { line: 3, column: 8 }, end: { line: 3, column: 12 } },
+	]);
+	expect(tree.body.map((node) => node.expression.loc)).toStrictEqual([
+		{ start: { line: 1, column: 7 }, end: { line: 1, column: 10 } },
+		{ start: { line: 3, column: 2 }, end: { line: 3, column: 5 } },
+		{ start: { line: 3, column: 8 }, end: { line: 3, column: 11 } },
+	]);
 	for (const [text, end] of [
 		["", { line: 1, column: 0 }],
 		["one;\n", { line: 2, column: 0 }],
 		["one;\r\n\n", { line: 3, column: 0 }],
 	]) {
-		assert.deepEqual(syntaxTree({ kind: "JS_MODULE", text, items: [] }).loc, {
+		expect(
+			syntaxTree({ kind: "JS_MODULE", text, items: [] }).loc,
+		).toStrictEqual({
 			start: { line: 1, column: 0 },
 			end,
 		});
@@ -149,59 +144,53 @@ test("syntax locations retain UTF-16 columns and LF-only line boundaries", () =>
 });
 
 test("assertion algorithm distinguishes missing, uncalled and invalid matchers", () => {
-	assert.deepEqual(
+	expect(
 		diagnose(validExpect, [
 			statement(call(identifier("expect"), [literal(1)])),
 		]),
-		["matcherNotFound"],
-	);
-	assert.deepEqual(
+	).toStrictEqual(["matcherNotFound"]);
+	expect(
 		diagnose(validExpect, [
 			statement(member(call(identifier("expect"), [literal(1)]), "toBe")),
 		]),
-		["matcherNotCalled"],
-	);
-	assert.deepEqual(
+	).toStrictEqual(["matcherNotCalled"]);
+	expect(
 		diagnose(validExpect, [statement(assertion(["not", "not"]))]),
-		["modifierUnknown"],
+	).toStrictEqual(["modifierUnknown"]);
+	expect(diagnose(validExpect, [statement(assertion(["not"]))])).toStrictEqual(
+		[],
 	);
-	assert.deepEqual(diagnose(validExpect, [statement(assertion(["not"]))]), []);
 });
 
 test("assertion argument limits retain the configured two-argument contract", () => {
-	assert.deepEqual(diagnose(validExpect, [statement(assertion([], []))]), [
+	expect(diagnose(validExpect, [statement(assertion([], []))])).toStrictEqual([
 		"notEnoughArgs",
 	]);
-	assert.deepEqual(
+	expect(
 		diagnose(validExpect, [
 			statement(assertion([], [literal(1), literal("reason")])),
 		]),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		diagnose(validExpect, [
 			statement(assertion([], [literal(1), literal(2), literal(3)])),
 		]),
-		["tooManyArgs"],
-	);
+	).toStrictEqual(["tooManyArgs"]);
 });
 
 test("async assertion algorithm preserves await and return handling", () => {
-	assert.deepEqual(
+	expect(
 		diagnose(validExpect, [statement(assertion(["resolves"]))]),
-		["asyncMustBeAwaited"],
-	);
-	assert.deepEqual(
+	).toStrictEqual(["asyncMustBeAwaited"]);
+	expect(
 		diagnose(validExpect, [statement(awaited(assertion(["resolves"])))]),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		diagnose(validExpect, [
 			statement(registration([returned(assertion(["rejects"]))])),
 		]),
-		[],
-	);
-	assert.deepEqual(diagnose(validExpect, [statement(assertion())]), []);
+	).toStrictEqual([]);
+	expect(diagnose(validExpect, [statement(assertion())])).toStrictEqual([]);
 });
 
 test("poll algorithm rejects floating poll and element assertions, accepting await and return", () => {
@@ -220,26 +209,23 @@ test("poll algorithm rejects floating poll and element assertions, accepting awa
 				"toBeVisible",
 			),
 		);
-	assert.deepEqual(diagnose(requireAwaitedExpectPoll, [statement(poll())]), [
-		"notAwaited",
-	]);
-	assert.deepEqual(diagnose(requireAwaitedExpectPoll, [statement(element())]), [
-		"notAwaited",
-	]);
-	assert.deepEqual(
-		diagnose(requireAwaitedExpectPoll, [statement(awaited(poll()))]),
-		[],
+	expect(diagnose(requireAwaitedExpectPoll, [statement(poll())])).toStrictEqual(
+		["notAwaited"],
 	);
-	assert.deepEqual(
+	expect(
+		diagnose(requireAwaitedExpectPoll, [statement(element())]),
+	).toStrictEqual(["notAwaited"]);
+	expect(
+		diagnose(requireAwaitedExpectPoll, [statement(awaited(poll()))]),
+	).toStrictEqual([]);
+	expect(
 		diagnose(requireAwaitedExpectPoll, [
 			statement(registration([returned(element())])),
 		]),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		diagnose(requireAwaitedExpectPoll, [statement(assertion())]),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 test("promise algorithm reports a floating assertion chain inside a test callback", () => {
@@ -251,25 +237,24 @@ test("promise algorithm reports a floating assertion chain inside a test callbac
 			),
 			[arrow(assertion())],
 		);
-	assert.deepEqual(
+	expect(
 		diagnose(validExpectInPromise, [
 			statement(registration([statement(chain())])),
 		]),
-		["expectInFloatingPromise"],
-	);
-	assert.deepEqual(
+	).toStrictEqual(["expectInFloatingPromise"]);
+	expect(
 		diagnose(validExpectInPromise, [
 			statement(registration([statement(awaited(chain()))])),
 		]),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		diagnose(validExpectInPromise, [
 			statement(registration([returned(chain())])),
 		]),
+	).toStrictEqual([]);
+	expect(diagnose(validExpectInPromise, [statement(chain())])).toStrictEqual(
 		[],
 	);
-	assert.deepEqual(diagnose(validExpectInPromise, [statement(chain())]), []);
 });
 
 test("promise algorithm keeps ordinary promise work and helper contracts valid", () => {
@@ -280,30 +265,28 @@ test("promise algorithm keeps ordinary promise work and helper contracts valid",
 		),
 		[arrow(literal(2))],
 	);
-	assert.deepEqual(
+	expect(
 		diagnose(validExpectInPromise, [
 			statement(registration([statement(chain)])),
 		]),
-		[],
-	);
+	).toStrictEqual([]);
 	const helper = arrow(
 		block([
 			statement(call(member(identifier("work"), "then"), [arrow(assertion())])),
 		]),
 	);
-	assert.deepEqual(
+	expect(
 		diagnose(validExpectInPromise, [
 			statement(
 				registration([statement(call(identifier("useHelper"), [helper]))]),
 			),
 		]),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 test("retry algorithm rejects registration overrides while accepting application options", () => {
 	const options = () => object([property("retry", literal(3))]);
-	assert.deepEqual(
+	expect(
 		diagnose(noRetries, [
 			statement(
 				call(identifier("test"), [
@@ -313,15 +296,13 @@ test("retry algorithm rejects registration overrides while accepting application
 				]),
 			),
 		]),
-		["retry"],
-	);
-	assert.deepEqual(
+	).toStrictEqual(["retry"]);
+	expect(
 		diagnose(noRetries, [
 			statement(call(identifier("request"), [literal("case"), options()])),
 		]),
-		[],
-	);
-	assert.deepEqual(
+	).toStrictEqual([]);
+	expect(
 		diagnose(noRetries, [
 			statement(
 				call(identifier("test"), [
@@ -331,8 +312,7 @@ test("retry algorithm rejects registration overrides while accepting application
 				]),
 			),
 		]),
-		[],
-	);
+	).toStrictEqual([]);
 });
 
 test("retry algorithm follows literal spreads without applying flag-value semantics", () => {
@@ -343,12 +323,11 @@ test("retry algorithm follows literal spreads without applying flag-value semant
 			argument: object([property("retry", literal(0))]),
 		},
 	]);
-	assert.deepEqual(
+	expect(
 		diagnose(noRetries, [
 			statement(
 				call(identifier("test"), [literal("case"), options, arrow(block([]))]),
 			),
 		]),
-		["retry"],
-	);
+	).toStrictEqual(["retry"]);
 });

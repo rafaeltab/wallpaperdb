@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 const pluginDiagnostics = (source) =>
@@ -11,42 +10,37 @@ test("interpolated template members retain empty boundary quasis", () => {
 		"expect[`${name}poll`](() => 1).toBe(1)",
 		"expect(1)[`${name}toBe`](1)",
 	])
-		assert.deepEqual(
+		expect(
 			pluginDiagnostics(`import { expect } from 'vitest'; ${expression};`),
-			[],
 			expression,
-		);
+		).toStrictEqual([]);
 	for (const expression of [
 		"expect(1)[`${name}not`]",
 		"expect(1)[`not${name}`]",
 	])
-		assert.equal(
+		expect(
 			pluginDiagnostics(
 				`import { expect } from 'vitest'; ${expression};`,
 			).filter((d) => d.message.startsWith("valid-expect:")).length,
-			1,
 			expression,
-		);
+		).toBe(1);
 });
 
 test("static template accessors and interpolation expressions remain checked", () => {
-	assert.equal(
+	expect(
 		pluginDiagnostics(
 			"import { expect } from 'vitest'; expect[`poll`](() => 1).toBe(1);",
 		).filter((d) => d.message.startsWith("require-awaited-expect-poll:"))
 			.length,
-		1,
-	);
-	assert.deepEqual(
+	).toBe(1);
+	expect(
 		pluginDiagnostics(
 			"import { expect } from 'vitest'; await expect[`poll`](() => 1).toBe(1);",
 		),
-		[],
-	);
-	assert.equal(
+	).toStrictEqual([]);
+	expect(
 		pluginDiagnostics(
 			"import { expect } from 'vitest'; expect(`value ${expect(1)}`).toBe('value');",
 		).filter((d) => d.message.startsWith("valid-expect:")).length,
-		1,
-	);
+	).toBe(1);
 });

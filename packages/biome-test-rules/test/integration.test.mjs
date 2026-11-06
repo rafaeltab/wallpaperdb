@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
 	copyFileSync,
@@ -14,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
-import { test } from "node:test";
+import { describe, expect, test } from "vitest";
 import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../../../", import.meta.url));
@@ -78,16 +77,28 @@ function isolatedRepository() {
 	}
 	const rules = "packages/biome-test-rules";
 	copyFileSync(
+		join(repository, rules, "vitest.config.ts"),
+		join(directory, rules, "vitest.config.ts"),
+	);
+	copyFileSync(
 		join(repository, rules, "test-correctness.json"),
 		join(directory, rules, "test-correctness.json"),
 	);
 	cpSync(join(repository, rules, "src"), join(directory, rules, "src"), {
 		recursive: true,
 	});
+	// The coverage collector builds declared dependencies before running tests.
+	// Include the shared Vitest policy's real build inputs in the isolated repo.
+	for (const file of ["src", "tsconfig.json"])
+		cpSync(
+			join(repository, "packages/vitest-config", file),
+			join(directory, "packages/vitest-config", file),
+			{ recursive: true },
+		);
 	const git = spawnSync("git", ["init", "--quiet", directory], {
 		encoding: "utf8",
 	});
-	assert.equal(git.status, 0, git.stderr);
+	expect(git.status, git.stderr).toBe(0);
 	gitFixture(directory, ["add", "--", "."]);
 	gitFixture(directory, [
 		"-c",
@@ -110,7 +121,7 @@ function gitFixture(directory, args) {
 	const result = spawnSync("git", ["-C", directory, ...args], {
 		encoding: "utf8",
 	});
-	assert.equal(result.status, 0, result.stderr);
+	expect(result.status, result.stderr).toBe(0);
 }
 
 function makeEnvironment(directory) {
@@ -151,13 +162,12 @@ function makeLint(directory, workspace, force = true) {
 			env: makeEnvironment(directory),
 		},
 	);
-	assert.equal(result.error, undefined);
+	expect(result.error).toBe(undefined);
 	return { status: result.status, output: result.stdout + result.stderr };
 }
 
 function makeRuleTests(directory) {
 	const env = makeEnvironment(directory);
-	delete env.NODE_TEST_CONTEXT;
 	const result = spawnSync(
 		"make",
 		[
@@ -172,7 +182,7 @@ function makeRuleTests(directory) {
 			env,
 		},
 	);
-	assert.equal(result.status, 0, result.stdout + result.stderr);
+	expect(result.status, result.stdout + result.stderr).toBe(0);
 	return result.stdout + result.stderr;
 }
 
@@ -188,29 +198,32 @@ test("unit coverage combines with the CRAP JavaScript rule inventory", () => {
 		);
 		writeFileSync(
 			join(workspace, "test/coverage.test.mjs"),
-			`import assert from 'node:assert/strict';
-import { test } from 'node:test';
+			`import { expect, test } from 'vitest';
 import { measured } from '../src/measurement.js';
-test('executes measured source', () => assert.equal(measured(), 42));`,
+test('executes measured source', () => expect(measured()).toBe(42));`,
 		);
 		gitFixture(directory, ["add", "--", "."]);
 		makeRuleTests(directory);
 		const reportPath = join(workspace, "coverage/unit/coverage-final.json");
-		assert.ok(
+		expect(
 			existsSync(reportPath),
 			"unit task must produce the collector's Istanbul report",
-		);
+		).toBeTruthy();
 		const coverage = JSON.parse(readFileSync(reportPath, "utf8"));
 		const measured = coverage[join(workspace, "src/measurement.js")];
-		assert.ok(Object.values(measured.f).some((hits) => hits > 0));
+		expect(Object.values(measured.f).some((hits) => hits > 0)).toBeTruthy();
 		const unmeasured = coverage[join(workspace, "src/syntax.js")];
-		assert.ok(unmeasured, "unloaded maintained rules must remain visible");
-		assert.ok(Object.values(unmeasured.s).every((hits) => hits === 0));
+		expect(
+			unmeasured,
+			"unloaded maintained rules must remain visible",
+		).toBeTruthy();
+		expect(
+			Object.values(unmeasured.s).every((hits) => hits === 0),
+		).toBeTruthy();
 		const env = {
 			...makeEnvironment(directory),
 			PACKAGE: "biome-test-rules",
 		};
-		delete env.NODE_TEST_CONTEXT;
 		const runCollector = (mode) =>
 			spawnSync(
 				join(repository, "scripts/node_modules/.bin/tsx"),
@@ -223,7 +236,7 @@ test('executes measured source', () => assert.equal(measured(), 42));`,
 				},
 			);
 		const report = runCollector("report");
-		assert.equal(report.status, 0, report.stdout + report.stderr);
+		expect(report.status, report.stdout + report.stderr).toBe(0);
 		for (const file of [
 			"syntax.js",
 			"scope.js",
@@ -233,30 +246,25 @@ test('executes measured source', () => assert.equal(measured(), 42));`,
 			"ported/valid-expect-in-promise.js",
 			"ported/require-awaited-expect-poll.js",
 		])
-			assert.ok(
+			expect(
 				report.stdout.includes(`src/${file}`),
 				`missing ${file}: ${report.stdout}`,
-			);
-		assert.match(
-			report.stdout,
+			).toBeTruthy();
+		expect(report.stdout).toMatch(
 			/0\.00%\tpackages\/biome-test-rules\/src\/syntax\.js:/,
 		);
-		assert.match(
-			report.stdout,
+		expect(report.stdout).toMatch(
 			/100\.00%\tpackages\/biome-test-rules\/src\/measurement\.js:/,
 		);
 		const check = runCollector("check");
-		assert.notEqual(
+		expect(
 			check.status,
-			0,
 			"unmeasured rules must not silently pass a zero threshold",
-		);
-		assert.match(
-			check.stdout + check.stderr,
+		).not.toBe(0);
+		expect(check.stdout + check.stderr).toMatch(
 			/CRAP: \d+ of \d+ functions exceed 0\./,
 		);
-		assert.doesNotMatch(
-			check.stdout + check.stderr,
+		expect(check.stdout + check.stderr).not.toMatch(
 			/ENOENT|No in-scope source|Cannot combine coverage/,
 		);
 	} finally {
@@ -272,11 +280,12 @@ function installRuleTestCounter(directory) {
 	writeFileSync(
 		join(workspace, "test/cache.test.mjs"),
 		`import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { test } from 'node:test';
+import { expect, test } from 'vitest';
 test('records actual execution', () => {
   const path = '.turbo/executions';
   const previous = existsSync(path) ? Number(readFileSync(path, 'utf8')) : 0;
   writeFileSync(path, String(previous + 1));
+  expect(readFileSync(path, 'utf8')).toBe(String(previous + 1));
 });`,
 	);
 	gitFixture(directory, ["add", "--", "."]);
@@ -288,9 +297,9 @@ test("rule-test cache reruns for staged and untracked discovered source tests", 
 	try {
 		const count = installRuleTestCounter(directory);
 		makeRuleTests(directory);
-		assert.equal(readFileSync(count, "utf8"), "1");
-		assert.match(makeRuleTests(directory), /cache hit/);
-		assert.equal(readFileSync(count, "utf8"), "1");
+		expect(readFileSync(count, "utf8")).toBe("1");
+		expect(makeRuleTests(directory)).toMatch(/cache hit/);
+		expect(readFileSync(count, "utf8")).toBe("1");
 		let executions = 1;
 		for (const extension of ["ts", "js", "mjs"])
 			for (const staged of [true, false]) {
@@ -303,11 +312,10 @@ test("rule-test cache reruns for staged and untracked discovered source tests", 
 				if (staged)
 					gitFixture(directory, ["add", "--", relative(directory, fixture)]);
 				makeRuleTests(directory);
-				assert.equal(
+				expect(
 					readFileSync(count, "utf8"),
-					String(++executions),
 					`${extension}, ${staged ? "staged" : "untracked"}`,
-				);
+				).toBe(String(++executions));
 			}
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
@@ -331,8 +339,8 @@ test("root lint cache changes when the shared rules or configuration changes", (
 				"maxArgs: 2, minArgs: 2",
 			);
 			writeFileSync(join(policy, "src/stricter.ts"), stricter);
-			assert.equal(makeLint(directory, "root", false).status, 0);
-			assert.match(makeLint(directory, "root", false).output, /cache hit/);
+			expect(makeLint(directory, "root", false).status).toBe(0);
+			expect(makeLint(directory, "root", false).output).toMatch(/cache hit/);
 			if (changed === "rules") writeFileSync(rule, stricter);
 			else {
 				const configPath = join(policy, "test-correctness.json");
@@ -345,8 +353,8 @@ test("root lint cache changes when the shared rules or configuration changes", (
 				);
 			}
 			const result = makeLint(directory, "root", false);
-			assert.notEqual(result.status, 0, `${changed}: ${result.output}`);
-			assert.match(result.output, /Expect requires at least/);
+			expect(result.status, `${changed}: ${result.output}`).not.toBe(0);
+			expect(result.output).toMatch(/Expect requires at least/);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}
@@ -402,19 +410,20 @@ test("Make lint discovers each workspace's actual test directories and accepts v
 				'import { expect } from "vitest";\nexpect(1, 2);\n',
 			);
 			const invalid = makeLint(directory, workspace);
-			assert.notEqual(invalid.status, 0, path);
-			assert.ok(invalid.output.includes(basename(path)), invalid.output);
-			assert.match(
+			expect(invalid.status, path).not.toBe(0);
+			expect(
+				invalid.output.includes(basename(path)),
 				invalid.output,
+			).toBeTruthy();
+			expect(invalid.output, path).toMatch(
 				/Expect must have a corresponding matcher/,
-				path,
 			);
 			writeFileSync(
 				fixture,
 				'import { expect } from "vitest";\nexpect(1).toBe(1);\n',
 			);
 			const valid = makeLint(directory, workspace);
-			assert.equal(valid.status, 0, valid.output);
+			expect(valid.status, valid.output).toBe(0);
 			rmSync(fixture);
 		}
 	} finally {
@@ -441,13 +450,13 @@ test("ordinary lint ignores generated sources and deliberately invalid CRAP fixt
 			);
 		}
 		const result = makeLint(directory, "root");
-		assert.equal(result.status, 0, result.output);
+		expect(result.status, result.output).toBe(0);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
 });
 
-test("rule-test cache tracks copied configuration and ignore policy", async (context) => {
+describe("rule-test cache tracks copied configuration and ignore policy", () => {
 	for (const path of [
 		"scripts/biome.json",
 		"infra/biome.json",
@@ -467,14 +476,14 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 			"scripts/toolchain.mjs",
 		].filter((path) => existsSync(join(repository, path))),
 	])
-		await context.test(path, () => {
+		test(path, () => {
 			const directory = isolatedRepository();
 			try {
 				const count = installRuleTestCounter(directory);
 				makeRuleTests(directory);
-				assert.equal(readFileSync(count, "utf8"), "1");
-				assert.match(makeRuleTests(directory), /cache hit/);
-				assert.equal(readFileSync(count, "utf8"), "1");
+				expect(readFileSync(count, "utf8")).toBe("1");
+				expect(makeRuleTests(directory)).toMatch(/cache hit/);
+				expect(readFileSync(count, "utf8")).toBe("1");
 				const config = join(directory, path);
 				writeFileSync(
 					config,
@@ -504,7 +513,7 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 				);
 				gitFixture(directory, ["add", "--", path]);
 				makeRuleTests(directory);
-				assert.equal(readFileSync(count, "utf8"), "2", path);
+				expect(readFileSync(count, "utf8"), path).toBe("2");
 			} finally {
 				rmSync(directory, { recursive: true, force: true });
 			}
@@ -518,14 +527,13 @@ test("mutation inventory records the isolated Biome plugin limitation", () => {
 		encoding: "utf8",
 		timeout: 30_000,
 	});
-	assert.equal(result.status, 0, result.stdout + result.stderr);
+	expect(result.status, result.stdout + result.stderr).toBe(0);
 	const entry = JSON.parse(result.stdout).workspaces[
 		"packages/biome-test-rules"
 	];
-	assert.equal(entry.decision, "excluded");
-	assert.match(entry.reason, /Biome/);
-	assert.equal(
-		entry.followUp,
+	expect(entry.decision).toBe("excluded");
+	expect(entry.reason).toMatch(/Biome/);
+	expect(entry.followUp).toBe(
 		"https://github.com/rafaeltab/wallpaperdb/issues/445",
 	);
 });

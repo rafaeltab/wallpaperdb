@@ -1,20 +1,20 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
+import { expect, test } from "vitest";
 import { lint } from "./lint.mjs";
 
 test("native restricted properties cover the four configured TODO names and message", () => {
 	for (const object of ["it", "test", "describe", "suite"]) {
 		const diagnostics = lint(`${object}.todo('unfinished');`);
-		assert.ok(
+		expect(
 			diagnostics.some((d) => d.category.endsWith("noJsRestrictedProperties")),
 			object,
-		);
-		assert.match(
+		).toBeTruthy();
+		expect(
 			lint(`${object}.todo('unfinished');`, {}, "example.test.ts", "terminal"),
+		).toMatch(
 			/Track unfinished tests in an issue rather than a passing placeholder\./,
 		);
 	}
-	assert.deepEqual(lint("application.todo('request');"), []);
+	expect(lint("application.todo('request');")).toStrictEqual([]);
 });
 
 test("native rules own floating promises, focus, skip and self-comparison", () => {
@@ -24,8 +24,8 @@ test("native rules own floating promises, focus, skip and self-comparison", () =
 		["it.skip('case', () => {});", "noSkippedTests"],
 		["const value = 1; value === value;", "noSelfCompare"],
 	])
-		assert.ok(
+		expect(
 			lint(source).some((d) => d.category.endsWith(rule)),
 			rule,
-		);
+		).toBeTruthy();
 });

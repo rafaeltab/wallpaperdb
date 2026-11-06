@@ -137,6 +137,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
       )}
       {board && panel === 'plan' && (
         <Plan
+          native={native}
           key={`${board.meta.currentPlanId}:${board.meta.currentPlanId ? board.entities.plans[board.meta.currentPlanId]?.version : ''}`}
           board={board}
           client={client}

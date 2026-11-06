@@ -1,6 +1,6 @@
 import { COLOR_ANCHORS_SHA256, COLOR_REFERENCE_COMMIT } from '@wallpaperdb/events';
 import type { ProjectionChange } from '../../src/capabilities/projection/index.js';
-import reference from '../fixtures/prototype/utilities.json';
+import reference from './color-reference.js';
 
 export const colorFixture = reference.cases[0];
 export function measuredColors(

@@ -11,7 +11,7 @@ import {
   colorUtilityFields,
   encodeColorUtilities,
 } from '../src/capabilities/catalogue/index.js';
-import reference from './fixtures/prototype/utilities.json';
+import reference from './helpers/color-reference.js';
 
 describe('Selected color utility encoder', () => {
   it('shares the frozen descriptor vocabulary with extraction through its public contract', () => {

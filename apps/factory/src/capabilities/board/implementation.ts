@@ -15,6 +15,8 @@ import { project } from './projection.js';
 import { issueSearch } from './search.js';
 import { failure, version } from './values.js';
 
+const maxOutstandingCommands = 64;
+
 /** Pure reads observe one committed revision. Effectful publication and command
  * responsibility use the store before publishing anything to the transport. */
 export function makeBoard(config: {
@@ -171,6 +173,16 @@ export function makeBoard(config: {
       Effect.gen(function* () {
         const prior = yield* store.command(request.commandId);
         if (prior) return replay(request, prior);
+        if (
+          [...receipts.values()].filter(
+            (r) => r.receipt.state === 'accepted' || r.receipt.state === 'running'
+          ).length >= maxOutstandingCommands
+        )
+          return failure(
+            'command-capacity',
+            'The command worker is at its pending limit. Observe outstanding receipts and retry later.',
+            request.commandId
+          );
         const action = current.snapshot.entities.actions[request.actionId];
         const rejected = validate(request, action);
         if (rejected) return rejected;

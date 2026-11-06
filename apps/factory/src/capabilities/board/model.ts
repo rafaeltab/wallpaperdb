@@ -520,6 +520,7 @@ export interface BoardFailure {
   readonly reason:
     | 'invalid-input'
     | 'ledger-unavailable'
+    | 'command-capacity'
     | 'action-not-found'
     | 'action-changed'
     | 'command-id-reused'

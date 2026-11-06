@@ -1009,6 +1009,48 @@ it('retains an accepted preview basis when the plan becomes historical', async (
   }
 });
 
+it('bounds outstanding commands while replaying retries and admitting work after completion', async () => {
+  const board = await liveBoard({ scopeId: 'test', initial, autoExecute: false });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const configure = Object.values(snapshot.entities.actions).find((a) => a.kind === 'configure');
+    if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
+    const request = (number: number) => ({
+      commandId: `00000000-0000-4000-8000-${String(number).padStart(12, '0')}`,
+      actionId: configure.id,
+      precondition: configure.availability.precondition,
+      kind: 'configure',
+      payload: {
+        paused: true,
+        concurrency: { kind: 'limited', maximum: 1 },
+        admissionAllowance: { kind: 'limited', maximum: 3 },
+      },
+    });
+    for (let i = 1; i <= 64; i++)
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request(i) }))
+          .statusCode
+      ).toBe(202);
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request(65) }))
+        .statusCode
+    ).toBe(503);
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request(1) }))
+        .statusCode
+    ).toBe(202);
+    expect((await app.inject(`/api/v2/commands/${request(65).commandId}`)).statusCode).toBe(404);
+    await board.execute();
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request(65) }))
+        .statusCode
+    ).toBe(202);
+  } finally {
+    await app.close();
+  }
+});
+
 it('keeps shared replay history coherent when a second producer has a stale local revision', async () => {
   const { mkdtemp, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

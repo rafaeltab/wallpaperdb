@@ -951,70 +951,126 @@ it('distinguishes failed CI without an actor from an owned automatic repair', as
   }
 });
 
-it('retains an accepted preview basis when the plan becomes historical', async () => {
-  const old: PlanningAttempt = {
-    id: '00000000-0000-4000-8000-000000000011',
-    revision: 1,
-    startedAt: 1000,
-    deadline: 5000,
-    finishedAt: 2000,
-    phase: 'succeeded',
-  };
-  const attempts: AttemptStore = {
-    pending: () => Effect.succeed(undefined),
-    get: (id) => Effect.succeed(id === old.id ? old : undefined),
-    create: () => Effect.succeed(false),
-    save: () => Effect.succeed(false),
-  };
-  const board = await liveBoard({
-    scopeId: 'test',
-    initial,
-    attempts,
-    commands: {
-      execute: () =>
-        Effect.succeed({ state: 'succeeded', result: { planId: `plan:${old.id}` }, reasons: [] }),
-    },
-  });
-  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
-  try {
-    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
-    const preview = Object.values(before.entities.actions).find((a) => a.kind === 'preview-plan');
-    if (preview?.availability.state !== 'available') throw new Error('Preview unavailable');
-    expect(
-      (
-        await app.inject({
-          method: 'POST',
-          url: '/api/v2/commands',
-          payload: {
-            commandId: '00000000-0000-4000-8000-000000000012',
-            actionId: preview.id,
-            precondition: preview.availability.precondition,
-            kind: 'preview-plan',
-            payload: {},
-          },
-        })
-      ).statusCode
-    ).toBe(202);
-    await board.idle();
-    await board.publish(initial, old);
-    const url = `/api/v2/plans/${encodeURIComponent(`plan:${old.id}`)}`;
-    const current = (await app.inject(url)).json();
-    expect(current.attempt.basis).toMatchObject({
-      boardCursor: before.cursor,
-      controlVersion: before.meta.factory.version,
+it.each([
+  { field: 'projectPriority', projectField: 'priority', next: 'P0' },
+  { field: 'projectSize', projectField: 'size', next: 'XL' },
+  { field: 'projectStatus', projectField: 'status', next: 'In Progress' },
+] as const)(
+  'retains a preview basis and invalidates changed $field before historical lookup',
+  async (change) => {
+    const { issueObservation } = await import('./fixtures/v2.js');
+    const observed = issueObservation(1, {
+      projectPriority: 'P2',
+      projectSize: 'M',
+      projectDetails: {
+        projectId: 'P1',
+        status: { id: 'planned', name: 'Planned', rank: null },
+        priority: { id: 'P2', name: 'P2', rank: 2 },
+        size: { id: 'M', name: 'M', rank: 2 },
+      },
     });
-    expect(current.attempt.applicability).toBe('current');
-    await board.publish(
-      { ...initial, state: { ...initial.state, revision: 1 } },
-      { ...old, id: '00000000-0000-4000-8000-000000000013', startedAt: 3000 }
-    );
-    const historical = (await app.inject(url)).json();
-    expect(historical.attempt.basis).toEqual(current.attempt.basis);
-    expect(historical.attempt.applicability).toBe('stale');
-  } finally {
-    await app.close();
+    const input: ScheduleSnapshot = {
+      ...initial,
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 1000,
+        facts: { issues: [observed], pullRequests: [] },
+      },
+    };
+    const old: PlanningAttempt = {
+      id: '00000000-0000-4000-8000-000000000011',
+      revision: 1,
+      startedAt: 1000,
+      deadline: 5000,
+      finishedAt: 2000,
+      phase: 'succeeded',
+    };
+    const attempts: AttemptStore = {
+      pending: () => Effect.succeed(undefined),
+      get: (id) => Effect.succeed(id === old.id ? old : undefined),
+      create: () => Effect.succeed(false),
+      save: () => Effect.succeed(false),
+    };
+    const board = await liveBoard({
+      scopeId: 'test',
+      initial: input,
+      attempts,
+      commands: {
+        execute: () =>
+          Effect.succeed({ state: 'succeeded', result: { planId: `plan:${old.id}` }, reasons: [] }),
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const preview = Object.values(before.entities.actions).find((a) => a.kind === 'preview-plan');
+      if (preview?.availability.state !== 'available') throw new Error('Preview unavailable');
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            payload: {
+              commandId: '00000000-0000-4000-8000-000000000012',
+              actionId: preview.id,
+              precondition: preview.availability.precondition,
+              kind: 'preview-plan',
+              payload: {},
+            },
+          })
+        ).statusCode
+      ).toBe(202);
+      await board.idle();
+      await board.publish(input, old);
+      const url = `/api/v2/plans/${encodeURIComponent(`plan:${old.id}`)}`;
+      const current = (await app.inject(url)).json();
+      expect(current.attempt.basis).toMatchObject({
+        boardCursor: before.cursor,
+        controlVersion: before.meta.factory.version,
+      });
+      expect(current.attempt.applicability).toBe('current');
+      await board.publish(
+        {
+          ...input,
+          observations: {
+            ...input.observations,
+            observedAt: 2000,
+            facts: {
+              issues: [
+                {
+                  ...observed,
+                  [change.field]: change.next,
+                  projectDetails: {
+                    ...observed.projectDetails!,
+                    [change.projectField]: { id: change.next, name: change.next, rank: 0 },
+                  },
+                },
+              ],
+              pullRequests: [],
+            },
+          },
+        },
+        old
+      );
+      const project = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.issues[
+        'issue:rafaeltab/wallpaperdb/1'
+      ].project;
+      if (project.state !== 'known') throw new Error('Project fields unavailable');
+      expect(project.value[change.projectField]?.name).toBe(change.next);
+      expect((await app.inject(url)).json().attempt.applicability).toBe('stale');
+      await board.publish(
+        { ...input, state: { ...input.state, revision: 1 } },
+        { ...old, id: '00000000-0000-4000-8000-000000000013', startedAt: 3000 }
+      );
+      const historical = (await app.inject(url)).json();
+      expect(historical.attempt.basis).toEqual(current.attempt.basis);
+      expect(historical.attempt.applicability).toBe('stale');
+    } finally {
+      await app.close();
+    }
   }
-});
+);
 
 it('bounds outstanding commands while replaying retries and admitting work after completion', async () => {
   const board = await liveBoard({ scopeId: 'test', initial, autoExecute: false });

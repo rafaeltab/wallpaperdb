@@ -89,7 +89,7 @@ test("547 complete preparation reuses Make capture and publishes each phase befo
 	assert.equal(result.status, "PASS_PREDEV_THROUGH_IMAGES");
 	assert.equal(result.next, "HOLD_BEFORE_SDK8");
 	assert.equal(result.owner.worker, "controlled-worker");
-	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(result.coldDeadline, result.coldStarted + 1200);
 	const wanted = [
 		"enroll",
 		"prepare-toolchain",
@@ -535,7 +535,7 @@ test("547 cold image provisioning refuses completion after original1200 before s
 			path.join(f.config.evidence, "preparation-result.json"),
 		);
 		assert.equal(result.status, "FAIL");
-		assert.equal(result.coldDeadline - result.coldStarted, 1200);
+		assert.equal(result.coldDeadline, result.coldStarted + 1200);
 		assert.equal(result.cleanup.status, "STOPPED_ACCOUNTED");
 		assert.equal(fs.existsSync(path.join(f.config.evidence, "startup")), false);
 		assert.equal(
@@ -2441,7 +2441,7 @@ test("547 v9 cold provisioning shares one aggregate without extending workload c
 			return receipt;
 		},
 	});
-	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(result.coldDeadline, result.coldStarted + 1200);
 	const provisioning = new Set([
 		"prepare-toolchain",
 		"prepare-workspace",
@@ -2531,7 +2531,7 @@ test("547 Chromium provisioning accepted after its old private cap retains the o
 	const install = result.phases.find((p) => p.phase === "chromium-install");
 	const launch = result.phases.find((p) => p.phase === "chromium-launch");
 	assert.equal(result.status, "PASS_PREDEV_THROUGH_IMAGES");
-	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(result.coldDeadline, result.coldStarted + 1200);
 	assert.equal(install.deadline, result.coldDeadline);
 	assert.ok(install.acceptedAt - install.started > 180);
 	assert.ok(install.acceptedAt < result.coldDeadline);
@@ -2583,7 +2583,7 @@ test("547 image allocation is clamped to the original remaining cold budget", as
 	const image = result.phases.findLast(
 		(p) => p.phase === "prepare-infra-images",
 	);
-	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(result.coldDeadline, result.coldStarted + 1200);
 	assert.equal(image.deadline, result.coldDeadline);
 	assert.ok(image.deadline - image.started < 1200);
 	assert.ok(image.acceptedAt < result.coldDeadline);
@@ -2606,7 +2606,7 @@ test("547 image acceptance after 300 seconds can use remaining original cold tim
 		(p) => p.phase === "prepare-images-before-restoration",
 	);
 	assert.equal(result.status, "PASS_PREDEV_THROUGH_IMAGES");
-	assert.equal(result.coldDeadline - result.coldStarted, 1200);
+	assert.equal(result.coldDeadline, result.coldStarted + 1200);
 	assert.equal(image.deadline, result.coldDeadline);
 	assert.ok(image.acceptedAt - image.started > 300);
 	assert.ok(image.acceptedAt < result.coldDeadline);

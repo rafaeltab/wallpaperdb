@@ -2126,13 +2126,19 @@ test("canonical Asset migration uses its running container while the original va
 
 async function migrationObserved(f, text) {
 	const file = path.join(f.control, "runtime-output");
-	const deadline = Date.now() + 4000;
-	while (Date.now() < deadline) {
+	const command = f.commands.at(-1);
+	// Readiness includes Make/source transfer; runtime keeps its own deadline.
+	const deadline = fixtureNow() + 20000;
+	while (fixtureNow() < deadline) {
 		if (fs.existsSync(file) && fs.readFileSync(file, "utf8").includes(text))
 			return;
+		if (command.closed)
+			assert.fail(
+				`Runtime ended before reporting ${text}: ${command.output()}`,
+			);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 	}
-	assert.fail(`Runtime did not report ${text}`);
+	assert.fail(`Runtime did not report ${text}: ${command.output()}`);
 }
 
 test("Asset migration awaits complete runtime delivery without database effects, then runs once and can repeat unchanged", async (t) => {
@@ -2146,8 +2152,18 @@ test("Asset migration awaits complete runtime delivery without database effects,
 	];
 	for (const name of names)
 		fs.writeFileSync(path.join(f.runtime, "apps/asset", name), "old delivery");
+	fs.writeFileSync(path.join(f.control, "pause-sync"), "yes");
 	const running = f.run("migrate", "PACKAGE=asset");
-	await migrationObserved(f, "asset-migration waiting");
+	// Source transfer may still be valid after the old four-second observation.
+	const release = setTimeout(
+		() => fs.writeFileSync(path.join(f.control, "release-sync"), "yes"),
+		4500,
+	);
+	try {
+		await migrationObserved(f, "asset-migration waiting");
+	} finally {
+		clearTimeout(release);
+	}
 	assert.deepEqual(f.effects(), []);
 	for (const name of names)
 		fs.copyFileSync(
@@ -2277,7 +2293,13 @@ for (const state of ["missing", "exited", "replaced"])
 	test(`Asset migration rejects ${state} instance without fallback`, async (t) => {
 		const f = await assetExecutionCheckout(t);
 		fs.writeFileSync(path.join(f.control, state), "yes");
-		const result = await f.run("migrate", "PACKAGE=asset").done;
+		const running = f.run("migrate", "PACKAGE=asset");
+		if (state === "missing")
+			await assert.rejects(
+				migrationObserved(f, "asset-migration ready"),
+				/Runtime ended before reporting asset-migration ready:[\s\S]*Asset migration requires one existing running container/,
+			);
+		const result = await running.done;
 		assert.notEqual(result.status, 0, result.output);
 		assert.deepEqual(f.effects(), []);
 		const calls = fs

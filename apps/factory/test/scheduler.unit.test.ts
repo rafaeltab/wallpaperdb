@@ -30,7 +30,7 @@ const issue = (number: number): PlanningIssue => ({
   blockersReady: true,
   prerequisiteEvidence: '',
 });
-function fixture() {
+function fixture(hooks?: { read: () => void; propose: (deadline?: number) => void }) {
   const store = controlledScheduleStore();
   const snapshot = () => Effect.runSync(store.read());
   const preparations: number[] = [];
@@ -119,15 +119,18 @@ function fixture() {
     read: () =>
       discoveryFailed
         ? Effect.fail(new Unavailable({ operation: 'controlled-discovery', cause: 'offline' }))
-        : Effect.sync(() => ({
-            issues,
-            job: { kind: 'empty' as const },
-            jobs: [...statuses.values()],
-            scheduleRevision: snapshot().revision,
-            admissions: snapshot().admissions.map((a) => a.issue),
-            paused: snapshot().paused,
-            capacity: { concurrency: snapshot().concurrency, admission: snapshot().allowance },
-          })),
+        : Effect.sync(() => {
+            hooks?.read();
+            return {
+              issues,
+              job: { kind: 'empty' as const },
+              jobs: [...statuses.values()],
+              scheduleRevision: snapshot().revision,
+              admissions: snapshot().admissions.map((a) => a.issue),
+              paused: snapshot().paused,
+              capacity: { concurrency: snapshot().concurrency, admission: snapshot().allowance },
+            };
+          }),
   };
   const deps = Layer.mergeAll(
     Layer.succeed(ScheduleObservations, {
@@ -183,8 +186,9 @@ function fixture() {
     Layer.succeed(PlanningSource, source),
     Layer.succeed(IPlanner, {
       ownership: () => Effect.succeed(undefined),
-      propose: () =>
+      propose: (_input, attempt) =>
         Effect.sync(() => {
+          hooks?.propose(attempt?.deadline);
           duringPlan?.();
           return {
             selected: issues.map((i) => ({
@@ -921,6 +925,30 @@ it('does not admit work when completed observation publication fails', async () 
     expect(f.launches).toEqual([]);
     expect(f.snapshot().admissions).toEqual([]);
   } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('includes automatic preflight discovery in the model overall deadline', async () => {
+  const { vi } = await import('vitest');
+  let now = 1000;
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const f = fixture({
+    read: () => {
+      now += 30000;
+    },
+    propose: (deadline) => {
+      expect(deadline).toBe(601000);
+    },
+  });
+  try {
+    const scheduler = await f.runtime.runPromise(Scheduler);
+    await f.runtime.runPromise(
+      scheduler.configure({ revision: 0, concurrency: 1, allowance: 1, paused: false })
+    );
+    await f.runtime.runPromise(scheduler.tick(base));
+  } finally {
+    clock.mockRestore();
     await f.runtime.dispose();
   }
 });

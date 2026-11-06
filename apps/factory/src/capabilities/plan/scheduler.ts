@@ -1,5 +1,5 @@
 import { Effect, Layer, Option, Semaphore } from 'effect';
-import { Issues, type Start, type Status } from '../job/index.js';
+import { Unavailable, Issues, type Start, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
@@ -253,7 +253,14 @@ export const SchedulerLive = Layer.effect(
           yield* reconcile();
           const snapshot = yield* status();
           if (!available(snapshot)) return snapshot;
-          const input = yield* source.read();
+          const deadline = Date.now() + 600000;
+          const input = yield* source.read().pipe(
+            Effect.timeoutOrElse({
+              duration: 600000,
+              orElse: () =>
+                Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
+            })
+          );
           const normalized = {
             ...input,
             job: normalize(input.job),
@@ -264,7 +271,7 @@ export const SchedulerLive = Layer.effect(
           if (signature === lastInput) {
             return yield* retry(retryPreview, base, snapshot.state.revision);
           }
-          const preview = yield* plan.preview();
+          const preview = yield* plan.preview({ deadline, progress: () => Effect.void });
           if (preview.kind === 'stale') return yield* status();
           lastInput = signature;
           retryPreview = joinPreview(preview);

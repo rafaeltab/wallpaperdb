@@ -176,3 +176,28 @@ it('rejects a cycle behind shared prerequisites without rejecting an independent
   expect(result.selected).toEqual([{ ...selection, issue: 584 }]);
   expect(result.rejected).toContainEqual({ issue: 580, reason: 'Cyclic explicit dependencies' });
 });
+
+it('rejects a context-only issue even when it otherwise passes every candidate policy', async () => {
+  const context = {
+    ...issue,
+    metadata: {
+      number: issue.number,
+      url: issue.url,
+      title: issue.title,
+      open: true,
+      candidate: false,
+      labels: issue.labels,
+      assignees: [],
+      projectStatus: null,
+      projectPriority: null,
+      projectSize: null,
+      commentCount: 0,
+      blockers: [],
+      parents: [],
+      pullRequests: [],
+    },
+  };
+  const result = await preview([context]);
+  expect(result.selected).toEqual([]);
+  expect(result.rejected).toContainEqual({ issue: 580, reason: 'Context-only issue' });
+});

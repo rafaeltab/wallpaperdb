@@ -641,9 +641,41 @@ it('sends the complete flat metadata index over stdin without bodies or duplicat
         ],
       },
     });
+    const active = {
+      kind: 'job' as const,
+      intent: {
+        id: 'active',
+        issue: 9,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/9',
+        base: 'a'.repeat(40),
+        context: 'PRIVATE_JOB_SENTINEL',
+        branch: 'factory/9',
+        createdAt: 0,
+        expectedStage: 'implementation' as const,
+      },
+      execution: { kind: 'absent' as const },
+      elapsedMs: 0,
+    };
+    const parked = {
+      ...active,
+      intent: { ...active.intent, id: 'parked', issue: 8 },
+      delivery: {
+        stage: 'implementation' as const,
+        active: false,
+        ready: false,
+        landed: false,
+        commit: 'b'.repeat(40),
+      },
+    };
+    const cancelled = {
+      ...parked,
+      intent: { ...active.intent, id: 'cancelled', issue: 7 },
+      delivery: { ...parked.delivery, activity: 'cancelled' as const },
+    };
     const input = {
       issues: [makeIssue(1, true), makeIssue(2, true), makeIssue(3, false)],
-      job: { kind: 'empty' as const },
+      job: active,
+      jobs: [active, parked, cancelled],
       capacity: { concurrency: 2, admission: 1 },
     };
     await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
@@ -665,7 +697,10 @@ it('sends the complete flat metadata index over stdin without bodies or duplicat
     expect(prompt).toContain('assignees: rafaeltab, zero-two-rafaeltab\nprs: 10 merged');
     expect(prompt).toContain('comment count: 7\nblockers:\n- 2');
     expect(prompt).toContain('blockers: none');
-    expect(prompt).toContain('# Running issues\n\nnone');
+    expect(prompt).toContain('# Running issues\n\n- #9: active\n- #8: parked');
+    expect(prompt.match(/^- #9: active$/gm)).toHaveLength(1);
+    expect(prompt).not.toContain('- #7:');
+    expect(prompt).not.toContain('PRIVATE_JOB_SENTINEL');
     expect(prompt).toContain('fetch its full issue body and all trusted maintainer comments');
     for (const omitted of [
       'PRIVATE_BODY_SENTINEL',

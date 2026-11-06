@@ -20,7 +20,12 @@ export function plannerMessage(input: PlanningInput, requestId: string) {
   const issues = [...new Map(input.issues.map((issue) => [issue.number, issue])).values()];
   const running = new Map<number, string>();
   for (const job of [input.job, ...(input.jobs ?? [])]) {
-    if (job.kind === 'job' && !job.delivery?.ready && !job.delivery?.landed)
+    if (
+      job.kind === 'job' &&
+      !job.delivery?.ready &&
+      !job.delivery?.landed &&
+      job.delivery?.activity !== 'cancelled'
+    )
       running.set(
         job.intent.issue,
         (job.delivery ? job.delivery.active === false : Boolean(job.resume)) ? 'parked' : 'active'

@@ -88,3 +88,42 @@ test("review evidence requires all axes and preserves actual reviewed comparison
 	};
 	assert.ok(reviewEvidenceErrors(pending, current).length);
 });
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { publishMarkdown } from "./agent-workflow.mjs";
+test("Markdown publication passes hostile body text as a file and verifies exact readback", (t) => {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "publication-"));
+	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	const body =
+		"First line\n\n```sh\n$(touch /tmp/should-not-exist)\nEOF\n```\n";
+	const bodyFile = path.join(directory, "body.md");
+	fs.writeFileSync(bodyFile, body);
+	let posted;
+	const run = (_program, args) => {
+		if (args.includes("--body-file")) {
+			posted = fs.readFileSync(args[args.indexOf("--body-file") + 1], "utf8");
+			assert.ok(!args.includes(body));
+			return "https://github.com/owner/repo/issues/1";
+		}
+		return JSON.stringify({ body: posted });
+	};
+	assert.equal(
+		publishMarkdown({ kind: "issue-edit", subject: "1", bodyFile }, run)
+			.bodyVerified,
+		true,
+	);
+	assert.equal(posted, body);
+	assert.throws(
+		() =>
+			publishMarkdown(
+				{ kind: "issue-edit", subject: "1", bodyFile },
+				(_p, args) =>
+					args.includes("--body-file")
+						? ""
+						: JSON.stringify({ body: "different" }),
+			),
+		/readback/,
+	);
+});

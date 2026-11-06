@@ -1,24 +1,12 @@
-import { execFileSync } from "node:child_process";
+import { publishMarkdown } from "./publish-markdown.mjs";
+export { publishMarkdown };
+import { command, github } from "./lib/agent-command.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
-export function command(program, args, options = {}) {
-	return execFileSync(program, args, {
-		cwd: repository,
-		encoding: "utf8",
-		timeout: 60_000,
-		maxBuffer: 32 * 1024 * 1024,
-		...options,
-	});
-}
-export function github(args) {
-	const value = JSON.parse(command("gh", args));
-	if (value.errors?.length)
-		throw new Error(`GitHub GraphQL error: ${JSON.stringify(value.errors)}`);
-	return value;
-}
+export { command, github };
 export function issuePreflight(issue, login, status) {
 	const errors = [];
 	if (issue.state !== "OPEN") errors.push("Issue must be open");
@@ -285,6 +273,14 @@ async function main() {
 			JSON.stringify({ head, baseRef, baseSha, mergeBase, errors }, null, 2),
 		);
 		if (errors.length) process.exitCode = 1;
+	} else if (action === "publish") {
+		console.log(
+			JSON.stringify(
+				publishMarkdown(JSON.parse(fs.readFileSync(subject, "utf8"))),
+				null,
+				2,
+			),
+		);
 	} else
 		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }

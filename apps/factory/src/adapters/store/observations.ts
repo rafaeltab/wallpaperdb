@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ObservationStore } from '../../capabilities/observe/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import {
   stateConnection,
-  records,
+  githubRichFacts,
   githubIssues,
   githubPulls,
   observationRefresh as table,
@@ -26,13 +26,7 @@ export function sqliteObservations(directory: string): ObservationStore {
             failedAt: row?.failedAt ?? undefined,
             error: row?.error ?? undefined,
             facts:
-              (db
-                .select()
-                .from(records)
-                .where(
-                  and(eq(records.namespace, 'observations'), eq(records.name, 'facts-v2.json'))
-                )
-                .get()?.value as import('../../capabilities/observe/index.js').Facts | undefined) ??
+              db.select().from(githubRichFacts).where(eq(githubRichFacts.id, 1)).get()?.value ??
               (row?.observedAt == null
                 ? undefined
                 : {
@@ -59,12 +53,9 @@ export function sqliteObservations(directory: string): ObservationStore {
                 : {}),
             };
             if (value.facts) {
-              tx.insert(records)
-                .values({ namespace: 'observations', name: 'facts-v2.json', value: value.facts })
-                .onConflictDoUpdate({
-                  target: [records.namespace, records.name],
-                  set: { value: value.facts },
-                })
+              tx.insert(githubRichFacts)
+                .values({ id: 1, value: value.facts })
+                .onConflictDoUpdate({ target: githubRichFacts.id, set: { value: value.facts } })
                 .run();
               tx.delete(githubIssues).run();
               tx.delete(githubPulls).run();

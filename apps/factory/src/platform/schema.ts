@@ -105,3 +105,26 @@ export const t3Observations = sqliteTable('t3_observations', {
     .$type<import('../capabilities/observe/index.js').ThreadState>()
     .notNull(),
 });
+
+export const v2Board = sqliteTable('v2_board', {
+  scope: text('scope').primaryKey(),
+  value: text('value', { mode: 'json' })
+    .$type<import('../capabilities/board/index.js').BoardRecord>()
+    .notNull(),
+});
+export const v2Commands = sqliteTable('v2_commands', {
+  id: text('id').primaryKey(),
+  scope: text('scope').notNull(),
+  request: text('request', { mode: 'json' })
+    .$type<import('../capabilities/board/index.js').FactoryV2Command>()
+    .notNull(),
+  receipt: text('receipt', { mode: 'json' })
+    .$type<import('../capabilities/board/index.js').FactoryV2CommandReceipt>()
+    .notNull(),
+});
+export const githubRichFacts = sqliteTable('github_rich_facts', {
+  id: integer('id').primaryKey(),
+  value: text('value', { mode: 'json' })
+    .$type<import('../capabilities/observe/index.js').Facts>()
+    .notNull(),
+});

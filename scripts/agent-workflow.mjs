@@ -36,7 +36,7 @@ export function issuePreflight(
 		errors.push("Open blockers require a verified stack-readiness assessment");
 	return errors;
 }
-export function prReadiness(pr, expectedChecks) {
+export function prReadiness(pr, expectedChecks, inapplicableChecks = []) {
 	const errors = [];
 	if (pr.state !== "OPEN") errors.push("PR is not open");
 	if (pr.mergeable !== "MERGEABLE")
@@ -44,15 +44,69 @@ export function prReadiness(pr, expectedChecks) {
 	if (!Array.isArray(expectedChecks))
 		errors.push("CI applicability requires a recorded policy assessment");
 	const checks = pr.statusCheckRollup ?? [];
+	if (!Array.isArray(inapplicableChecks)) {
+		errors.push("Conditional exclusions must be an array");
+		inapplicableChecks = [];
+	}
 	for (const name of expectedChecks ?? [])
 		if (!checks.some((check) => (check.name ?? check.context) === name))
 			errors.push(`Missing expected check ${name}`);
 	for (const check of checks) {
 		if (check.advisory === true) continue;
+		const name = check.name ?? check.context;
+		const excluded = inapplicableChecks.find(
+			(entry) =>
+				entry.name === name && entry.policyPath && entry.rationale?.trim(),
+		);
+		if (
+			excluded &&
+			check.conclusion === "SKIPPED" &&
+			!expectedChecks?.includes(name)
+		)
+			continue;
 		if ((check.conclusion ?? check.state) !== "SUCCESS")
 			errors.push(
 				`Check ${check.name ?? check.context} is ${check.conclusion || check.state || check.status || "unknown"}`,
 			);
+	}
+	return errors;
+}
+export function ciAssessmentErrors(assessment, snapshot) {
+	const errors = [];
+	if (!assessment) return errors;
+	if (
+		assessment.policySha !== snapshot.policySha ||
+		assessment.head !== snapshot.head ||
+		assessment.baseRef !== snapshot.baseRef ||
+		!assessment.rationale?.trim()
+	)
+		errors.push(
+			"CI assessment is not bound to current head, base branch and trusted policy",
+		);
+	if (assessment.expectedChecks?.length === 0 && !assessment.noCiReason?.trim())
+		errors.push(
+			"An empty expected-check list requires an intentional CI exclusion explanation",
+		);
+	if (assessment.inapplicableChecks !== undefined) {
+		if (!Array.isArray(assessment.inapplicableChecks))
+			return [...errors, "Conditional exclusions must be an array"];
+		if (
+			assessment.inapplicableChecks.length &&
+			(!snapshot.mergeSha || assessment.mergeSha !== snapshot.mergeSha)
+		)
+			errors.push(
+				"Conditional exclusions must bind the effective merge configuration",
+			);
+		for (const excluded of assessment.inapplicableChecks)
+			if (
+				!excluded.name?.trim() ||
+				!excluded.rationale?.trim() ||
+				!snapshot.policy.some((file) => file.path === excluded.policyPath) ||
+				assessment.expectedChecks?.includes(excluded.name)
+			)
+				errors.push(
+					"Conditional exclusion requires an inapplicable check, trusted workflow path and rationale",
+				);
 	}
 	return errors;
 }
@@ -292,22 +346,29 @@ async function main() {
 			? JSON.parse(fs.readFileSync(args[0], "utf8"))
 			: null;
 		markAdvisoryChecks(pr, repo.nameWithOwner, policy);
-		const errors = prReadiness(pr, assessment?.expectedChecks);
-		if (
-			assessment &&
-			(assessment.policySha !== policySha ||
-				assessment.head !== pr.headRefOid ||
-				assessment.baseRef !== pr.baseRefName ||
-				!assessment.rationale)
-		)
-			errors.push(
-				"CI assessment is not bound to current head, base branch and trusted policy",
-			);
-		if (assessment?.expectedChecks?.length === 0 && !assessment.noCiReason)
-			errors.push(
-				"An empty expected-check list requires an intentional CI exclusion explanation",
-			);
-		const result = { pr, liveBase, policySha, policy, effective, errors };
+		const errors = [
+			...prReadiness(
+				pr,
+				assessment?.expectedChecks,
+				assessment?.inapplicableChecks,
+			),
+			...ciAssessmentErrors(assessment, {
+				policySha,
+				head: pr.headRefOid,
+				baseRef: pr.baseRefName,
+				mergeSha: merge,
+				policy,
+			}),
+		];
+		const result = {
+			pr,
+			liveBase,
+			policySha,
+			policy,
+			mergeSha: merge,
+			effective,
+			errors,
+		};
 		const refreshed = readPr(subject);
 		if (
 			refreshed.headRefOid !== pr.headRefOid ||

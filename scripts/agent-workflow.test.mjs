@@ -47,7 +47,97 @@ test("issue preflight accepts only individually verified stack blockers", () => 
 	);
 });
 
-import { prReadiness } from "./agent-workflow.mjs";
+import { prReadiness, ciAssessmentErrors } from "./agent-workflow.mjs";
+test("conditional applicability binds trusted policy and effective merge configuration", () => {
+	const snapshot = {
+		head: "a".repeat(40),
+		baseRef: "main",
+		policySha: "b".repeat(40),
+		mergeSha: "c".repeat(40),
+		policy: [{ path: ".github/workflows/docs.yml" }],
+	};
+	const assessment = {
+		...snapshot,
+		rationale: "inspected trusted event conditions",
+		expectedChecks: ["build"],
+		inapplicableChecks: [
+			{
+				name: "docs",
+				policyPath: ".github/workflows/docs.yml",
+				rationale: "paths condition does not match",
+			},
+		],
+	};
+	assert.deepEqual(ciAssessmentErrors(assessment, snapshot), []);
+	for (const change of [
+		{ head: "d".repeat(40) },
+		{ policySha: "d".repeat(40) },
+		{ baseRef: "other" },
+		{ mergeSha: "d".repeat(40) },
+		{ expectedChecks: ["docs"] },
+		{
+			inapplicableChecks: [
+				{
+					name: "docs",
+					policyPath: ".github/workflows/pr-controlled.yml",
+					rationale: "removed by PR",
+				},
+			],
+		},
+		{
+			inapplicableChecks: [
+				{ name: "docs", policyPath: ".github/workflows/docs.yml" },
+			],
+		},
+	])
+		assert.ok(
+			ciAssessmentErrors({ ...assessment, ...change }, snapshot).length,
+		);
+});
+test("readiness allows explicitly assessed conditional skips while retaining failed and required gates", () => {
+	const pr = {
+		state: "OPEN",
+		mergeable: "MERGEABLE",
+		statusCheckRollup: [
+			{ name: "build", conclusion: "SUCCESS" },
+			{ name: "conditional-docs", conclusion: "SKIPPED" },
+		],
+	};
+	const exclusions = [
+		{
+			name: "conditional-docs",
+			policyPath: ".github/workflows/docs.yml",
+			rationale: "trusted paths condition excludes this change",
+		},
+	];
+	assert.deepEqual(prReadiness(pr, ["build"], exclusions), []);
+	assert.ok(prReadiness(pr, ["build"]).length);
+	assert.ok(prReadiness(pr, ["build", "conditional-docs"], exclusions).length);
+	assert.ok(
+		prReadiness(
+			{
+				...pr,
+				statusCheckRollup: [
+					{ name: "conditional-docs", conclusion: "FAILURE" },
+				],
+			},
+			[],
+			exclusions,
+		).length,
+	);
+	assert.ok(
+		prReadiness(
+			{
+				...pr,
+				statusCheckRollup: [
+					{ name: "conditional-docs", status: "IN_PROGRESS" },
+				],
+			},
+			[],
+			exclusions,
+		).length,
+	);
+});
 test("PR readiness never treats absent, pending or unknown checks as passing", () => {
 	const pr = {
 		state: "OPEN",

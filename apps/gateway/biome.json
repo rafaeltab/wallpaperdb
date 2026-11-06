@@ -49,7 +49,7 @@
     }
   },
   "files": {
-    "maxSize": 3000000,
+    "maxSize": 4194304,
     "includes": ["src/**/*.ts", "test/**/*.ts", "*.json", "*.ts", "scripts/**/*.mjs"]
   },
   "root": false,

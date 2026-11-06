@@ -1,4 +1,5 @@
 import {
+	type AnyJsAstNode,
 	ast,
 	defineRule,
 	registerDiagnostic,
@@ -8,7 +9,17 @@ import {
 // Queries visit only relevant native nodes. No source copying, filesystem IO,
 // dependency resolution, or whole-tree traversal occurs in these rules.
 const runners =
-	/^(?:run(?:Promise|Sync|Fork|Callback)(?:Exit)?|make|makeWith|defaultRuntime)$/;
+	/^(?:run(?:Promise|Sync|Fork|Callback)(?:Exit)?(?:With)?|make|makeWith|makeRunMain|defaultRuntime)$/;
+function propertyName(member: AnyJsAstNode | undefined): string | undefined {
+	if (member?.kind === "JS_STATIC_MEMBER_EXPRESSION")
+		return member.member?.text.trim();
+	if (
+		member?.kind === "JS_COMPUTED_MEMBER_EXPRESSION" &&
+		member.member?.kind === "JS_STRING_LITERAL_EXPRESSION"
+	)
+		return member.member.valueToken?.slice(1, -1);
+	return undefined;
+}
 export const capabilityExecution = defineRule({
 	query: semantic("JS_REFERENCE_IDENTIFIER"),
 	run(node, context) {
@@ -40,13 +51,15 @@ export const capabilityExecution = defineRule({
 		const parent = node.parent;
 		const member =
 			parent?.kind === "JS_IDENTIFIER_EXPRESSION" ? parent.parent : undefined;
-		const property =
-			member?.kind === "JS_STATIC_MEMBER_EXPRESSION"
-				? member.member?.text.trim()
-				: member?.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
-					? member.member?.text.trim().replace(/^['"]|['"]$/g, "")
-					: undefined;
+		const property = propertyName(member);
+		const namespaceRunner =
+			source === "effect" &&
+			specifier?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER" &&
+			/^(Effect|Runtime|ManagedRuntime)$/.test(property ?? "")
+				? propertyName(member?.parent)
+				: undefined;
 		if (
+			(namespaceRunner && runners.test(namespaceRunner)) ||
 			(source !== "effect" && original && runners.test(original)) ||
 			(property &&
 				runners.test(property) &&

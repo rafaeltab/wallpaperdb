@@ -20,6 +20,34 @@ test("capabilities reject runtime execution and global configuration without rej
 	])
 		assert.equal(check(source).length, 0, source);
 });
+test("capabilities reject namespace execution and the pinned Effect runner family", () => {
+	for (const source of [
+		"import * as E from 'effect'; E.Effect.runSync(E.Effect.succeed(1));",
+		"import * as E from 'effect'; E['Effect']['runPromiseWith'](services)(task);",
+		"import { Runtime } from 'effect'; Runtime.makeRunMain(options);",
+		...[
+			"runForkWith",
+			"runCallbackWith",
+			"runPromiseWith",
+			"runPromiseExitWith",
+			"runSyncWith",
+			"runSyncExitWith",
+		].map(
+			(name) =>
+				`import { Effect } from 'effect'; Effect.${name}(services)(task);`,
+		),
+	])
+		assert.ok(
+			check(source).some((d) => d.message.startsWith("capability-execution:")),
+			source,
+		);
+	for (const source of [
+		"import * as E from 'effect'; E.Effect.succeed(1); E.Option.make;",
+		"import * as E from 'effect'; function local(E) { E.Effect.runSync(task); }",
+		"import { Effect } from 'effect'; const runSync = 'succeed'; Effect[runSync](1);",
+	])
+		assert.equal(check(source).length, 0, source);
+});
 test("capability entries contain explicit reexports and contracts remain in contract.ts", () => {
 	const file = "apps/example/src/capabilities/search/index.ts";
 	assert.ok(check("export type * from './contract.js';", file).length);

@@ -1142,7 +1142,14 @@ async function reconcileDevelopment(
 				console.log(
 					"Docker restoration raced startup; reconciling the owned project again.",
 				);
-				await wait(1000);
+				const conflict = diagnostic.match(
+					/already in use by container "([a-f0-9]{64})"/i,
+				);
+				if (!conflict) throw error;
+				await ssh(
+					id,
+					`${workerEnvironment}; cd ${remote} && COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-container-restore ${conflict[1]}`,
+				);
 			}
 		}
 		if (!foreground) await watchDevelopment(id);
@@ -1778,6 +1785,45 @@ async function applicationImageCommand(id, admission, command, engineBaseline) {
 					}
 				: {}),
 		});
+	}
+}
+
+async function waitRestoredContainer(containerId) {
+	const project = process.env.COMPOSE_PROJECT_NAME;
+	if (
+		process.env.WALLPAPERDB_BOAT_WORKER !== "1" ||
+		!project ||
+		!/^[a-f0-9]{64}$/.test(containerId ?? "")
+	)
+		throw new Error("Container restoration requires an exact owned conflict");
+	const deadline = Date.now() + 120000;
+	for (;;) {
+		const remaining = deadline - Date.now();
+		if (remaining <= 0)
+			throw new Error("Conflicting container restoration exceeded 120 seconds");
+		const result = spawnSync(
+			"docker",
+			[
+				"container",
+				"inspect",
+				"--format",
+				'{{index .Config.Labels "com.docker.compose.project"}}',
+				containerId,
+			],
+			{
+				encoding: "utf8",
+				maxBuffer: 1024,
+				timeout: Math.min(1000, remaining),
+			},
+		);
+		if (result.status === 0) {
+			if (result.stdout.trim() !== project)
+				throw new Error(
+					"Restored container belongs to a different Compose project",
+				);
+			return;
+		}
+		await wait(Math.min(500, Math.max(0, deadline - Date.now())));
 	}
 }
 
@@ -2636,6 +2682,8 @@ async function watchDevelopment(id) {
 try {
 	if (action === "prepare-infra-images") prepareInfraImages();
 	else if (action === "wait-app-images") await waitApplicationImages();
+	else if (action === "wait-container-restore")
+		await waitRestoredContainer(args[0]);
 	else if (action === "enroll") {
 		const [
 			mode = "validation",

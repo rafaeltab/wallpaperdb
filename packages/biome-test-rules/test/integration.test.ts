@@ -496,7 +496,7 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path.endsWith(".mjs") || path.endsWith(".mts")
+					path.endsWith(".mjs") || path.endsWith(".mts") || path.endsWith(".ts")
 						? readFileSync(config, "utf8") +
 								(path === "scripts/crap.mts"
 									? "\nthrow new Error('Collector changed after caching');\n"

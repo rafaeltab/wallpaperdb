@@ -14,6 +14,8 @@ export interface BoardInput {
 }
 export interface BoardRecord {
   snapshot: FactoryV2Snapshot;
+  inputVersion: string;
+  details: Readonly<Record<string, import('./model.js').FactoryV2ItemDetails>>;
   history: readonly FactoryV2Delta[];
 }
 export interface CommandRecord {
@@ -33,3 +35,18 @@ export interface BoardStore {
   commands(): Effect.Effect<readonly CommandRecord[], Unavailable>;
 }
 export const BoardStore = Context.Service<BoardStore>('wallpaperdb.factory.BoardStore');
+export interface BoardCommands {
+  execute(
+    command: FactoryV2Command,
+    target: import('./model.js').Action,
+    input: ScheduleSnapshot
+  ): Effect.Effect<
+    {
+      state: 'succeeded' | 'rejected' | 'uncertain';
+      result: FactoryV2CommandReceipt['result'];
+      reasons: readonly import('./model.js').Reason[];
+    },
+    Unavailable
+  >;
+}
+export const BoardCommands = Context.Service<BoardCommands>('wallpaperdb.factory.BoardCommands');

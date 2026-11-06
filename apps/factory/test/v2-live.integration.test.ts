@@ -1,7 +1,15 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { operationsServer, type FactoryV2Snapshot } from '../src/http/index.js';
-import { liveBoard } from '../src/capabilities/board/index.js';
+import {
+  makeBoard,
+  BoardStore,
+  BoardCommands,
+  type BoardRecord,
+  type CommandRecord,
+} from '../src/capabilities/board/index.js';
+import { Time } from '../src/capabilities/job/index.js';
+import { liveV2Data } from '../src/http/index.js';
 import type { ScheduleSnapshot } from '../src/capabilities/observe/index.js';
 
 const initial: ScheduleSnapshot = {
@@ -163,3 +171,151 @@ it('publishes real issue and PR facts atomically with stable card identities and
     await app.close();
   }
 });
+
+it('retains the projection across restart and durably deduplicates commands before checking stale preconditions', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { sqliteBoard } = await import('../src/adapters/store/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'factory-v2-'));
+  let configured = 0;
+  const store = sqliteBoard(directory);
+  const commands = {
+    execute: () =>
+      Effect.sync(() => {
+        configured++;
+        return { state: 'succeeded' as const, result: null, reasons: [] };
+      }),
+  };
+  const create = async () => {
+    const board = await liveBoard({
+      scopeId: 'test',
+      initial,
+      store,
+      commands,
+      now: () => 1000,
+      run: Effect.runPromise,
+    });
+    return {
+      board,
+      app: operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board }),
+    };
+  };
+  try {
+    const first = await create();
+    const snapshot = (await first.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const configure = Object.values(snapshot.entities.actions).find((a) => a.kind === 'configure');
+    if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
+    const command = {
+      commandId: '00000000-0000-4000-8000-000000000001',
+      actionId: configure.id,
+      precondition: configure.availability.precondition,
+      kind: 'configure',
+      payload: {
+        paused: false,
+        concurrency: { kind: 'limited', maximum: 1 },
+        admissionAllowance: { kind: 'limited', maximum: 3 },
+      },
+    };
+    const accepted = await first.app.inject({
+      method: 'POST',
+      url: '/api/v2/commands',
+      payload: command,
+    });
+    expect(accepted.statusCode).toBe(202);
+    await first.board.idle();
+    expect((await first.app.inject(`/api/v2/commands/${command.commandId}`)).json()).toMatchObject({
+      state: 'succeeded',
+    });
+    await first.app.close();
+    const second = await create();
+    try {
+      expect((await second.app.inject('/api/v2/board')).json().cursor).toBe(snapshot.cursor);
+      expect(
+        (await second.app.inject({ method: 'POST', url: '/api/v2/commands', payload: command }))
+          .statusCode
+      ).toBe(200);
+      expect(configured).toBe(1);
+      expect(
+        (
+          await second.app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            payload: { ...command, payload: { ...command.payload, paused: true } },
+          })
+        ).json()
+      ).toMatchObject({ code: 'id-reused' });
+      expect(
+        (
+          await second.app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            payload: {
+              ...command,
+              commandId: '00000000-0000-4000-8000-000000000002',
+              precondition: 'old',
+            },
+          })
+        ).json()
+      ).toMatchObject({ code: 'stale-action' });
+    } finally {
+      await second.app.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+async function liveBoard(config: {
+  scopeId: string;
+  initial: ScheduleSnapshot;
+  now?: () => number;
+  store?: BoardStore;
+  commands?: BoardCommands;
+  run?: typeof Effect.runPromise;
+}) {
+  let saved: BoardRecord | undefined;
+  const records = new Map<string, CommandRecord>();
+  const store = config.store ?? {
+    read: () => Effect.succeed(saved),
+    save: (record: BoardRecord) =>
+      Effect.sync(() => {
+        saved = record;
+      }),
+    command: (id: string) => Effect.succeed(records.get(id)),
+    accept: (record: CommandRecord) =>
+      Effect.sync(() => {
+        if (records.has(record.request.commandId)) return false;
+        records.set(record.request.commandId, record);
+        return true;
+      }),
+    finish: (record: CommandRecord) =>
+      Effect.sync(() => {
+        records.set(record.request.commandId, record);
+      }),
+    commands: () => Effect.succeed([...records.values()]),
+  };
+  const board = await Effect.runPromise(
+    makeBoard(config).pipe(
+      Effect.provideService(BoardStore, store),
+      Effect.provideService(
+        BoardCommands,
+        config.commands ?? {
+          execute: () => Effect.succeed({ state: 'rejected', result: null, reasons: [] }),
+        }
+      ),
+      Effect.provideService(Time, { now: () => Effect.succeed(config.now?.() ?? 1000) })
+    )
+  );
+  let pending: Promise<void> | undefined;
+  const data = liveV2Data(board, Effect.runPromise, () => {
+    pending ??= Effect.runPromise(board.processPending()).finally(() => {
+      pending = undefined;
+    });
+  });
+  return {
+    ...data,
+    publish: (input: ScheduleSnapshot) => Effect.runPromise(board.publish(input)),
+    idle: () => pending ?? Promise.resolve(),
+  };
+}

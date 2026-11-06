@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
-import { type Profile } from '@/lib/api/user';
+import type { Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/graphql/client', () => ({

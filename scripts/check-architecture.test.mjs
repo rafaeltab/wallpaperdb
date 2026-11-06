@@ -190,7 +190,7 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 	expect(cached.status, cached.stdout + cached.stderr).toBe(0);
 	expect(
 		cached.stdout,
-		first.stdout + "\nSECOND RUN\n" + cached.stdout,
+		`${first.stdout}\nSECOND RUN\n${cached.stdout}`,
 	).toMatch(/cache hit/);
 	project.write(
 		"packages/other/test/consumer.ts",

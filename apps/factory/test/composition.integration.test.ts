@@ -10,7 +10,7 @@ it('validates host configuration before serving and composes the real driving an
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    FACTORY_STATE: host.directory + '/state',
+    FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   };
   try {
@@ -44,7 +44,7 @@ it('validates host configuration before serving and composes the real driving an
 it('continues admitted work through publication without an operations-page observer', async () => {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
-  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   await host.save({ complete: true, base: host.base });
   const running = await startFactory({
@@ -52,7 +52,7 @@ it('continues admitted work through publication without an operations-page obser
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    FACTORY_STATE: host.directory + '/state',
+    FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   });
   try {
@@ -239,7 +239,7 @@ it('continuously admits a validated semantic plan through production adapters wi
 it('refreshes GitHub observations without clients and keeps HTTP local', async () => {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
-  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   const issue = (number: number, body: string) => ({
     number,
@@ -259,7 +259,7 @@ it('refreshes GitHub observations without clients and keeps HTTP local', async (
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    FACTORY_STATE: host.directory + '/state',
+    FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   });
   try {
@@ -270,7 +270,7 @@ it('refreshes GitHub observations without clients and keeps HTTP local', async (
       async () =>
         expect(
           (
-            await Effect.runPromise(sqliteObservations(host.directory + '/state').read())
+            await Effect.runPromise(sqliteObservations(`${host.directory}/state`).read())
           ).facts?.issues.map((i) => i.number)
         ).toEqual([400, 577]),
       { timeout: 10000, interval: 30 }

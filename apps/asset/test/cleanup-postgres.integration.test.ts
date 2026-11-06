@@ -134,7 +134,7 @@ it('honors the exact recorded seven-day and thirty-day evidence boundaries and f
         correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
         decision: {
           kind: 'create' as const,
-          assetType: assetType!,
+          assetType: assetType,
           owner: { namespace: 'clerk', subject: 'exact-expiry' },
         },
         context: { occurrence: { source: 'https://test/wallpaper', id: crypto.randomUUID() } },
@@ -176,7 +176,7 @@ it('honors the exact recorded seven-day and thirty-day evidence boundaries and f
             return {
               state,
               result: undefined,
-              retirement: { sourceId, evidenceExpiresAt: evidenceExpiresAt! },
+              retirement: { sourceId, evidenceExpiresAt: evidenceExpiresAt },
             };
           })
         )
@@ -569,7 +569,7 @@ it('serializes accepted read protection with membership and releases it without 
     await sources.runPromise(SourceStore.use((store) => store.releaseRead('active-read')));
     const work = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
     expect(work.map((item) => item.target)).toEqual([{ kind: 'source', assetId, sourceId }]);
-    await cleanup.runPromise(CleanupStore.use((store) => store.completed(work[0]!)));
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(work[0])));
     expect(
       (await pool.query('SELECT id FROM immutable_sources WHERE id = $1', [sourceId])).rows
     ).toEqual([]);

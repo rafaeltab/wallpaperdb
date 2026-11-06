@@ -71,7 +71,8 @@ const isPromiseMethodThatUsesValue = (
 		node.argument.type === AST_NODE_TYPES.CallExpression &&
 		node.argument.arguments.length > 0
 	) {
-		const nodeName = getNodeName(node.argument)!;
+		const nodeName = getNodeName(node.argument);
+		if (nodeName === null) return false;
 		if (["Promise.all", "Promise.allSettled"].includes(nodeName)) {
 			const [firstArg] = node.argument.arguments;
 			if (
@@ -355,8 +356,6 @@ export default createEslintRule({
 					}
 					case AST_NODE_TYPES.ExpressionStatement:
 						break;
-					case AST_NODE_TYPES.ReturnStatement:
-					case AST_NODE_TYPES.AwaitExpression:
 					default:
 						return;
 				}

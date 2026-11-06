@@ -20,8 +20,7 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
       base: host.base,
       context: 'Read only',
-      prerequisiteEvidence:
-        'Verified prerequisite issue 573, PR 591, reviewed and CI-passing commit ' + host.base,
+      prerequisiteEvidence: `Verified prerequisite issue 573, PR 591, reviewed and CI-passing commit ${host.base}`,
       branch: 'factory/job-1',
       createdAt: 100,
       expectedStage: 'implementation',
@@ -43,7 +42,7 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       threadId: 'thread-live',
       model: 'gpt-6.1-sol',
       branch: 'factory/job-1',
-      worktree: host.directory + '/worker',
+      worktree: `${host.directory}/worker`,
     });
     await host.save({ overrides: { title: 'Renamed worker [factory:job-1]' } });
     expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({ kind: 'found' });
@@ -78,7 +77,7 @@ it('reads current structured questions, excluding historical and inherited quest
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const { writeFile } = await import('node:fs/promises');
-    const authorizationFile = host.directory + '/authorization';
+    const authorizationFile = `${host.directory}/authorization`;
     await writeFile(authorizationFile, 'Bearer controlled-protocol');
     const adapter = t3Execution({
       binary: host.binary,

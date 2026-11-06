@@ -10,7 +10,7 @@ import type {
   FileCoverage,
   FunctionCoverageUnit,
   FunctionSpanSource,
-  StatementCoverageUnit
+  StatementCoverageUnit,
 } from "./coverageUnits.js";
 
 const MAX_COLUMN = Number.MAX_SAFE_INTEGER;
@@ -31,7 +31,10 @@ export class CoverageReportParseError extends Error {
   }
 }
 
-export async function parseCoverageReport(reportPath: string, sourceRoot: string): Promise<Map<string, FileCoverage>> {
+export async function parseCoverageReport(
+  reportPath: string,
+  sourceRoot: string,
+): Promise<Map<string, FileCoverage>> {
   const raw = parseCoverageJson(reportPath, await readFile(reportPath, "utf8"));
   const report = isRecord(raw) ? raw : {};
   const records = new Map<string, FileCoverage>();
@@ -75,7 +78,10 @@ function parseStatements(statementMapValue: unknown, hitsValue: unknown): Statem
   return deduplicateStatements(statements);
 }
 
-function parseStatementEntry(locationValue: unknown, hitsValue: unknown): StatementCoverageUnit | null {
+function parseStatementEntry(
+  locationValue: unknown,
+  hitsValue: unknown,
+): StatementCoverageUnit | null {
   const hits = parseFiniteNumber(hitsValue);
   if (hits === null) {
     return null;
@@ -103,7 +109,7 @@ function parseBranches(branchMapValue: unknown, hitsValue: unknown): BranchCover
 function parseCoverageEntry(
   entryKey: string,
   entryValue: unknown,
-  sourceRoot: string
+  sourceRoot: string,
 ): { normalizedPath: string; coverage: FileCoverage } | null {
   if (!isRecord(entryValue)) {
     return null;
@@ -121,24 +127,28 @@ function parseCoverageEntry(
       statements: parseStatements(entryValue.statementMap, entryValue.s),
       branches: parseBranches(entryValue.branchMap, entryValue.b),
       functions: parseFunctions(entryValue.fnMap, entryValue.f),
-      ...(isLegacyV8(entryValue) ? { legacyV8: true } : {})
-    }
+      ...(isLegacyV8(entryValue) ? { legacyV8: true } : {}),
+    },
   };
 }
 
 function isLegacyV8(entry: JsonRecord): boolean {
-  return typeof entry.all === "boolean" || (
-    isRecord(entry.branchMap) && Object.values(entry.branchMap).some(
-      (branch) => isRecord(branch) && branch.type === "branch"
-    )
+  return (
+    typeof entry.all === "boolean" ||
+    (isRecord(entry.branchMap) &&
+      Object.values(entry.branchMap).some((branch) => isRecord(branch) && branch.type === "branch"))
   );
 }
 
 function mergeCoverageEntry(
   records: Map<string, FileCoverage>,
-  entry: { normalizedPath: string; coverage: FileCoverage }
+  entry: { normalizedPath: string; coverage: FileCoverage },
 ): void {
-  const merged = records.get(entry.normalizedPath) ?? { statements: [], branches: [], functions: [] };
+  const merged = records.get(entry.normalizedPath) ?? {
+    statements: [],
+    branches: [],
+    functions: [],
+  };
   merged.statements.push(...entry.coverage.statements);
   merged.branches.push(...entry.coverage.branches);
   merged.functions.push(...entry.coverage.functions);
@@ -146,7 +156,7 @@ function mergeCoverageEntry(
     statements: deduplicateStatements(merged.statements),
     branches: deduplicateBranches(merged.branches),
     functions: deduplicateFunctions(merged.functions),
-    ...(merged.legacyV8 || entry.coverage.legacyV8 ? { legacyV8: true } : {})
+    ...(merged.legacyV8 || entry.coverage.legacyV8 ? { legacyV8: true } : {}),
   });
 }
 
@@ -192,7 +202,7 @@ function parseLineSpan(value: unknown): SourceSpan | null {
     startLine: line,
     startColumn: 0,
     endLine: line,
-    endColumn: MAX_COLUMN
+    endColumn: MAX_COLUMN,
   };
 }
 
@@ -214,7 +224,7 @@ function parseSpan(value: unknown): SourceSpan | null {
     startLine: start.line,
     startColumn: start.column,
     endLine: end.line,
-    endColumn: end.column
+    endColumn: end.column,
   };
 }
 
@@ -228,7 +238,10 @@ function parsePosition(value: unknown): { line: number; column: number } | null 
     return null;
   }
 
-  const column = value.column === null || value.column === undefined ? MAX_COLUMN : parseColumnNumber(value.column);
+  const column =
+    value.column === null || value.column === undefined
+      ? MAX_COLUMN
+      : parseColumnNumber(value.column);
   if (column === null) {
     return null;
   }
@@ -241,7 +254,9 @@ function parseHitArray(value: unknown): number[] {
     return [];
   }
 
-  return value.map((entry) => parseFiniteNumber(entry)).filter((entry): entry is number => entry !== null);
+  return value
+    .map((entry) => parseFiniteNumber(entry))
+    .filter((entry): entry is number => entry !== null);
 }
 
 function parseFiniteNumber(value: unknown): number | null {
@@ -259,7 +274,9 @@ function parseColumnNumber(value: unknown): number | null {
 }
 
 function parseInteger(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)
+    ? value
+    : null;
 }
 
 function deduplicateStatements(statements: StatementCoverageUnit[]): StatementCoverageUnit[] {
@@ -285,7 +302,7 @@ function deduplicateBranches(branches: BranchCoverageUnit[]): BranchCoverageUnit
     }
     deduplicated.set(key, {
       ...branch,
-      hits: mergeBranchHits(existing.hits, branch.hits)
+      hits: mergeBranchHits(existing.hits, branch.hits),
     });
   }
   return [...deduplicated.values()];
@@ -320,11 +337,19 @@ function toBranchCoverageUnit(branchValue: unknown, hitsValue: unknown): BranchC
   if (hits.length === 0 || span === null) {
     return null;
   }
-  return { span, hits, ...(typeof branchValue.type === "string" ? { type: branchValue.type } : {}) };
+  return {
+    span,
+    hits,
+    ...(typeof branchValue.type === "string" ? { type: branchValue.type } : {}),
+  };
 }
 
 function resolveBranchSpan(branchValue: JsonRecord): SourceSpan | null {
-  return parseSpan(branchValue.loc) ?? parseFirstLocation(branchValue.locations) ?? parseLineSpan(branchValue.line);
+  return (
+    parseSpan(branchValue.loc) ??
+    parseFirstLocation(branchValue.locations) ??
+    parseLineSpan(branchValue.line)
+  );
 }
 
 function resolveFunctionEntry(entryValue: unknown): FunctionCoverageUnit | null {
@@ -341,7 +366,7 @@ function resolveFunctionEntry(entryValue: unknown): FunctionCoverageUnit | null 
 
 function createFunctionCoverageUnit(
   entryValue: JsonRecord,
-  resolved: { span: SourceSpan; source: FunctionSpanSource }
+  resolved: { span: SourceSpan; source: FunctionSpanSource },
 ): FunctionCoverageUnit {
   const declarationStart = resolveDeclarationStart(entryValue);
   const name = typeof entryValue.name === "string" ? entryValue.name : undefined;
@@ -349,12 +374,12 @@ function createFunctionCoverageUnit(
     span: resolved.span,
     spanSource: resolved.source,
     ...(name ? { name } : {}),
-    ...(declarationStart ? { declarationStart } : {})
+    ...(declarationStart ? { declarationStart } : {}),
   };
 }
 
 function resolveFunctionSpanWithSource(
-  entryValue: JsonRecord
+  entryValue: JsonRecord,
 ): { span: SourceSpan; source: FunctionSpanSource } | null {
   const loc = parseSpan(entryValue.loc);
   if (loc) {
@@ -404,28 +429,41 @@ function selectCanonicalFunctionEntry(entries: FunctionCoverageUnit[]): Function
     }
   }
 
-  const canonical = [...uniqueBySpan.values()].sort(compareFunctionSpecificity)[0]!;
+  const canonical = [...uniqueBySpan.values()].sort(compareFunctionSpecificity)[0];
   // A zero count is reliable only when every merged variant supplies a count.
   const hits = entries.every((entry) => entry.hits !== undefined)
-    ? Math.max(...entries.map((entry) => entry.hits!))
+    ? Math.max(...entries.map((entry) => entry.hits ?? 0))
     : undefined;
   const { hits: _previousHits, ...identity } = canonical;
   return { ...identity, ...(hits === undefined ? {} : { hits }) };
 }
 
-function compareFunctionSpecificity(left: FunctionCoverageUnit, right: FunctionCoverageUnit): number {
+function compareFunctionSpecificity(
+  left: FunctionCoverageUnit,
+  right: FunctionCoverageUnit,
+): number {
   return firstNonZeroComparison([
     functionSpanSourceRank(left.spanSource) - functionSpanSourceRank(right.spanSource),
     spanLineCount(left.span) - spanLineCount(right.span),
-    comparePosition(right.span.startLine, right.span.startColumn, left.span.startLine, left.span.startColumn),
-    comparePosition(left.span.endLine, left.span.endColumn, right.span.endLine, right.span.endColumn)
+    comparePosition(
+      right.span.startLine,
+      right.span.startColumn,
+      left.span.startLine,
+      left.span.startColumn,
+    ),
+    comparePosition(
+      left.span.endLine,
+      left.span.endColumn,
+      right.span.endLine,
+      right.span.endColumn,
+    ),
   ]);
 }
 
 const FUNCTION_SPAN_SOURCE_RANK: Record<FunctionSpanSource, number> = {
   loc: 0,
   decl: 1,
-  line: 2
+  line: 2,
 };
 
 function functionSpanSourceRank(source: FunctionSpanSource | undefined): number {
@@ -440,7 +478,12 @@ function firstNonZeroComparison(comparisons: number[]): number {
   return comparisons.find((comparison) => comparison !== 0) ?? 0;
 }
 
-function comparePosition(leftLine: number, leftColumn: number, rightLine: number, rightColumn: number): number {
+function comparePosition(
+  leftLine: number,
+  leftColumn: number,
+  rightLine: number,
+  rightColumn: number,
+): number {
   if (leftLine !== rightLine) {
     return leftLine - rightLine;
   }
@@ -450,7 +493,7 @@ function comparePosition(leftLine: number, leftColumn: number, rightLine: number
 function mergeBranchHits(existingHits: number[], nextHits: number[]): number[] {
   const mergedHits = nextHits.map((hits, index) => Math.max(hits, existingHits[index] ?? 0));
   for (let index = mergedHits.length; index < existingHits.length; index += 1) {
-    mergedHits.push(existingHits[index]!);
+    mergedHits.push(existingHits[index]);
   }
   return mergedHits;
 }

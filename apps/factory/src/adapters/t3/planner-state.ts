@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { publisher, requiredRecord } from '../../platform/index.js';
 import { plannerSchema as schema } from '../../platform/index.js';
 export function plannerState(directory: string) {

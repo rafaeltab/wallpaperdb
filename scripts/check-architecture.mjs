@@ -136,7 +136,7 @@ for (const filename of [
 			errors.push(
 				`${location}: ${owner} depends on external technology ${specifier}`,
 			);
-		if (!resolved || !resolved.startsWith(`${src}${path.sep}`)) continue;
+		if (!resolved?.startsWith(`${src}${path.sep}`)) continue;
 		if (graph.has(filename)) graph.get(filename).push(resolved);
 		const module = publicModule(resolved);
 		if (

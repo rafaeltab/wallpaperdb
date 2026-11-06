@@ -6,7 +6,7 @@ it('translates external issue observations and rejects unverified or malformed d
   const host = await protocol();
   const path = process.env.PATH;
   const fixture = process.env.FACTORY_FIXTURE;
-  process.env.PATH = host.directory + ':' + path;
+  process.env.PATH = `${host.directory}:${path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const adapter = githubIssues({ project: host.repository, base: host.base, prerequisites: [] });
@@ -74,7 +74,7 @@ it('selects a verified child base and blocks divergent joins using real Git ance
   const host = await protocol();
   const path = process.env.PATH;
   const previous = process.env.FACTORY_FIXTURE;
-  process.env.PATH = host.directory + ':' + path;
+  process.env.PATH = `${host.directory}:${path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const { execFileSync } = await import('node:child_process');

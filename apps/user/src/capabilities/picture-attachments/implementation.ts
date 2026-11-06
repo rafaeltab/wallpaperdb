@@ -179,8 +179,7 @@ export const pictureAttachmentsLayer = Layer.effect(
             },
             ({ intent, profile, registered }) => {
               if (
-                !intent ||
-                intent.state !== 'accepting-source' ||
+                intent?.state !== 'accepting-source' ||
                 !registered ||
                 c.sourceId !== c.defaultSourceId ||
                 c.sourceId !== c.initialAnalysisSourceId

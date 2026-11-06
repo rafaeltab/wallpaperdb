@@ -11,11 +11,19 @@ vi.mock('@wallpaperdb/react-muuri', () => ({
   useRefresh: () => ({ refresh: () => {} }),
 }));
 
-const items = ['first', 'second'].map((id) => ({ id, src: '/image.png', width: 1000, height: 1000, aspectRatio: 1 }));
+const items = ['first', 'second'].map((id) => ({
+  id,
+  src: '/image.png',
+  width: 1000,
+  height: 1000,
+  aspectRatio: 1,
+}));
 function Item({ item, isExpanded, span, onClick }: GridItemRendererProps) {
-  return <button type="button" onClick={onClick} aria-expanded={isExpanded}>
-    {item.id} {span.cols}x{span.rows}
-  </button>;
+  return (
+    <button type="button" onClick={onClick} aria-expanded={isExpanded}>
+      {item.id} {span.cols}x{span.rows}
+    </button>
+  );
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -23,7 +31,9 @@ afterEach(() => vi.restoreAllMocks());
 describe('Muuri grid expansion composition', () => {
   it('expands one item, transfers expansion, and collapses a repeated click', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1000);
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 1000, 600));
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 100, 1000, 600)
+    );
     const onItemClick = vi.fn();
     render(<MuuriGrid items={items} ItemRenderer={Item} onItemClick={onItemClick} />);
     const first = screen.getByRole('button', { name: 'first 1x1' });
@@ -46,7 +56,9 @@ describe('Muuri grid expansion composition', () => {
     const first = screen.getByRole('button', { name: 'first 1x1' });
     fireEvent.click(first);
     expect(first).toHaveAttribute('aria-expanded', 'true');
-    const wrapper = container.querySelector('[data-item-id="first"]')!.firstElementChild!;
+    const wrapper = required(
+      required(container.querySelector('[data-item-id="first"]')).firstElementChild
+    );
     const originalWidth = (wrapper as HTMLElement).style.width;
     width.mockReturnValue(300);
     fireEvent(window, new Event('resize'));
@@ -54,3 +66,8 @@ describe('Muuri grid expansion composition', () => {
     expect(Number.parseFloat((wrapper as HTMLElement).style.width)).toBeLessThanOrEqual(300);
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

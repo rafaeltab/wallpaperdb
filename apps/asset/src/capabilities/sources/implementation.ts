@@ -268,7 +268,7 @@ export function sourcesLayer(configuration: {
             const old = state.candidates.find((c) => c.idempotencyKey === input.idempotencyKey);
             if (old) return sameIntent(old, input) ? result(old) : reject('idempotency-conflict');
             const policy = configuration.types[state.asset.assetType];
-            if (!policy || !policy.operations.includes(input.operation))
+            if (!policy?.operations.includes(input.operation))
               return reject('unsupported-operation');
             if (
               (input.operation === 'replace-set' && state.asset.assetType !== 'picture') ||

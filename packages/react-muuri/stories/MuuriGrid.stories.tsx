@@ -100,7 +100,7 @@ export const VaryingSizes: Story = {
       <div style={containerStyle}>
         <MuuriGrid layoutDuration={300}>
           {sizes.map((size, index) => (
-            <MuuriItem key={`${size.width}x${size.height}-${index}`}>
+            <MuuriItem key={`${size.width}x${size.height}`}>
               <div
                 style={{
                   ...itemStyle,
@@ -161,7 +161,7 @@ export const VaryingSizesDraggable: Story = {
       <div style={containerStyle}>
         <MuuriGrid dragEnabled dragSort layoutDuration={300}>
           {sizes.map((size, index) => (
-            <MuuriItem key={`${size.width}x${size.height}-${index}`}>
+            <MuuriItem key={`${size.width}x${size.height}`}>
               <div
                 style={{
                   ...itemStyle,

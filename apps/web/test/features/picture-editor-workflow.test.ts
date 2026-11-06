@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createPictureEditor, type PictureSource, type PictureCommand, type PictureSaveResult, type PictureCrop } from '@/features/picture-editor';
+import {
+  createPictureEditor,
+  type PictureSource,
+  type PictureCommand,
+  type PictureSaveResult,
+  type PictureCrop,
+} from '@/features/picture-editor';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -14,18 +20,26 @@ function deferred<T>() {
 const policy = {
   acceptedSourceFormats: ['image/png', 'image/gif'],
   output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const },
-  maxOutputBytes: 5242880, animation: { available: true },
+  maxOutputBytes: 5242880,
+  animation: { available: true },
   encoding: { staticQuality: 85, animationQuality: 85 },
 };
 const profile = { version: 1, limits: { maxPixels: 20000000, maxDecodedBytes: 80000000 } };
 
 function setup() {
-  const decodes: { file: File; signal: AbortSignal; result: ReturnType<typeof deferred<PictureSource<Blob>>> }[] = [];
+  const decodes: {
+    file: File;
+    signal: AbortSignal;
+    result: ReturnType<typeof deferred<PictureSource<Blob>>>;
+  }[] = [];
   const previews = new Set<string>();
   let previewId = 0;
   let busy = false;
   const availabilityListeners = new Set<() => void>();
-  const requests: { command: PictureCommand<Blob>; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
+  const requests: {
+    command: PictureCommand<Blob>;
+    result: ReturnType<typeof deferred<PictureSaveResult>>;
+  }[] = [];
   const notices: string[] = [];
   const refreshes: ReturnType<typeof deferred<{ version: number }>>[] = [];
   let owner = {};
@@ -38,11 +52,21 @@ function setup() {
     createOperation: () => new AbortController(),
     ownership: {
       getIdentity: () => owner,
-      subscribe(listener) { ownerListeners.add(listener); return () => { ownerListeners.delete(listener); }; },
+      subscribe(listener) {
+        ownerListeners.add(listener);
+        return () => {
+          ownerListeners.delete(listener);
+        };
+      },
     },
     availability: {
       isBusy: () => busy,
-      subscribe(listener) { availabilityListeners.add(listener); return () => { availabilityListeners.delete(listener); }; },
+      subscribe(listener) {
+        availabilityListeners.add(listener);
+        return () => {
+          availabilityListeners.delete(listener);
+        };
+      },
     },
     save(command) {
       if (busy) throw new Error('Profile is busy');
@@ -51,7 +75,9 @@ function setup() {
       requests.push({ command, result });
       return result.promise.finally(() => setBusy(false));
     },
-    notify(message) { notices.push(message); },
+    notify(message) {
+      notices.push(message);
+    },
     refresh() {
       if (busy) throw new Error('Profile is busy');
       setBusy(true);
@@ -70,35 +96,61 @@ function setup() {
         previews.add(url);
         return url;
       },
-      release(url) { previews.delete(url); },
+      release(url) {
+        previews.delete(url);
+      },
     },
   });
   const deactivate = editor.activate();
   editor.open();
-  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners, refreshes, ownerListeners,
-    replaceOwner(notify = true) { owner = {}; if (notify) for (const listener of ownerListeners) listener(); },
+  return {
+    editor,
+    decodes,
+    previews,
+    deactivate,
+    requests,
+    notices,
+    setBusy,
+    availabilityListeners,
+    refreshes,
+    ownerListeners,
+    replaceOwner(notify = true) {
+      owner = {};
+      if (notify) for (const listener of ownerListeners) listener();
+    },
   };
 }
 
 function source() {
   let disposed = false;
-  const encodes: { crop: PictureCrop; signal: AbortSignal; result: ReturnType<typeof deferred<Blob>> }[] = [];
+  const encodes: {
+    crop: PictureCrop;
+    signal: AbortSignal;
+    result: ReturnType<typeof deferred<Blob>>;
+  }[] = [];
   const picture: PictureSource<Blob> = {
-    width: 800, height: 400, preview: new Blob(['preview']),
+    width: 800,
+    height: 400,
+    preview: new Blob(['preview']),
     process(crop, _policy, signal) {
       const result = deferred<Blob>();
       encodes.push({ crop, signal, result });
       return result.promise;
     },
-    dispose() { disposed = true; },
+    dispose() {
+      disposed = true;
+    },
   };
   return { picture, encodes, isDisposed: () => disposed };
 }
 
 async function selectReady(context: ReturnType<typeof setup>) {
-  const selected = context.editor.select(new File(['source'], 'portrait.png', { type: 'image/png' }), policy);
+  const selected = context.editor.select(
+    new File(['source'], 'portrait.png', { type: 'image/png' }),
+    policy
+  );
   const decoded = source();
-  context.decodes.at(-1)!.result.resolve(decoded.picture);
+  required(context.decodes.at(-1)).result.resolve(decoded.picture);
   await selected;
   return decoded;
 }
@@ -112,7 +164,11 @@ describe('picture workflow recovery and lifetimes', () => {
     const selecting = context.editor.select(file, policy);
     context.decodes[0].result.reject(new Error('Decode failed'));
     await selecting;
-    expect(context.editor.getSnapshot()).toMatchObject({ error: 'Decode failed', selection: { file, source: null }, processing: false });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      error: 'Decode failed',
+      selection: { file, source: null },
+      processing: false,
+    });
     const applying = context.editor.apply(policy);
     context.editor.cancel();
     const obsolete = source();
@@ -129,28 +185,37 @@ describe('picture workflow recovery and lifetimes', () => {
     await retrying;
   });
 
-  it.each(['png', 'gif'])('cancels %s processing, ignores its late result, and retries the retained crop', async (format) => {
-    const context = setup();
-    const selecting = context.editor.select(new File(['source'], `portrait.${format}`, { type: `image/${format}` }), policy);
-    const decoded = source();
-    context.decodes[0].result.resolve(decoded.picture);
-    await selecting;
-    const crop = { x: 300, y: 100, size: 200, zoom: 2, maxZoom: 6.25, lowResolution: false };
-    context.editor.setCrop(crop);
-    const applying = context.editor.apply(policy);
-    context.editor.cancel();
-    expect(decoded.encodes[0].signal.aborted).toBe(true);
-    decoded.encodes[0].result.resolve(canonical);
-    await applying;
-    expect(context.requests).toEqual([]);
-    expect(context.editor.getSnapshot()).toMatchObject({ processing: false, selection: { crop } });
-    const retrying = context.editor.apply(policy);
-    expect(decoded.encodes[1].crop).toEqual(crop);
-    decoded.encodes[1].result.resolve(canonical);
-    await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: true });
-    await retrying;
-  });
+  it.each(['png', 'gif'])(
+    'cancels %s processing, ignores its late result, and retries the retained crop',
+    async (format) => {
+      const context = setup();
+      const selecting = context.editor.select(
+        new File(['source'], `portrait.${format}`, { type: `image/${format}` }),
+        policy
+      );
+      const decoded = source();
+      context.decodes[0].result.resolve(decoded.picture);
+      await selecting;
+      const crop = { x: 300, y: 100, size: 200, zoom: 2, maxZoom: 6.25, lowResolution: false };
+      context.editor.setCrop(crop);
+      const applying = context.editor.apply(policy);
+      context.editor.cancel();
+      expect(decoded.encodes[0].signal.aborted).toBe(true);
+      decoded.encodes[0].result.resolve(canonical);
+      await applying;
+      expect(context.requests).toEqual([]);
+      expect(context.editor.getSnapshot()).toMatchObject({
+        processing: false,
+        selection: { crop },
+      });
+      const retrying = context.editor.apply(policy);
+      expect(decoded.encodes[1].crop).toEqual(crop);
+      decoded.encodes[1].result.resolve(canonical);
+      await expect.poll(() => context.requests.length).toBe(1);
+      context.requests[0].result.resolve({ success: true });
+      await retrying;
+    }
+  );
 
   it('keeps processing and upload failures editable, and retries the current crop with the captured version', async () => {
     const context = setup();
@@ -158,11 +223,17 @@ describe('picture workflow recovery and lifetimes', () => {
     let applying = context.editor.apply(policy);
     decoded.encodes[0].result.reject(new Error('Encoding failed'));
     await applying;
-    expect(context.editor.getSnapshot()).toMatchObject({ error: 'Encoding failed', selection: { file: { name: 'portrait.png' } } });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      error: 'Encoding failed',
+      selection: { file: { name: 'portrait.png' } },
+    });
     applying = context.editor.apply(policy);
     decoded.encodes[1].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: false, error: { message: 'Upload unavailable' } });
+    context.requests[0].result.resolve({
+      success: false,
+      error: { message: 'Upload unavailable' },
+    });
     await applying;
     expect(context.editor.getSnapshot().error).toBe('Upload unavailable');
     const crop = { x: 350, y: 150, size: 100, zoom: 4, maxZoom: 6.25, lowResolution: false };
@@ -195,7 +266,11 @@ describe('picture workflow recovery and lifetimes', () => {
     decoded.encodes[0].result.resolve(canonical);
     await applying;
     expect(context.requests).toEqual([]);
-    expect(context.editor.getSnapshot()).toMatchObject({ processing: false, error: expect.stringContaining('Your Profile is busy'), selection: { file: { name: 'portrait.png' } } });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      processing: false,
+      error: expect.stringContaining('Your Profile is busy'),
+      selection: { file: { name: 'portrait.png' } },
+    });
     context.setBusy(false);
     const retrying = context.editor.apply(policy);
     decoded.encodes[1].result.resolve(canonical);
@@ -210,11 +285,17 @@ describe('picture workflow recovery and lifetimes', () => {
     const applying = context.editor.apply(policy);
     decoded.encodes[0].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    context.requests[0].result.resolve({
+      success: false,
+      error: { message: 'Conflict', versionConflict: true },
+    });
     await expect.poll(() => context.refreshes.length).toBe(1);
     context.refreshes[0].reject(new Error('Offline'));
     await applying;
-    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'required', error: expect.stringContaining('Unable to refresh') });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      recovery: 'required',
+      error: expect.stringContaining('Unable to refresh'),
+    });
     const replacement = await selectReady(context);
     await context.editor.apply(policy);
     context.editor.requestRemoval();
@@ -225,7 +306,10 @@ describe('picture workflow recovery and lifetimes', () => {
     context.refreshes[1].resolve({ version: 9 });
     await refreshing;
     expect(context.requests).toHaveLength(1);
-    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'review', selection: { expectedVersion: 9, crop: { zoom: 1 } } });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      recovery: 'review',
+      selection: { expectedVersion: 9, crop: { zoom: 1 } },
+    });
     const retrying = context.editor.apply(policy);
     replacement.encodes[0].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(2);
@@ -234,53 +318,81 @@ describe('picture workflow recovery and lifetimes', () => {
     await retrying;
   });
 
-  it.each(['replace', 'close', 'deactivate'])('fences a late encoded result after %s', async (transition) => {
-    const context = setup();
-    const decoded = await selectReady(context);
-    const applying = context.editor.apply(policy);
-    if (transition === 'replace') await selectReady(context);
-    if (transition === 'close') { context.editor.close(); context.editor.open(); }
-    if (transition === 'deactivate') { context.deactivate(); context.editor.activate(); context.editor.open(); }
-    const current = context.editor.getSnapshot();
-    decoded.encodes[0].result.resolve(canonical);
-    await applying;
-    expect(context.editor.getSnapshot()).toBe(current);
-    expect(context.requests).toEqual([]);
-    expect(decoded.isDisposed()).toBe(true);
-    expect(context.notices).toEqual([]);
-  });
+  it.each(['replace', 'close', 'deactivate'])(
+    'fences a late encoded result after %s',
+    async (transition) => {
+      const context = setup();
+      const decoded = await selectReady(context);
+      const applying = context.editor.apply(policy);
+      if (transition === 'replace') await selectReady(context);
+      if (transition === 'close') {
+        context.editor.close();
+        context.editor.open();
+      }
+      if (transition === 'deactivate') {
+        context.deactivate();
+        context.editor.activate();
+        context.editor.open();
+      }
+      const current = context.editor.getSnapshot();
+      decoded.encodes[0].result.resolve(canonical);
+      await applying;
+      expect(context.editor.getSnapshot()).toBe(current);
+      expect(context.requests).toEqual([]);
+      expect(decoded.isDisposed()).toBe(true);
+      expect(context.notices).toEqual([]);
+    }
+  );
 
-  it.each(['success', 'failure', 'conflict'])('ignores obsolete request %s feedback after reopening', async (outcome) => {
-    const context = setup();
-    const decoded = await selectReady(context);
-    const applying = context.editor.apply(policy);
-    decoded.encodes[0].result.resolve(canonical);
-    await expect.poll(() => context.requests.length).toBe(1);
-    context.editor.close(); context.editor.open();
-    const current = context.editor.getSnapshot();
-    context.requests[0].result.resolve(outcome === 'success' ? { success: true } : { success: false, error: { message: 'Failed', versionConflict: outcome === 'conflict' } });
-    await applying;
-    expect(context.editor.getSnapshot()).toBe(current);
-    expect(context.notices).toEqual([]);
-    expect(context.refreshes).toEqual([]);
-  });
+  it.each(['success', 'failure', 'conflict'])(
+    'ignores obsolete request %s feedback after reopening',
+    async (outcome) => {
+      const context = setup();
+      const decoded = await selectReady(context);
+      const applying = context.editor.apply(policy);
+      decoded.encodes[0].result.resolve(canonical);
+      await expect.poll(() => context.requests.length).toBe(1);
+      context.editor.close();
+      context.editor.open();
+      const current = context.editor.getSnapshot();
+      context.requests[0].result.resolve(
+        outcome === 'success'
+          ? { success: true }
+          : {
+              success: false,
+              error: { message: 'Failed', versionConflict: outcome === 'conflict' },
+            }
+      );
+      await applying;
+      expect(context.editor.getSnapshot()).toBe(current);
+      expect(context.notices).toEqual([]);
+      expect(context.refreshes).toEqual([]);
+    }
+  );
 
-  it.each(['success', 'failure'])('ignores obsolete refresh %s after replacing the session', async (outcome) => {
-    const context = setup();
-    const decoded = await selectReady(context);
-    const applying = context.editor.apply(policy);
-    decoded.encodes[0].result.resolve(canonical);
-    await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
-    await expect.poll(() => context.refreshes.length).toBe(1);
-    context.editor.close(); context.editor.open();
-    const current = context.editor.getSnapshot();
-    if (outcome === 'success') context.refreshes[0].resolve({ version: 7 });
-    else context.refreshes[0].reject(new Error('Offline'));
-    await applying;
-    expect(context.editor.getSnapshot()).toBe(current);
-    expect(context.notices).toEqual([]);
-  });
+  it.each(['success', 'failure'])(
+    'ignores obsolete refresh %s after replacing the session',
+    async (outcome) => {
+      const context = setup();
+      const decoded = await selectReady(context);
+      const applying = context.editor.apply(policy);
+      decoded.encodes[0].result.resolve(canonical);
+      await expect.poll(() => context.requests.length).toBe(1);
+      context.requests[0].result.resolve({
+        success: false,
+        error: { message: 'Conflict', versionConflict: true },
+      });
+      await expect.poll(() => context.refreshes.length).toBe(1);
+      context.editor.close();
+      context.editor.open();
+      const current = context.editor.getSnapshot();
+      if (outcome === 'success') context.refreshes[0].resolve({ version: 7 });
+      else context.refreshes[0].reject(new Error('Offline'));
+      await applying;
+      expect(context.editor.getSnapshot()).toBe(current);
+      expect(context.notices).toEqual([]);
+    }
+  );
 });
 
 describe('picture editing session', () => {
@@ -291,7 +403,11 @@ describe('picture editing session', () => {
     decoded.encodes[0].result.reject(new Error('Encoding failed'));
     await applying;
     context.editor.returnToSelection();
-    expect(context.editor.getSnapshot()).toMatchObject({ open: true, selection: null, error: null });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      open: true,
+      selection: null,
+      error: null,
+    });
     expect(decoded.isDisposed()).toBe(true);
     expect(context.previews.size).toBe(0);
     expect(context.requests).toEqual([]);
@@ -300,56 +416,73 @@ describe('picture editing session', () => {
     expect(context.editor.getSnapshot().selection?.expectedVersion).toBe(1);
   });
 
-  it.each(['decoding', 'processing', 'writing', 'owner replacement', 'deactivation'])('rejects Back during %s even before UI controls update', async (restriction) => {
-    const context = setup();
-    let pending: Promise<void> | undefined;
-    let decoded: ReturnType<typeof source> | undefined;
-    if (restriction === 'decoding') {
-      pending = context.editor.select(new File(['source'], 'portrait.png', { type: 'image/png' }), policy);
-    } else {
-      decoded = await selectReady(context);
-      if (restriction === 'processing') pending = context.editor.apply(policy);
-      if (restriction === 'writing') context.setBusy(true, false);
-      if (restriction === 'owner replacement') context.replaceOwner(false);
-      if (restriction === 'deactivation') context.deactivate();
+  it.each(['decoding', 'processing', 'writing', 'owner replacement', 'deactivation'])(
+    'rejects Back during %s even before UI controls update',
+    async (restriction) => {
+      const context = setup();
+      let pending: Promise<void> | undefined;
+      let decoded: ReturnType<typeof source> | undefined;
+      if (restriction === 'decoding') {
+        pending = context.editor.select(
+          new File(['source'], 'portrait.png', { type: 'image/png' }),
+          policy
+        );
+      } else {
+        decoded = await selectReady(context);
+        if (restriction === 'processing') pending = context.editor.apply(policy);
+        if (restriction === 'writing') context.setBusy(true, false);
+        if (restriction === 'owner replacement') context.replaceOwner(false);
+        if (restriction === 'deactivation') context.deactivate();
+      }
+      const before = context.editor.getSnapshot();
+      expect(context.editor.returnToSelection()).toBe(false);
+      expect(context.editor.getSnapshot()).toBe(before);
+      expect(context.requests).toEqual([]);
+      if (pending) {
+        context.editor.cancel();
+        if (decoded) decoded.encodes[0].result.resolve(canonical);
+        else context.decodes[0].result.resolve(source().picture);
+        await pending;
+      }
+      context.deactivate();
     }
-    const before = context.editor.getSnapshot();
-    expect(context.editor.returnToSelection()).toBe(false);
-    expect(context.editor.getSnapshot()).toBe(before);
-    expect(context.requests).toEqual([]);
-    if (pending) {
-      context.editor.cancel();
-      if (decoded) decoded.encodes[0].result.resolve(canonical);
-      else context.decodes[0].result.resolve(source().picture);
-      await pending;
-    }
-    context.deactivate();
-  });
+  );
 
-  it.each(['required', 'review'])('preserves %s conflict recovery when returning to selection', async (recovery) => {
-    const context = setup();
-    const decoded = await selectReady(context);
-    const applying = context.editor.apply(policy);
-    decoded.encodes[0].result.resolve(canonical);
-    await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
-    await expect.poll(() => context.refreshes.length).toBe(1);
-    if (recovery === 'required') context.refreshes[0].reject(new Error('Offline'));
-    else context.refreshes[0].resolve({ version: 7 });
-    await applying;
-    expect(context.editor.returnToSelection()).toBe(true);
-    expect(context.editor.getSnapshot()).toMatchObject({ open: true, selection: null, error: null, recovery });
-    expect(decoded.isDisposed()).toBe(true);
-    const replacement = await selectReady(context);
-    if (recovery === 'required') {
-      expect(context.editor.getSnapshot().selection?.expectedVersion).toBeNull();
-      await context.editor.apply(policy);
-      context.editor.requestRemoval();
-      expect(replacement.encodes).toEqual([]);
-      expect(context.editor.getSnapshot().removeVersion).toBeNull();
+  it.each(['required', 'review'])(
+    'preserves %s conflict recovery when returning to selection',
+    async (recovery) => {
+      const context = setup();
+      const decoded = await selectReady(context);
+      const applying = context.editor.apply(policy);
+      decoded.encodes[0].result.resolve(canonical);
+      await expect.poll(() => context.requests.length).toBe(1);
+      context.requests[0].result.resolve({
+        success: false,
+        error: { message: 'Conflict', versionConflict: true },
+      });
+      await expect.poll(() => context.refreshes.length).toBe(1);
+      if (recovery === 'required') context.refreshes[0].reject(new Error('Offline'));
+      else context.refreshes[0].resolve({ version: 7 });
+      await applying;
+      expect(context.editor.returnToSelection()).toBe(true);
+      expect(context.editor.getSnapshot()).toMatchObject({
+        open: true,
+        selection: null,
+        error: null,
+        recovery,
+      });
+      expect(decoded.isDisposed()).toBe(true);
+      const replacement = await selectReady(context);
+      if (recovery === 'required') {
+        expect(context.editor.getSnapshot().selection?.expectedVersion).toBeNull();
+        await context.editor.apply(policy);
+        context.editor.requestRemoval();
+        expect(replacement.encodes).toEqual([]);
+        expect(context.editor.getSnapshot().removeVersion).toBeNull();
+      }
+      expect(context.requests).toHaveLength(1);
     }
-    expect(context.requests).toHaveLength(1);
-  });
+  );
 
   it('captures the removal confirmation version independently of upload policy and keeps cancellation local', async () => {
     const { editor, requests, notices } = setup();
@@ -389,12 +522,21 @@ describe('picture editing session', () => {
     const applying = context.editor.apply(policy);
     decoded.encodes[0].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(1);
-    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    context.requests[0].result.resolve({
+      success: false,
+      error: { message: 'Conflict', versionConflict: true },
+    });
     await expect.poll(() => context.refreshes.length).toBe(1);
-    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'required', selection: { crop, expectedVersion: null } });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      recovery: 'required',
+      selection: { crop, expectedVersion: null },
+    });
     context.refreshes[0].resolve({ version: 7 });
     await applying;
-    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'review', selection: { crop, expectedVersion: 7 } });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      recovery: 'review',
+      selection: { crop, expectedVersion: 7 },
+    });
     expect(context.requests).toHaveLength(1);
     const retrying = context.editor.apply(policy);
     expect(decoded.encodes[1].crop).toEqual(crop);
@@ -411,10 +553,19 @@ describe('picture editing session', () => {
     const applying = context.editor.apply(policy);
     decoded.encodes[0].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(1);
-    expect(context.requests[0].command).toMatchObject({ action: 'upload', expectedVersion: 1, picture: { type: 'image/webp', size: 9 } });
+    expect(context.requests[0].command).toMatchObject({
+      action: 'upload',
+      expectedVersion: 1,
+      picture: { type: 'image/webp', size: 9 },
+    });
     context.requests[0].result.resolve({ success: true });
     await applying;
-    expect(context.editor.getSnapshot()).toMatchObject({ open: false, selection: null, processing: false, error: null });
+    expect(context.editor.getSnapshot()).toMatchObject({
+      open: false,
+      selection: null,
+      processing: false,
+      error: null,
+    });
     expect(context.previews.size).toBe(0);
     expect(decoded.isDisposed()).toBe(true);
     expect(context.notices).toEqual(['Profile picture saved']);
@@ -433,7 +584,8 @@ describe('picture editing session', () => {
     decodes[1].result.resolve(source().picture);
     await second;
     expect(editor.getSnapshot().selection).toMatchObject({
-      file: { name: 'second.png' }, expectedVersion: 2,
+      file: { name: 'second.png' },
+      expectedVersion: 2,
       crop: { x: 200, y: 0, size: 400, zoom: 1 },
     });
     expect(previews.size).toBe(1);
@@ -441,3 +593,8 @@ describe('picture editing session', () => {
     expect(previews.size).toBe(0);
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

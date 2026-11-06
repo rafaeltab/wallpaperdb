@@ -48,11 +48,11 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const config = loadConfig();
   if (!config.attachmentWorkflow) throw new Error('User Asset workflow configuration is required');
   process.stdout.write(
-    JSON.stringify(
+    `${JSON.stringify(
       await runAttachmentOperator(process.argv.slice(2), {
         databaseUrl: config.databaseUrl,
         ...config.attachmentWorkflow,
       })
-    ) + '\n'
+    )}\n`
   );
 }

@@ -131,7 +131,7 @@ it('keeps malformed business payload identity stable across CloudEvent occurrenc
 it('safely rejects excessive JSON nesting within the accepted raw-body bound', () => {
   const head = JSON.stringify({ ...envelope, data: { ...envelope.data, nested: null } });
   const bytes = Buffer.from(
-    head.replace('"nested":null', '"nested":' + '['.repeat(3000) + '0' + ']'.repeat(3000))
+    head.replace('"nested":null', `"nested":${'['.repeat(3000)}0${']'.repeat(3000)}`)
   );
   expect(bytes.byteLength).toBeLessThan(16384);
   expect(() => decodeAssetCommand([route], route.subject, bytes)).not.toThrow();

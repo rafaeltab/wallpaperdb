@@ -87,7 +87,7 @@ export function assetFixture() {
       if (!entry) continue;
       pending.delete(parsed.data.id);
       clearTimeout(entry.timer);
-      if (parsed.data.error) entry.reject(new Error(parsed.data.error + ': ' + diagnostics));
+      if (parsed.data.error) entry.reject(new Error(`${parsed.data.error}: ${diagnostics}`));
       else entry.resolve(parsed.data.result);
     }
   });
@@ -105,7 +105,7 @@ export function assetFixture() {
         reject(new Error(`Asset fixture ${operation} timed out: ${diagnostics}`));
       }, 30000);
       pending.set(id, { resolve, reject, timer });
-      input.write(JSON.stringify({ id, operation, ...(options ? { options } : {}) }) + '\n');
+      input.write(`${JSON.stringify({ id, operation, ...(options ? { options } : {}) })}\n`);
     });
   const wait = async (ms: number) => {
     let timer: ReturnType<typeof setTimeout> | undefined;

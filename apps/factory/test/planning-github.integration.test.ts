@@ -93,8 +93,8 @@ it.each([undefined, false, true])(
     const metadata = await protocol();
     const priorPath = process.env.PATH;
     try {
-      await Effect.runPromise(f.issues.prepare!(5));
-      await Effect.runPromise(f.issues.reconcile!());
+      await Effect.runPromise(required(f.issues.prepare)(5));
+      await Effect.runPromise(required(f.issues.reconcile)());
       const path = join(f.host.directory, 'restacker.json');
       const saved = JSON.parse(await readFile(path, 'utf8'));
       expect(saved.thread.pendingRequestCount).toBe(1);
@@ -127,7 +127,7 @@ it.each([undefined, false, true])(
         admitRecovery: () => Effect.succeed(false),
       });
       const job: import('../src/capabilities/job/index.js').Job = {
-        status: () => scheduled.reconcile!().pipe(Effect.as({ kind: 'empty' as const })),
+        status: () => required(scheduled.reconcile)().pipe(Effect.as({ kind: 'empty' as const })),
         start: () => Effect.die('Planning must not admit work'),
         resume: () => Effect.die('Planning must not resume a job'),
         cancel: () => Effect.die('Planning must not cancel work'),
@@ -278,3 +278,8 @@ it('deduplicates converging parents, blockers and cycles and retains PRs without
     await host.cleanup();
   }
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

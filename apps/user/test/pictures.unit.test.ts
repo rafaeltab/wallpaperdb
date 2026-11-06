@@ -78,7 +78,7 @@ function setup(
     finishUpload: (id) =>
       Effect.sync(() => {
         const asset = assets.get(id);
-        if (!asset || asset.state !== 'uploading') return false;
+        if (asset?.state !== 'uploading') return false;
         asset.state = 'staged';
         return true;
       }),

@@ -1,5 +1,5 @@
 import { access, rm, writeFile } from 'node:fs/promises';
-import { type Server } from 'node:http';
+import type { Server } from 'node:http';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';

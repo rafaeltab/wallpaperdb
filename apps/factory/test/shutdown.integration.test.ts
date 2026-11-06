@@ -7,7 +7,7 @@ it('bounds HTTP draining and cancels the underlying observer process while prese
   const host = await protocol();
   const oldPath = process.env.PATH;
   const oldFixture = process.env.FACTORY_FIXTURE;
-  process.env.PATH = host.directory + ':' + oldPath;
+  process.env.PATH = `${host.directory}:${oldPath}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const running = await startFactory({
@@ -15,7 +15,7 @@ it('bounds HTTP draining and cancels the underlying observer process while prese
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: host.directory + '/state',
+      FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
     });
     try {
@@ -24,7 +24,7 @@ it('bounds HTTP draining and cancels the underlying observer process while prese
       const origin = `http://127.0.0.1:${address.port}`;
       expect(
         (
-          await fetch(origin + '/api/job', {
+          await fetch(`${origin}/api/job`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ issue: 576 }),
@@ -32,7 +32,7 @@ it('bounds HTTP draining and cancels the underlying observer process while prese
         ).status
       ).toBe(202);
       await host.save({ delayObserve: true });
-      const request = fetch(origin + '/api/job')
+      const request = fetch(`${origin}/api/job`)
         .then((response) => response.text())
         .catch(() => null);
       let pid = 0;

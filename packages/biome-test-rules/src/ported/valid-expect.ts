@@ -298,15 +298,16 @@ export default createEslintRule({
 						loc,
 					});
 				}
-				const matcher = vitestFnCall.matcher!;
-				const matcherCallExpression = matcher.parent!.parent!;
-				if (matcherCallExpression.type !== AST_NODE_TYPES.CallExpression)
+				const matcher = vitestFnCall.matcher;
+				if (!matcher) throw new Error("Expected a parsed assertion matcher");
+				const matcherCallExpression = matcher.parent?.parent;
+				if (matcherCallExpression?.type !== AST_NODE_TYPES.CallExpression)
 					return;
 				const parentNode = findTopMostMatcherCallExpression(
 					matcherCallExpression,
 				);
 				const shouldBeAwaited =
-					vitestFnCall.modifiers!.some((modifier) => {
+					vitestFnCall.modifiers?.some((modifier) => {
 						const value = getAccessorValue(modifier);
 						return (
 							value === ModifierName.resolves || value === ModifierName.rejects
@@ -350,7 +351,7 @@ export default createEslintRule({
 							);
 							if (!functionExpression.async && !foundAsyncFixer) {
 								const targetFunction =
-									getNormalizeFunctionExpression(functionExpression)!;
+									getNormalizeFunctionExpression(functionExpression);
 								fixes.push(fixer.insertTextBefore(targetFunction, "async "));
 							}
 							const returnStatement =
@@ -358,8 +359,10 @@ export default createEslintRule({
 									? node.parent
 									: null;
 							if (alwaysAwait && returnStatement) {
+								if (!context.sourceCode)
+									throw new Error("Expected source code for an assertion fix");
 								const sourceCodeText =
-									context.sourceCode!.getText(returnStatement);
+									context.sourceCode.getText(returnStatement);
 								const replacedText = sourceCodeText.replace("return", "await");
 								fixes.push(fixer.replaceText(returnStatement, replacedText));
 							} else {

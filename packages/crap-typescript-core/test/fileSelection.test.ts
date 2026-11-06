@@ -7,11 +7,17 @@ import {
   changedTypeScriptFilesUnderSourceRoots,
   expandExplicitPaths,
   findAllTypeScriptFilesUnderSourceRoots,
-  isAnalyzableFile
+  isAnalyzableFile,
 } from "../src/fileSelection";
 import type * as UtilsModule from "../src/utils";
 import { parseFileMethods } from "../src/parser";
-import { createTempDir, disposeTempDir, initGitRepository, runProcess, writeProjectFiles } from "./testUtils";
+import {
+  createTempDir,
+  disposeTempDir,
+  initGitRepository,
+  runProcess,
+  writeProjectFiles,
+} from "./testUtils";
 
 const tempDirs: string[] = [];
 
@@ -29,15 +35,17 @@ describe("file selection", () => {
     await writeProjectFiles(tempDir, {
       "src/rules.js": "export function choose(value) { return value ? 1 : 0; }",
       "src/rules.test.js": "export const ignored = () => 1;",
-      "src/node_modules/ignored.js": "export const ignored = () => 1;"
+      "src/node_modules/ignored.js": "export const ignored = () => 1;",
     });
 
     const files = await expandExplicitPaths(tempDir, ["src"]);
-    expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual(["src/rules.js"]);
-    const methods = await parseFileMethods(files[0]!);
-    expect(methods.map((method) => ({ name: method.displayName, complexity: method.complexity }))).toEqual([
-      { name: "choose", complexity: 2 }
+    expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
+      "src/rules.js",
     ]);
+    const methods = await parseFileMethods(files[0]);
+    expect(
+      methods.map((method) => ({ name: method.displayName, complexity: method.complexity })),
+    ).toEqual([{ name: "choose", complexity: 2 }]);
   });
 
   it("finds TypeScript files under nested src roots and ignores tests", async () => {
@@ -49,13 +57,13 @@ describe("file selection", () => {
       "src/app.spec.ts": "export const appSpec = 1;",
       "packages/demo/src/component.tsx": "export const Component = () => null;",
       "packages/demo/src/types.d.ts": "export interface Types {}",
-      "packages/demo/__tests__/demo.test.ts": "export const demo = 1;"
+      "packages/demo/__tests__/demo.test.ts": "export const demo = 1;",
     });
 
     const files = await findAllTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "packages/demo/src/component.tsx",
-      "src/app.ts"
+      "src/app.ts",
     ]);
   });
 
@@ -65,13 +73,13 @@ describe("file selection", () => {
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
       "packages/demo/src/component.ts": "export const component = 1;",
-      "src/app.ts": "export const app = 1;"
+      "src/app.ts": "export const app = 1;",
     });
 
     const files = await expandExplicitPaths(tempDir, ["src/app.ts", "packages/demo"]);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "packages/demo/src/component.ts",
-      "src/app.ts"
+      "src/app.ts",
     ]);
   });
 
@@ -81,12 +89,12 @@ describe("file selection", () => {
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
       "src/app.ts": "export const app = 1;",
-      "src/types.d.ts": "export interface Types {}"
+      "src/types.d.ts": "export interface Types {}",
     });
 
     const files = await expandExplicitPaths(tempDir, ["src"]);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
-      "src/app.ts"
+      "src/app.ts",
     ]);
   });
 
@@ -102,13 +110,13 @@ describe("file selection", () => {
       "src/.vite/ignored.ts": "export const ignored = 1;",
       "src/coverage/ignored.ts": "export const ignored = 1;",
       "src/dist/ignored.ts": "export const ignored = 1;",
-      "src/node_modules/ignored.ts": "export const ignored = 1;"
+      "src/node_modules/ignored.ts": "export const ignored = 1;",
     });
 
     const files = await findAllTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "src/app.ts",
-      "src/nested/util.ts"
+      "src/nested/util.ts",
     ]);
   });
 
@@ -127,14 +135,14 @@ describe("file selection", () => {
       "packages/demo/.nuxt/src/generated.ts": "export const generated = 1;",
       "packages/demo/.svelte-kit/src/generated.ts": "export const generated = 1;",
       "packages/demo/.turbo/src/generated.ts": "export const generated = 1;",
-      "packages/demo/.vite/src/generated.ts": "export const generated = 1;"
+      "packages/demo/.vite/src/generated.ts": "export const generated = 1;",
     });
 
     const files = await findAllTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "src/app.ts",
       "src/build/handwritten.ts",
-      "src/build/src/nested.ts"
+      "src/build/src/nested.ts",
     ]);
   });
 
@@ -143,12 +151,12 @@ describe("file selection", () => {
     tempDirs.push(tempDir);
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
-      "packages/demo/Src/component.ts": "export const component = 1;"
+      "packages/demo/Src/component.ts": "export const component = 1;",
     });
 
     const files = await findAllTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
-      "packages/demo/Src/component.ts"
+      "packages/demo/Src/component.ts",
     ]);
   });
 
@@ -162,10 +170,7 @@ describe("file selection", () => {
         return [dirEntry("src", "directory")];
       }
       if (currentDir === srcRoot) {
-        return [
-          dirEntry("Node_Modules", "directory"),
-          dirEntry("app.ts", "file")
-        ];
+        return [dirEntry("Node_Modules", "directory"), dirEntry("app.ts", "file")];
       }
       if (currentDir === mixedCaseIgnored) {
         throw new Error("walkSourceTree descended into a mixed-case ignored directory");
@@ -174,7 +179,9 @@ describe("file selection", () => {
     });
     vi.doMock("node:fs/promises", () => ({ readdir }));
 
-    const { findAllTypeScriptFilesUnderSourceRoots: findFiles } = await import("../src/fileSelection");
+    const { findAllTypeScriptFilesUnderSourceRoots: findFiles } = await import(
+      "../src/fileSelection"
+    );
     const files = await findFiles(repoRoot);
 
     expect(files).toEqual([path.join(srcRoot, "app.ts")]);
@@ -188,19 +195,23 @@ describe("file selection", () => {
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
       "src/app.ts": "export const app = 1;\n",
-      "test/app.test.ts": "export const testValue = 1;\n"
+      "test/app.test.ts": "export const testValue = 1;\n",
     });
     await runProcess("git", ["add", "."], tempDir);
     await runProcess("git", ["commit", "-m", "initial"], tempDir);
 
     await writeFile(path.join(tempDir, "src/app.ts"), "export const app = 2;\n", "utf8");
     await writeFile(path.join(tempDir, "src/new-file.ts"), "export const next = 3;\n", "utf8");
-    await writeFile(path.join(tempDir, "test/app.test.ts"), "export const testValue = 2;\n", "utf8");
+    await writeFile(
+      path.join(tempDir, "test/app.test.ts"),
+      "export const testValue = 2;\n",
+      "utf8",
+    );
 
     const files = await changedTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "src/app.ts",
-      "src/new-file.ts"
+      "src/new-file.ts",
     ]);
   });
 
@@ -210,7 +221,7 @@ describe("file selection", () => {
     await initGitRepository(tempDir);
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
-      "src/hello world.ts": "export const app = 1;\n"
+      "src/hello world.ts": "export const app = 1;\n",
     });
     await runProcess("git", ["add", "."], tempDir);
     await runProcess("git", ["commit", "-m", "initial"], tempDir);
@@ -219,7 +230,7 @@ describe("file selection", () => {
 
     const files = await changedTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
-      "src/hello world.ts"
+      "src/hello world.ts",
     ]);
   });
 
@@ -229,7 +240,7 @@ describe("file selection", () => {
     await initGitRepository(tempDir);
     await writeProjectFiles(tempDir, {
       "package.json": '{"name":"fixture","private":true}',
-      "src/old-name.ts": "export const app = 1;\n"
+      "src/old-name.ts": "export const app = 1;\n",
     });
     await runProcess("git", ["add", "."], tempDir);
     await runProcess("git", ["commit", "-m", "initial"], tempDir);
@@ -238,7 +249,7 @@ describe("file selection", () => {
 
     const files = await changedTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
-      "src/new-name.ts"
+      "src/new-name.ts",
     ]);
   });
 
@@ -269,7 +280,9 @@ describe("file selection", () => {
     const filesystemRoot = path.parse(process.cwd()).root;
     expect(isAnalyzableFile(path.join(filesystemRoot, "dist", "app.ts"))).toBe(false);
     expect(isAnalyzableFile(path.join(filesystemRoot, "coverage", "app.ts"))).toBe(false);
-    expect(isAnalyzableFile(path.join(filesystemRoot, "node_modules", "pkg", "index.ts"))).toBe(false);
+    expect(isAnalyzableFile(path.join(filesystemRoot, "node_modules", "pkg", "index.ts"))).toBe(
+      false,
+    );
   });
 
   it("does not expand explicit build-output directories that would only contain generated source roots", async () => {
@@ -279,12 +292,14 @@ describe("file selection", () => {
       "package.json": '{"name":"fixture","private":true}',
       "src/build/handwritten.ts": "export const handwritten = 1;",
       "packages/demo/build/src/generated.ts": "export const generated = 1;",
-      "packages/demo/out/src/generated.ts": "export const generated = 1;"
+      "packages/demo/out/src/generated.ts": "export const generated = 1;",
     });
 
-    await expect(expandExplicitPaths(tempDir, ["packages/demo/build", "packages/demo/out"])).resolves.toEqual([]);
+    await expect(
+      expandExplicitPaths(tempDir, ["packages/demo/build", "packages/demo/out"]),
+    ).resolves.toEqual([]);
     await expect(expandExplicitPaths(tempDir, ["src/build"])).resolves.toEqual([
-      path.join(tempDir, "src", "build", "handwritten.ts")
+      path.join(tempDir, "src", "build", "handwritten.ts"),
     ]);
   });
 
@@ -296,19 +311,31 @@ describe("file selection", () => {
       "package.json": '{"name":"fixture","private":true}',
       "src/build/handwritten.ts": "export const handwritten = 1;\n",
       "src/build/src/nested.ts": "export const nested = 1;\n",
-      "packages/demo/build/src/generated.ts": "export const generated = 1;\n"
+      "packages/demo/build/src/generated.ts": "export const generated = 1;\n",
     });
     await runProcess("git", ["add", "."], tempDir);
     await runProcess("git", ["commit", "-m", "initial"], tempDir);
 
-    await writeFile(path.join(tempDir, "src", "build", "handwritten.ts"), "export const handwritten = 2;\n", "utf8");
-    await writeFile(path.join(tempDir, "src", "build", "src", "nested.ts"), "export const nested = 2;\n", "utf8");
-    await writeFile(path.join(tempDir, "packages", "demo", "build", "src", "generated.ts"), "export const generated = 2;\n", "utf8");
+    await writeFile(
+      path.join(tempDir, "src", "build", "handwritten.ts"),
+      "export const handwritten = 2;\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(tempDir, "src", "build", "src", "nested.ts"),
+      "export const nested = 2;\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(tempDir, "packages", "demo", "build", "src", "generated.ts"),
+      "export const generated = 2;\n",
+      "utf8",
+    );
 
     const files = await changedTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
       "src/build/handwritten.ts",
-      "src/build/src/nested.ts"
+      "src/build/src/nested.ts",
     ]);
   });
 
@@ -320,7 +347,7 @@ describe("file selection", () => {
       "package.json": '{"name":"fixture","private":true}',
       "src/app.ts": "export const app = 1;\n",
       "src/remove.ts": "export const removeMe = 1;\n",
-      "docs/readme.ts": "export const docs = 1;\n"
+      "docs/readme.ts": "export const docs = 1;\n",
     });
     await runProcess("git", ["add", "."], tempDir);
     await runProcess("git", ["commit", "-m", "initial"], tempDir);
@@ -331,12 +358,14 @@ describe("file selection", () => {
 
     const files = await changedTypeScriptFilesUnderSourceRoots(tempDir);
     expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual([
-      "src/app.ts"
+      "src/app.ts",
     ]);
 
     const nonRepoDir = await createTempDir("crap-files-nonrepo-");
     tempDirs.push(nonRepoDir);
-    await expect(changedTypeScriptFilesUnderSourceRoots(nonRepoDir)).rejects.toThrow("not a git repository");
+    await expect(changedTypeScriptFilesUnderSourceRoots(nonRepoDir)).rejects.toThrow(
+      "not a git repository",
+    );
   });
 
   it("requires complete git status output for changed-file parsing", async () => {
@@ -348,19 +377,24 @@ describe("file selection", () => {
       const actual = await vi.importActual<typeof UtilsModule>("../src/utils");
       return {
         ...actual,
-        runCommand
+        runCommand,
       };
     });
-    const { changedTypeScriptFilesUnderSourceRoots: changedFiles } = await import("../src/fileSelection");
+    const { changedTypeScriptFilesUnderSourceRoots: changedFiles } = await import(
+      "../src/fileSelection"
+    );
 
     await expect(changedFiles("repo")).rejects.toThrow("Command output exceeded 1 bytes");
     expect(runCommand).toHaveBeenCalledWith("git", ["status", "--porcelain", "-z"], "repo", {
-      rejectOnTruncatedOutput: true
+      rejectOnTruncatedOutput: true,
     });
   });
 });
 
-function dirEntry(name: string, type: "directory" | "file"): {
+function dirEntry(
+  name: string,
+  type: "directory" | "file",
+): {
   name: string;
   isDirectory(): boolean;
   isFile(): boolean;
@@ -368,6 +402,6 @@ function dirEntry(name: string, type: "directory" | "file"): {
   return {
     name,
     isDirectory: () => type === "directory",
-    isFile: () => type === "file"
+    isFile: () => type === "file",
   };
 }

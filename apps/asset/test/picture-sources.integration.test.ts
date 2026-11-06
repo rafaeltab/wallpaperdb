@@ -220,7 +220,7 @@ it('replaces a canonical picture through Owner HTTP with atomic retirement, roll
     const acceptanceCompletedAt = Date.now();
     expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
     const winningIndex = results.findIndex((r) => r.statusCode === 200);
-    const winning = results[winningIndex]!.json<{ sourceId: string }>();
+    const winning = results[winningIndex].json<{ sourceId: string }>();
     const winner = winningIndex === 0 ? editA : editB;
     const loser = winningIndex === 0 ? editB : editA;
     const winningBytes = winningIndex === 0 ? newBytes : await image('green');

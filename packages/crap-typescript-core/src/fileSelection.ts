@@ -18,10 +18,12 @@ const EXCLUDED_PATH_SEGMENTS = [
   "/.vite/",
   "/dist/",
   "/coverage/",
-  "/node_modules/"
+  "/node_modules/",
 ];
 
-export async function findAllTypeScriptFilesUnderSourceRoots(projectRoot: string): Promise<string[]> {
+export async function findAllTypeScriptFilesUnderSourceRoots(
+  projectRoot: string,
+): Promise<string[]> {
   const files = new Set<string>();
   await walkForSourceRoots(projectRoot, async (sourceRoot) => {
     await walkSourceTree(sourceRoot, async (filePath) => {
@@ -31,7 +33,10 @@ export async function findAllTypeScriptFilesUnderSourceRoots(projectRoot: string
   return Array.from(files).sort();
 }
 
-export async function expandExplicitPaths(projectRoot: string, values: string[]): Promise<string[]> {
+export async function expandExplicitPaths(
+  projectRoot: string,
+  values: string[],
+): Promise<string[]> {
   const files = new Set<string>();
   for (const value of values) {
     const resolvedPath = path.resolve(projectRoot, value);
@@ -47,9 +52,11 @@ export async function expandExplicitPaths(projectRoot: string, values: string[])
   return Array.from(files).sort();
 }
 
-export async function changedTypeScriptFilesUnderSourceRoots(projectRoot: string): Promise<string[]> {
+export async function changedTypeScriptFilesUnderSourceRoots(
+  projectRoot: string,
+): Promise<string[]> {
   const result = await runCommand("git", ["status", "--porcelain", "-z"], projectRoot, {
-    rejectOnTruncatedOutput: true
+    rejectOnTruncatedOutput: true,
   });
   if (result.exitCode !== 0) {
     throw new Error(result.stderr.trim() || "git status --porcelain failed");
@@ -89,7 +96,7 @@ function parseGitStatusEntry(entry: string): GitStatusEntry | null {
   }
   return {
     status: entry.slice(0, 2),
-    pathValue: entry.slice(3)
+    pathValue: entry.slice(3),
   };
 }
 
@@ -106,7 +113,7 @@ function collectChangedFile(projectRoot: string, entry: GitStatusEntry, files: S
 function collectChangedFilesFromStatus(projectRoot: string, entries: string[]): Set<string> {
   const files = new Set<string>();
   for (let index = 0; index < entries.length; index += 1) {
-    const entry = parseGitStatusEntry(entries[index]!);
+    const entry = parseGitStatusEntry(entries[index]);
     if (!entry) {
       continue;
     }
@@ -146,7 +153,7 @@ function isGeneratedSourceRootPath(normalizedPath: string): boolean {
   const segments = normalizedPath.split("/").filter(Boolean);
   for (let index = 0; index < segments.length - 1; index += 1) {
     if (
-      BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS.has(segments[index]!) &&
+      BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS.has(segments[index]) &&
       segments[index + 1] === "src" &&
       !segments.slice(0, index).includes("src")
     ) {
@@ -174,7 +181,7 @@ function hasSourceAncestor(directoryPath: string): boolean {
 
 async function walkForSourceRoots(
   currentDir: string,
-  onSourceRoot: (sourceRoot: string) => Promise<void>
+  onSourceRoot: (sourceRoot: string) => Promise<void>,
 ): Promise<void> {
   const entries = await readdir(currentDir, { withFileTypes: true });
   for (const entry of entries) {
@@ -193,7 +200,10 @@ async function walkForSourceRoots(
   }
 }
 
-async function walkSourceTree(currentDir: string, onFile: (filePath: string) => Promise<void>): Promise<void> {
+async function walkSourceTree(
+  currentDir: string,
+  onFile: (filePath: string) => Promise<void>,
+): Promise<void> {
   const entries = await readdir(currentDir, { withFileTypes: true });
   for (const entry of entries) {
     await walkSourceTreeEntry(currentDir, entry, onFile);
@@ -203,7 +213,7 @@ async function walkSourceTree(currentDir: string, onFile: (filePath: string) => 
 async function walkSourceTreeEntry(
   currentDir: string,
   entry: Dirent,
-  onFile: (filePath: string) => Promise<void>
+  onFile: (filePath: string) => Promise<void>,
 ): Promise<void> {
   const absolutePath = path.join(currentDir, entry.name);
   if (entry.isDirectory()) {
@@ -216,7 +226,10 @@ async function walkSourceTreeEntry(
   await onFile(absolutePath);
 }
 
-async function walkDirectory(directoryPath: string, onFile: (filePath: string) => Promise<void>): Promise<void> {
+async function walkDirectory(
+  directoryPath: string,
+  onFile: (filePath: string) => Promise<void>,
+): Promise<void> {
   if (IGNORED_DIRECTORIES.has(path.basename(directoryPath).toLowerCase())) {
     return;
   }

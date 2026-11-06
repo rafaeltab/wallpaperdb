@@ -841,8 +841,8 @@ it('retires the complete prior set atomically and rejects stale restoration whil
             state.sources = ids.map(source);
             state.sourceSetRevision = '1';
             state.deliveryRevision = '7';
-            state.defaultSourceId = ids[0]!;
-            state.initialAnalysisSourceId = ids[0]!;
+            state.defaultSourceId = ids[0];
+            state.initialAnalysisSourceId = ids[0];
             return { state, result: structuredClone(state) };
           })
         )

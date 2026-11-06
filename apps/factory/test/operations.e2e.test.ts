@@ -9,7 +9,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
   const host = await protocol();
   const path = process.env.PATH;
   const fixture = process.env.FACTORY_FIXTURE;
-  process.env.PATH = host.directory + ':' + path;
+  process.env.PATH = `${host.directory}:${path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   await writeFile(join(host.directory, 'metadata-auth'), 'controlled-only', { mode: 0o600 });
   const browser = await chromium.launch({ headless: true });
@@ -22,7 +22,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
       FACTORY_T3_MCP_AUTHORIZATION_FILE: join(host.directory, 'metadata-auth'),
       FACTORY_T3_CONNECT_ORIGIN: 'https://app.t3.codes',
-      FACTORY_STATE: host.directory + '/state',
+      FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
     });
     try {

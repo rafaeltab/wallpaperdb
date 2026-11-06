@@ -16,7 +16,7 @@ function createMockGrid(): MuuriInstance & { _emit: EmitFunction } {
       if (!listeners.has(event)) {
         listeners.set(event, new Set());
       }
-      listeners.get(event)!.add(listener);
+      required(listeners.get(event)).add(listener);
       return grid;
     }),
     off: vi.fn((event: keyof MuuriEvents, listener: (...args: unknown[]) => void) => {
@@ -277,3 +277,8 @@ describe('event-bridge', () => {
     });
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

@@ -1551,7 +1551,7 @@ test("a FIFO lock target is rejected without blocking or starting Docker", (t) =
 });
 
 for (const failure of ["none", "build", "browser"]) {
-	test(`browser credentials reach only its suite child during ${failure === "none" ? "a complete run" : failure + " failure"}`, async (t) => {
+	test(`browser credentials reach only its suite child during ${failure === "none" ? "a complete run" : `${failure} failure`}`, async (t) => {
 		const f = await browserFixture(t);
 		f.env.TEST_OBSERVE_CHILD_ENV = "1";
 		f.env.CLERK_SECRET_KEY = "sk_test_parent_override";

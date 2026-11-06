@@ -343,7 +343,7 @@ export function syntaxTree(root: NativeNode): SyntaxNode {
 				node.expressions = [];
 				for (const element of native.elements) {
 					if (element.kind === "JS_TEMPLATE_CHUNK_ELEMENT")
-						node.quasis.at(-1)!.value.raw += element.text;
+						node.quasis[node.quasis.length - 1].value.raw += element.text;
 					else {
 						node.expressions.push(child(element.expression ?? element));
 						node.quasis.push({ value: { raw: "" } });
@@ -368,7 +368,8 @@ export function syntaxTree(root: NativeNode): SyntaxNode {
 		}
 		return node;
 	}
-	const tree = build(root, 0, source)!;
+	const tree = build(root, 0, source);
+	if (!tree) throw new Error("Expected a syntax tree root");
 	tree.parent = undefined;
 	return tree;
 }

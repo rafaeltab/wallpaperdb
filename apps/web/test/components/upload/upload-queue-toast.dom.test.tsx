@@ -7,11 +7,7 @@ function createMockFile(name = 'test.jpg'): File {
   return new File(['test'], name, { type: 'image/jpeg' });
 }
 
-function createQueuedFile(
-  id: string,
-  status: QueuedFile['status'],
-  name = 'test.jpg'
-): QueuedFile {
+function createQueuedFile(id: string, status: QueuedFile['status'], name = 'test.jpg'): QueuedFile {
   return {
     id,
     file: createMockFile(name),
@@ -227,7 +223,7 @@ describe('UploadQueueToast', () => {
     const retryText = screen.getByText(/Retry failed/i);
     const retryButton = retryText.closest('button');
     expect(retryButton).not.toBeNull();
-    fireEvent.click(retryButton!);
+    fireEvent.click(required(retryButton));
 
     expect(onRetryFailed).toHaveBeenCalledTimes(1);
   });
@@ -253,7 +249,7 @@ describe('UploadQueueToast', () => {
     const dismissText = screen.getByText(/Dismiss/i);
     const dismissButton = dismissText.closest('button');
     expect(dismissButton).not.toBeNull();
-    fireEvent.click(dismissButton!);
+    fireEvent.click(required(dismissButton));
 
     expect(onClearCompleted).toHaveBeenCalledTimes(1);
   });
@@ -446,7 +442,9 @@ describe('UploadQueueToast', () => {
       />
     );
 
-    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    const indicator = screen
+      .getByRole('progressbar')
+      .querySelector('[data-slot="progress-indicator"]');
     expect(indicator).toHaveAttribute('data-variant', 'stopped');
   });
 
@@ -472,7 +470,9 @@ describe('UploadQueueToast', () => {
       />
     );
 
-    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    const indicator = screen
+      .getByRole('progressbar')
+      .querySelector('[data-slot="progress-indicator"]');
     expect(indicator).not.toHaveAttribute('data-variant', 'stopped');
   });
 
@@ -496,7 +496,9 @@ describe('UploadQueueToast', () => {
       />
     );
 
-    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    const indicator = screen
+      .getByRole('progressbar')
+      .querySelector('[data-slot="progress-indicator"]');
     expect(indicator).not.toHaveAttribute('data-variant', 'stopped');
   });
 
@@ -522,3 +524,8 @@ describe('UploadQueueToast', () => {
     expect(screen.getByText('Stopped')).toBeInTheDocument();
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

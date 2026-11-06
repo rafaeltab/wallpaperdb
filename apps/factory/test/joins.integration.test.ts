@@ -1814,7 +1814,7 @@ it.each([false, true])(
           !observed.previousHead
         )
           throw new Error('Missing current comparison');
-        expect(await Effect.runPromise(current.repairReplay!(command, head))).toBe(true);
+        expect(await Effect.runPromise(required(current.repairReplay)(command, head))).toBe(true);
         const execution = t3Execution({
           project: f.host.repository,
           projectId: 'project-id',
@@ -2015,7 +2015,7 @@ it.each(['valid', 'conflicting', 'retired-target'] as const)(
       const observed = await Effect.runPromise(current.pullRequest(command(4, 'C', f.a, 'A')));
       expect(observed).toMatchObject({ ready: !conflicting, commit: c.commit });
       if (!conflicting) expect(observed).toMatchObject({ reviewedCommit: f.c });
-      const recoveries = await Effect.runPromise(current.recoveries!());
+      const recoveries = await Effect.runPromise(required(current.recoveries)());
       if (conflicting)
         expect(recoveries).toContainEqual(
           expect.objectContaining({
@@ -2095,7 +2095,7 @@ it('bounds landing facts to the affected family despite retained unrelated landi
     const config = { ...f.config, prerequisites };
     for (let i = 0; i < 2; i++) {
       const issues = githubIssues(config);
-      await Effect.runPromise(issues.reconcile!());
+      await Effect.runPromise(required(issues.reconcile)());
       expect(
         await Effect.runPromise(
           issues.pullRequest({
@@ -2424,7 +2424,7 @@ it.each([
   const { completed, legacy } = options;
   const f = await fixture({ ciFails: !completed });
   try {
-    await Effect.runPromise(f.issues.prepare!(5));
+    await Effect.runPromise(required(f.issues.prepare)(5));
     if (legacy) {
       const root = join(f.host.directory, 'joins');
       const key = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
@@ -2495,7 +2495,7 @@ it.each([
       ready: false,
       reviewedCommit: f.c,
     });
-    await Effect.runPromise(f.reopen().reconcile!());
+    await Effect.runPromise(required(f.reopen().reconcile)());
     expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
       commit: repaired,
       ready: true,
@@ -2511,21 +2511,23 @@ it.each([
         const failed = JSON.parse(await readFile(path, 'utf8'));
         failed.newCI = 'FAILURE';
         await writeFile(path, JSON.stringify(failed));
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired))).toBe(true);
-        failed.newCI = 'SUCCESS';
-        await writeFile(path, JSON.stringify(failed));
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired, repaired))).toBe(
+        expect(await Effect.runPromise(required(f.reopen().repairReplay)(intent, repaired))).toBe(
           true
         );
-        await Effect.runPromise(f.reopen().reconcile!());
+        failed.newCI = 'SUCCESS';
+        await writeFile(path, JSON.stringify(failed));
+        expect(
+          await Effect.runPromise(required(f.reopen().repairReplay)(intent, repaired, repaired))
+        ).toBe(true);
+        await Effect.runPromise(required(f.reopen().reconcile)());
         expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
           commit: repaired,
           ready: true,
           reviewedCommit: f.c,
         });
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, repaired, repaired))).toBe(
-          true
-        );
+        expect(
+          await Effect.runPromise(required(f.reopen().repairReplay)(intent, repaired, repaired))
+        ).toBe(true);
       }
     }
 
@@ -2562,7 +2564,7 @@ it('preserves operator edits in the interrupted automatic conflict worktree duri
 it('restacks descendants of an accepted middle replay repair without losing the repair or replaying landed A', async () => {
   const f = await landedFixture();
   try {
-    await Effect.runPromise(f.issues.reconcile!());
+    await Effect.runPromise(required(f.issues.reconcile)());
     const intent = {
       id: 'B-job',
       issue: 2,
@@ -2575,7 +2577,7 @@ it('restacks descendants of an accepted middle replay repair without losing the 
     };
     const pr = await Effect.runPromise(f.issues.pullRequest(intent));
     if (pr.kind !== 'found') throw new Error('Missing B');
-    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+    expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, pr.commit))).toBe(true);
     f.git('switch', '--detach', pr.commit);
     await writeFile(join(f.host.repository, 'fix-B.txt'), 'fixed B');
     f.git('add', '.');
@@ -2587,8 +2589,10 @@ it('restacks descendants of an accepted middle replay repair without losing the 
       'origin',
       `${repaired}:refs/heads/B`
     );
-    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit, repaired))).toBe(true);
-    await Effect.runPromise(f.issues.reconcile!());
+    expect(
+      await Effect.runPromise(required(f.issues.repairReplay)(intent, pr.commit, repaired))
+    ).toBe(true);
+    await Effect.runPromise(required(f.issues.reconcile)());
     const child = await Effect.runPromise(
       f.issues.pullRequest({ ...intent, issue: 4, branch: 'C' })
     );
@@ -2608,7 +2612,7 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
   async (outcome) => {
     const f = await landedFixture({ conflict: true, restack: { outcome, review: true } });
     try {
-      for (let i = 0; i < 3; i++) await Effect.runPromise(f.issues.reconcile!());
+      for (let i = 0; i < 3; i++) await Effect.runPromise(required(f.issues.reconcile)());
       const intent = {
         id: 'B-job',
         issue: 2,
@@ -2621,7 +2625,9 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       };
       const pr = await Effect.runPromise(f.issues.pullRequest(intent));
       if (pr.kind !== 'found') throw new Error('Missing B');
-      expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+      expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, pr.commit))).toBe(
+        true
+      );
       f.git('switch', '--detach', pr.commit);
       await writeFile(join(f.host.repository, 'shared.txt'), 'B repaired behavior');
       f.git('add', '.');
@@ -2635,8 +2641,10 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       );
       const results = [];
       for (let i = 0; i < 8; i++) {
-        results.push(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit, repaired)));
-        const recovering = await Effect.runPromise(f.issues.recoveries!());
+        results.push(
+          await Effect.runPromise(required(f.issues.repairReplay)(intent, pr.commit, repaired))
+        );
+        const recovering = await Effect.runPromise(required(f.issues.recoveries)());
         if (i === 0)
           expect(recovering).toContainEqual(expect.objectContaining({ issue: 3, active: true }));
         if (i === 0) {
@@ -2652,18 +2660,18 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
           const before = await deliveries();
           await unlink(path);
           expect(
-            await Effect.runPromise(f.reopen().repairReplay!(intent, pr.commit, repaired))
+            await Effect.runPromise(required(f.reopen().repairReplay)(intent, pr.commit, repaired))
           ).toBe(false);
           await writeFile(path, JSON.stringify({ ...JSON.parse(saved), head: f.host.base }));
           expect(
-            await Effect.runPromise(f.reopen().repairReplay!(intent, pr.commit, repaired))
+            await Effect.runPromise(required(f.reopen().repairReplay)(intent, pr.commit, repaired))
           ).toBe(false);
           expect(await deliveries()).toBe(before);
           await writeFile(path, saved);
         }
       }
       expect(results.at(-1)).toBe(true);
-      await Effect.runPromise(f.issues.reconcile!());
+      await Effect.runPromise(required(f.issues.reconcile)());
       const child = await Effect.runPromise(
         f.issues.pullRequest({ ...intent, issue: 4, branch: 'C' })
       );
@@ -2671,14 +2679,16 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       if (child.kind !== 'found') throw new Error('Missing C');
       expect(f.git('merge-base', '--is-ancestor', repaired, child.commit)).toBe('');
       expect(
-        (await Effect.runPromise(f.issues.recoveries!())).every((value) => value.active !== true)
+        (await Effect.runPromise(required(f.issues.recoveries)())).every(
+          (value) => value.active !== true
+        )
       ).toBe(true);
       const childIntent = { ...intent, issue: 4, branch: 'C' };
-      expect(await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit))).toBe(
-        true
-      );
       expect(
-        (await Effect.runPromise(f.reopen().recoveries!())).filter((value) => value.active)
+        await Effect.runPromise(required(f.reopen().repairReplay)(childIntent, child.commit))
+      ).toBe(true);
+      expect(
+        (await Effect.runPromise(required(f.reopen().recoveries)())).filter((value) => value.active)
       ).toEqual([]);
       const root = join(f.host.directory, 'joins');
       const scratch = (await readdir(root)).find((name) => name.startsWith('repair-replay-'));
@@ -2691,29 +2701,33 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
       );
       const completion = join(parent, `complete-${successor.generation}.json`);
       await rename(completion, `${completion}.pending`);
-      expect(await Effect.runPromise(f.reopen().recoveries!())).toContainEqual(
+      expect(await Effect.runPromise(required(f.reopen().recoveries)())).toContainEqual(
         expect.objectContaining({ issue: 4, active: true })
       );
       await rename(`${completion}.pending`, completion);
       await rename(ownerPath, `${ownerPath}.legacy`);
-      expect(await Effect.runPromise(f.reopen().recoveries!())).toContainEqual(
+      expect(await Effect.runPromise(required(f.reopen().recoveries)())).toContainEqual(
         expect.objectContaining({ issue: 4, active: true })
       );
       await rename(`${ownerPath}.legacy`, ownerPath);
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit, child.commit))
+        await Effect.runPromise(
+          required(f.reopen().repairReplay)(childIntent, child.commit, child.commit)
+        )
       ).toBe(true);
-      await Effect.runPromise(f.reopen().reconcile!());
-      expect(await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit))).toBe(
-        true
-      );
+      await Effect.runPromise(required(f.reopen().reconcile)());
       expect(
-        (await Effect.runPromise(f.reopen().recoveries!())).filter((value) => value.active)
+        await Effect.runPromise(required(f.reopen().repairReplay)(childIntent, child.commit))
+      ).toBe(true);
+      expect(
+        (await Effect.runPromise(required(f.reopen().recoveries)())).filter((value) => value.active)
       ).toEqual([]);
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(childIntent, child.commit, child.commit))
+        await Effect.runPromise(
+          required(f.reopen().repairReplay)(childIntent, child.commit, child.commit)
+        )
       ).toBe(true);
-      await Effect.runPromise(f.reopen().reconcile!());
+      await Effect.runPromise(required(f.reopen().reconcile)());
       const generations = (await readdir(root)).filter(
         (name) => name.startsWith('repair-replay-') && name.endsWith(`-${child.commit}`)
       );
@@ -2729,7 +2743,7 @@ it.each([false, true])(
   async (verified) => {
     const f = await landedFixture();
     try {
-      await Effect.runPromise(f.issues.reconcile!());
+      await Effect.runPromise(required(f.issues.reconcile)());
       const root = join(f.host.directory, 'joins');
       const key = (await readdir(root)).find((value) => /^[a-f0-9]{64}$/.test(value));
       if (!key) throw new Error('Missing landing journal');
@@ -2760,7 +2774,7 @@ it.each([false, true])(
         ready: verified,
         reviewedCommit: f.c,
       });
-      await Effect.runPromise(current.reconcile!());
+      await Effect.runPromise(required(current.reconcile)());
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C')).toBe(before);
       expect(await Effect.runPromise(githubIssues(f.config).pullRequest(intent))).toMatchObject({
         ready: verified,
@@ -2776,7 +2790,7 @@ it.each(['branch:C', 'group:9'])(
   async (resource) => {
     const f = await fixture({ groups: true });
     try {
-      await Effect.runPromise(f.issues.prepare!(5));
+      await Effect.runPromise(required(f.issues.prepare)(5));
       const root = join(f.host.directory, 'joins');
       const original = (await readdir(root)).find((n) => /^[a-f0-9]{64}$/.test(n));
       if (!original) throw new Error('Missing completed operation');
@@ -2803,9 +2817,9 @@ it.each(['branch:C', 'group:9'])(
       };
       const observed = await Effect.runPromise(f.issues.pullRequest(intent));
       if (observed.kind !== 'found') throw new Error('Missing replay');
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit))).toBe(
-        false
-      );
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, observed.commit))
+      ).toBe(false);
       expect(
         (await readdir(join(root, original))).filter((n) => n.startsWith('repair-request-'))
       ).toEqual([]);
@@ -2823,7 +2837,7 @@ it.each([false, true])(
   async (pending) => {
     const f = await fixture({ ciFails: pending, groups: true });
     try {
-      await Effect.runPromise(f.issues.prepare!(5));
+      await Effect.runPromise(required(f.issues.prepare)(5));
       const root = join(f.host.directory, 'joins');
       const original = (await readdir(root)).find((n) => /^[a-f0-9]{64}$/.test(n));
       if (!original) throw new Error('Missing operation');
@@ -2844,13 +2858,15 @@ it.each([false, true])(
       };
       const observed = await Effect.runPromise(f.issues.pullRequest(intent));
       if (observed.kind !== 'found') throw new Error('Missing replay');
-      expect(await Effect.runPromise(f.issues.repairReplay!(intent, observed.commit))).toBe(true);
+      expect(
+        await Effect.runPromise(required(f.issues.repairReplay)(intent, observed.commit))
+      ).toBe(true);
       const claims = join(root, 'writers', createHash('sha256').update('branch:C').digest('hex'));
       const owner = async () => {
         const names = (await readdir(claims))
           .filter((n) => /^writer-\d+.json$/.test(n))
           .sort((a, b) => Number(a.match(/\d+/)?.[0]) - Number(b.match(/\d+/)?.[0]));
-        return JSON.parse(await readFile(join(claims, names.at(-1)!), 'utf8')).key;
+        return JSON.parse(await readFile(join(claims, required(names.at(-1))), 'utf8')).key;
       };
       const active = await owner();
       expect(active).not.toBe(original);
@@ -2866,7 +2882,9 @@ it.each([false, true])(
         );
         expect(owners.at(-1)).toBe(active);
       }
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit))).toBe(true);
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, observed.commit))
+      ).toBe(true);
       expect(await owner()).toBe(active);
       expect(
         (await readdir(join(root, original))).filter((n) => n.startsWith('repair-request-'))
@@ -2876,7 +2894,7 @@ it.each([false, true])(
       await mkdir(join(root, competitor));
       await writeFile(join(root, competitor, 'request.json'), JSON.stringify({ numbers }));
       await writeFile(join(root, competitor, 'seed.json'), JSON.stringify(saved.layers));
-      await Effect.runPromise(f.reopen().reconcile!());
+      await Effect.runPromise(required(f.reopen().reconcile)());
       expect(await owner()).toBe(active);
       f.git('switch', '--detach', observed.commit);
       await writeFile(join(f.host.repository, 'repair.txt'), 'fixed');
@@ -2890,23 +2908,23 @@ it.each([false, true])(
         `${fixed}:refs/heads/C`
       );
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit, fixed))
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, observed.commit, fixed))
       ).toBe(false);
       expect(await owner()).toBe(active);
       const pass = JSON.parse(await readFile(state, 'utf8'));
       pass.newCI = 'SUCCESS';
       await writeFile(state, JSON.stringify(pass));
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(intent, observed.commit, fixed))
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, observed.commit, fixed))
       ).toBe(true);
       expect(await owner()).toBe(active);
-      await Effect.runPromise(f.reopen().reconcile!());
-      await Effect.runPromise(f.reopen().reconcile!());
+      await Effect.runPromise(required(f.reopen().reconcile)());
+      await Effect.runPromise(required(f.reopen().reconcile)());
       expect(await owner()).toBe(competitor);
       const failedAgain = JSON.parse(await readFile(state, 'utf8'));
       failedAgain.newCI = 'FAILURE';
       await writeFile(state, JSON.stringify(failedAgain));
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, fixed))).toBe(false);
+      expect(await Effect.runPromise(required(f.reopen().repairReplay)(intent, fixed))).toBe(false);
       expect(await owner()).toBe(competitor);
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(fixed);
       expect(await readFile(join(f.host.repository, 'repair.txt'), 'utf8')).toBe('fixed');
@@ -3018,7 +3036,7 @@ it.each([
   async ({ retired, pending }) => {
     const f = await fixture({ groups: true });
     try {
-      await Effect.runPromise(f.issues.prepare!(5));
+      await Effect.runPromise(required(f.issues.prepare)(5));
       const intent = {
         id: 'C-job',
         issue: 4,
@@ -3037,7 +3055,9 @@ it.each([
       if (pending) {
         live.newCI = 'FAILURE';
         await writeFile(path, JSON.stringify(live));
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+        expect(
+          await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+        ).toBe(true);
         live.newCI = 'SUCCESS';
         await writeFile(path, JSON.stringify(live));
       }
@@ -3075,9 +3095,9 @@ it.each([
         const certificatePath = join(root, original, 'complete.json');
         const certificate = await readFile(certificatePath);
         await unlink(certificatePath);
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(
-          false
-        );
+        expect(
+          await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+        ).toBe(false);
         await writeFile(certificatePath, certificate);
       }
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
@@ -3085,7 +3105,7 @@ it.each([
         commit: before.commit,
         reviewedCommit: f.c,
       });
-      expect(await Effect.runPromise(f.reopen().recoveries!())).not.toContainEqual(
+      expect(await Effect.runPromise(required(f.reopen().recoveries)())).not.toContainEqual(
         expect.objectContaining({ progress: expect.stringContaining('manual recovery') })
       );
       live.newCI = 'FAILURE';
@@ -3110,16 +3130,18 @@ it.each([
             .map((name) => Number(name.match(/\d+/)?.[0]));
           const name = join(claims, `writer-${Math.max(...ordinals) + 1}.json`);
           await writeFile(name, JSON.stringify({ key: successor }));
-          expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(
-            false
-          );
+          expect(
+            await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+          ).toBe(false);
           expect(
             (await readdir(join(root, original))).filter((value) => value.startsWith('comparison-'))
           ).toEqual([]);
           await unlink(name);
         }
       }
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+      ).toBe(true);
       if (retired) {
         const bindingPath = join(root, original, 'comparison-initial.json');
         const bindingBytes = await readFile(bindingPath, 'utf8');
@@ -3131,7 +3153,9 @@ it.each([
         });
         await writeFile(bindingPath, bindingBytes);
       }
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+      ).toBe(true);
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
         commit: before.commit,
         maintenancePending: true,
@@ -3141,9 +3165,11 @@ it.each([
         recovered.newCI = 'SUCCESS';
         await writeFile(path, JSON.stringify(recovered));
         expect(
-          await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, before.commit))
+          await Effect.runPromise(
+            required(f.reopen().repairReplay)(intent, before.commit, before.commit)
+          )
         ).toBe(true);
-        await Effect.runPromise(f.reopen().reconcile!());
+        await Effect.runPromise(required(f.reopen().reconcile)());
         expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
           ready: true,
           commit: before.commit,
@@ -3151,7 +3177,9 @@ it.each([
         });
         recovered.newCI = 'FAILURE';
         await writeFile(path, JSON.stringify(recovered));
-        expect(await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit))).toBe(true);
+        expect(
+          await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit))
+        ).toBe(true);
       }
       f.git('switch', '--detach', before.commit);
       await writeFile(join(f.host.repository, 'repair.txt'), 'repaired after target retirement');
@@ -3165,15 +3193,15 @@ it.each([
         `${repaired}:refs/heads/C`
       );
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit, repaired))
       ).toBe(false);
       const passed = JSON.parse(await readFile(path, 'utf8'));
       passed.newCI = 'SUCCESS';
       await writeFile(path, JSON.stringify(passed));
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit, repaired))
       ).toBe(true);
-      await Effect.runPromise(f.reopen().reconcile!());
+      await Effect.runPromise(required(f.reopen().reconcile)());
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
         ready: true,
         commit: repaired,
@@ -3184,7 +3212,7 @@ it.each([
         prerequisite: { base: repaired },
       });
       expect(
-        await Effect.runPromise(f.reopen().repairReplay!(intent, before.commit, repaired))
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, before.commit, repaired))
       ).toBe(true);
       expect(f.git('show', `${repaired}:repair.txt`)).toBe('repaired after target retirement');
     } finally {
@@ -3198,7 +3226,7 @@ it.each(['C', 'B'])(
   async (branch) => {
     const f = await landedFixture();
     try {
-      await Effect.runPromise(f.issues.reconcile!());
+      await Effect.runPromise(required(f.issues.reconcile)());
       const intent = {
         id: `${branch}-job`,
         issue: branch === 'C' ? 4 : 2,
@@ -3218,7 +3246,9 @@ it.each(['C', 'B'])(
       const start = await Effect.runPromise(f.issues.pullRequest(intent));
       if (start.kind !== 'found') throw new Error('Missing replay');
       await changeCI('FAILURE');
-      expect(await Effect.runPromise(f.issues.repairReplay!(intent, start.commit))).toBe(true);
+      expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, start.commit))).toBe(
+        true
+      );
       f.git('switch', '--detach', start.commit);
       await writeFile(join(f.host.repository, 'fixed.txt'), 'CI correction');
       f.git('add', '.');
@@ -3231,8 +3261,10 @@ it.each(['C', 'B'])(
         `${h1}:refs/heads/${branch}`
       );
       await changeCI('SUCCESS');
-      expect(await Effect.runPromise(f.issues.repairReplay!(intent, start.commit, h1))).toBe(true);
-      await Effect.runPromise(f.reopen().reconcile!());
+      expect(
+        await Effect.runPromise(required(f.issues.repairReplay)(intent, start.commit, h1))
+      ).toBe(true);
+      await Effect.runPromise(required(f.reopen().reconcile)());
       await writeFile(join(f.host.repository, 'review.txt'), 'authorized correction');
       f.git('add', '.');
       f.git('commit', '-m', 'review correction');
@@ -3260,8 +3292,8 @@ it.each(['C', 'B'])(
           threadId: 'review-owner',
           commit: stage === 'review' ? h1 : commit,
           comparison: {
-            base: start.parent!,
-            prBase: start.base!,
+            base: required(start.parent),
+            prBase: required(start.base),
             previousHead: stage === 'publication' ? h1 : (start.previousHead ?? start.commit),
           },
         };
@@ -3371,10 +3403,16 @@ it.each(['C', 'B'])(
             { ...publication, comparison: undefined },
             {
               ...publication,
-              comparison: { ...publication.comparison!, previousHead: start.commit },
+              comparison: { ...required(publication.comparison), previousHead: start.commit },
             },
-            { ...publication, comparison: { ...publication.comparison!, base: f.host.base } },
-            { ...publication, comparison: { ...publication.comparison!, prBase: 'other' } },
+            {
+              ...publication,
+              comparison: { ...required(publication.comparison), base: f.host.base },
+            },
+            {
+              ...publication,
+              comparison: { ...required(publication.comparison), prBase: 'other' },
+            },
           ])
             expect(await Effect.runPromise(retryPort(intent, request, evidence))).toBe(false);
           for (const invalid of [
@@ -3382,7 +3420,7 @@ it.each(['C', 'B'])(
             { ...evidence, worktreeClean: false },
             { ...evidence, commit: h1 },
             { ...evidence, ordinal: evidence.ordinal + 1 },
-            { ...evidence, runId: publication.previousRunId! },
+            { ...evidence, runId: required(publication.previousRunId) },
             { ...evidence, stageIndex: publication.index + 1 },
           ])
             expect(await Effect.runPromise(retryPort(intent, publication, invalid))).toBe(false);
@@ -3426,7 +3464,7 @@ it.each(['C', 'B'])(
       await unlink(join(owning, 'dirty-proof.txt'));
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h1, h2, {
+          required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
             evidence: { ...reviewed.evidence, ordinal: reviewed.evidence.ordinal + 1 },
           })
@@ -3434,15 +3472,15 @@ it.each(['C', 'B'])(
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h1, h2, {
+          required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
-            evidence: { ...reviewed.evidence, runId: reviewed.request.previousRunId! },
+            evidence: { ...reviewed.evidence, runId: required(reviewed.request.previousRunId) },
           })
         )
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h1, h2, {
+          required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
             evidence: { ...reviewed.evidence, accepted: false },
           })
@@ -3450,32 +3488,32 @@ it.each(['C', 'B'])(
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h1, h2, {
+          required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
             request: {
               ...reviewed.request,
-              comparison: { ...reviewed.request.comparison!, base: f.host.base },
+              comparison: { ...required(reviewed.request.comparison), base: f.host.base },
             },
           })
         )
       ).toBe(false);
       const oldConfig = JSON.parse(await readFile(f.host.configFile, 'utf8'));
       await f.host.save({ ...oldConfig, joinWriter: true, joinWriterBranch: branch });
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
-        false
-      );
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, h1, h2, reviewed))
+      ).toBe(false);
       await f.host.save(oldConfig);
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
-        true
-      );
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, h1, h2, reviewed))
+      ).toBe(true);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h1, h2, await authority('review', h2, 1))
+          required(f.reopen().repairReplay)(intent, h1, h2, await authority('review', h2, 1))
         )
       ).toBe(true);
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h1, h2, reviewed))).toBe(
-        true
-      );
+      expect(
+        await Effect.runPromise(required(f.reopen().repairReplay)(intent, h1, h2, reviewed))
+      ).toBe(true);
 
       expect(f.git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0]).toBe(
         h1
@@ -3489,7 +3527,7 @@ it.each(['C', 'B'])(
       if (branch === 'C') await retryInterruptedPublication('before-push');
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+          required(f.reopen().repairReplay)(intent, h2, h2, await authority('publication'))
         )
       ).toBe(false);
       f.git(
@@ -3509,7 +3547,7 @@ it.each(['C', 'B'])(
       const published = await authority('publication');
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, {
+          required(f.reopen().repairReplay)(intent, h2, h2, {
             ...published,
             request: {
               ...published.request,
@@ -3520,18 +3558,18 @@ it.each(['C', 'B'])(
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, {
+          required(f.reopen().repairReplay)(intent, h2, h2, {
             ...published,
             request: {
               ...published.request,
-              comparison: { ...published.request.comparison!, previousHead: start.commit },
+              comparison: { ...required(published.request.comparison), previousHead: start.commit },
             },
           })
         )
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, {
+          required(f.reopen().repairReplay)(intent, h2, h2, {
             ...published,
             evidence: { ...published.evidence, linked: [] },
           })
@@ -3539,7 +3577,7 @@ it.each(['C', 'B'])(
       ).toBe(false);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+          required(f.reopen().repairReplay)(intent, h2, h2, await authority('publication'))
         )
       ).toBe(true);
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
@@ -3547,10 +3585,10 @@ it.each(['C', 'B'])(
         ready: false,
         manualRecovery: false,
       });
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h2))).toBe(true);
+      expect(await Effect.runPromise(required(f.reopen().repairReplay)(intent, h2))).toBe(true);
       await changeCI('SUCCESS');
-      expect(await Effect.runPromise(f.reopen().repairReplay!(intent, h2, h2))).toBe(true);
-      await Effect.runPromise(f.reopen().reconcile!());
+      expect(await Effect.runPromise(required(f.reopen().repairReplay)(intent, h2, h2))).toBe(true);
+      await Effect.runPromise(required(f.reopen().reconcile)());
       expect(await Effect.runPromise(f.reopen().pullRequest(intent))).toMatchObject({
         commit: h2,
         ready: true,
@@ -3558,7 +3596,7 @@ it.each(['C', 'B'])(
       });
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(intent, h2, h2, await authority('publication'))
+          required(f.reopen().repairReplay)(intent, h2, h2, await authority('publication'))
         )
       ).toBe(true);
       const assertions: import('../src/adapters/github/index.js').VerifiedPrerequisite[] =
@@ -3605,7 +3643,7 @@ it.each(['C', 'B'])(
       execFileSync('git', ['-C', owning, 'reset', '--hard', unknown]);
       expect(
         await Effect.runPromise(
-          f.reopen().repairReplay!(
+          required(f.reopen().repairReplay)(
             intent,
             unknown,
             unknown,
@@ -3630,7 +3668,7 @@ it('finishes scheduler admission when an admitted repair waits for COMPLEX desce
     | undefined;
   let schedulerRuntime: ManagedRuntime.ManagedRuntime<Scheduler, never> | undefined;
   try {
-    for (let i = 0; i < 3; i++) await Effect.runPromise(f.issues.reconcile!());
+    for (let i = 0; i < 3; i++) await Effect.runPromise(required(f.issues.reconcile)());
     const intent = {
       id: 'B-capacity',
       issue: 2,
@@ -3643,7 +3681,7 @@ it('finishes scheduler admission when an admitted repair waits for COMPLEX desce
     };
     const pr = await Effect.runPromise(f.issues.pullRequest(intent));
     if (pr.kind !== 'found' || !pr.parent || !pr.base) throw new Error('Missing verified B');
-    expect(await Effect.runPromise(f.issues.repairReplay!(intent, pr.commit))).toBe(true);
+    expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, pr.commit))).toBe(true);
     f.git('switch', '--detach', pr.commit);
     await writeFile(join(f.host.repository, 'shared.txt'), 'B repaired behavior');
     f.git('add', '.');
@@ -3860,7 +3898,7 @@ process.exit(result.status ?? 1);
         (call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation)
       )
     ).toHaveLength(0);
-    expect(await Effect.runPromise(issues.recoveries!())).toContainEqual(
+    expect(await Effect.runPromise(required(issues.recoveries)())).toContainEqual(
       expect.objectContaining({ issue: 4, active: false })
     );
     if (unrelated.kind !== 'job') throw new Error('Missing unrelated job');
@@ -3889,3 +3927,8 @@ process.exit(result.status ?? 1);
     await f.close();
   }
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

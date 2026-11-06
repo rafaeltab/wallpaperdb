@@ -44,7 +44,7 @@ test("static template import sources retain the pinned raw module value", () => 
 		expect(
 			diagnostics(`${declaration} check(1).toBe(1);`, "valid-expect"),
 		).toStrictEqual([]);
-		for (const source of ["`application`", "`vi${name}`", "`vi\\u0074est`"])
+		for (const source of ["`application`", `\`vi\${name}\``, "`vi\\u0074est`"])
 			expect(
 				diagnostics(
 					`const { expect: check } = ${loader}(${source}); check(1);`,
@@ -64,7 +64,7 @@ test("static template destructuring keys retain upstream imported names", () => 
 			).length,
 			loader,
 		).toBe(1);
-	for (const key of ["`application`", "`ex${name}`", "`ex\\u0070ect`"])
+	for (const key of ["`application`", `\`ex\${name}\``, "`ex\\u0070ect`"])
 		expect(
 			diagnostics(
 				`const { [${key}]: check } = await import('vitest'); check(1);`,

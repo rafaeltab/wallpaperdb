@@ -36,7 +36,7 @@ export async function protocol() {
     config,
     binary: join(directory, 't3'),
     save: async (patch: object) => {
-      const next = configFile + '.next';
+      const next = `${configFile}.next`;
       await writeFile(next, JSON.stringify({ ...config, ...patch }));
       await rename(next, configFile);
     },

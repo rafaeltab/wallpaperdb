@@ -6,7 +6,7 @@ import { protocol } from './fixtures/setup.js';
 it('requires a unique matching PR and mandatory current checks while ignoring advisory failures', async () => {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
-  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   const intent: Intent = {
     id: '1',
@@ -94,7 +94,7 @@ it('requires a unique matching PR and mandatory current checks while ignoring ad
 async function publicationScenario() {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
-  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
   const intent: Intent = {
     id: 'base-advance',

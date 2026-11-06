@@ -26,13 +26,13 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock ResizeObserver for components that use it
-globalThis.ResizeObserver = vi.fn().mockImplementation(function () {
-  return {
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  };
-});
+globalThis.ResizeObserver = vi.fn(
+  class {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+);
 
 // Mock DataTransfer for drag and drop tests
 class MockDataTransfer {
@@ -113,7 +113,8 @@ class MockIntersectionObserver implements IntersectionObserver {
   }
 }
 
-globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+globalThis.IntersectionObserver =
+  MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Test helper to trigger intersection on all observers
 export function triggerIntersection(isIntersecting: boolean) {

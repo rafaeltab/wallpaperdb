@@ -45,7 +45,7 @@ describe('MuuriContext', () => {
       );
 
       expect(capturedContext).not.toBeNull();
-      expect(capturedContext!.grid).toBeNull();
+      expect(required<MuuriContextValue | null>(capturedContext).grid).toBeNull();
     });
 
     it('should provide registerItem function', () => {
@@ -58,7 +58,9 @@ describe('MuuriContext', () => {
       );
 
       expect(capturedContext).not.toBeNull();
-      expect(capturedContext!.registerItem).toBeInstanceOf(Function);
+      expect(required<MuuriContextValue | null>(capturedContext).registerItem).toBeInstanceOf(
+        Function
+      );
     });
 
     it('should provide unregisterItem function', () => {
@@ -71,7 +73,9 @@ describe('MuuriContext', () => {
       );
 
       expect(capturedContext).not.toBeNull();
-      expect(capturedContext!.unregisterItem).toBeInstanceOf(Function);
+      expect(required<MuuriContextValue | null>(capturedContext).unregisterItem).toBeInstanceOf(
+        Function
+      );
     });
 
     it('should render children', () => {
@@ -115,3 +119,8 @@ describe('MuuriContext', () => {
     });
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

@@ -76,7 +76,7 @@ function runComposeDown(projectName, composeFile, removeVolumes) {
 	console.log(`  $ ${cmd}`);
 	try {
 		execSync(cmd, { stdio: "inherit" });
-	} catch (err) {
+	} catch (_err) {
 		// Exit code 1 from docker compose down is common when there's nothing
 		// running. Treat it as a soft warning, not a hard failure.
 		console.warn(

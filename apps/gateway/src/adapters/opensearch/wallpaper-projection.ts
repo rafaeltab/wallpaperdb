@@ -94,7 +94,7 @@ export function nextWallpaper(
   const order = `${change.occurrence.occurredAt}/${JSON.stringify([change.occurrence.source, change.occurrence.id])}`;
   const advanced = {
     ...snapshot,
-    updatedAt: snapshot.updatedAt > updatedAt ? snapshot.updatedAt : updatedAt,
+    updatedAt: [snapshot.updatedAt, updatedAt].sort()[1],
   };
   switch (change._tag) {
     case 'WallpaperUploaded':

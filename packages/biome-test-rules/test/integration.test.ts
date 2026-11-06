@@ -503,7 +503,7 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 									: "\n// Collector policy changed.\n")
 						: path === "mutation.inventory.json" ||
 								path.endsWith("/mutation.config.json")
-							? readFileSync(config, "utf8") + "\n"
+							? `${readFileSync(config, "utf8")}\n`
 							: [
 										"mise.toml",
 										"mise.lock",

@@ -37,7 +37,7 @@ it('exports telemetry with incoming trace context through the composed runtime a
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: host.directory + '/state',
+      FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
       FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
     });
@@ -89,7 +89,7 @@ it('bounds a stalled collector during cleanup without leaving exporter sockets',
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: host.directory + '/state',
+      FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
       FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
     });

@@ -760,7 +760,7 @@ it.each(['B', 'C'])(
       expect(await Effect.runPromise(issues.repairReplay(command, before.commit, fixed))).toBe(
         true
       );
-      await Effect.runPromise(f.issues().reconcile!());
+      await Effect.runPromise(required(f.issues().reconcile)());
       const ready = await Effect.runPromise(f.issues().inspect(4));
       expect(ready.blockersReady).toBe(true);
       const head = ready.prerequisite?.base;
@@ -784,7 +784,9 @@ it.each(['B', 'C'])(
       expect(await Effect.runPromise(f.issues().inspect(4))).toMatchObject({
         blockersReady: false,
       });
-      expect(await Effect.runPromise(f.issues().repairReplay!(command, fixed))).toBe(false);
+      expect(await Effect.runPromise(required(f.issues().repairReplay)(command, fixed))).toBe(
+        false
+      );
     } finally {
       await f.close();
     }
@@ -797,7 +799,7 @@ it.each([false, true])(
     const f = await fixture(true, true);
     try {
       const issues = f.issues();
-      await Effect.runPromise(issues.prepare!(4));
+      await Effect.runPromise(required(issues.prepare)(4));
       const command = (issue: number, branch: string) => ({
         id: branch,
         issue,
@@ -868,7 +870,7 @@ it.each([false, true])(
           projectId: 'project-id',
         },
       });
-      await Effect.runPromise(current.reconcile!());
+      await Effect.runPromise(required(current.reconcile)());
       const observed = await Effect.runPromise(
         current.pullRequest({ ...command(3, 'C'), prBase: 'B' })
       );
@@ -885,3 +887,8 @@ it.each([false, true])(
     }
   }
 );
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

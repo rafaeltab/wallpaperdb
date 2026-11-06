@@ -168,7 +168,7 @@ const fs=require('fs'); const args=process.argv.slice(2); const result=require('
         }
       }
       if (edit === 'remote')
-        git('--git-dir=' + join(host.directory, 'remote.git'), 'update-ref', 'refs/heads/C', f.d);
+        git(`--git-dir=${join(host.directory, 'remote.git')}`, 'update-ref', 'refs/heads/C', f.d);
       if (['base', 'group', 'ci'].includes(edit)) {
         const path = join(host.directory, 'join-live.json');
         const live = JSON.parse(await readFile(path, 'utf8'));

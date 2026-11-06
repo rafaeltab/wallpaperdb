@@ -64,79 +64,75 @@ describe('Asset HTTP contract', () => {
   });
 });
 
-it.each([
-  'GET',
-  'HEAD',
-] as const)('checks Profile authority through the capability for %s and never caches absence', async (method) => {
-  const pictures: string[] = [];
-  const app = await createHttpApp(
-    { nodeEnv: 'test', port: 0 },
-    services({
-      ...empty,
-      picture: (id) => {
-        pictures.push(id);
-        return Effect.succeed({ _tag: 'NotFound' });
-      },
-    })
-  );
-  try {
-    const result = await app.inject({ method, url: '/profile-pictures/pic_1' });
-    expect(pictures).toEqual(['pic_1']);
-    expect(result.statusCode).toBe(404);
-    expect(result.headers['cache-control']).toBe('no-store');
-    expect(result.headers['content-type']).toContain('application/problem+json');
-  } finally {
-    await app.close();
-  }
-});
-it.each([
-  'wallpapers/w1',
-  'profile-pictures/p1',
-])('hides technical failures for %s', async (path) => {
-  const fail = () =>
-    Effect.fail(
-      new DeliveryUnavailable({
-        operation: 'storage',
-        cause: new Error('private-storage-key secret-token'),
+it.each(['GET', 'HEAD'] as const)(
+  'checks Profile authority through the capability for %s and never caches absence',
+  async (method) => {
+    const pictures: string[] = [];
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 0 },
+      services({
+        ...empty,
+        picture: (id) => {
+          pictures.push(id);
+          return Effect.succeed({ _tag: 'NotFound' });
+        },
       })
     );
-  const app = await createHttpApp(
-    { nodeEnv: 'test', port: 0 },
-    services({ wallpaper: fail, picture: fail })
-  );
-  try {
-    const result = await app.inject('/' + path);
-    expect(result.statusCode).toBe(503);
-    expect(result.headers['cache-control']).toBe('no-store');
-    expect(result.json().type).toMatch(
-      /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/blob\/main\/docs\/problems\//
+    try {
+      const result = await app.inject({ method, url: '/profile-pictures/pic_1' });
+      expect(pictures).toEqual(['pic_1']);
+      expect(result.statusCode).toBe(404);
+      expect(result.headers['cache-control']).toBe('no-store');
+      expect(result.headers['content-type']).toContain('application/problem+json');
+    } finally {
+      await app.close();
+    }
+  }
+);
+it.each(['wallpapers/w1', 'profile-pictures/p1'])(
+  'hides technical failures for %s',
+  async (path) => {
+    const fail = () =>
+      Effect.fail(
+        new DeliveryUnavailable({
+          operation: 'storage',
+          cause: new Error('private-storage-key secret-token'),
+        })
+      );
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 0 },
+      services({ wallpaper: fail, picture: fail })
     );
-    expect(result.body).not.toContain('private-storage-key');
-    expect(result.body).not.toContain('secret-token');
-  } finally {
-    await app.close();
+    try {
+      const result = await app.inject(`/${path}`);
+      expect(result.statusCode).toBe(503);
+      expect(result.headers['cache-control']).toBe('no-store');
+      expect(result.json().type).toMatch(
+        /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/blob\/main\/docs\/problems\//
+      );
+      expect(result.body).not.toContain('private-storage-key');
+      expect(result.body).not.toContain('secret-token');
+    } finally {
+      await app.close();
+    }
   }
-});
-it.each([
-  'w=0',
-  'w=2.5',
-  'h=-1',
-  'fit=outside',
-  'w=x',
-  'w=1&w=2',
-])('rejects malformed query %s before invoking delivery', async (query) => {
-  const app = await createHttpApp(
-    { nodeEnv: 'test', port: 0 },
-    services({ ...empty, wallpaper: () => Effect.die('must not call') })
-  );
-  try {
-    const result = await app.inject('/wallpapers/w1?' + query);
-    expect(result.statusCode).toBe(400);
-    expect(result.json().type).toContain('/invalid-dimensions.md');
-  } finally {
-    await app.close();
+);
+it.each(['w=0', 'w=2.5', 'h=-1', 'fit=outside', 'w=x', 'w=1&w=2'])(
+  'rejects malformed query %s before invoking delivery',
+  async (query) => {
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 0 },
+      services({ ...empty, wallpaper: () => Effect.die('must not call') })
+    );
+    try {
+      const result = await app.inject(`/wallpapers/w1?${query}`);
+      expect(result.statusCode).toBe(400);
+      expect(result.json().type).toContain('/invalid-dimensions.md');
+    } finally {
+      await app.close();
+    }
   }
-});
+);
 it('translates capability rejection and hides defects', async () => {
   const app = await createHttpApp(
     { nodeEnv: 'test', port: 0 },
@@ -181,7 +177,7 @@ it('interrupts capability work when the requesting client disconnects', async ()
   try {
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
     const controller = new AbortController();
-    const response = fetch(address + '/wallpapers/w1', { signal: controller.signal }).catch(
+    const response = fetch(`${address}/wallpapers/w1`, { signal: controller.signal }).catch(
       () => undefined
     );
     await running;
@@ -222,7 +218,7 @@ it('lets an in-flight response complete after shutdown starts', async () => {
   );
   try {
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
-    const response = fetch(address + '/wallpapers/w1');
+    const response = fetch(`${address}/wallpapers/w1`);
     // Attach rejection immediately so a premature socket close is also reported by the assertion.
     const outcome = response.then(
       (result) => result.status,
@@ -273,7 +269,7 @@ it('interrupts a stalled request at the shutdown deadline and releases its scope
   });
   try {
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
-    const response = fetch(address + '/wallpapers/w1').catch(() => undefined);
+    const response = fetch(`${address}/wallpapers/w1`).catch(() => undefined);
     await running;
     const start = performance.now();
     await app.close();

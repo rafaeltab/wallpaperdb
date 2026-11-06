@@ -62,8 +62,7 @@ export function creationLayer(ownerNamespace: string) {
               { kind: 'wallpaper', id: result.wallpaperId },
               (wallpaper) => {
                 if (
-                  !wallpaper ||
-                  wallpaper.state !== 'creating-asset' ||
+                  wallpaper?.state !== 'creating-asset' ||
                   wallpaper.commandId !== result.commandId ||
                   wallpaper.creationEventId !== result.creationEventId ||
                   (result.outcome === 'created' && !result.assetId)
@@ -89,8 +88,7 @@ export function creationLayer(ownerNamespace: string) {
               },
               (wallpaper, registered) => {
                 if (
-                  !wallpaper ||
-                  wallpaper.state !== 'accepting-source' ||
+                  wallpaper?.state !== 'accepting-source' ||
                   !registered ||
                   confirmation.sourceId !== confirmation.defaultSourceId ||
                   confirmation.sourceId !== confirmation.initialAnalysisSourceId

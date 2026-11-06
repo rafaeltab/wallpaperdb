@@ -25,13 +25,16 @@
 		"check:migrations": "node check-migrations.mjs && node check-generated.mjs migrations",
 		"check:migration-replay": "node docker-validation.mjs --label migration-replay -- node check-migration-replay.mjs",
 		"agent": "node agent-workflow.mjs",
-		"check:services": "node check-service-wiring.mjs"
+		"check:services": "node check-service-wiring.mjs",
+		"dependencies:install": "cd .. && pnpm install --frozen-lockfile --ignore-scripts --filter @wallpaperdb/scripts..."
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
 		"istanbul-lib-coverage": "3.2.2",
 		"@stryker-mutator/core": "10.0.0",
-		"@stryker-mutator/vitest-runner": "10.0.0"
+		"@stryker-mutator/vitest-runner": "10.0.0",
+		"remark-parse": "11.0.0",
+		"unified": "11.0.5"
 	},
 	"devDependencies": {
 		"@wallpaperdb/vitest-config": "workspace:*",

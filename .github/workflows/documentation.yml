@@ -16,6 +16,8 @@ jobs:
         with:
           version: '2026.10.17'
           install_args: --locked
+      - name: Install checker dependencies without setup side effects
+        run: make run PACKAGE=scripts SCRIPT=dependencies:install
       - run: make lint-docs
       - name: Check edited documentation including imported skills
         if: github.event_name == 'pull_request'

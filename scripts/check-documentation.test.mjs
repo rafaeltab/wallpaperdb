@@ -22,6 +22,12 @@ test("documentation resolves links, duplicate headings, references and unique sk
 		"[ok](target.md#a-heading-1)\n[ref][target]\n[target]: target.md\nUse $example.\n```sh\n[example](missing.md)\n```\n",
 	);
 	assert.deepEqual(checkDocumentation(root, ["guide.md"]), []);
+	write("name (draft).md", "# A *formatted* heading\n");
+	write(
+		"guide.md",
+		"[nested [label]](<name (draft).md#a-formatted-heading>)\n\n    [code](missing.md)\n",
+	);
+	assert.deepEqual(checkDocumentation(root, ["guide.md"]), []);
 	write(
 		"guide.md",
 		"[bad](target.md#missing)\n[absent](absent.md)\nUse $unknown-skill.\n",

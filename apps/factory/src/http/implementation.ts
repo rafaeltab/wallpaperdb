@@ -6,12 +6,14 @@ import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import type { Plan, Scheduler } from '../capabilities/plan/index.js';
+import { registerV2Routes, type V2Data } from './v2/server.js';
 import { serveAssets } from './assets.js';
 import type { WorkRelationship } from './contract.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
   .strict();
 export function operationsServer(config: {
+  v2?: V2Data;
   threads?: () => Effect.Effect<
     import('../capabilities/observe/index.js').ThreadSnapshot,
     Unavailable
@@ -258,6 +260,12 @@ export function operationsServer(config: {
             )
           );
       return schedulerStatus(request);
+    });
+  }
+  if (config.v2) {
+    const data = config.v2;
+    app.register(async (instance) => {
+      registerV2Routes(instance, data);
     });
   }
   app.get('/health', () => ({ status: 'ok' }));

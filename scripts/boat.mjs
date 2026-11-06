@@ -1121,7 +1121,15 @@ async function reconcileDevelopment(
 			state.developmentDependencies?.dependencies !== dependencies;
 		delete state.watcher;
 		save(state);
-		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && ${rebuild ? "" : `COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-app-images && `}make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`;
+		const imagePreparation = rebuild
+			? applicationImageCommands()
+					.map(
+						(targets) =>
+							`make ${targets.map(quote).join(" ")} BOAT_EXEC=worker`,
+					)
+					.join(" && ")
+			: `COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-app-images`;
+		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && ${imagePreparation} && make apps-start ARGS=--no-build BOAT_EXEC=worker`;
 		for (let attempt = 1; ; attempt++) {
 			let diagnostic = "";
 			try {

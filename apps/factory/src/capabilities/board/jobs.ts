@@ -28,6 +28,7 @@ export function populateJobs(context: ProjectionContext) {
       const pr = tables.pullRequests[pid];
       const verified = current?.prerequisite;
       if (
+        (delivery?.ready || delivery?.landed) &&
         verified?.parent &&
         verified.base &&
         pr.metadata.state === 'known' &&

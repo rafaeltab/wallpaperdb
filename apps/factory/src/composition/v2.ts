@@ -42,11 +42,6 @@ export async function v2Producer(config: {
   try {
     const run = <A>(effect: Effect.Effect<A, Unavailable>) =>
       runtime.runPromise(effect, { signal: config.signal });
-    const board = await runtime.runPromise(
-      Effect.flatMap(config.read(), (initial) =>
-        makeBoard({ scopeId: config.scopeId, epoch: randomUUID(), initial })
-      )
-    );
     const attemptStore = sqliteAttemptStore(config.directory);
     const latestPlan = () =>
       Effect.gen(function* () {
@@ -58,9 +53,11 @@ export async function v2Producer(config: {
         });
         return { ...plan, launch };
       });
-    await run(
-      Effect.flatMap(latestPlan(), (plan) =>
-        Effect.flatMap(config.read(), (input) => board.publish(input, plan))
+    const board = await runtime.runPromise(
+      Effect.flatMap(
+        Effect.all({ initial: config.read(), initialPlan: latestPlan() }),
+        ({ initial, initialPlan }) =>
+          makeBoard({ scopeId: config.scopeId, epoch: randomUUID(), initial, initialPlan })
       )
     );
     let publishing: Promise<void> | undefined,

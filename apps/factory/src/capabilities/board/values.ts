@@ -4,7 +4,12 @@ import type { Entity, Fact, Source } from './model.js';
 export const version = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function entity<T extends { id: string }>(value: T): T & Entity<T['id']> {
-  return { ...value, version: version(value) };
+  return {
+    ...value,
+    version: version(
+      Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'version'))
+    ),
+  };
 }
 export const timestamp = (value: number | undefined) =>
   value === undefined ? null : new Date(value).toISOString();

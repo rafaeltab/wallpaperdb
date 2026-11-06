@@ -17,14 +17,24 @@ export function populateCards(context: ProjectionContext) {
       input.recoveries?.some(
         (r) => r.question && pr.metadata.state === 'known' && r.pr === pr.metadata.value.url
       );
-    const code =
-      factoryStatus(jobs, maintenance, !!recoveryQuestion) ??
-      providerStatus(pr) ??
-      (subject.kind === 'issue'
-        ? tables.issues[subject.issueId].eligibility.state === 'allowed'
-          ? 'ready'
-          : 'blocked'
-        : 'unknown');
+    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion),
+      provider = providerStatus(pr);
+    const terminal =
+      (provider === 'ready' || provider === 'landed') &&
+      jobs.every((j) => !j.occupiesCapacity) &&
+      maintenance.length === 0 &&
+      automatic !== 'manual-recovery' &&
+      automatic !== 'awaiting-answer' &&
+      automatic !== 'cancelled';
+    const code = terminal
+      ? provider
+      : (automatic ??
+        provider ??
+        (subject.kind === 'issue'
+          ? tables.issues[subject.issueId].eligibility.state === 'allowed'
+            ? 'ready'
+            : 'blocked'
+          : 'unknown'));
     const id = `item:${pid ?? (subject.kind === 'issue' ? subject.issueId : 'unknown')}` as const;
     const tids = [
       ...new Set([

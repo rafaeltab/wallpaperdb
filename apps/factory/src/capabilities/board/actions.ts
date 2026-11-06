@@ -27,10 +27,13 @@ export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): F
   };
   const factory = snapshot.meta.factory;
   const configure = make('configure', factory.id, true, '', input.state.revision);
+  const currentPlan = snapshot.meta.currentPlanId
+    ? snapshot.entities.plans[snapshot.meta.currentPlanId]
+    : undefined;
   const preview = make(
     'preview-plan',
     factory.id,
-    !snapshot.meta.currentPlanId,
+    !currentPlan || currentPlan.phase === 'succeeded' || currentPlan.phase === 'failed',
     'A planning attempt is outstanding.',
     input.state.revision
   );
@@ -90,11 +93,11 @@ export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): F
         .map((w) => w.control.parked?.question);
       return [
         item.id,
-        entity({
+        {
           ...item,
-          version: version({ base: item.version, pr: pr?.version, questions }),
           actionIds,
-        }),
+          version: version({ base: item.version, pr: pr?.version, questions, actionIds }),
+        },
       ];
     })
   );

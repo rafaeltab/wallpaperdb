@@ -10,6 +10,7 @@ export function liveV2Data(
   return {
     ...board,
     plan: (id: string) => run(board.plan(id)),
+    receipt: (id: string) => run(board.receipt(id)),
     submit: async (command: import('./contract.js').FactoryV2Command) => {
       const result = await run(board.submit(command));
       if (!('code' in result) && result.status === 202) pump();

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
 export function command(program, args, options = {}) {
@@ -82,6 +83,72 @@ export function workflowSnapshot(repo, ref) {
 				`repos/${repo}/contents/${file.path}?ref=${encodeURIComponent(ref)}`,
 			]).content,
 		}));
+}
+const oid = (value) =>
+	typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
+export function reviewEvidenceErrors(ledger, current) {
+	const errors = [];
+	if (ledger.pendingScopeDecisions?.length)
+		errors.push("Pending scope decisions");
+	for (const key of ["head", "baseSha", "mergeBase"])
+		if (!oid(current[key])) errors.push(`Invalid current ${key}`);
+	for (const key of ["head", "baseRef", "baseSha", "mergeBase"])
+		if (ledger.current?.[key] !== current[key])
+			errors.push(`Evidence comparison differs at ${key}`);
+	for (const axis of ["Standards", "Spec", "Defects"]) {
+		const review = ledger.reviews?.filter((r) => r.axis === axis).at(-1);
+		if (!review) {
+			errors.push(`Missing ${axis} review`);
+			continue;
+		}
+		for (const key of [
+			"reviewer",
+			"task",
+			"baseRef",
+			"diffCommand",
+			"requirements",
+			"scope",
+		])
+			if (typeof review[key] !== "string" || !review[key].trim())
+				errors.push(`${axis}: missing ${key}`);
+		for (const key of ["head", "baseSha", "mergeBase"])
+			if (!oid(review[key])) errors.push(`${axis}: invalid ${key}`);
+		if (
+			review.outcome !== "clean" ||
+			!Array.isArray(review.findings) ||
+			review.findings.some(
+				(f) =>
+					f.disposition !== "resolved" &&
+					!(
+						f.disposition === "follow-up" &&
+						/^https:\/\/github.com\/[^/]+\/[^/]+\/issues\/\d+$/.test(f.url)
+					),
+			)
+		)
+			errors.push(`${axis}: required findings or review remain incomplete`);
+		if (
+			!review.artifacts?.length ||
+			review.artifacts.some(
+				(a) =>
+					!path.isAbsolute(a.path ?? "") ||
+					!/^[a-f0-9]{64}$/.test(a.sha256 ?? ""),
+			)
+		)
+			errors.push(`${axis}: inspectable evidence artifacts required`);
+		if (review.head !== current.head || review.baseRef !== current.baseRef) {
+			const assessment = review.applicability;
+			if (
+				assessment?.head !== current.head ||
+				assessment?.baseRef !== current.baseRef ||
+				assessment?.reviewedHead !== review.head ||
+				!assessment?.assessor ||
+				!assessment?.rationale ||
+				!assessment?.artifacts?.length
+			)
+				errors.push(`${axis}: explicit applicability assessment required`);
+		}
+	}
+	return errors;
 }
 async function main() {
 	const [action, subject, ...args] = process.argv.slice(2);
@@ -180,7 +247,46 @@ async function main() {
 			result.errors.push("PR comparison changed during snapshot");
 		console.log(JSON.stringify(result, null, 2));
 		if (errors.length) process.exitCode = 1;
-	} else throw new Error("Expected issue-preflight or pr-snapshot");
+	} else if (action === "review-evidence") {
+		const ledger = JSON.parse(fs.readFileSync(subject, "utf8"));
+		const head = command("git", ["rev-parse", "HEAD"]).trim();
+		const baseRef = ledger.current?.baseRef;
+		if (!baseRef || baseRef.startsWith("-"))
+			throw new Error("Expected comparison base ref");
+		const baseSha = command("git", [
+			"rev-parse",
+			"--verify",
+			`${baseRef}^{commit}`,
+		]).trim();
+		const mergeBase = command("git", ["merge-base", head, baseSha]).trim();
+		const errors = reviewEvidenceErrors(ledger, {
+			head,
+			baseRef,
+			baseSha,
+			mergeBase,
+		});
+		for (const review of ledger.reviews ?? [])
+			for (const artifact of [
+				...(review.artifacts ?? []),
+				...(review.applicability?.artifacts ?? []),
+			]) {
+				try {
+					const data = fs.readFileSync(artifact.path);
+					if (
+						!data.length ||
+						createHash("sha256").update(data).digest("hex") !== artifact.sha256
+					)
+						errors.push(`Changed or empty artifact ${artifact.path}`);
+				} catch {
+					errors.push(`Unavailable artifact ${artifact.path}`);
+				}
+			}
+		console.log(
+			JSON.stringify({ head, baseRef, baseSha, mergeBase, errors }, null, 2),
+		);
+		if (errors.length) process.exitCode = 1;
+	} else
+		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }
 if (
 	process.argv[1] &&

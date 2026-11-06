@@ -47,3 +47,44 @@ test("PR readiness never treats absent, pending or unknown checks as passing", (
 		).length,
 	);
 });
+
+import { reviewEvidenceErrors } from "./agent-workflow.mjs";
+test("review evidence requires all axes and preserves actual reviewed comparisons", () => {
+	const head = "a".repeat(40),
+		base = "b".repeat(40);
+	const current = { head, baseRef: "main", baseSha: base, mergeBase: base };
+	const review = (axis) => ({
+		axis,
+		reviewer: "independent",
+		task: "task-1",
+		head,
+		baseRef: "main",
+		baseSha: base,
+		mergeBase: base,
+		diffCommand: "git diff base head",
+		requirements: "issue 668",
+		scope: "authorized work",
+		outcome: "clean",
+		findings: [],
+		artifacts: [{ path: "/evidence.patch", sha256: "c".repeat(64) }],
+	});
+	const evidence = {
+		current,
+		reviews: ["Standards", "Spec", "Defects"].map(review),
+	};
+	assert.deepEqual(reviewEvidenceErrors(evidence, current), []);
+	assert.ok(
+		reviewEvidenceErrors(
+			{ ...evidence, reviews: evidence.reviews.slice(1) },
+			current,
+		).length,
+	);
+	assert.ok(
+		reviewEvidenceErrors(evidence, { ...current, head: "d".repeat(40) }).length,
+	);
+	const pending = {
+		...evidence,
+		reviews: [...evidence.reviews, { ...review("Spec"), outcome: "pending" }],
+	};
+	assert.ok(reviewEvidenceErrors(pending, current).length);
+});

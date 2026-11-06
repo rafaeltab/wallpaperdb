@@ -16,7 +16,7 @@ Use this policy for local independent reviews, hosted code and security reviews,
 
 ### Record the reviewed comparison
 
-Keep the review ledger in session state or outside the repository. For each review kind or axis, retain the reviewer's identity, task or authenticated result URL, outcome and findings, scope and requirements, full reviewed head SHA, base repository/ref and live base SHA, merge-base SHA, and the diff command used. Preserve the Git objects or an inspectable patch and base context so the original comparison can be reconstructed after refs move. For hosted reviews, establish the actual comparison from authenticated metadata or a captured round recording its head, base branch, and starting base SHA. An unbound result is incomplete evidence.
+Keep a JSON review ledger outside the repository. Before publication, run `make run PACKAGE=scripts SCRIPT=agent ARGS='review-evidence /absolute/path/ledger.json'`. The [validator](../../../../../scripts/agent-workflow.mjs) defines comparison, review-axis, provenance, finding, and hashed-artifact fields. Preserve original reviewer records when carrying evidence forward. Authenticate hosted results and establish their actual comparison; a complete local record alone does not prove independent review occurred.
 
 ### Assess applicability after changes
 

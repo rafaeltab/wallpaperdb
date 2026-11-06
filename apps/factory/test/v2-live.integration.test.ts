@@ -307,7 +307,26 @@ async function liveBoard(config: {
       Effect.sync(() => {
         records.set(record.request.commandId, record);
       }),
-    commands: () => Effect.succeed([...records.values()]),
+    interruptPending: (reason) =>
+      Effect.sync(() => {
+        for (const [id, record] of records)
+          if (record.receipt.state === 'accepted' || record.receipt.state === 'running')
+            records.set(id, {
+              ...record,
+              receipt: {
+                ...record.receipt,
+                version: `${record.receipt.version}-restart`,
+                state: 'uncertain',
+                reasons: [reason],
+              },
+            });
+      }),
+    planBasis: (id) =>
+      Effect.succeed(
+        [...records.values()].find(
+          (r) => r.receipt.result && 'planId' in r.receipt.result && r.receipt.result.planId === id
+        )?.basis ?? undefined
+      ),
   };
   const build = makeBoard({ ...config, epoch: 'test' }).pipe(
     Effect.provideService(BoardStore, store),
@@ -958,6 +977,11 @@ it.each([
 ] as const)(
   'retains a preview basis and invalidates changed $field before historical lookup',
   async (change) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const directory = await mkdtemp(join(tmpdir(), 'v2-plan-basis-'));
     const { issueObservation } = await import('./fixtures/v2.js');
     const observed = issueObservation(1, {
       projectPriority: 'P2',
@@ -995,6 +1019,7 @@ it.each([
     const board = await liveBoard({
       scopeId: 'test',
       initial: input,
+      store: sqliteBoard(directory),
       attempts,
       commands: {
         execute: () =>
@@ -1068,6 +1093,7 @@ it.each([
       expect(historical.attempt.applicability).toBe('stale');
     } finally {
       await app.close();
+      await rm(directory, { recursive: true, force: true });
     }
   }
 );

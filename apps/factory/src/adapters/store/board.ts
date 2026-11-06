@@ -93,18 +93,33 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
           if (updated.changes !== 1) throw new Error('Missing command responsibility');
         })
       ),
-    commands: () =>
+    interruptPending: (reason) =>
       operation(() =>
-        stateConnection(directory, (db) =>
-          db
-            .select({
-              request: v2Commands.request,
-              receipt: v2Commands.receipt,
-              basis: v2Commands.basis,
+        stateConnection(directory, (db) => {
+          db.update(v2Commands)
+            .set({
+              receipt: sql`json_set(${v2Commands.receipt}, '$.state', 'uncertain', '$.version', json_extract(${v2Commands.receipt}, '$.version') || '-restart', '$.reasons', json(${JSON.stringify([reason])}))`,
             })
-            .from(v2Commands)
-            .where(eq(v2Commands.scope, scope))
-            .all()
+            .where(
+              and(
+                eq(v2Commands.scope, scope),
+                sql`json_extract(${v2Commands.receipt}, '$.state') in ('accepted','running')`
+              )
+            )
+            .run();
+        })
+      ),
+    planBasis: (id) =>
+      operation(() =>
+        stateConnection(
+          directory,
+          (db) =>
+            db
+              .select({ basis: v2Commands.basis })
+              .from(v2Commands)
+              .where(and(eq(v2Commands.scope, scope), eq(v2Commands.planId, id)))
+              .limit(1)
+              .get()?.basis ?? undefined
         )
       ),
   };

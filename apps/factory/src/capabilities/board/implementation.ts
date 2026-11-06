@@ -43,7 +43,12 @@ export function makeBoard(config: {
     const at = new Date(yield* time.now()).toISOString();
     const initial = project(input, at, config.scopeId, cursor());
     if (config.initialPlan) {
-      const detail = planDetails(config.initialPlan, initial.snapshot);
+      const detail = planDetails(
+        config.initialPlan,
+        initial.snapshot,
+        yield* store.planBasis(`plan:${config.initialPlan.id}`),
+        planningIdentity(input)
+      );
       initial.snapshot = {
         ...initial.snapshot,
         meta: {
@@ -77,31 +82,11 @@ export function makeBoard(config: {
     }
     const listeners = new Set<() => void>();
     const receipts = new Map<string, CommandRecord>();
-    for (const record of yield* store.commands()) {
-      if (record.receipt.state === 'accepted' || record.receipt.state === 'running') {
-        const interrupted = {
-          ...record,
-          receipt: {
-            ...record.receipt,
-            version: version([record.receipt.version, 'restart']),
-            state: 'uncertain' as const,
-            reasons: [
-              {
-                code: 'interrupted-command',
-                message:
-                  'Command processing was interrupted. Reconcile the owning operation before submitting new work.',
-              },
-            ],
-          },
-        };
-        yield* store.finish(interrupted);
-        receipts.set(record.request.commandId, interrupted);
-      } else receipts.set(record.request.commandId, record);
-    }
-    const planBasis = (id: string) =>
-      [...receipts.values()].find(
-        (r) => r.receipt.result && 'planId' in r.receipt.result && r.receipt.result.planId === id
-      )?.basis ?? undefined;
+    yield* store.interruptPending({
+      code: 'interrupted-command',
+      message:
+        'Command processing was interrupted. Reconcile the owning operation before submitting new work.',
+    });
     let lastPlan: BoardPlan | undefined = config.initialPlan;
     const publish = (nextInput: ScheduleSnapshot, plan?: BoardPlan) =>
       Effect.gen(function* () {
@@ -123,7 +108,7 @@ export function makeBoard(config: {
             checkRuns: retainFact(current.details[id]?.checkRuns, detail.checkRuns),
           };
         if (lastPlan) {
-          const basis = planBasis(`plan:${lastPlan.id}`);
+          const basis = yield* store.planBasis(`plan:${lastPlan.id}`);
           const detail = planDetails(
             lastPlan,
             next.snapshot,
@@ -183,11 +168,7 @@ export function makeBoard(config: {
       Effect.gen(function* () {
         const prior = yield* store.command(request.commandId);
         if (prior) return replay(request, prior);
-        if (
-          [...receipts.values()].filter(
-            (r) => r.receipt.state === 'accepted' || r.receipt.state === 'running'
-          ).length >= maxOutstandingCommands
-        )
+        if (receipts.size >= maxOutstandingCommands)
           return failure(
             'command-capacity',
             'The command worker is at its pending limit. Observe outstanding receipts and retry later.',
@@ -254,7 +235,12 @@ export function makeBoard(config: {
             };
             if (!(yield* store.claim(running))) {
               const winner = yield* store.command(record.request.commandId);
-              if (winner) receipts.set(record.request.commandId, winner);
+              if (
+                winner &&
+                (winner.receipt.state === 'accepted' || winner.receipt.state === 'running')
+              )
+                receipts.set(record.request.commandId, winner);
+              else receipts.delete(record.request.commandId);
               continue;
             }
             receipts.set(record.request.commandId, running);
@@ -287,7 +273,7 @@ export function makeBoard(config: {
             },
           };
           yield* store.finish(completed);
-          receipts.set(record.request.commandId, completed);
+          receipts.delete(record.request.commandId);
         }
       }).pipe(worker.withPermits(1), Effect.withSpan('factory.board.commands'));
     yield* publish(config.initial, config.initialPlan);
@@ -343,11 +329,12 @@ export function makeBoard(config: {
             const old =
               id.startsWith('plan:') && attempts ? yield* attempts.get(id.slice(5)) : undefined;
             const ownership = old && planner ? yield* planner.ownership(false, old.id) : undefined;
+            const basis = old ? yield* store.planBasis(id) : undefined;
             return old
               ? planDetails(
                   { ...old, launch: ownership?.requestId === old.id ? ownership : undefined },
                   current.snapshot,
-                  planBasis(id),
+                  basis,
                   planningIdentity(input)
                 )
               : undefined;

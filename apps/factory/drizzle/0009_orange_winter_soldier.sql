@@ -1,0 +1,2 @@
+ALTER TABLE `v2_commands` ADD `plan_id` text GENERATED ALWAYS AS (json_extract(receipt, '$.result.planId')) VIRTUAL;--> statement-breakpoint
+CREATE INDEX `v2_commands_plan` ON `v2_commands` (`scope`,`plan_id`);

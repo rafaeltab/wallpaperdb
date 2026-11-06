@@ -100,19 +100,94 @@ function importPaths(source: import("typescript").SourceFile) {
 }
 
 const sourceFiles = files(src);
-const graph: Map<string, string[]> = new Map(
-	sourceFiles.map((filename: string) => [filename, []]),
-);
+const sources = new Map();
+function readSource(filename) {
+	if (!sources.has(filename))
+		sources.set(
+			filename,
+			ts.createSourceFile(
+				filename,
+				fs.readFileSync(filename, "utf8"),
+				ts.ScriptTarget.Latest,
+				true,
+			),
+		);
+	return sources.get(filename);
+}
+function resolveSource(filename, specifier) {
+	return ts.resolveModuleName(
+		specifier,
+		filename,
+		{ moduleResolution: ts.ModuleResolutionKind.Bundler },
+		ts.sys,
+	).resolvedModule?.resolvedFileName;
+}
+// Follow only explicitly exported names, using cached syntax rather than a
+// TypeScript program/type checker. Private implementation declarations stay private.
+function contractOrigin(filename, name, seen = new Set()) {
+	const key = `${filename}:${name}`;
+	if (seen.has(key) || !filename.startsWith(`${src}${path.sep}`)) return;
+	seen.add(key);
+	for (const statement of readSource(filename).statements) {
+		if (
+			(ts.isInterfaceDeclaration(statement) ||
+				ts.isTypeAliasDeclaration(statement) ||
+				ts.isClassDeclaration(statement) ||
+				ts.isEnumDeclaration(statement)) &&
+			statement.name?.text === name
+		)
+			return { filename, name };
+		if (
+			ts.isExportDeclaration(statement) &&
+			statement.exportClause &&
+			ts.isNamedExports(statement.exportClause)
+		) {
+			const exported = statement.exportClause.elements.find(
+				(entry) => entry.name.text === name,
+			);
+			if (exported) {
+				const target =
+					statement.moduleSpecifier &&
+					ts.isStringLiteral(statement.moduleSpecifier)
+						? resolveSource(filename, statement.moduleSpecifier.text)
+						: filename;
+				if (target) {
+					const origin = contractOrigin(
+						target,
+						exported.propertyName?.text ?? exported.name.text,
+						seen,
+					);
+					if (origin) return origin;
+				}
+			}
+		}
+		if (
+			ts.isImportDeclaration(statement) &&
+			ts.isStringLiteral(statement.moduleSpecifier)
+		) {
+			const bindings = statement.importClause?.namedBindings;
+			const imported =
+				bindings && ts.isNamedImports(bindings)
+					? bindings.elements.find((entry) => entry.name.text === name)
+					: undefined;
+			if (imported) {
+				const target = resolveSource(filename, statement.moduleSpecifier.text);
+				if (target)
+					return contractOrigin(
+						target,
+						imported.propertyName?.text ?? imported.name.text,
+						seen,
+					);
+			}
+		}
+	}
+}
+const graph = new Map(sourceFiles.map((filename) => [filename, []]));
 for (const filename of [
 	...sourceFiles,
 	...files(path.join(application, "test")),
 ]) {
-	const source = ts.createSourceFile(
-		filename,
-		fs.readFileSync(filename, "utf8"),
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	const source = readSource(filename);
 	const owner = capability(filename);
 	for (const { specifier, node } of importPaths(source)) {
 		const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
@@ -171,6 +246,32 @@ for (const filename of [
 	}
 	if (owner && filename === path.join(capabilitiesRoot, owner, "index.ts")) {
 		for (const statement of source.statements) {
+			if (
+				ts.isExportDeclaration(statement) &&
+				statement.exportClause &&
+				ts.isNamedExports(statement.exportClause)
+			) {
+				for (const entry of statement.exportClause.elements) {
+					const target =
+						statement.moduleSpecifier &&
+						ts.isStringLiteral(statement.moduleSpecifier)
+							? resolveSource(filename, statement.moduleSpecifier.text)
+							: filename;
+					const origin =
+						target &&
+						contractOrigin(target, entry.propertyName?.text ?? entry.name.text);
+					if (
+						origin &&
+						capability(origin.filename) === owner &&
+						origin.filename !==
+							path.join(capabilitiesRoot, owner, "contract.ts") &&
+						origin.filename !== filename
+					)
+						errors.push(
+							`${path.relative(repo, filename)}: public contract ${origin.name} must be declared in contract.ts`,
+						);
+				}
+			}
 			if (
 				ts.isFunctionDeclaration(statement) ||
 				(ts.isVariableStatement(statement) &&

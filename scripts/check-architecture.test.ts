@@ -5,6 +5,41 @@ import path from "node:path";
 import { expect, test, type TestContext } from "vitest";
 import { fileURLToPath } from "node:url";
 
+test("public capability contracts originate in contract.ts through aliases and barrels", (t) => {
+	for (const entry of [
+		"export type { Search } from './implementation.js';",
+		"export { Search as PublicSearch } from './barrel.js';",
+		"import type { Search as PublicSearch } from './implementation.js'; export type { PublicSearch };",
+	]) {
+		const project = fixture(t);
+		project.source("capabilities/search/index.ts", entry);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/barrel.ts",
+			"export type { Search } from './implementation.js';",
+		);
+		const result = project.run();
+		assert.equal(result.status, 1, result.stdout);
+		assert.match(
+			result.stderr,
+			/public contract Search must be declared in contract.ts/,
+		);
+		project.source(
+			"capabilities/search/contract.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export type { Search } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
+		);
+		const allowed = project.run();
+		assert.equal(allowed.status, 0, allowed.stderr);
+	}
+});
+
 const repository = fileURLToPath(new URL("../", import.meta.url));
 
 function fixture(
@@ -144,7 +179,8 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 		"turbo.json",
 		JSON.stringify({
 			futureFlags: productionConfiguration.futureFlags,
-			experimentalObservability: productionConfiguration.experimentalObservability,
+			experimentalObservability:
+				productionConfiguration.experimentalObservability,
 			tasks: {
 				"//#architecture:workspaces":
 					productionTasks["//#architecture:workspaces"],

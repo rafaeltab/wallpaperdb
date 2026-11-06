@@ -85,6 +85,7 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
         vi.stubEnv('S3_ENDPOINT', undefined);
         vi.stubEnv('S3_ACCESS_KEY_ID', undefined);
         vi.stubEnv('S3_SECRET_ACCESS_KEY', undefined);
+        vi.stubEnv('USER_ASSET_WORKFLOW_FILE', undefined);
         const config = { ...loadConfig(), port: 0 };
         const services = Layer.effect(
           Availability,

@@ -20,7 +20,43 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it('retains a newer observed revision when an earlier save response arrives late', async () => {
+  const initial = base();
+  const newer = { ...initial, state: { ...initial.state, revision: 3, concurrency: 7 } };
+  let reads = 0;
+  let completeSave!: (response: Response) => void;
+  vi.stubGlobal('fetch', (_path: string, options?: RequestInit) => {
+    if (options?.method)
+      return new Promise<Response>((resolve) => {
+        completeSave = resolve;
+      });
+    if (++reads === 1) return Promise.resolve(json(initial));
+    if (reads === 2) return Promise.resolve(json(newer));
+    return new Promise<Response>(() => {});
+  });
+  vi.useFakeTimers();
+  await act(async () => {
+    render(<App />);
+  });
+  await act(async () => {
+    screen
+      .getByRole('button', { name: 'Save scheduler controls' })
+      .closest('form')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(screen.getByText(/Latest observed revision 3/)).toBeTruthy();
+  await act(async () => {
+    completeSave(json({ state: { ...initial.state, revision: 2 } }));
+  });
+  expect(screen.getByText(/Editing revision 3\. Latest observed revision 3/)).toBeTruthy();
+  expect(screen.getByLabelText<HTMLInputElement>('Concurrency').value).toBe('7');
 });
 
 it('adopts saved controls and their revision before a slow observation completes', async () => {

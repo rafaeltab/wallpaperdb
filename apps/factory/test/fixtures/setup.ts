@@ -2,12 +2,11 @@ import {
 	mkdtemp,
 	writeFile,
 	chmod,
-	copyFile,
 	readFile,
 	rm,
 	rename,
-	symlink,
 } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -33,13 +32,12 @@ export async function protocol() {
 	const configFile = join(directory, "config.json");
 	const config = { directory, repository, lost: true };
 	await writeFile(configFile, JSON.stringify(config));
-	await copyFile(
-		resolve("test/fixtures/protocol.ts"),
-		join(directory, "protocol.ts"),
+	const executable = stripTypeScriptTypes(
+		await readFile(resolve("test/fixtures/protocol.ts"), "utf8"),
 	);
-	await chmod(join(directory, "protocol.ts"), 0o700);
 	for (const name of ["gh", "t3"]) {
-		await symlink("protocol.ts", join(directory, name));
+		await writeFile(join(directory, name), executable);
+		await chmod(join(directory, name), 0o700);
 	}
 	return {
 		directory,

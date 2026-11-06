@@ -41,7 +41,33 @@ test("capability entries contain explicit reexports and contracts remain in cont
 });
 
 test("undeclared imports fail while declared dependencies and builtins pass", () => {
- const files = { 'package.json': JSON.stringify({ dependencies: { declared: '1.0.0' } }) };
- assert.ok(lint("import 'undeclared';", files).some(d => d.category === 'lint/correctness/noUndeclaredDependencies'));
- assert.equal(lint("import 'declared'; import 'node:fs';", files).filter(d => d.category === 'lint/correctness/noUndeclaredDependencies').length, 0);
+	const files = {
+		"package.json": JSON.stringify({ dependencies: { declared: "1.0.0" } }),
+	};
+	assert.ok(
+		lint("import 'undeclared';", files).some(
+			(d) => d.category === "lint/correctness/noUndeclaredDependencies",
+		),
+	);
+	assert.equal(
+		lint("import 'declared'; import 'node:fs';", files).filter(
+			(d) => d.category === "lint/correctness/noUndeclaredDependencies",
+		).length,
+		0,
+	);
+});
+
+test("fixed-wait diagnostics are advisory and do not flag unrelated application methods", () => {
+	assert.ok(
+		lint("await page.waitForTimeout(100);").some(
+			(d) =>
+				d.message.startsWith("test-fixed-wait:") && d.severity === "warning",
+		),
+	);
+	assert.equal(
+		lint('await page.waitForSelector("button");').filter((d) =>
+			d.message.startsWith("test-fixed-wait:"),
+		).length,
+		0,
+	);
 });

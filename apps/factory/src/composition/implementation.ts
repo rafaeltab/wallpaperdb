@@ -383,9 +383,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
         }))
       ),
-    submitPlan: () => attempts.submit(),
+    submitPlan: (parent) => attempts.submit(parent),
     observePlan: async (id) => (await attempts.observe(id))?.launch,
-    signal: requests.signal,
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   }).catch(async (cause) => {
     requests.abort();
     await Promise.allSettled([

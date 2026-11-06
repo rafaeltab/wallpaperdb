@@ -1,14 +1,12 @@
 import Fastify, { type FastifyRequest } from 'fastify';
 import { Effect, type Tracer } from 'effect';
-import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
-import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
-import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import type { Plan, Scheduler } from '../capabilities/plan/index.js';
 import { registerV2Routes, type V2Data } from './v2/server.js';
 import { serveAssets } from './assets.js';
 import type { WorkRelationship } from './contract.js';
+import { requestOperation } from './tracing.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
   .strict();
@@ -70,21 +68,11 @@ export function operationsServer(config: {
       .type('application/problem+json')
       .send(problem(500, 'generic-server', 'Unexpected server failure'));
   });
-  const propagator = new W3CTraceContextPropagator();
   const execute = <A>(
     request: FastifyRequest,
     name: string,
     operation: Effect.Effect<A, Unavailable>
-  ) => {
-    const parent = trace.getSpanContext(
-      propagator.extract(ROOT_CONTEXT, request.headers, {
-        keys: Object.keys,
-        get: (headers, key) => headers[key],
-      })
-    );
-    const observed = operation.pipe(Effect.withSpan(name));
-    return config.run(parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed);
-  };
+  ) => config.run(requestOperation(request.headers, name, operation));
   const schedulerStatus = async (request: FastifyRequest) => {
     if (config.snapshot) return execute(request, 'factory.http.snapshot', config.snapshot());
     if (!config.scheduler) return undefined;

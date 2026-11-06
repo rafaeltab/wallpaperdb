@@ -38,4 +38,10 @@ test("workspace audit checks membership, task graph and application dependencies
 	assert.deepEqual(checkWorkspaces(root), []);
 	write("packages/shared/src/index.ts", "export const value=1;");
 	assert.ok(checkWorkspaces(root).some((e) => e.includes("check-types")));
+	fs.rmSync(path.join(root, "packages/shared/package.json"));
+	fs.rmSync(path.join(root, "packages/shared/src/index.ts"));
+	write("packages/shared/src/index.js", "export const value=1;");
+	assert.ok(
+		checkWorkspaces(root).some((e) => e.includes("owning package.json")),
+	);
 });

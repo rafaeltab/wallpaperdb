@@ -3,24 +3,39 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
-function hasTypeScript(directory) {
+function hasCode(directory, extension = /\.[cm]?[jt]sx?$/) {
 	if (!fs.existsSync(directory)) return false;
 	return fs
 		.readdirSync(directory, { withFileTypes: true })
 		.some((e) =>
 			e.isDirectory()
-				? !["node_modules", "dist", ".turbo"].includes(e.name) &&
-					hasTypeScript(path.join(directory, e.name))
-				: /\.[cm]?tsx?$/.test(e.name),
+				? ![
+						"node_modules",
+						"dist",
+						"build",
+						"coverage",
+						".turbo",
+						".git",
+						".next",
+						".output",
+					].includes(e.name) && hasCode(path.join(directory, e.name), extension)
+				: extension.test(e.name),
 		);
 }
 export function checkWorkspaces(root) {
 	const errors = [];
-	const patterns = [
-		...fs
-			.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8")
-			.matchAll(/^  - ['"]?([^'"\s]+)['"]?\s*$/gm),
-	].map((m) => m[1]);
+	const section = fs
+		.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf8")
+		.match(/^packages:\s*\n((?:[ \t]+[^\n]*\n|[ \t]*\n)*)/m)?.[1];
+	if (!section)
+		throw new Error(
+			"Expected a block-style packages list in pnpm-workspace.yaml",
+		);
+	const patterns = [...section.matchAll(/^  - ['"]?([^'"\s]+)['"]?\s*$/gm)].map(
+		(m) => m[1],
+	);
+	if (!patterns.length)
+		throw new Error("Workspace package discovery produced no patterns");
 	const directories = [];
 	for (const pattern of patterns) {
 		if (pattern.endsWith("/*")) {
@@ -40,7 +55,7 @@ export function checkWorkspaces(root) {
 	for (const directory of directories) {
 		const file = path.join(root, directory, "package.json");
 		if (!fs.existsSync(file)) {
-			if (hasTypeScript(path.join(root, directory)))
+			if (hasCode(path.join(root, directory)))
 				errors.push(
 					`${directory}: maintained code requires an owning package.json`,
 				);
@@ -54,7 +69,7 @@ export function checkWorkspaces(root) {
 	const tasks = read(path.join(root, "turbo.json")).tasks;
 	for (const [name, { directory, manifest }] of manifests) {
 		const scripts = manifest.scripts ?? {};
-		if (hasTypeScript(path.join(root, directory, "src")))
+		if (hasCode(path.join(root, directory, "src"), /\.[cm]?tsx?$/))
 			for (const task of ["lint", "check-types"])
 				if (!scripts[task])
 					errors.push(`${directory}: TypeScript source requires ${task}`);

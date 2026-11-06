@@ -191,7 +191,7 @@ function makeRuleTests(directory: string) {
 	return result.stdout + result.stderr;
 }
 
-test("unit coverage combines with the CRAP JavaScript rule inventory", () => {
+test("unit coverage combines with the CRAP TypeScript rule inventory", () => {
 	const directory = isolatedRepository();
 	try {
 		const workspace = join(directory, "packages/biome-test-rules");
@@ -220,7 +220,7 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		> = JSON.parse(readFileSync(reportPath, "utf8"));
 		const measured = coverage[join(workspace, "src/measurement.ts")];
 		expect(Object.values(measured.f).some((hits) => hits > 0)).toBeTruthy();
-		const unmeasured = coverage[join(workspace, "src/syntax.js")];
+		const unmeasured = coverage[join(workspace, "src/syntax.ts")];
 		expect(
 			unmeasured,
 			"unloaded maintained rules must remain visible",

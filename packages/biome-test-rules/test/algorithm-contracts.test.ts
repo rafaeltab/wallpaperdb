@@ -133,7 +133,9 @@ test("syntax locations retain UTF-16 columns and LF-only line boundaries", () =>
 		{ start: { line: 3, column: 2 }, end: { line: 3, column: 6 } },
 		{ start: { line: 3, column: 8 }, end: { line: 3, column: 12 } },
 	]);
-	expect(tree.body.map((node) => node.expression.loc)).toStrictEqual([
+	expect(
+		(tree.body as SyntaxNode[]).map((node) => node.expression.loc),
+	).toStrictEqual([
 		{ start: { line: 1, column: 7 }, end: { line: 1, column: 10 } },
 		{ start: { line: 3, column: 2 }, end: { line: 3, column: 5 } },
 		{ start: { line: 3, column: 8 }, end: { line: 3, column: 11 } },

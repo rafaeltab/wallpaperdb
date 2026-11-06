@@ -99,10 +99,12 @@ function associate(
         evidence: 'factory-binding' as const,
         observedAt: retained.jobsObservedAt ?? null,
       }));
+      let missingPullRequest = false;
       for (const pr of thread.pullRequests) {
         const observed = retained.facts?.pullRequests.find(
           (value) => value.number === pr.number && value.url === pr.url
         );
+        if (!observed) missingPullRequest = true;
         for (const issue of observed?.linkedIssues ?? [])
           associations.push({
             issue,
@@ -123,7 +125,7 @@ function associate(
           ? ('conflicting' as const)
           : associations.length
             ? ('evidenced' as const)
-            : thread.pullRequests.length && !retained.facts
+            : missingPullRequest
               ? ('unavailable' as const)
               : ('absent' as const),
       };

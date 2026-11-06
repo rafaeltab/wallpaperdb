@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, desc } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import type { AttemptStore, PlanningAttempt } from '../../capabilities/plan/index.js';
@@ -82,6 +82,12 @@ export function sqliteAttemptStore(directory: string): AttemptStore {
         })
       : undefined;
   return {
+    latest: () =>
+      operation(() =>
+        stateConnection(directory, (db) =>
+          translate(db.select().from(table).orderBy(desc(table.startedAt)).limit(1).get())
+        )
+      ),
     pending: () =>
       operation(() =>
         stateConnection(directory, (db) =>

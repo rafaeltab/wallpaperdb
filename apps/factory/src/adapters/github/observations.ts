@@ -125,6 +125,109 @@ const schema = z.object({
     }),
   }),
 });
+const issueMetadata = schema.shape.data.shape.repository.shape.issue.omit({
+  closedByPullRequestsReferences: true,
+  timelineItems: true,
+});
+const issueFields = `number url title updatedAt body state author { login } parent { number url } labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } assignees(first:100) { nodes { ${userFields} } pageInfo { hasNextPage } } comments { totalCount } projectItems(first:100) { nodes { project { id title number owner { ... on User { login } ... on Organization { login } } } priority:fieldValueByName(name:"Priority") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } size:fieldValueByName(name:"Size") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name optionId } } } pageInfo { hasNextPage } }`;
+function translateIssue(
+  issue: z.infer<typeof issueMetadata>,
+  candidate: boolean,
+  blockers: readonly number[],
+  parents: readonly number[],
+  pullRequests: readonly number[],
+  nativeBlockers: readonly number[]
+): IssueObservation {
+  const projectItem = issue.projectItems.nodes.find(
+    (p) => p.project.number === 7 && p.project.owner.login === 'rafaeltab'
+  );
+  return {
+    updatedAt: issue.updatedAt,
+    labelDetails: issue.labels.nodes.every((l) => l.id && l.color)
+      ? issue.labels.nodes.map((l) => label.parse(l))
+      : undefined,
+    assigneeDetails: issue.assignees.nodes.every((a) => a.id && a.url)
+      ? issue.assignees.nodes.map((a) => user.parse(a))
+      : undefined,
+    projectDetails: projectItem?.project.id
+      ? {
+          projectId: projectItem.project.id,
+          status: selectedChoice(projectItem.fieldValueByName),
+          priority: selectedChoice(projectItem.priority, ['P0', 'P1', 'P2', 'P3', 'P4']),
+          size: selectedChoice(projectItem.size, ['XS', 'S', 'M', 'L', 'XL']),
+        }
+      : issue.projectItems.nodes.length === 0
+        ? { projectId: null, status: null, priority: null, size: null }
+        : undefined,
+    nativeParent: issue.parent?.number ?? null,
+    nativeBlockers: nativeBlockers,
+    number: issue.number,
+    url: issue.url,
+    title: issue.title,
+    open: issue.state === 'OPEN',
+    candidate,
+    labels: issue.labels.nodes.map((l) => l.name),
+    assignees: issue.assignees.nodes.map((a) => a.login),
+    projectStatus: projectItem?.fieldValueByName?.name ?? null,
+    projectPriority: projectItem?.priority?.name ?? null,
+    projectSize: projectItem?.size?.name ?? null,
+    commentCount: issue.comments.totalCount,
+    blockers,
+    parents,
+    pullRequests: pullRequests,
+  };
+}
+async function issueIndex(project: string, signal: AbortSignal) {
+  const pages = z
+    .array(
+      z.object({
+        data: z.object({
+          repository: z.object({
+            issues: z.object({
+              nodes: z.array(issueMetadata),
+              pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+            }),
+          }),
+        }),
+      })
+    )
+    .parse(
+      JSON.parse(
+        await command(
+          'gh',
+          [
+            'api',
+            'graphql',
+            '--paginate',
+            '--slurp',
+            '-f',
+            `query=query($endCursor:String) { repository(owner:"rafaeltab",name:"wallpaperdb") { issues(first:100,states:OPEN,after:$endCursor) { nodes { ${issueFields} } pageInfo { hasNextPage endCursor } } } }`,
+          ],
+          project,
+          signal
+        )
+      )
+    );
+  if (!pages.length || pages.at(-1)?.data.repository.issues.pageInfo.hasNextPage)
+    throw new Error('Incomplete issue index');
+  const nodes = pages.flatMap((p) => p.data.repository.issues.nodes);
+  if (nodes.length > 1000) throw new Error('Issue index exceeds supported bound');
+  return nodes.map((i) => {
+    if (
+      i.url !== `https://github.com/rafaeltab/wallpaperdb/issues/${i.number}` ||
+      i.state !== 'OPEN'
+    )
+      throw new Error('Invalid issue index identity');
+    return translateIssue(
+      i,
+      i.labels.nodes.some((l) => l.name === 'ready-for-agent'),
+      [],
+      i.parent ? [i.parent.number] : [],
+      [],
+      []
+    );
+  });
+}
 const pullFields = `__typename number url title isDraft updatedAt mergeable labels(first:100) { nodes { ${labelFields} } pageInfo { hasNextPage } } reviewRequests(first:100) { nodes { requestedReviewer { __typename ... on User { ${userFields} } ... on Team { id } } } pageInfo { hasNextPage } } state headRefOid headRefName baseRefOid baseRefName reviewDecision reviews(first:100) { nodes { state submittedAt author { login avatarUrl url ... on User { id name } ... on Bot { id } } commit { oid } } pageInfo { hasNextPage } } closingIssuesReferences(first:100) { nodes { number url } pageInfo { hasNextPage } } commits(last:1) { nodes { commit { oid statusCheckRollup { state contexts(first:100) { nodes { __typename ... on CheckRun { id name status conclusion detailsUrl startedAt completedAt } ... on StatusContext { id context state targetUrl } } pageInfo { hasNextPage } } } } } }`;
 export async function observeIssue(
   project: string,
@@ -193,44 +296,14 @@ export async function observeIssue(
     linked.set(pr.number, { ...(previous ?? translatePull(pr)), crossReferencedIssues: [n] });
   }
   const prs = [...linked.values()];
-  const projectItem = issue.projectItems.nodes.find(
-    (p) => p.project.number === 7 && p.project.owner.login === 'rafaeltab'
-  );
-  const metadata: IssueObservation = {
-    updatedAt: issue.updatedAt,
-    labelDetails: issue.labels.nodes.every((l) => l.id && l.color)
-      ? issue.labels.nodes.map((l) => label.parse(l))
-      : undefined,
-    assigneeDetails: issue.assignees.nodes.every((a) => a.id && a.url)
-      ? issue.assignees.nodes.map((a) => user.parse(a))
-      : undefined,
-    projectDetails: projectItem?.project.id
-      ? {
-          projectId: projectItem.project.id,
-          status: selectedChoice(projectItem.fieldValueByName),
-          priority: selectedChoice(projectItem.priority, ['P0', 'P1', 'P2', 'P3', 'P4']),
-          size: selectedChoice(projectItem.size, ['XS', 'S', 'M', 'L', 'XL']),
-        }
-      : issue.projectItems.nodes.length === 0
-        ? { projectId: null, status: null, priority: null, size: null }
-        : undefined,
-    nativeParent: issue.parent?.number ?? null,
-    nativeBlockers: native.map((b) => b.number),
-    number: n,
-    url: issue.url,
-    title: issue.title,
-    open: issue.state === 'OPEN',
+  const metadata = translateIssue(
+    issue,
     candidate,
-    labels: issue.labels.nodes.map((l) => l.name),
-    assignees: issue.assignees.nodes.map((a) => a.login),
-    projectStatus: projectItem?.fieldValueByName?.name ?? null,
-    projectPriority: projectItem?.priority?.name ?? null,
-    projectSize: projectItem?.size?.name ?? null,
-    commentCount: issue.comments.totalCount,
     blockers,
     parents,
-    pullRequests: [...new Set(prs.map((p) => p.number))],
-  };
+    prs.map((p) => p.number),
+    native.map((b) => b.number)
+  );
   return { metadata, pullRequests: prs };
 }
 export function githubObservations(
@@ -243,32 +316,8 @@ export function githubObservations(
         const retained = yield* admitted();
         return yield* Effect.tryPromise({
           try: async (signal) => {
-            const candidates = z
-              .array(z.object({ number }))
-              .parse(
-                JSON.parse(
-                  await command(
-                    'gh',
-                    [
-                      'issue',
-                      'list',
-                      '--repo',
-                      'rafaeltab/wallpaperdb',
-                      '--state',
-                      'open',
-                      '--label',
-                      'ready-for-agent',
-                      '--limit',
-                      '1000',
-                      '--json',
-                      'number',
-                    ],
-                    project,
-                    signal
-                  )
-                )
-              );
-            if (candidates.length >= 1000) throw new Error('Discovery exceeds supported bound');
+            const index = await issueIndex(project, signal);
+            const candidates = index.filter((i) => i.candidate);
             const pages = z
               .array(
                 z.object({
@@ -315,7 +364,9 @@ export function githubObservations(
               throw new Error('Incomplete open PR index');
             const queue = [...new Set([...candidates.map((i) => i.number), ...retained])];
             const seen = new Set<number>();
-            const issues: IssueObservation[] = [];
+            const issues: IssueObservation[] = index.filter(
+              (i) => !i.candidate && !retained.includes(i.number)
+            );
             const pulls = new Map<number, PullObservation>();
             for (const pr of pages.flatMap((p) => p.data.repository.pullRequests.nodes)) {
               if (
@@ -324,6 +375,7 @@ export function githubObservations(
               )
                 throw new Error('Mismatched open PR');
               pulls.set(pr.number, translatePull(pr));
+              queue.push(...pr.closingIssuesReferences.nodes.map((i) => i.number));
             }
             while (queue.length) {
               const batch = [...new Set(queue.splice(0, 4))].filter((n) => !seen.has(n));
@@ -340,6 +392,8 @@ export function githubObservations(
                 )
               );
               for (const value of values) {
+                const existing = issues.findIndex((i) => i.number === value.metadata.number);
+                if (existing >= 0) issues.splice(existing, 1);
                 issues.push(value.metadata);
                 for (const pr of value.pullRequests) {
                   const previous = pulls.get(pr.number);
@@ -356,7 +410,11 @@ export function githubObservations(
                 queue.push(...value.metadata.blockers, ...value.metadata.parents);
               }
             }
-            return { issues, pullRequests: [...pulls.values()] };
+            return {
+              issues: issues.sort((a, b) => a.number - b.number),
+              pullRequests: [...pulls.values()],
+              verifiedPrBases: await verifiedBases(project, [...pulls.values()], signal),
+            };
           },
           catch: (cause) => new Unavailable({ operation: 'github-observations', cause }),
         }).pipe(Effect.tapError(Effect.logError), Effect.withSpan('factory.github.observations'));
@@ -479,4 +537,41 @@ function reviewState(value: string): NonNullable<PullObservation['reviewers']>[n
     default:
       return 'commented';
   }
+}
+
+async function verifiedBases(
+  project: string,
+  pulls: readonly PullObservation[],
+  signal: AbortSignal
+) {
+  const edges: { base: number; tip: number }[] = [];
+  for (const tip of pulls.filter((p) => p.state === 'OPEN')) {
+    const matches = pulls.filter(
+      (p) =>
+        p.state === 'OPEN' &&
+        p.number !== tip.number &&
+        p.headBranch === tip.baseBranch &&
+        p.head === tip.base
+    );
+    if (matches.length !== 1) continue;
+    const base = matches[0];
+    const comparison = z
+      .object({ status: z.string(), merge_base_commit: z.object({ sha: z.string() }) })
+      .parse(
+        JSON.parse(
+          await command(
+            'gh',
+            ['api', `repos/rafaeltab/wallpaperdb/compare/${base.head}...${tip.head}`],
+            project,
+            signal
+          )
+        )
+      );
+    if (
+      ['ahead', 'identical'].includes(comparison.status) &&
+      comparison.merge_base_commit.sha === base.head
+    )
+      edges.push({ base: base.number, tip: tip.number });
+  }
+  return edges;
 }

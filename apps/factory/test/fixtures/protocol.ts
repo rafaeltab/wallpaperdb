@@ -545,7 +545,24 @@ export async function runProtocol(
               },
             ]
           );
-        else {
+        else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
+          const conn = (nodes: unknown[]) => ({ nodes, pageInfo: { hasNextPage: false } });
+          const nodes = config.planning.issues.map((issue: { labels: unknown[]; comments: unknown[] }) => ({
+            ...issue,
+            parent: null,
+            labels: conn(issue.labels),
+            assignees: conn([]),
+            comments: { totalCount: issue.comments.length },
+            projectItems: conn(config.planning.projectItems ?? []),
+          }));
+          reply([
+            {
+              data: {
+                repository: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } },
+              },
+            },
+          ]);
+        } else {
           const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
           const issue =
             config.planning.issues.find((i: { number: number }) => i.number === n) ??

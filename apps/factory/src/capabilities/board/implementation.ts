@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto';
-import { Effect, Semaphore } from 'effect';
+import { Effect, Semaphore, Option } from 'effect';
+import { AttemptStore } from '../plan/index.js';
 import { Time } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type {
@@ -7,27 +7,29 @@ import type {
   FactoryV2Changes,
   FactoryV2Problem,
   FactoryV2Command,
-  FactoryV2IssueSearch,
-  FactoryV2PlanDetails,
   Action,
 } from './model.js';
 import { BoardStore, BoardCommands, type CommandRecord } from './contract.js';
 import { version, problem } from './values.js';
 import { project } from './projection.js';
+import { issueSearch } from './search.js';
+import { planDetails } from './plans.js';
+import type { PlanningAttempt } from '../plan/index.js';
 import { actions } from './actions.js';
 import { entityChanges } from './changes.js';
 
 /** Pure reads observe one committed revision. Effectful publication and command
  * responsibility use the store before publishing anything to the transport. */
-export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot }) {
+export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot; epoch: string }) {
   return Effect.gen(function* () {
     const store = yield* BoardStore,
       commands = yield* BoardCommands,
       time = yield* Time;
     const lock = yield* Semaphore.make(1),
       worker = yield* Semaphore.make(1);
+    const attempts = Option.getOrUndefined(yield* Effect.serviceOption(AttemptStore));
     const restored = yield* store.read();
-    const epoch = randomUUID();
+    const epoch = config.epoch;
     let revision = 0,
       input = config.initial;
     const cursor = () =>
@@ -36,7 +38,7 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot }
     const initial = project(input, at, config.scopeId, cursor());
     let current = { ...initial, snapshot: actions(initial.snapshot, input) };
     let history: readonly FactoryV2Delta[] = restored?.history ?? [];
-    let identity = restored?.inputVersion ?? version(stable(input));
+    let identity = restored?.inputVersion ?? version({ input: stable(input), plan: undefined });
     if (restored) current = { snapshot: restored.snapshot, details: restored.details };
     else yield* store.save({ ...current, history, inputVersion: identity });
     const listeners = new Set<() => void>();
@@ -62,9 +64,11 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot }
         receipts.set(record.request.commandId, interrupted);
       } else receipts.set(record.request.commandId, record);
     }
-    const publish = (nextInput: ScheduleSnapshot) =>
+    let lastPlan: PlanningAttempt | undefined;
+    const publish = (nextInput: ScheduleSnapshot, plan?: PlanningAttempt) =>
       Effect.gen(function* () {
-        const nextIdentity = version(stable(nextInput));
+        lastPlan = plan ?? lastPlan;
+        const nextIdentity = version({ input: stable(nextInput), plan: lastPlan });
         input = nextInput;
         if (identity === nextIdentity) return;
         const before = current.snapshot;
@@ -74,6 +78,18 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot }
           config.scopeId,
           cursor()
         );
+        if (lastPlan) {
+          const detail = planDetails(lastPlan, next.snapshot);
+          next.snapshot = {
+            ...next.snapshot,
+            meta: { ...next.snapshot.meta, currentPlanId: detail.attempt.id },
+            entities: {
+              ...next.snapshot.entities,
+              issues: detail.entities.issues,
+              plans: { [detail.attempt.id]: detail.attempt },
+            },
+          };
+        }
         revision++;
         next.snapshot = actions({ ...next.snapshot, cursor: cursor() }, input);
         for (const detail of Object.values(next.details)) {
@@ -209,23 +225,25 @@ export function makeBoard(config: { scopeId: string; initial: ScheduleSnapshot }
         };
       },
       receipt: (id: string) => receipts.get(id)?.receipt,
-      search: (
-        query: string,
-        _limit: number,
-        _token?: string
-      ): FactoryV2IssueSearch | FactoryV2Problem => ({
-        apiVersion: 2,
-        query,
-        nextPageToken: null,
-        coverage: current.snapshot.meta.coverage,
-        sources: current.snapshot.entities.sources,
-        hits: [],
-        users: current.snapshot.entities.users,
-        labels: current.snapshot.entities.labels,
-        repositories: current.snapshot.entities.repositories,
-      }),
+      search: issueSearch(() => current.snapshot),
       details: (id: string) => current.details[id],
-      plan: (_id: string): FactoryV2PlanDetails | undefined => undefined,
+      plan: (id: string) =>
+        Effect.gen(function* () {
+          const attempt =
+            current.snapshot.entities.plans[id as import('./model.js').PlanAttempt['id']];
+          if (!attempt) {
+            const old =
+              id.startsWith('plan:') && attempts ? yield* attempts.get(id.slice(5)) : undefined;
+            return old ? planDetails(old, current.snapshot) : undefined;
+          }
+          const { issues, repositories, labels, users, sources, threads } =
+            current.snapshot.entities;
+          return {
+            apiVersion: 2 as const,
+            attempt,
+            entities: { issues, repositories, labels, users, sources, threads },
+          };
+        }),
       close: () => {
         listeners.clear();
       },

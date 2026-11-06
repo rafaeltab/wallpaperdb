@@ -51,6 +51,11 @@
                 "build/**"
             ]
         },
+        "@wallpaperdb/profile-markdown#build": {
+            "dependsOn": ["^build", "gen:swagger-pages"],
+            "outputs": ["dist/**"],
+            "cache": false
+        },
         "build:docker": {
             "dependsOn": [
                 "build"

@@ -21,7 +21,7 @@
     "test:mutation": "node ../../scripts/mutation.mjs --package profile-markdown",
     "test:watch": "vitest",
     "check-types": "tsc --noEmit",
-    "build": "esbuild src/index.ts --bundle --platform=neutral --format=esm --target=es2022 --outfile=dist/index.js"
+    "build": "node build.mjs"
   },
   "dependencies": {
     "remark-gfm": "^4.0.1",

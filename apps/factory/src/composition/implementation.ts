@@ -58,6 +58,7 @@ import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
+import { v2Producer } from './v2.js';
 import { planningWorker } from './planning.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
@@ -357,7 +358,23 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
       })),
   };
+  const v2 = await v2Producer({
+    directory: configuration.FACTORY_STATE,
+    scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,
+    base: configuration.FACTORY_BASE,
+    scheduler,
+    read: () =>
+      Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
+        Effect.map(({ schedule, threads }) => ({
+          ...schedule,
+          threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
+        }))
+      ),
+    submitPlan: () => attempts.submit(),
+    signal: requests.signal,
+  });
   const app = operationsServer({
+    v2: v2.data,
     threads: threads.snapshot,
     base: configuration.FACTORY_BASE,
     job,
@@ -456,6 +473,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       } finally {
         clearTimeout(deadline);
         requests.abort();
+        await v2.close();
         await attempts.close();
         await observing?.catch(() => undefined);
         await refreshing?.catch(() => undefined);

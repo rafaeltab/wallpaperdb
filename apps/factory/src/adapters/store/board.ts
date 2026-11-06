@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { BoardStore } from '../../capabilities/board/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { stateConnection, v2Board, v2Commands } from '../../platform/index.js';
@@ -30,7 +30,11 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
       operation(() =>
         stateConnection(directory, (db) =>
           db
-            .select({ request: v2Commands.request, receipt: v2Commands.receipt })
+            .select({
+              request: v2Commands.request,
+              receipt: v2Commands.receipt,
+              basis: v2Commands.basis,
+            })
             .from(v2Commands)
             .where(and(eq(v2Commands.id, id), eq(v2Commands.scope, scope)))
             .get()
@@ -45,6 +49,24 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
               .insert(v2Commands)
               .values({ scope, id: record.request.commandId, ...record })
               .onConflictDoNothing()
+              .run().changes === 1
+        )
+      ),
+    claim: (record) =>
+      operation(() =>
+        stateConnection(
+          directory,
+          (db) =>
+            db
+              .update(v2Commands)
+              .set({ receipt: record.receipt })
+              .where(
+                and(
+                  eq(v2Commands.id, record.request.commandId),
+                  eq(v2Commands.scope, scope),
+                  sql`json_extract(${v2Commands.receipt}, '$.state') = 'accepted'`
+                )
+              )
               .run().changes === 1
         )
       ),
@@ -63,7 +85,11 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
       operation(() =>
         stateConnection(directory, (db) =>
           db
-            .select({ request: v2Commands.request, receipt: v2Commands.receipt })
+            .select({
+              request: v2Commands.request,
+              receipt: v2Commands.receipt,
+              basis: v2Commands.basis,
+            })
             .from(v2Commands)
             .where(eq(v2Commands.scope, scope))
             .all()

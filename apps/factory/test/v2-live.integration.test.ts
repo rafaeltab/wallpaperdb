@@ -273,6 +273,7 @@ async function liveBoard(config: {
   store?: BoardStore;
   commands?: BoardCommands;
   run?: typeof Effect.runPromise;
+  autoExecute?: boolean;
 }) {
   let saved: BoardRecord | undefined;
   const records = new Map<string, CommandRecord>();
@@ -286,6 +287,13 @@ async function liveBoard(config: {
     accept: (record: CommandRecord) =>
       Effect.sync(() => {
         if (records.has(record.request.commandId)) return false;
+        records.set(record.request.commandId, record);
+        return true;
+      }),
+    claim: (record: CommandRecord) =>
+      Effect.sync(() => {
+        const prior = records.get(record.request.commandId);
+        if (prior?.receipt.state !== 'accepted') return false;
         records.set(record.request.commandId, record);
         return true;
       }),
@@ -309,6 +317,7 @@ async function liveBoard(config: {
   );
   let pending: Promise<void> | undefined;
   const data = liveV2Data(board, Effect.runPromise, () => {
+    if (config.autoExecute === false) return;
     pending ??= Effect.runPromise(board.processPending()).finally(() => {
       pending = undefined;
     });
@@ -320,6 +329,7 @@ async function liveBoard(config: {
       plan?: import('../src/capabilities/plan/index.js').PlanningAttempt
     ) => Effect.runPromise(board.publish(input, plan)),
     idle: () => pending ?? Promise.resolve(),
+    execute: () => Effect.runPromise(board.processPending()),
   };
 }
 
@@ -445,6 +455,305 @@ it('uses verified PR ancestry for linear stacks, stops at forks and retains card
       observedAt: new Date(2000).toISOString(),
     });
     expect(Object.keys(after.entities.stacks)).toEqual(Object.keys(before.entities.stacks));
+  } finally {
+    await app.close();
+  }
+});
+
+it('projects factory-verified prerequisites as satisfied while retaining parent grouping and policy-blocked starts', async () => {
+  const { issueObservation, pullObservation } = await import('./fixtures/v2.js');
+  const input = {
+    ...initial,
+    state: { ...initial.state, paused: false },
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [
+          issueObservation(1, {
+            blockers: [2],
+            parents: [9],
+            evaluation: {
+              allowed: true,
+              blockersReady: true,
+              verifiedAt: 2000,
+              prerequisites: [
+                {
+                  issue: 2,
+                  pr: 42,
+                  commit: 'a'.repeat(40),
+                  parent: 'b'.repeat(40),
+                  prBase: 'main',
+                  basis: 'verified-unmerged',
+                },
+              ],
+            },
+          }),
+          issueObservation(2),
+          issueObservation(3, {
+            evaluation: {
+              allowed: false,
+              blockersReady: true,
+              verifiedAt: 2000,
+              prerequisites: [],
+            },
+          }),
+        ],
+        pullRequests: [pullObservation(42, { linkedIssues: [2] })],
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/1'].eligibility.state).toBe(
+      'allowed'
+    );
+    expect(snapshot.entities.relationships['relationship:prerequisite/2/1']).toMatchObject({
+      satisfaction: {
+        state: 'satisfied',
+        basis: 'verified-unmerged',
+        pullRequestId: 'pr:rafaeltab/wallpaperdb/42',
+        comparison: { headOid: 'a'.repeat(40), baseOid: 'b'.repeat(40), baseRef: 'main' },
+      },
+    });
+    expect(
+      snapshot.entities.actions['action:start/issue:rafaeltab/wallpaperdb/3'].availability.state
+    ).toBe('disabled');
+    expect(snapshot.entities.relationships['relationship:parent/9/1'].kind).toBe('parent');
+  } finally {
+    await app.close();
+  }
+});
+
+it('counts parked questions and manual recovery once, keeps automatic recovery out of attention and omits private paths', async () => {
+  const { issueObservation, pullObservation } = await import('./fixtures/v2.js');
+  const intent = {
+    id: 'owner-1',
+    issue: 1,
+    issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/1',
+    base: 'b'.repeat(40),
+    context: 'private prompt',
+    branch: 'private-branch',
+    createdAt: 1000,
+    expectedStage: 'implementation' as const,
+  };
+  const input: ScheduleSnapshot = {
+    ...initial,
+    state: { ...initial.state, admissions: [{ issue: 1, base: intent.base, context: '' }] },
+    jobs: [
+      {
+        kind: 'job',
+        intent,
+        elapsedMs: 100,
+        execution: {
+          kind: 'found',
+          threadId: 't1',
+          status: 'waiting',
+          worktree: '/private/worktree',
+          branch: 'private-branch',
+          model: 'gpt-6.1-sol',
+        },
+        delivery: {
+          stage: 'implementation',
+          commit: intent.base,
+          ready: false,
+          landed: false,
+          active: false,
+          question: { id: 'q1', text: 'Choose a behavior' },
+        },
+      },
+    ],
+    localWork: [
+      {
+        intent,
+        control: {
+          revision: 0,
+          cancelled: false,
+          claimed: [],
+          parked: { index: 0, question: { id: 'q1', text: 'Choose a behavior' } },
+        },
+      },
+    ],
+    observations: {
+      state: 'current',
+      stale: false,
+      observedAt: 2000,
+      facts: {
+        issues: [issueObservation(1)],
+        pullRequests: [pullObservation(42), pullObservation(43)],
+      },
+    },
+    recoveries: [
+      {
+        issue: 2,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+        progress: 'Conflict at /private/worktree',
+        active: true,
+        phase: 'resolving',
+      },
+      {
+        issue: 3,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/43',
+        progress: 'Reconcile /private/worktree',
+        active: false,
+        phase: 'manual-recovery',
+      },
+    ],
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: intent.base, run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    const snapshot = response.json<FactoryV2Snapshot>();
+    expect(
+      Object.values(snapshot.entities.items).filter((i) => i.attention.state === 'required')
+    ).toHaveLength(2);
+    expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/42'].attention.state).toBe(
+      'none'
+    );
+    expect(snapshot.meta.factory).toMatchObject({
+      concurrency: { occupied: 1 },
+      admission: { consumed: 1 },
+    });
+    expect(response.body).not.toContain('/private/worktree');
+    expect(response.body).not.toContain('private prompt');
+    const card = Object.values(snapshot.entities.items).find(
+      (i) => i.status.code === 'awaiting-answer'
+    );
+    if (!card) throw new Error('Parked card absent');
+    expect(
+      (
+        await app.inject({
+          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+          headers: { 'if-match': `"${card.version}"` },
+        })
+      ).json()
+    ).toMatchObject({ questions: [{ id: 'q1', text: 'Choose a behavior' }] });
+  } finally {
+    await app.close();
+  }
+});
+
+it('keeps an interrupted accepted command uncertain and prevents its old worker from executing it', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { sqliteBoard } = await import('../src/adapters/store/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'v2-command-claim-'));
+  let executed = 0;
+  const commands = {
+    execute: () =>
+      Effect.sync(() => {
+        executed++;
+        return { state: 'succeeded' as const, result: null, reasons: [] };
+      }),
+  };
+  const store = sqliteBoard(directory);
+  const first = await liveBoard({ scopeId: 'test', initial, store, commands, autoExecute: false });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: first });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const action = Object.values(snapshot.entities.actions).find((a) => a.kind === 'configure');
+    if (action?.availability.state !== 'available') throw new Error('Configure missing');
+    const command = {
+      commandId: '00000000-0000-4000-8000-000000000009',
+      actionId: action.id,
+      precondition: action.availability.precondition,
+      kind: 'configure',
+      payload: {
+        paused: false,
+        concurrency: { kind: 'limited', maximum: 1 },
+        admissionAllowance: { kind: 'limited', maximum: 3 },
+      },
+    };
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: command })).statusCode
+    ).toBe(202);
+    const reopened = await liveBoard({ scopeId: 'test', initial, store, commands });
+    const second = operationsServer({
+      base: 'a'.repeat(40),
+      run: Effect.runPromise,
+      job,
+      v2: reopened,
+    });
+    try {
+      expect(
+        (await second.inject({ method: 'POST', url: '/api/v2/commands', payload: command })).json()
+      ).toMatchObject({ state: 'uncertain' });
+      await first.execute();
+      await reopened.idle();
+      expect(executed).toBe(0);
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('invalidates item details when individual checks change without changing the card status', async () => {
+  const { pullObservation } = await import('./fixtures/v2.js');
+  const pr = pullObservation(42, {
+    checkRuns: [
+      {
+        id: 'C1',
+        name: 'typecheck',
+        state: 'passed',
+        url: null,
+        head: 'a'.repeat(40),
+        startedAt: null,
+        completedAt: null,
+      },
+    ],
+    ci: 'SUCCESS',
+  });
+  const input = {
+    ...initial,
+    observations: {
+      state: 'current' as const,
+      stale: false,
+      observedAt: 2000,
+      facts: { issues: [], pullRequests: [pr] },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const card = Object.values(before.entities.items)[0];
+    await board.publish({
+      ...input,
+      observations: {
+        ...input.observations,
+        facts: {
+          issues: [],
+          pullRequests: [{ ...pr, checkRuns: [{ ...pr.checkRuns![0], name: 'build' }] }],
+        },
+      },
+    });
+    expect(
+      (
+        await app.inject({
+          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+          headers: { 'if-match': `"${card.version}"` },
+        })
+      ).statusCode
+    ).toBe(412);
+    const current = Object.values(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items
+    )[0];
+    expect(
+      (
+        await app.inject({
+          url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+          headers: { 'if-match': `"${current.version}"` },
+        })
+      ).json()
+    ).toMatchObject({ checkRuns: { state: 'known', value: [{ name: 'build' }] } });
   } finally {
     await app.close();
   }

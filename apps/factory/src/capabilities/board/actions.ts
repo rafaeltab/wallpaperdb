@@ -1,6 +1,6 @@
 import type { ScheduleSnapshot } from '../observe/index.js';
-import type { FactoryV2Snapshot, Action, ActionKind } from './model.js';
-import { entity, version, jobId } from './values.js';
+import type { Action, ActionKind, FactoryV2Snapshot } from './model.js';
+import { entity, jobId, version } from './values.js';
 export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): FactoryV2Snapshot {
   const result: Record<Action['id'], Action> = {};
   const make = (
@@ -81,7 +81,21 @@ export function actions(snapshot: FactoryV2Snapshot, input: ScheduleSnapshot): F
       const actionIds = Object.values(result)
         .filter((a) => targets.some((t) => t === a.targetId))
         .map((a) => a.id);
-      return [item.id, entity({ ...item, actionIds })];
+      const pr =
+        item.subject.kind === 'pull-request'
+          ? snapshot.entities.pullRequests[item.subject.pullRequestId]
+          : undefined;
+      const questions = input.localWork
+        .filter((w) => w.intent && item.jobIds.includes(jobId(w.intent.issue)))
+        .map((w) => w.control.parked?.question);
+      return [
+        item.id,
+        entity({
+          ...item,
+          version: version({ base: item.version, pr: pr?.version, questions }),
+          actionIds,
+        }),
+      ];
     })
   );
   return {

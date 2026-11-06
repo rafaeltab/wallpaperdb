@@ -113,6 +113,9 @@ export const v2Board = sqliteTable('v2_board', {
     .notNull(),
 });
 export const v2Commands = sqliteTable('v2_commands', {
+  basis: text('basis', { mode: 'json' }).$type<
+    import('../capabilities/board/index.js').PlanAttempt['basis']
+  >(),
   id: text('id').primaryKey(),
   scope: text('scope').notNull(),
   request: text('request', { mode: 'json' })

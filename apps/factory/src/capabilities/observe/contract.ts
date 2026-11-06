@@ -19,6 +19,20 @@ export interface ObservedChoice {
   rank: number | null;
 }
 export interface IssueObservation {
+  author?: string;
+  evaluation?: {
+    allowed: boolean;
+    blockersReady: boolean;
+    verifiedAt: number;
+    prerequisites: readonly {
+      issue: number;
+      pr: number;
+      commit: string;
+      parent?: string;
+      prBase?: string;
+      basis: 'verified-unmerged' | 'verified-landed';
+    }[];
+  };
   updatedAt?: string;
   labelDetails?: readonly ObservedLabel[];
   assigneeDetails?: readonly ObservedUser[];
@@ -52,6 +66,7 @@ export interface PullObservation {
   mergeability?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
   labelDetails?: readonly ObservedLabel[];
   checkRuns?: readonly {
+    requirement?: 'required' | 'optional' | 'unknown';
     id: string;
     name: string;
     state: 'passed' | 'failed' | 'running' | 'queued' | 'skipped' | 'neutral' | 'unknown';

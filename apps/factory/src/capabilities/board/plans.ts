@@ -1,10 +1,11 @@
-import type { PlanningAttempt } from '../plan/index.js';
-import type { FactoryV2Snapshot, FactoryV2PlanDetails, PlanAttempt, Tables } from './model.js';
-import { entity, timestamp, issueId, unknown } from './values.js';
+import type { BoardPlan } from './contract.js';
+import type { FactoryV2PlanDetails, FactoryV2Snapshot, PlanAttempt, Tables } from './model.js';
+import { entity, issueId, timestamp, unknown } from './values.js';
 export function planDetails(
-  attempt: PlanningAttempt,
+  attempt: BoardPlan,
   snapshot: FactoryV2Snapshot,
-  basis?: PlanAttempt['basis']
+  basis?: PlanAttempt['basis'],
+  currentInputVersion?: string
 ): FactoryV2PlanDetails {
   const issues: Tables['issues'] = { ...snapshot.entities.issues };
   const referenced = new Set<number>();
@@ -36,15 +37,31 @@ export function planDetails(
     startedAt: new Date(attempt.startedAt).toISOString(),
     deadline: new Date(attempt.deadline).toISOString(),
     finishedAt: timestamp(attempt.finishedAt),
-    phase: attempt.phase,
+    phase:
+      attempt.launch?.phase === 'uncertain' || attempt.launch?.phase === 'launch-intent'
+        ? 'uncertain'
+        : attempt.phase,
     progress: attempt.detail ?? attempt.phase,
-    threadId: null,
+    threadId: attempt.launch?.run
+      ? (Object.values(snapshot.entities.threads).find(
+          (t) =>
+            t.metadata.state === 'known' &&
+            t.metadata.value.threadId === attempt.launch?.run?.threadId
+        )?.id ?? null)
+      : null,
     basis: basis ?? {
-      boardCursor: snapshot.cursor,
+      boardCursor: 'unavailable',
       inputVersion: 'unknown',
       controlVersion: 'unknown',
     },
-    applicability: attempt.result?.kind === 'stale' ? 'stale' : 'unknown',
+    applicability:
+      attempt.result?.kind === 'stale'
+        ? 'stale'
+        : basis && currentInputVersion
+          ? basis.inputVersion === currentInputVersion
+            ? 'current'
+            : 'stale'
+          : 'unknown',
     result: attempt.result
       ? {
           selected: attempt.result.selected.map((s) => ({

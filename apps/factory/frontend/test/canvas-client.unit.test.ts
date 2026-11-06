@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { fakeV2Server } from '../../src/http/index.js';
 import { FactoryClient } from '../src/canvas/client';
 
@@ -67,4 +67,27 @@ it('reserves commands synchronously and retains an uncertain request for an expl
   );
   await client.retry();
   expect(bodies[1]).toBe(bodies[0]);
+});
+it('creates a v4 command UUID on a private HTTP origin without randomUUID', async () => {
+  vi.stubGlobal('crypto', { getRandomValues: (bytes: Uint8Array) => bytes.fill(255) });
+  let commandId = '';
+  const client = new FactoryClient(async (_path, init) => {
+    commandId = JSON.parse(String(init?.body)).commandId;
+    return new Response(JSON.stringify({ commandId, state: 'succeeded', reasons: [] }));
+  });
+  try {
+    await client.submit(
+      {
+        id: 'action:preview',
+        version: '1',
+        kind: 'preview-plan',
+        targetId: 'factory:main',
+        availability: { state: 'available', precondition: 'current', validUntil: null },
+      },
+      { kind: 'preview-plan', payload: {} }
+    );
+    expect(commandId).toBe('ffffffff-ffff-4fff-bfff-ffffffffffff');
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

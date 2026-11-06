@@ -20,7 +20,7 @@ it('a fresh process reconciles publication after a lost response without repeati
   await new Promise<void>((resolve) => socket.close(() => resolve()));
   const env = {
     ...process.env,
-    PATH: host.directory + ':' + process.env.PATH,
+    PATH: `${host.directory}:${process.env.PATH}`,
     FACTORY_FIXTURE: host.configFile,
     FACTORY_PROJECT: host.repository,
     FACTORY_T3_PROJECT_ID: 'project-id',
@@ -52,7 +52,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     vi.waitFor(
       async () => {
         expect(child.exitCode, diagnostics).toBeNull();
-        expect((await fetch(origin + '/health')).ok).toBe(true);
+        expect((await fetch(`${origin}/health`)).ok).toBe(true);
       },
       {
         timeout: 10000,
@@ -62,7 +62,7 @@ it('a fresh process reconciles publication after a lost response without repeati
   let child = launch();
   try {
     await ready();
-    const response = await fetch(origin + '/api/job', {
+    const response = await fetch(`${origin}/api/job`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ issue: 577, context: 'Read only' }),
@@ -77,17 +77,17 @@ it('a fresh process reconciles publication after a lost response without repeati
     await ready();
     await vi.waitFor(
       async () =>
-        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
           execution: { threadId: 'thread-live', run: { id: 'run-1' } },
         }),
       { timeout: 10000, interval: 30 }
     );
     const scheduler = z
       .object({ state: z.object({ revision: z.number() }) })
-      .parse(await (await fetch(origin + '/api/scheduler')).json());
+      .parse(await (await fetch(`${origin}/api/scheduler`)).json());
     expect(
       (
-        await fetch(origin + '/api/scheduler', {
+        await fetch(`${origin}/api/scheduler`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -107,7 +107,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     });
     await vi.waitFor(
       async () => {
-        await fetch(origin + '/api/job');
+        await fetch(`${origin}/api/job`);
         expect(
           (await host.calls()).filter(
             (call) => call.args[1] === 'send' && !call.args.includes('--help')
@@ -121,7 +121,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     await ready();
     await vi.waitFor(
       async () =>
-        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
           delivery: { stage: 'review', ready: false },
         }),
       { timeout: 10000, interval: 30 }
@@ -135,7 +135,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     });
     await vi.waitFor(
       async () => {
-        await fetch(origin + '/api/job');
+        await fetch(`${origin}/api/job`);
         expect(
           (await host.calls()).filter(
             (call) =>
@@ -149,12 +149,12 @@ it('a fresh process reconciles publication after a lost response without repeati
     await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
     child = launch();
     await ready();
-    expect(await (await fetch(origin + '/api/scheduler')).json()).toMatchObject({
+    expect(await (await fetch(`${origin}/api/scheduler`)).json()).toMatchObject({
       state: { concurrency: 3, allowance: -1, paused: true, admissions: [{ issue: 577 }] },
     });
     await vi.waitFor(
       async () =>
-        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
           kind: 'job',
           intent: { issue: 577, expectedStage: 'implementation' },
           execution: { threadId: 'thread-live' },
@@ -175,7 +175,7 @@ it('a fresh process reconciles publication after a lost response without repeati
         (call) => call.binary === 't3' && call.args[1] === 'start' && !call.args.includes('--help')
       )
     ).toHaveLength(1);
-    const duplicate = await fetch(origin + '/api/job', {
+    const duplicate = await fetch(`${origin}/api/job`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ issue: 577 }),
@@ -199,7 +199,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     await host.save(waiting);
     await vi.waitFor(
       async () => {
-        const observed = await (await fetch(origin + '/api/job')).json();
+        const observed = await (await fetch(`${origin}/api/job`)).json();
         expect(observed).toMatchObject({
           delivery: { stage: 'babysitting', activity: 'waiting-for-github' },
         });
@@ -216,7 +216,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     await host.save(watcher);
     await vi.waitFor(
       async () =>
-        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
           delivery: { activity: 'waiting-for-github', deadline: initialWait?.deadline },
         }),
       { timeout: 10000, interval: 30 }
@@ -237,7 +237,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     await ready();
     await vi.waitFor(
       async () => {
-        await fetch(origin + '/api/job');
+        await fetch(`${origin}/api/job`);
         expect(
           (await host.calls()).filter(
             (call) => call.args[1] === 'send' && !call.args.includes('--help')
@@ -259,7 +259,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     await ready();
     await vi.waitFor(
       async () =>
-        expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
           delivery: { stage: 'babysitting', activity: 'continuation-pending', ready: false },
         }),
       { timeout: 10000, interval: 30 }
@@ -269,10 +269,8 @@ it('a fresh process reconciles publication after a lost response without repeati
         (call) => call.args[1] === 'send' && !call.args.includes('--help')
       )
     ).toHaveLength(4);
-    const demonstrated = await (await fetch(origin + '/api/job')).json();
-    process.stdout.write(
-      'Factory composition demonstration: ' + JSON.stringify(demonstrated) + '\n'
-    );
+    const demonstrated = await (await fetch(`${origin}/api/job`)).json();
+    process.stdout.write(`Factory composition demonstration: ${JSON.stringify(demonstrated)}\n`);
   } finally {
     await stop(child);
     await host.cleanup();

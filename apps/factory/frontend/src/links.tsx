@@ -12,16 +12,14 @@ export function ExternalLink({ href, children }: { href: string; children: React
 }
 export function Issues({ numbers }: { numbers: readonly number[] }) {
   return numbers.length ? (
-    <>
-      {numbers.map((number, index) => (
-        <span key={number}>
-          {index ? ', ' : ''}
-          <ExternalLink href={`https://github.com/rafaeltab/wallpaperdb/issues/${number}`}>
-            #{number}
-          </ExternalLink>
-        </span>
-      ))}
-    </>
+    numbers.map((number, index) => (
+      <span key={number}>
+        {index ? ', ' : ''}
+        <ExternalLink href={`https://github.com/rafaeltab/wallpaperdb/issues/${number}`}>
+          #{number}
+        </ExternalLink>
+      </span>
+    ))
   ) : (
     <>None</>
   );

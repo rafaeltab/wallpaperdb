@@ -141,7 +141,7 @@ export async function configureDevelopment(
   await mkdir(join(root, 'apps/wallpaper'), { recursive: true });
   await writeFile(
     workflowPath,
-    JSON.stringify(
+    `${JSON.stringify(
       {
         operatorNotification: {
           url: authority.operatorNotification.url,
@@ -156,7 +156,7 @@ export async function configureDevelopment(
       },
       null,
       2
-    ) + '\n',
+    )}\n`,
     { mode: 0o600 }
   );
   await chmod(workflowPath, 0o600);
@@ -166,7 +166,7 @@ export async function configureDevelopment(
   await mkdir(join(root, 'apps/user'), { recursive: true });
   await writeFile(
     userWorkflow,
-    JSON.stringify(
+    `${JSON.stringify(
       {
         credential: { user: user.user, password: user.password },
         operatorNotification: {
@@ -177,7 +177,7 @@ export async function configureDevelopment(
       },
       null,
       2
-    ) + '\n',
+    )}\n`,
     { mode: 0o600 }
   );
   await chmod(userWorkflow, 0o600);

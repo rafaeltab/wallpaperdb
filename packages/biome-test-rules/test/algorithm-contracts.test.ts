@@ -134,7 +134,7 @@ function diagnose(rule: AdaptedRule, statements: Input[]) {
 	};
 	const options =
 		rule === validExpect
-			? [{ ...rule.meta.defaultOptions![0], maxArgs: 2 }]
+			? [{ ...required(rule.meta.defaultOptions)[0], maxArgs: 2 }]
 			: (rule.meta.defaultOptions ?? []);
 	visitSyntax(tree, rule.create(context, options));
 	return reports;
@@ -428,3 +428,9 @@ test("retry algorithm follows literal spreads without applying flag-value semant
 		]),
 	).toStrictEqual(["retry"]);
 });
+
+function required<T>(value: T): NonNullable<T> {
+	if (value === null || value === undefined)
+		throw new Error("Expected a required test value");
+	return value;
+}

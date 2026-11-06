@@ -15,7 +15,7 @@ if (!/^wallpaperdb-factory-[a-z0-9-]+$/.test(name ?? ''))
 const realRelease = await realpath(release);
 const installation = JSON.parse(await readFile(join(realRelease, 'installation.json'), 'utf8'));
 const realState = await realpath(state);
-if (realState === realRelease || realState.startsWith(realRelease + '/'))
+if (realState === realRelease || realState.startsWith(`${realRelease}/`))
   throw new Error('Keep durable state outside the installation');
 const format = JSON.parse(
   await readFile(join(realState, 'format.json'), 'utf8').catch((error) => {
@@ -64,8 +64,8 @@ UMask=0077
 [Install]
 WantedBy=default.target
 `;
-await writeFile(unit + '.next', contents, { mode: 0o600 });
-await rename(unit + '.next', unit);
+await writeFile(`${unit}.next`, contents, { mode: 0o600 });
+await rename(`${unit}.next`, unit);
 execFileSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'inherit' });
 execFileSync('systemctl', ['--user', 'enable', name], { stdio: 'inherit' });
 execFileSync('systemctl', ['--user', 'restart', name], { stdio: 'inherit' });

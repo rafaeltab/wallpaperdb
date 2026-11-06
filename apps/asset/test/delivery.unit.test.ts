@@ -248,24 +248,22 @@ describe('asset delivery', () => {
       options: { width: 4000 },
       limits: { maxResizeWidth: 7680, maxResizeHeight: 4320, maxOutputPixels: 33177600 },
     },
-  ])('rejects output beyond $name using inspected dimensions', async ({
-    raw,
-    displayed,
-    options,
-    limits,
-  }) => {
-    const f = fixture({
-      wallpaper: { ...original, width: raw[0]!, height: raw[1]! },
-      displayedGeometry: { width: displayed[0]!, height: displayed[1]!, requiresOrientation: true },
-      ...limits,
-    });
-    expect(
-      await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', { ...options, fit: 'contain' })))
-    ).toMatchObject({ _tag: 'Rejected' });
-    expect(f.reads).toEqual(['original']);
-    expect(f.resizes).toEqual([]);
-    expect(f.queries).toEqual([]);
-  });
+  ])(
+    'rejects output beyond $name using inspected dimensions',
+    async ({ raw, displayed, options, limits }) => {
+      const f = fixture({
+        wallpaper: { ...original, width: raw[0], height: raw[1] },
+        displayedGeometry: { width: displayed[0], height: displayed[1], requiresOrientation: true },
+        ...limits,
+      });
+      expect(
+        await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', { ...options, fit: 'contain' })))
+      ).toMatchObject({ _tag: 'Rejected' });
+      expect(f.reads).toEqual(['original']);
+      expect(f.resizes).toEqual([]);
+      expect(f.queries).toEqual([]);
+    }
+  );
   it('accepts a height-only resize that raw dimensions would falsely reject', async () => {
     const f = fixture({
       wallpaper: { ...original, width: 120, height: 80 },
@@ -314,19 +312,22 @@ describe('asset delivery', () => {
   it.each([
     { width: 40, height: 120, requiresOrientation: false },
     { width: 80, height: 120, requiresOrientation: true },
-  ])('falls back to the inspected original when a nominal variant is unsafe: %j', async (variantGeometry) => {
-    const f = fixture({
-      wallpaper: { ...original, width: 120, height: 80 },
-      variantGeometry,
-      maxResizeHeight: 100,
-    });
-    expect(
-      await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', { width: 40, fit: 'contain' })))
-    ).toMatchObject({ _tag: 'Found' });
-    expect(f.queries).toEqual([[40, 80]]);
-    expect(f.reads).toEqual(['original', 'variant', 'original']);
-    expect(f.resizes).toEqual([{ width: 40, fit: 'contain', mimeType: 'image/png' }]);
-  });
+  ])(
+    'falls back to the inspected original when a nominal variant is unsafe: %j',
+    async (variantGeometry) => {
+      const f = fixture({
+        wallpaper: { ...original, width: 120, height: 80 },
+        variantGeometry,
+        maxResizeHeight: 100,
+      });
+      expect(
+        await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', { width: 40, fit: 'contain' })))
+      ).toMatchObject({ _tag: 'Found' });
+      expect(f.queries).toEqual([[40, 80]]);
+      expect(f.reads).toEqual(['original', 'variant', 'original']);
+      expect(f.resizes).toEqual([{ width: 40, fit: 'contain', mimeType: 'image/png' }]);
+    }
+  );
   it('falls back when actual variant dimensions cannot satisfy nominally matching bounds', async () => {
     const f = fixture({ variantGeometry: { width: 800, height: 900, requiresOrientation: false } });
     expect(
@@ -350,22 +351,20 @@ describe('asset delivery', () => {
       height: 900,
       originalWidth: 1920,
     },
-  ] as const)('falls back when actual pixels require enlargement for %j', async ({
-    options,
-    width,
-    height,
-    originalWidth,
-  }) => {
-    const f = fixture({
-      wallpaper: { ...original, width: originalWidth },
-      variantGeometry: { width, height, requiresOrientation: false },
-    });
-    expect(await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', options)))).toMatchObject({
-      _tag: 'Found',
-    });
-    expect(f.reads).toEqual(['original', 'variant', 'original']);
-    expect(f.resizes).toEqual([{ ...options, mimeType: 'image/png' }]);
-  });
+  ] as const)(
+    'falls back when actual pixels require enlargement for %j',
+    async ({ options, width, height, originalWidth }) => {
+      const f = fixture({
+        wallpaper: { ...original, width: originalWidth },
+        variantGeometry: { width, height, requiresOrientation: false },
+      });
+      expect(await f.run(AssetDelivery.use((d) => d.wallpaper('wall_1', options)))).toMatchObject({
+        _tag: 'Found',
+      });
+      expect(f.reads).toEqual(['original', 'variant', 'original']);
+      expect(f.resizes).toEqual([{ ...options, mimeType: 'image/png' }]);
+    }
+  );
   it('preserves fill enlargement from an inspected variant', async () => {
     const f = fixture({ variantGeometry: { width: 800, height: 900, requiresOrientation: false } });
     expect(
@@ -376,19 +375,21 @@ describe('asset delivery', () => {
     expect(f.reads).toEqual(['original', 'variant', 'variant']);
     expect(f.resizes).toEqual([{ width: 960, height: 1080, fit: 'fill', mimeType: 'image/png' }]);
   });
-  it.each([
-    { width: 7681 },
-    { height: 4321 },
-  ])('rejects oversized one-dimensional requests without consulting an unavailable catalog: %j', async (options) => {
-    const f = fixture({ catalogFailure: true, maxResizeWidth: 7680, maxResizeHeight: 4320 });
-    expect(
-      await f.run(
-        Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { ...options, fit: 'contain' }))
-      )
-    ).toEqual({ _tag: 'Rejected', reason: 'Requested dimensions exceed asset limits' });
-    expect(f.wallpaperLookups).toEqual([]);
-    expect(f.reads).toEqual([]);
-  });
+  it.each([{ width: 7681 }, { height: 4321 }])(
+    'rejects oversized one-dimensional requests without consulting an unavailable catalog: %j',
+    async (options) => {
+      const f = fixture({ catalogFailure: true, maxResizeWidth: 7680, maxResizeHeight: 4320 });
+      expect(
+        await f.run(
+          Effect.flatMap(AssetDelivery, (d) =>
+            d.wallpaper('wall_1', { ...options, fit: 'contain' })
+          )
+        )
+      ).toEqual({ _tag: 'Rejected', reason: 'Requested dimensions exceed asset limits' });
+      expect(f.wallpaperLookups).toEqual([]);
+      expect(f.reads).toEqual([]);
+    }
+  );
   it('counts exact-original delivery as no resize rather than a variant miss', async () => {
     const f = fixture();
     const snapshots = await f.run(
@@ -414,37 +415,37 @@ describe('asset delivery', () => {
     { width: 3000, height: 6000 },
     { width: 12000, height: 2000 },
     { width: 8000, height: 8000 },
-  ])('streams a $width×$height original at its source dimensions above resize limits', async ({
-    width,
-    height,
-  }) => {
-    const f = fixture({
-      wallpaper: { ...original, width, height },
-      maxResizeWidth: 7680,
-      maxResizeHeight: 4320,
-      maxOutputPixels: 33177600,
-    });
-    for (const fit of ['contain', 'cover', 'fill'] as const) {
-      const outcome = await f.run(
-        Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { width, height, fit }))
-      );
-      expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png', fileSizeBytes: 3 });
-      if (outcome._tag !== 'Found') throw new Error('expected original');
-      const chunks = [];
-      for await (const chunk of outcome.body) chunks.push(...chunk);
-      expect(chunks).toEqual([1, 2, 3]);
+  ])(
+    'streams a $width×$height original at its source dimensions above resize limits',
+    async ({ width, height }) => {
+      const f = fixture({
+        wallpaper: { ...original, width, height },
+        maxResizeWidth: 7680,
+        maxResizeHeight: 4320,
+        maxOutputPixels: 33177600,
+      });
+      for (const fit of ['contain', 'cover', 'fill'] as const) {
+        const outcome = await f.run(
+          Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { width, height, fit }))
+        );
+        expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png', fileSizeBytes: 3 });
+        if (outcome._tag !== 'Found') throw new Error('expected original');
+        const chunks = [];
+        for await (const chunk of outcome.body) chunks.push(...chunk);
+        expect(chunks).toEqual([1, 2, 3]);
+      }
+      expect(f.reads).toEqual([
+        'original',
+        'original',
+        'original',
+        'original',
+        'original',
+        'original',
+      ]);
+      expect(f.resizes).toEqual([]);
+      expect(f.queries).toEqual([]);
     }
-    expect(f.reads).toEqual([
-      'original',
-      'original',
-      'original',
-      'original',
-      'original',
-      'original',
-    ]);
-    expect(f.resizes).toEqual([]);
-    expect(f.queries).toEqual([]);
-  });
+  );
   it.each([
     { width: 3000, height: 5999, inspected: true },
     { width: 3000, height: 6001, inspected: true },
@@ -454,45 +455,46 @@ describe('asset delivery', () => {
     { width: 3000.5, height: 6000, inspected: false },
     { width: Number.NaN, height: 6000, inspected: false },
     { width: Number.MAX_SAFE_INTEGER + 1, height: 6000, inspected: false },
-  ])('keeps rejecting invalid or oversized transformations of a large original: %j', async ({
-    inspected,
-    ...options
-  }) => {
-    const f = fixture({
-      wallpaper: { ...original, width: 3000, height: 6000 },
-      maxResizeWidth: 7680,
-      maxResizeHeight: 4320,
-    });
-    expect(
-      await f.run(
-        Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { ...options, fit: 'contain' }))
-      )
-    ).toMatchObject({ _tag: 'Rejected' });
-    expect(f.reads).toEqual(inspected ? ['original'] : []);
-    expect(f.resizes).toEqual([]);
-  });
-  it.each([
-    'contain',
-    'cover',
-    'fill',
-  ] as const)('streams matching originals and variants without encoding for %s', async (fit) => {
-    for (const width of [1920, 960]) {
-      const f = fixture();
-      const outcome = await f.run(
-        Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { width, height: 1080, fit }))
-      );
-      expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png' });
-      expect(f.reads).toEqual(
-        width === 1920 ? ['original', 'original'] : ['original', 'variant', 'variant']
-      );
+  ])(
+    'keeps rejecting invalid or oversized transformations of a large original: %j',
+    async ({ inspected, ...options }) => {
+      const f = fixture({
+        wallpaper: { ...original, width: 3000, height: 6000 },
+        maxResizeWidth: 7680,
+        maxResizeHeight: 4320,
+      });
+      expect(
+        await f.run(
+          Effect.flatMap(AssetDelivery, (d) =>
+            d.wallpaper('wall_1', { ...options, fit: 'contain' })
+          )
+        )
+      ).toMatchObject({ _tag: 'Rejected' });
+      expect(f.reads).toEqual(inspected ? ['original'] : []);
       expect(f.resizes).toEqual([]);
-      if (outcome._tag !== 'Found') throw new Error('expected image');
-      expect(outcome.fileSizeBytes).toBe(width === 1920 ? original.fileSizeBytes : undefined);
-      const chunks = [];
-      for await (const chunk of outcome.body) chunks.push(...chunk);
-      expect(chunks).toEqual([1, 2, 3]);
     }
-  });
+  );
+  it.each(['contain', 'cover', 'fill'] as const)(
+    'streams matching originals and variants without encoding for %s',
+    async (fit) => {
+      for (const width of [1920, 960]) {
+        const f = fixture();
+        const outcome = await f.run(
+          Effect.flatMap(AssetDelivery, (d) => d.wallpaper('wall_1', { width, height: 1080, fit }))
+        );
+        expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png' });
+        expect(f.reads).toEqual(
+          width === 1920 ? ['original', 'original'] : ['original', 'variant', 'variant']
+        );
+        expect(f.resizes).toEqual([]);
+        if (outcome._tag !== 'Found') throw new Error('expected image');
+        expect(outcome.fileSizeBytes).toBe(width === 1920 ? original.fileSizeBytes : undefined);
+        const chunks = [];
+        for await (const chunk of outcome.body) chunks.push(...chunk);
+        expect(chunks).toEqual([1, 2, 3]);
+      }
+    }
+  );
   it('still resizes the original when an exact-size variant is missing', async () => {
     const f = fixture();
     f.loseVariant();

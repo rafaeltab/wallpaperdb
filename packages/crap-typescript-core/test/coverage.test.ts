@@ -19,12 +19,14 @@ describe("coverage helpers", () => {
     tempDirs.push(projectRoot);
     const reportPath = path.join(projectRoot, "coverage", "coverage-final.json");
     await writeProjectFiles(projectRoot, {
-      "coverage/coverage-final.json": "{not-json"
+      "coverage/coverage-final.json": "{not-json",
     });
 
-    await expect(parseCoverageReport(reportPath, projectRoot)).rejects.toThrow(CoverageReportParseError);
     await expect(parseCoverageReport(reportPath, projectRoot)).rejects.toThrow(
-      `Coverage report at ${reportPath} could not be parsed:`
+      CoverageReportParseError,
+    );
+    await expect(parseCoverageReport(reportPath, projectRoot)).rejects.toThrow(
+      `Coverage report at ${reportPath} could not be parsed:`,
     );
   });
 
@@ -41,7 +43,7 @@ describe("coverage helpers", () => {
           fnMap: {},
           s: {},
           b: {},
-          f: {}
+          f: {},
         },
         "empty-path": {
           path: "",
@@ -50,7 +52,7 @@ describe("coverage helpers", () => {
           fnMap: {},
           s: {},
           b: {},
-          f: {}
+          f: {},
         },
         "absolute-key": {
           path: absoluteSourcePath,
@@ -59,15 +61,18 @@ describe("coverage helpers", () => {
           fnMap: {},
           s: {},
           b: {},
-          f: {}
+          f: {},
         },
-        invalid: null
-      })
+        invalid: null,
+      }),
     });
 
-    const coverage = await parseCoverageReport(path.join(projectRoot, "coverage", "coverage-final.json"), projectRoot);
-    const expectedPaths = [path.resolve(projectRoot, "src", "fallback.ts"), absoluteSourcePath].map((filePath) =>
-      filePath.replace(/\\/g, "/").toLowerCase()
+    const coverage = await parseCoverageReport(
+      path.join(projectRoot, "coverage", "coverage-final.json"),
+      projectRoot,
+    );
+    const expectedPaths = [path.resolve(projectRoot, "src", "fallback.ts"), absoluteSourcePath].map(
+      (filePath) => filePath.replace(/\\/g, "/").toLowerCase(),
     );
 
     expect([...coverage.keys()].sort()).toEqual(expectedPaths.sort());
@@ -97,20 +102,20 @@ export const trim = (value: string) => value.trim();
           statementMap: {
             "0": {
               start: { line: 2, column: 2 },
-              end: { line: 2, column: 19 }
+              end: { line: 2, column: 19 },
             },
             "1": {
               start: { line: 7, column: 4 },
-              end: { line: 7, column: 13 }
+              end: { line: 7, column: 13 },
             },
             "2": {
               start: { line: 9, column: 2 },
-              end: { line: 9, column: 26 }
+              end: { line: 9, column: 26 },
             },
             "3": {
               start: { line: 12, column: 39 },
-              end: { line: 12, column: 51 }
-            }
+              end: { line: 12, column: 51 },
+            },
           },
           fnMap: {},
           branchMap: {
@@ -119,36 +124,36 @@ export const trim = (value: string) => value.trim();
               type: "if",
               loc: {
                 start: { line: 6, column: 2 },
-                end: { line: 8, column: 3 }
+                end: { line: 8, column: 3 },
               },
               locations: [
                 {
                   start: { line: 6, column: 2 },
-                  end: { line: 8, column: 3 }
+                  end: { line: 8, column: 3 },
                 },
-                {}
-              ]
-            }
+                {},
+              ],
+            },
           },
           s: {
             "0": 1,
             "1": 1,
             "2": 0,
-            "3": 1
+            "3": 1,
           },
           f: {},
           b: {
-            "0": [1, 1]
-          }
-        }
-      })
+            "0": [1, 1],
+          },
+        },
+      }),
     });
 
     const filePath = path.join(projectRoot, "src", "sample.ts");
     const methods = await parseFileMethods(filePath);
     const coverageReport = await parseCoverageReport(
       path.join(projectRoot, "coverage", "coverage-final.json"),
-      projectRoot
+      projectRoot,
     );
     const methodCoverage = coverageForMethods(methods, [...coverageReport.values()][0]);
 
@@ -156,18 +161,18 @@ export const trim = (value: string) => value.trim();
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: null, status: "structural_na", reason: null }
+        branch: { percent: null, status: "structural_na", reason: null },
       },
       {
         coverage: { percent: 50.0, status: "measured", reason: null },
         statement: { percent: 50.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
+        branch: { percent: 100.0, status: "measured", reason: null },
       },
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: null, status: "structural_na", reason: null }
-      }
+        branch: { percent: null, status: "structural_na", reason: null },
+      },
     ]);
   });
 
@@ -188,32 +193,32 @@ export function risky(flag: boolean): number {
 }
 
 export const trim = (value: string) => value.trim();
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
     const methodCoverage = coverageForMethods(methods, {
       statements: [],
       branches: [],
-      functions: []
+      functions: [],
     });
 
     expect(methodCoverage.map(summarizeMethodCoverage)).toEqual([
       {
         coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
         statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        branch: { percent: null, status: "structural_na", reason: null }
+        branch: { percent: null, status: "structural_na", reason: null },
       },
       {
         coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
         statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        branch: { percent: null, status: "unknown", reason: "branch_unattributed" }
+        branch: { percent: null, status: "unknown", reason: "branch_unattributed" },
       },
       {
         coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
         statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        branch: { percent: null, status: "structural_na", reason: null }
-      }
+        branch: { percent: null, status: "structural_na", reason: null },
+      },
     ]);
   });
 
@@ -235,26 +240,28 @@ export function branchy(flag: boolean): number {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
-    expect(coverageForMethods(methods, undefined, "missing_report").map(summarizeMethodCoverage)).toEqual([
+    expect(
+      coverageForMethods(methods, undefined, "missing_report").map(summarizeMethodCoverage),
+    ).toEqual([
       {
         coverage: { percent: null, status: "unknown", reason: "missing_report" },
         statement: { percent: null, status: "structural_na", reason: null },
-        branch: { percent: null, status: "structural_na", reason: null }
+        branch: { percent: null, status: "structural_na", reason: null },
       },
       {
         coverage: { percent: null, status: "unknown", reason: "missing_report" },
         statement: { percent: null, status: "structural_na", reason: null },
-        branch: { percent: null, status: "structural_na", reason: null }
+        branch: { percent: null, status: "structural_na", reason: null },
       },
       {
         coverage: { percent: null, status: "unknown", reason: "missing_report" },
         statement: { percent: null, status: "unknown", reason: "missing_report" },
-        branch: { percent: null, status: "unknown", reason: "missing_report" }
-      }
+        branch: { percent: null, status: "unknown", reason: "missing_report" },
+      },
     ]);
   });
 
@@ -281,41 +288,43 @@ export function classDeclOnly(): void {
 export function enumDeclOnly(): void {
   enum LocalEnum { A }
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
     const methodCoverage = coverageForMethods(methods, {
       statements: [],
       branches: [],
-      functions: []
+      functions: [],
     });
-    const byName = new Map(methods.map((method, index) => [method.displayName, methodCoverage[index]]));
+    const byName = new Map(
+      methods.map((method, index) => [method.displayName, methodCoverage[index]]),
+    );
 
-    expect(summarizeMethodCoverage(byName.get("empty")!)).toEqual({
+    expect(summarizeMethodCoverage(required(byName.get("empty")))).toEqual({
       coverage: { percent: 100.0, status: "structural_na", reason: null },
       statement: { percent: null, status: "structural_na", reason: null },
-      branch: { percent: null, status: "structural_na", reason: null }
+      branch: { percent: null, status: "structural_na", reason: null },
     });
-    expect(summarizeMethodCoverage(byName.get("typeOnly")!)).toEqual({
+    expect(summarizeMethodCoverage(required(byName.get("typeOnly")))).toEqual({
       coverage: { percent: 100.0, status: "structural_na", reason: null },
       statement: { percent: null, status: "structural_na", reason: null },
-      branch: { percent: null, status: "structural_na", reason: null }
+      branch: { percent: null, status: "structural_na", reason: null },
     });
-    expect(summarizeMethodCoverage(byName.get("functionDeclOnly")!)).toEqual({
+    expect(summarizeMethodCoverage(required(byName.get("functionDeclOnly")))).toEqual({
       coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
       statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-      branch: { percent: null, status: "structural_na", reason: null }
+      branch: { percent: null, status: "structural_na", reason: null },
     });
-    expect(summarizeMethodCoverage(byName.get("classDeclOnly")!)).toEqual({
+    expect(summarizeMethodCoverage(required(byName.get("classDeclOnly")))).toEqual({
       coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
       statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-      branch: { percent: null, status: "structural_na", reason: null }
+      branch: { percent: null, status: "structural_na", reason: null },
     });
-    expect(summarizeMethodCoverage(byName.get("enumDeclOnly")!)).toEqual({
+    expect(summarizeMethodCoverage(required(byName.get("enumDeclOnly")))).toEqual({
       coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
       statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-      branch: { percent: null, status: "structural_na", reason: null }
+      branch: { percent: null, status: "structural_na", reason: null },
     });
   });
 
@@ -337,37 +346,39 @@ export function enumDeclOnly(): void {
           statementMap: {
             "0": {
               start: { line: 3, column: 4 },
-              end: { line: 3, column: 13 }
+              end: { line: 3, column: 13 },
             },
             "1": {
               start: { line: 5, column: 2 },
-              end: { line: 5, column: 11 }
-            }
+              end: { line: 5, column: 11 },
+            },
           },
           fnMap: {},
           branchMap: {},
           s: {
             "0": 1,
-            "1": 1
+            "1": 1,
           },
           f: {},
-          b: {}
-        }
-      })
+          b: {},
+        },
+      }),
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
     const coverageReport = await parseCoverageReport(
       path.join(projectRoot, "coverage", "coverage-final.json"),
-      projectRoot
+      projectRoot,
     );
 
-    expect(coverageForMethods(methods, [...coverageReport.values()][0]).map(summarizeMethodCoverage)).toEqual([
+    expect(
+      coverageForMethods(methods, [...coverageReport.values()][0]).map(summarizeMethodCoverage),
+    ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: null, status: "unknown", reason: "branch_unattributed" }
-      }
+        branch: { percent: null, status: "unknown", reason: "branch_unattributed" },
+      },
     ]);
   });
 
@@ -382,7 +393,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -392,17 +403,17 @@ export function enumDeclOnly(): void {
         branches: [
           {
             span: { startLine: 2, startColumn: 2, endLine: 4, endColumn: 3 },
-            hits: [1, 0]
-          }
+            hits: [1, 0],
+          },
         ],
-        functions: []
-      }).map(summarizeMethodCoverage)
+        functions: [],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 50.0, status: "measured", reason: null },
         statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        branch: { percent: 50.0, status: "measured", reason: null }
-      }
+        branch: { percent: 50.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -417,7 +428,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -426,22 +437,22 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 3, startColumn: 4, endLine: 3, endColumn: 13 }, hits: 1 },
-          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 }
+          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 2, startColumn: 2, endLine: 4, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
-        functions: [{ span: method.bodySpan }]
-      }).map(summarizeMethodCoverage)
+        functions: [{ span: method.bodySpan }],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -456,7 +467,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -464,22 +475,22 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 3, startColumn: 4, endLine: 3, endColumn: 13 }, hits: 1 },
-          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 }
+          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 1, startColumn: 0, endLine: 4, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
-        functions: [{ span: { startLine: 1, startColumn: 0, endLine: 6, endColumn: 1 } }]
-      }).map(summarizeMethodCoverage)
+        functions: [{ span: { startLine: 1, startColumn: 0, endLine: 6, endColumn: 1 } }],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: null, status: "unknown", reason: "branch_unattributed" }
-      }
+        branch: { percent: null, status: "unknown", reason: "branch_unattributed" },
+      },
     ]);
   });
 
@@ -495,7 +506,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -506,36 +517,36 @@ export function enumDeclOnly(): void {
           statementMap: {
             "0": {
               start: { line: 4, column: 4 },
-              end: { line: 4, column: 13 }
+              end: { line: 4, column: 13 },
             },
             "1": {
               start: { line: 6, column: 2 },
-              end: { line: 6, column: 11 }
-            }
+              end: { line: 6, column: 11 },
+            },
           },
           fnMap: {
             "0": {
               name: "deduped",
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 1, column: 15 }
+                end: { line: 1, column: 15 },
               },
               loc: {
                 start: { line: 2, column: 0 },
-                end: { line: 7, column: 1 }
-              }
+                end: { line: 7, column: 1 },
+              },
             },
             "1": {
               name: "deduped",
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 1, column: 15 }
+                end: { line: 1, column: 15 },
               },
               loc: {
                 start: { line: 1, column: 0 },
-                end: { line: 7, column: null }
-              }
-            }
+                end: { line: 7, column: null },
+              },
+            },
           },
           branchMap: {
             "0": {
@@ -543,40 +554,42 @@ export function enumDeclOnly(): void {
               type: "if",
               loc: {
                 start: { line: 3, column: 2 },
-                end: { line: 5, column: 3 }
+                end: { line: 5, column: 3 },
               },
               locations: [
                 {
                   start: { line: 3, column: 2 },
-                  end: { line: 5, column: 3 }
+                  end: { line: 5, column: 3 },
                 },
-                {}
-              ]
-            }
+                {},
+              ],
+            },
           },
           s: {
             "0": 1,
-            "1": 1
+            "1": 1,
           },
           f: {},
           b: {
-            "0": [1, 1]
-          }
-        }
-      })
+            "0": [1, 1],
+          },
+        },
+      }),
     });
 
     const coverageReport = await parseCoverageReport(
       path.join(projectRoot, "coverage", "coverage-final.json"),
-      projectRoot
+      projectRoot,
     );
 
-    expect(coverageForMethods(methods, [...coverageReport.values()][0]).map(summarizeMethodCoverage)).toEqual([
+    expect(
+      coverageForMethods(methods, [...coverageReport.values()][0]).map(summarizeMethodCoverage),
+    ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -592,7 +605,7 @@ export function enumDeclOnly(): void {
   }
   return values;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -601,13 +614,13 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 4, startColumn: 4, endLine: 4, endColumn: 22 }, hits: 1 },
-          { span: { startLine: 6, startColumn: 2, endLine: 6, endColumn: 15 }, hits: 1 }
+          { span: { startLine: 6, startColumn: 2, endLine: 6, endColumn: 15 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 3, startColumn: 2, endLine: 5, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
         functions: [
           {
@@ -617,18 +630,18 @@ export function enumDeclOnly(): void {
               startLine: method.bodySpan.startLine,
               startColumn: method.bodySpan.startColumn,
               endLine: method.bodySpan.endLine - 1,
-              endColumn: Number.MAX_SAFE_INTEGER
+              endColumn: Number.MAX_SAFE_INTEGER,
             },
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -644,7 +657,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -652,35 +665,35 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 4, startColumn: 4, endLine: 4, endColumn: 13 }, hits: 1 },
-          { span: { startLine: 6, startColumn: 2, endLine: 6, endColumn: 11 }, hits: 1 }
+          { span: { startLine: 6, startColumn: 2, endLine: 6, endColumn: 11 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 3, startColumn: 2, endLine: 5, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
         functions: [
           {
             name: "conflict",
             declarationStart: { line: 1, column: 0 },
-            span: methods[0]!.bodySpan,
-            spanSource: "loc"
+            span: required(methods[0]).bodySpan,
+            spanSource: "loc",
           },
           {
             name: "conflict_alt",
             declarationStart: { line: 1, column: 1 },
-            span: methods[0]!.bodySpan,
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            span: required(methods[0]).bodySpan,
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: null, status: "unknown", reason: "fnmap_conflict" },
         statement: { percent: null, status: "unknown", reason: "fnmap_conflict" },
-        branch: { percent: null, status: "unknown", reason: "fnmap_conflict" }
-      }
+        branch: { percent: null, status: "unknown", reason: "fnmap_conflict" },
+      },
     ]);
   });
 
@@ -695,7 +708,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -703,29 +716,29 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 3, startColumn: 4, endLine: 3, endColumn: 13 }, hits: 1 },
-          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 }
+          { span: { startLine: 5, startColumn: 2, endLine: 5, endColumn: 11 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 2, startColumn: 2, endLine: 4, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
         functions: [
           {
             name: "wrapped",
             declarationStart: { line: 1, column: 0 },
             span: { startLine: 1, startColumn: 0, endLine: 6, endColumn: 1 },
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -742,7 +755,7 @@ export function enumDeclOnly(): void {
       return 0;
   }
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -750,29 +763,29 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 4, startColumn: 6, endLine: 4, endColumn: 15 }, hits: 1 },
-          { span: { startLine: 6, startColumn: 6, endLine: 6, endColumn: 15 }, hits: 1 }
+          { span: { startLine: 6, startColumn: 6, endLine: 6, endColumn: 15 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 2, startColumn: 2, endLine: 6, endColumn: 3 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
         functions: [
           {
             name: "branchy",
             declarationStart: { line: 1, column: 0 },
             span: { startLine: 2, startColumn: 2, endLine: 6, endColumn: Number.MAX_SAFE_INTEGER },
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -787,7 +800,7 @@ export function enumDeclOnly(): void {
   }
   return 0;
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -799,17 +812,22 @@ export function enumDeclOnly(): void {
           {
             name: "different",
             declarationStart: { line: 10, column: 0 },
-            span: { startLine: 10, startColumn: 0, endLine: 12, endColumn: Number.MAX_SAFE_INTEGER },
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            span: {
+              startLine: 10,
+              startColumn: 0,
+              endLine: 12,
+              endColumn: Number.MAX_SAFE_INTEGER,
+            },
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
         statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        branch: { percent: null, status: "unknown", reason: "branch_unattributed" }
-      }
+        branch: { percent: null, status: "unknown", reason: "branch_unattributed" },
+      },
     ]);
   });
 
@@ -826,7 +844,7 @@ export function enumDeclOnly(): void {
     return 0;
   }
 }
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
@@ -834,27 +852,27 @@ export function enumDeclOnly(): void {
       coverageForMethods(methods, {
         statements: [
           { span: { startLine: 4, startColumn: 6, endLine: 4, endColumn: 15 }, hits: 1 },
-          { span: { startLine: 6, startColumn: 4, endLine: 6, endColumn: 13 }, hits: 1 }
+          { span: { startLine: 6, startColumn: 4, endLine: 6, endColumn: 13 }, hits: 1 },
         ],
         branches: [
           {
             span: { startLine: 3, startColumn: 4, endLine: 5, endColumn: 5 },
-            hits: [1, 1]
-          }
+            hits: [1, 1],
+          },
         ],
         functions: [
           {
             span: { startLine: 2, startColumn: 29, endLine: 5, endColumn: Number.MAX_SAFE_INTEGER },
-            spanSource: "loc"
-          }
-        ]
-      }).map(summarizeMethodCoverage)
+            spanSource: "loc",
+          },
+        ],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
-      }
+        branch: { percent: 100.0, status: "measured", reason: null },
+      },
     ]);
   });
 
@@ -864,22 +882,24 @@ export function enumDeclOnly(): void {
     await writeProjectFiles(projectRoot, {
       "package.json": '{"name":"fixture","private":true}',
       "src/sample.ts": `export const trim = (value: string) => value.trim();
-`
+`,
     });
 
     const methods = await parseFileMethods(path.join(projectRoot, "src", "sample.ts"));
     expect(
       coverageForMethods(methods, {
-        statements: [{ span: { startLine: 1, startColumn: 39, endLine: 1, endColumn: 51 }, hits: 1 }],
+        statements: [
+          { span: { startLine: 1, startColumn: 39, endLine: 1, endColumn: 51 }, hits: 1 },
+        ],
         branches: [],
-        functions: [{ span: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 10 } }]
-      }).map(summarizeMethodCoverage)
+        functions: [{ span: { startLine: 1, startColumn: 0, endLine: 1, endColumn: 10 } }],
+      }).map(summarizeMethodCoverage),
     ).toEqual([
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: null, status: "structural_na", reason: null }
-      }
+        branch: { percent: null, status: "structural_na", reason: null },
+      },
     ]);
   });
 
@@ -894,12 +914,12 @@ export function enumDeclOnly(): void {
           statementMap: {
             "0": {
               start: { line: 2, column: 2 },
-              end: { line: 2, column: 19 }
+              end: { line: 2, column: 19 },
             },
             "1": {
               start: { line: 2, column: 2 },
-              end: { line: 2, column: 19 }
-            }
+              end: { line: 2, column: 19 },
+            },
           },
           branchMap: {
             "0": {
@@ -907,43 +927,46 @@ export function enumDeclOnly(): void {
               locations: [
                 {
                   start: { line: 3, column: 2 },
-                  end: { line: 5, column: 3 }
-                }
-              ]
+                  end: { line: 5, column: 3 },
+                },
+              ],
             },
             "1": {
               loc: {
                 start: { line: 3, column: 2 },
-                end: { line: 5, column: 3 }
-              }
-            }
+                end: { line: 5, column: 3 },
+              },
+            },
           },
           fnMap: {
             "0": {
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 6, column: 1 }
-              }
+                end: { line: 6, column: 1 },
+              },
             },
             "1": {
-              line: 1
-            }
+              line: 1,
+            },
           },
           s: {
             "0": 1,
-            "1": 3
+            "1": 3,
           },
           b: {
             "0": [1, 0],
-            "1": [0, 2, 4]
+            "1": [0, 2, 4],
           },
-          f: {}
-        }
-      })
+          f: {},
+        },
+      }),
     });
 
     const [fileCoverage] = (
-      await parseCoverageReport(path.join(projectRoot, "coverage", "coverage-final.json"), projectRoot)
+      await parseCoverageReport(
+        path.join(projectRoot, "coverage", "coverage-final.json"),
+        projectRoot,
+      )
     ).values();
     expect(fileCoverage.statements).toEqual([
       {
@@ -951,10 +974,10 @@ export function enumDeclOnly(): void {
           startLine: 2,
           startColumn: 2,
           endLine: 2,
-          endColumn: 19
+          endColumn: 19,
         },
-        hits: 3
-      }
+        hits: 3,
+      },
     ]);
     expect(fileCoverage.branches).toEqual([
       {
@@ -962,10 +985,10 @@ export function enumDeclOnly(): void {
           startLine: 3,
           startColumn: 2,
           endLine: 5,
-          endColumn: 3
+          endColumn: 3,
         },
-        hits: [1, 2, 4]
-      }
+        hits: [1, 2, 4],
+      },
     ]);
     expect(fileCoverage.functions).toEqual([
       {
@@ -973,23 +996,23 @@ export function enumDeclOnly(): void {
           startLine: 1,
           startColumn: 0,
           endLine: 6,
-          endColumn: 1
+          endColumn: 1,
         },
         declarationStart: {
           line: 1,
-          column: 0
+          column: 0,
         },
-        spanSource: "decl"
+        spanSource: "decl",
       },
       {
         span: {
           startLine: 1,
           startColumn: 0,
           endLine: 1,
-          endColumn: Number.MAX_SAFE_INTEGER
+          endColumn: Number.MAX_SAFE_INTEGER,
         },
-        spanSource: "line"
-      }
+        spanSource: "line",
+      },
     ]);
   });
 
@@ -1004,16 +1027,16 @@ export function enumDeclOnly(): void {
           statementMap: {
             "0": {
               start: { line: 2, column: 2 },
-              end: { line: 2, column: 19 }
+              end: { line: 2, column: 19 },
             },
             "1": {
               start: { line: 3.5, column: 2 },
-              end: { line: 3, column: 19 }
+              end: { line: 3, column: 19 },
             },
             "2": {
               start: { line: 4, column: -1 },
-              end: { line: 4, column: 19 }
-            }
+              end: { line: 4, column: 19 },
+            },
           },
           branchMap: {
             "0": {
@@ -1021,44 +1044,47 @@ export function enumDeclOnly(): void {
               locations: [
                 {
                   start: { line: 6, column: 2 },
-                  end: { line: 8, column: 3 }
-                }
-              ]
+                  end: { line: 8, column: 3 },
+                },
+              ],
             },
             "1": {
-              line: 6.5
-            }
+              line: 6.5,
+            },
           },
           fnMap: {
             "0": {
-              line: 1
+              line: 1,
             },
             "1": {
-              line: -1
+              line: -1,
             },
             "2": {
               decl: {
                 start: { line: 1, column: -1 },
-                end: { line: 6, column: 1 }
-              }
-            }
+                end: { line: 6, column: 1 },
+              },
+            },
           },
           s: {
             "0": 1.5,
             "1": 2,
-            "2": 3
+            "2": 3,
           },
           b: {
             "0": [1, 0.5],
-            "1": [2]
+            "1": [2],
           },
-          f: {}
-        }
-      })
+          f: {},
+        },
+      }),
     });
 
     const [fileCoverage] = (
-      await parseCoverageReport(path.join(projectRoot, "coverage", "coverage-final.json"), projectRoot)
+      await parseCoverageReport(
+        path.join(projectRoot, "coverage", "coverage-final.json"),
+        projectRoot,
+      )
     ).values();
 
     expect(fileCoverage.statements).toEqual([
@@ -1067,10 +1093,10 @@ export function enumDeclOnly(): void {
           startLine: 2,
           startColumn: 2,
           endLine: 2,
-          endColumn: 19
+          endColumn: 19,
         },
-        hits: 1.5
-      }
+        hits: 1.5,
+      },
     ]);
     expect(fileCoverage.branches).toEqual([
       {
@@ -1078,10 +1104,10 @@ export function enumDeclOnly(): void {
           startLine: 6,
           startColumn: 2,
           endLine: 8,
-          endColumn: 3
+          endColumn: 3,
         },
-        hits: [1, 0.5]
-      }
+        hits: [1, 0.5],
+      },
     ]);
     expect(fileCoverage.functions).toEqual([
       {
@@ -1090,10 +1116,10 @@ export function enumDeclOnly(): void {
           startLine: 1,
           startColumn: 0,
           endLine: 1,
-          endColumn: Number.MAX_SAFE_INTEGER
+          endColumn: Number.MAX_SAFE_INTEGER,
         },
-        spanSource: "line"
-      }
+        spanSource: "line",
+      },
     ]);
   });
 
@@ -1108,38 +1134,41 @@ export function enumDeclOnly(): void {
           statementMap: {
             "0": {
               start: { line: 4, column: 6 },
-              end: { line: 4, column: 5 }
-            }
+              end: { line: 4, column: 5 },
+            },
           },
           branchMap: {
             "0": {
               loc: {
                 start: { line: 6, column: 4 },
-                end: { line: 5, column: 8 }
-              }
-            }
+                end: { line: 5, column: 8 },
+              },
+            },
           },
           fnMap: {
             "0": {
               loc: {
                 start: { line: 8, column: 2 },
-                end: { line: 7, column: 9 }
-              }
-            }
+                end: { line: 7, column: 9 },
+              },
+            },
           },
           s: {
-            "0": 1
+            "0": 1,
           },
           b: {
-            "0": [1]
+            "0": [1],
           },
-          f: {}
-        }
-      })
+          f: {},
+        },
+      }),
     });
 
     const [fileCoverage] = (
-      await parseCoverageReport(path.join(projectRoot, "coverage", "coverage-final.json"), projectRoot)
+      await parseCoverageReport(
+        path.join(projectRoot, "coverage", "coverage-final.json"),
+        projectRoot,
+      )
     ).values();
 
     expect(fileCoverage.statements).toEqual([]);
@@ -1162,41 +1191,44 @@ export function enumDeclOnly(): void {
               name: "preferLoc",
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 1, column: 18 }
+                end: { line: 1, column: 18 },
               },
               loc: {
                 start: { line: 2, column: 0 },
-                end: { line: 6, column: 1 }
-              }
+                end: { line: 6, column: 1 },
+              },
             },
             "1": {
               name: "preferLoc",
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 1, column: 18 }
-              }
+                end: { line: 1, column: 18 },
+              },
             },
             "2": {
               name: "preferLoc",
               decl: {
                 start: { line: 1, column: 0 },
-                end: { line: 1, column: 18 }
+                end: { line: 1, column: 18 },
               },
               loc: {
                 start: { line: 3, column: 0 },
-                end: { line: 5, column: 1 }
-              }
-            }
+                end: { line: 5, column: 1 },
+              },
+            },
           },
           s: {},
           b: {},
-          f: {}
-        }
-      })
+          f: {},
+        },
+      }),
     });
 
     const [fileCoverage] = (
-      await parseCoverageReport(path.join(projectRoot, "coverage", "coverage-final.json"), projectRoot)
+      await parseCoverageReport(
+        path.join(projectRoot, "coverage", "coverage-final.json"),
+        projectRoot,
+      )
     ).values();
 
     expect(fileCoverage.functions).toEqual([
@@ -1204,16 +1236,16 @@ export function enumDeclOnly(): void {
         name: "preferLoc",
         declarationStart: {
           line: 1,
-          column: 0
+          column: 0,
         },
         span: {
           startLine: 3,
           startColumn: 0,
           endLine: 5,
-          endColumn: 1
+          endColumn: 1,
         },
-        spanSource: "loc"
-      }
+        spanSource: "loc",
+      },
     ]);
   });
 });
@@ -1230,11 +1262,15 @@ function summarizeMethodCoverage(coverage: {
   return {
     coverage: summarizeMetric(coverage.coverage),
     statement: summarizeMetric(coverage.statementCoverage),
-    branch: summarizeMetric(coverage.branchCoverage)
+    branch: summarizeMetric(coverage.branchCoverage),
   };
 }
 
-function summarizeMetric(metric: { percent: number | null; status: string; unknownReason: string | null }): {
+function summarizeMetric(metric: {
+  percent: number | null;
+  status: string;
+  unknownReason: string | null;
+}): {
   percent: number | null;
   status: string;
   reason: string | null;
@@ -1242,6 +1278,11 @@ function summarizeMetric(metric: { percent: number | null; status: string; unkno
   return {
     percent: metric.percent === null ? null : Number(metric.percent.toFixed(1)),
     status: metric.status,
-    reason: metric.unknownReason
+    reason: metric.unknownReason,
   };
+}
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error("Expected a required test value");
+  return value;
 }

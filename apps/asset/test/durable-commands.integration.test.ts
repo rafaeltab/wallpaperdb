@@ -458,7 +458,8 @@ it('reclaims an ambiguous real broker publication after process restart with the
       .publish(encoded.subject, JSON.stringify(encoded.event), { msgID: reclaimed.id });
     expect(retry.duplicate).toBe(true);
     expect(retry.seq).toBe(initial.seq);
-    await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.published(reclaimed!)));
+    const publication = reclaimed;
+    await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.published(publication)));
     expect(await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual(
       []
     );
@@ -624,7 +625,7 @@ it('hands excessively nested malformed input to durable quarantine without repea
     time: '2026-10-22T00:00:00.000Z',
     datacontenttype: 'application/json',
     data: { commandId: 'deep-malformed', applicationReference: '', nested: null },
-  }).replace('"nested":null', '"nested":' + '['.repeat(5000) + '0' + ']'.repeat(5000));
+  }).replace('"nested":null', `"nested":${'['.repeat(5000)}0${']'.repeat(5000)}`);
   await application.jetstream().publish('asset.commands.user.create', event);
   await expect
     .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {

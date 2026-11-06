@@ -77,7 +77,7 @@ it('accepts only a structured outcome of the expected completed run at the clean
     for (const message of [
       { ...valid, role: 'user' },
       { ...valid, runId: 'old' },
-      { ...valid, text: '> ' + valid.text },
+      { ...valid, text: `> ${valid.text}` },
       { ...valid, text: '<TASK>COMPLETE</TASK>' },
       { ...valid, text: JSON.stringify({ ...receipt, tests: false }) },
       { ...valid, text: JSON.stringify({ ...receipt, base: 'a'.repeat(40) }) },
@@ -209,7 +209,7 @@ it('recognizes only the current expected assistant waiting receipt, without acce
     for (const invalid of [
       { ...message, role: 'user' },
       { ...message, runId: 'old' },
-      { ...message, text: '> ' + message.text },
+      { ...message, text: `> ${message.text}` },
       { ...message, text: '<PR>READY</PR>' },
     ]) {
       await host.save({ overrides, messages: [invalid] });
@@ -273,7 +273,7 @@ it('delivers the durable per-job PR target instead of the configured default', (
     );
     expect(sends).toHaveLength(1);
     expect(sends[0].args[3]).toContain(
-      'against PR target factory/A, pinned comparison ' + host.base
+      `against PR target factory/A, pinned comparison ${host.base}`
     );
   }));
 

@@ -11,7 +11,7 @@ import {
   type StageRequest,
   type Time,
   Unavailable,
-  ContinuationAdmission,
+  type ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
 

@@ -32,6 +32,8 @@ export default createEslintRule({
 					return;
 				}
 				const nodeToReport = vitestFnCall.members[0].parent;
+				if (!nodeToReport)
+					throw new Error("Expected an assertion member parent");
 				if (reported.has(nodeToReport)) {
 					return;
 				}
@@ -45,7 +47,7 @@ export default createEslintRule({
 					return;
 				}
 				context.report({
-					node: nodeToReport!,
+					node: nodeToReport,
 					messageId: "notAwaited",
 					data: {
 						method: `expect.${getAccessorValue(vitestFnCall.members[0])}`,

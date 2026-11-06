@@ -449,7 +449,7 @@ const resolvePossibleAliasedGlobal = (global: string, context: Context) => {
 	if (alias) return alias[0];
 	return null;
 };
-const isAncestorTestCaseCall = ({ parent }: SyntaxNode) => {
+const _isAncestorTestCaseCall = ({ parent }: SyntaxNode) => {
 	return (
 		parent?.type === AST_NODE_TYPES.CallExpression &&
 		parent.callee.type === AST_NODE_TYPES.Identifier &&

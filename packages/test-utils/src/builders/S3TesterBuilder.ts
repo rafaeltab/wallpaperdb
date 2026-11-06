@@ -219,8 +219,12 @@ class S3Helpers {
     const response = await this.getS3Client().send(
       new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix })
     );
-    // biome-ignore lint/style/noNonNullAssertion: AWS SDK guarantees Key exists in Contents
-    return response.Contents?.map((obj) => obj.Key!) ?? [];
+    return (
+      response.Contents?.map((obj) => {
+        if (obj.Key === undefined) throw new Error('Expected a key in the S3 object listing');
+        return obj.Key;
+      }) ?? []
+    );
   }
 
   /**

@@ -58,7 +58,7 @@ const arrow = (items: number[]) => {
   return 0;
 };
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -72,10 +72,10 @@ const arrow = (items: number[]) => {
         complexity: 3,
         bodySpan: {
           startLine: 2,
-          endLine: 7
+          endLine: 7,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
+        expectsBranchCoverage: true,
       },
       {
         functionName: "callback",
@@ -86,10 +86,10 @@ const arrow = (items: number[]) => {
         complexity: 1,
         bodySpan: {
           startLine: 9,
-          endLine: 17
+          endLine: 17,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: false
+        expectsBranchCoverage: false,
       },
       {
         functionName: "inner",
@@ -100,10 +100,10 @@ const arrow = (items: number[]) => {
         complexity: 2,
         bodySpan: {
           startLine: 10,
-          endLine: 15
+          endLine: 15,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
+        expectsBranchCoverage: true,
       },
       {
         functionName: "score",
@@ -114,10 +114,10 @@ const arrow = (items: number[]) => {
         complexity: 2,
         bodySpan: {
           startLine: 21,
-          endLine: 28
+          endLine: 28,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
+        expectsBranchCoverage: true,
       },
       {
         functionName: "arrow",
@@ -128,11 +128,11 @@ const arrow = (items: number[]) => {
         complexity: 3,
         bodySpan: {
           startLine: 31,
-          endLine: 38
+          endLine: 38,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
-      }
+        expectsBranchCoverage: true,
+      },
     ]);
   });
 
@@ -158,7 +158,7 @@ const arrow = (items: number[]) => {
   value = 0;
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -166,7 +166,7 @@ const arrow = (items: number[]) => {
 
     expect(methods.map((method) => method.displayName)).toEqual([
       "Example.constructor",
-      "Example.inner"
+      "Example.inner",
     ]);
     expect(byName.get("Example.constructor")).toMatchObject({
       functionName: "constructor",
@@ -176,15 +176,15 @@ const arrow = (items: number[]) => {
       complexity: 2,
       bodySpan: {
         startLine: 2,
-        endLine: 12
+        endLine: 12,
       },
       expectsStatementCoverage: true,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("Example.inner")).toMatchObject({
       functionName: "inner",
       containerName: "Example",
-      complexity: 2
+      complexity: 2,
     });
   });
 
@@ -210,7 +210,7 @@ export function oneCaseAndDefault(value: number): number {
   }
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -218,11 +218,11 @@ export function oneCaseAndDefault(value: number): number {
 
     expect(byName.get("fallbackOnly")).toMatchObject({
       complexity: 1,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("oneCaseAndDefault")).toMatchObject({
       complexity: 2,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
   });
 
@@ -248,7 +248,7 @@ export function optionalPropertyThenRegularCall(value?: { first: () => string })
   return value?.first();
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -256,19 +256,19 @@ export function optionalPropertyThenRegularCall(value?: { first: () => string })
 
     expect(byName.get("optionalProperties")).toMatchObject({
       complexity: 3,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("optionalThenRegularAccess")).toMatchObject({
       complexity: 2,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("regularThenOptionalCall")).toMatchObject({
       complexity: 2,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("optionalPropertyThenRegularCall")).toMatchObject({
       complexity: 2,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
   });
 
@@ -292,12 +292,12 @@ export function optionalPropertyThenRegularCall(value?: { first: () => string })
     return 1;
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     await expect(parseFileMethods(filePath)).rejects.toThrow(ParseError);
     await expect(parseFileMethods(filePath)).rejects.toThrow(
-      new RegExp(`Unable to parse TypeScript source .*broken\\.ts: line \\d+, column \\d+:`)
+      /Unable to parse TypeScript source .*broken\.ts: line \d+, column \d+:/,
     );
   });
 
@@ -314,7 +314,7 @@ export function optionalPropertyThenRegularCall(value?: { first: () => string })
   return 0;
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toMatchObject([
@@ -327,11 +327,11 @@ export function optionalPropertyThenRegularCall(value?: { first: () => string })
         complexity: 2,
         bodySpan: {
           startLine: 1,
-          endLine: 6
+          endLine: 6,
         },
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
-      }
+        expectsBranchCoverage: true,
+      },
     ]);
   });
 
@@ -348,18 +348,18 @@ export function declarationsOnly(): void {
   interface Shape { value: string }
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toMatchObject([
       {
         functionName: "trim",
-        expectsStatementCoverage: true
+        expectsStatementCoverage: true,
       },
       {
         functionName: "declarationsOnly",
-        expectsStatementCoverage: false
-      }
+        expectsStatementCoverage: false,
+      },
     ]);
   });
 
@@ -388,7 +388,7 @@ export function enumDeclOnly(): void {
   enum LocalEnum { A }
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -444,7 +444,7 @@ registry["upper"] = function (value: string): string {
   return value ? value.toUpperCase() : value;
 };
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
@@ -457,46 +457,46 @@ registry["upper"] = function (value: string): string {
       "Example.handler",
       "helper[renderKey]",
       "registry.trim",
-      "registry[\"upper\"]"
+      'registry["upper"]',
     ]);
     expect(byName.get("Example.get value")).toMatchObject({
       functionName: "get value",
       containerName: "Example",
       complexity: 2,
       expectsStatementCoverage: true,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("Example.set value")).toMatchObject({
       functionName: "set value",
       containerName: "Example",
       complexity: 2,
       expectsStatementCoverage: true,
-      expectsBranchCoverage: true
+      expectsBranchCoverage: true,
     });
     expect(byName.get("Example[renderKey]")).toMatchObject({
       functionName: "[renderKey]",
       containerName: "Example",
-      complexity: 2
+      complexity: 2,
     });
     expect(byName.get("Example.handler")).toMatchObject({
       functionName: "handler",
       containerName: "Example",
-      complexity: 2
+      complexity: 2,
     });
     expect(byName.get("helper[renderKey]")).toMatchObject({
       functionName: "[renderKey]",
       containerName: "helper",
-      complexity: 1
+      complexity: 1,
     });
     expect(byName.get("registry.trim")).toMatchObject({
       functionName: "trim",
       containerName: "registry",
-      complexity: 1
+      complexity: 1,
     });
-    expect(byName.get("registry[\"upper\"]")).toMatchObject({
-      functionName: "[\"upper\"]",
+    expect(byName.get('registry["upper"]')).toMatchObject({
+      functionName: '["upper"]',
       containerName: "registry",
-      complexity: 2
+      complexity: 2,
     });
   });
 
@@ -509,7 +509,7 @@ registry["upper"] = function (value: string): string {
       `export const RenderValue = <T,>({ value }: { value: T | null }) =>
   value ? <span>{String(value)}</span> : <span>empty</span>;
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toMatchObject([
@@ -519,8 +519,8 @@ registry["upper"] = function (value: string): string {
         displayName: "RenderValue",
         complexity: 2,
         expectsStatementCoverage: true,
-        expectsBranchCoverage: true
-      }
+        expectsBranchCoverage: true,
+      },
     ]);
   });
 
@@ -550,7 +550,7 @@ namespace TypesOnly {
   export type Alias = string;
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toEqual([]);
@@ -572,18 +572,18 @@ namespace TypesOnly {
   }
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toMatchObject([
       {
         functionName: "get #value",
-        displayName: "Example.get #value"
+        displayName: "Example.get #value",
       },
       {
         functionName: "#render",
-        displayName: "Example.#render"
-      }
+        displayName: "Example.#render",
+      },
     ]);
   });
 
@@ -617,19 +617,19 @@ class Example {
   };
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     expect(await parseFileMethods(filePath)).toMatchObject([
       {
-        displayName: "registry.render.nested"
+        displayName: "registry.render.nested",
       },
       {
-        displayName: "root.child.leaf"
+        displayName: "root.child.leaf",
       },
       {
-        displayName: "Example.helper.format"
-      }
+        displayName: "Example.helper.format",
+      },
     ]);
   });
 
@@ -651,17 +651,19 @@ class Example {
   }
 }
 `,
-      "utf8"
+      "utf8",
     );
 
-    expect(await parseFileMethods(filePath)).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        displayName: "Example.build"
-      }),
-      expect.objectContaining({
-        displayName: "obj.foo.bar"
-      })
-    ]));
+    expect(await parseFileMethods(filePath)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayName: "Example.build",
+        }),
+        expect.objectContaining({
+          displayName: "obj.foo.bar",
+        }),
+      ]),
+    );
   });
 
   it("composes nested class display names", async () => {
@@ -678,14 +680,16 @@ class Example {
   };
 }
 `,
-      "utf8"
+      "utf8",
     );
 
-    expect(await parseFileMethods(filePath)).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        displayName: "Outer.Inner.value"
-      })
-    ]));
+    expect(await parseFileMethods(filePath)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayName: "Outer.Inner.value",
+        }),
+      ]),
+    );
   });
 
   it("handles identifier, property, element, fallback, and unowned object-literal assignment targets", async () => {
@@ -733,31 +737,33 @@ export function createHandlers() {
   };
 }
 `,
-      "utf8"
+      "utf8",
     );
 
     const methods = await parseFileMethods(filePath);
 
-    expect(methods).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        displayName: "direct"
-      }),
-      expect.objectContaining({
-        displayName: "registry.format"
-      }),
-      expect.objectContaining({
-        displayName: "registry.nested.format"
-      }),
-      expect.objectContaining({
-        displayName: "registry[\"upper\"]"
-      }),
-      expect.objectContaining({
-        displayName: "<assigned>"
-      }),
-      expect.objectContaining({
-        displayName: "returned"
-      })
-    ]));
+    expect(methods).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          displayName: "direct",
+        }),
+        expect.objectContaining({
+          displayName: "registry.format",
+        }),
+        expect.objectContaining({
+          displayName: "registry.nested.format",
+        }),
+        expect.objectContaining({
+          displayName: 'registry["upper"]',
+        }),
+        expect.objectContaining({
+          displayName: "<assigned>",
+        }),
+        expect.objectContaining({
+          displayName: "returned",
+        }),
+      ]),
+    );
     expect(methods.filter((method) => method.displayName === "<assigned>")).toHaveLength(3);
   });
 });

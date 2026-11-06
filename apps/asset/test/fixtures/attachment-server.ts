@@ -200,12 +200,10 @@ try {
         await confirmations.runPromise(SourceConfirmationHealth);
       }
       if (parsed.operation === 'close') await close();
-      process.stdout.write(
-        'ATTACHMENT_FIXTURE ' + JSON.stringify({ id: parsed.id, result }) + '\n'
-      );
+      process.stdout.write(`ATTACHMENT_FIXTURE ${JSON.stringify({ id: parsed.id, result })}\n`);
       if (parsed.operation === 'close') break;
     } catch (error) {
-      process.stderr.write(String(error) + '\n');
+      process.stderr.write(`${String(error)}\n`);
       process.stdout.write(
         'ATTACHMENT_FIXTURE ' +
           JSON.stringify({ id: parsed.id, error: 'Asset fixture operation failed' }) +

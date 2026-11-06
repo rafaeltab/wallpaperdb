@@ -84,7 +84,7 @@ test("CI installs the locked project tools instead of selecting separate Node an
 		);
 		const jobs = source
 			.slice(source.indexOf("\njobs:\n"))
-			.split(/^  (?=[\w-]+:\n)/m)
+			.split(/^ {2}(?=[\w-]+:\n)/m)
 			.filter((job) => job.includes("runs-on:"));
 		expect(jobs.length > 0).toBeTruthy();
 		for (const job of jobs) {

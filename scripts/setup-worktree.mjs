@@ -21,13 +21,11 @@ import {
 	readFileSync,
 	statSync,
 	writeFileSync,
-	appendFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve, relative } from "node:path";
 import { getProjectName } from "./lib/worktree-project.mjs";
 import {
-	parseEnvValues,
 	applyOverrides,
 	extractKeys,
 	filterApplicableSecrets,

@@ -10,7 +10,7 @@ export interface MethodCoverage {
 export function computeMethodCoverage(
   method: MethodDescriptor,
   statements: StatementCoverageUnit[],
-  branches: BranchCoverageUnit[]
+  branches: BranchCoverageUnit[],
 ): MethodCoverage {
   const statementCoverage = toStatementCoverageMetric(method, statements);
   const branchCoverage = toBranchCoverageMetric(method, branches);
@@ -18,11 +18,14 @@ export function computeMethodCoverage(
   return {
     coverage: combineCoverageMetrics(statementCoverage, branchCoverage),
     statementCoverage,
-    branchCoverage
+    branchCoverage,
   };
 }
 
-export function unavailableMethodCoverage(method: MethodDescriptor, reason: CoverageUnknownReason): MethodCoverage {
+export function unavailableMethodCoverage(
+  method: MethodDescriptor,
+  reason: CoverageUnknownReason,
+): MethodCoverage {
   return {
     coverage: unknownCoverageMetric(reason),
     statementCoverage: method.expectsStatementCoverage
@@ -30,13 +33,13 @@ export function unavailableMethodCoverage(method: MethodDescriptor, reason: Cove
       : structuralNaCoverageMetric(),
     branchCoverage: method.expectsBranchCoverage
       ? unknownCoverageMetric(reason)
-      : structuralNaCoverageMetric()
+      : structuralNaCoverageMetric(),
   };
 }
 
 function toStatementCoverageMetric(
   method: MethodDescriptor,
-  statements: StatementCoverageUnit[]
+  statements: StatementCoverageUnit[],
 ): CoverageMetric {
   const percent = percentageOfCoveredStatements(statements);
   if (percent !== null) {
@@ -49,7 +52,7 @@ function toStatementCoverageMetric(
 
 function toBranchCoverageMetric(
   method: MethodDescriptor,
-  branches: BranchCoverageUnit[]
+  branches: BranchCoverageUnit[],
 ): CoverageMetric {
   const percent = percentageOfCoveredBranches(branches);
   if (percent !== null) {
@@ -60,17 +63,23 @@ function toBranchCoverageMetric(
     : structuralNaCoverageMetric();
 }
 
-function combineCoverageMetrics(statementCoverage: CoverageMetric, branchCoverage: CoverageMetric): CoverageMetric {
+function combineCoverageMetrics(
+  statementCoverage: CoverageMetric,
+  branchCoverage: CoverageMetric,
+): CoverageMetric {
   if (statementCoverage.status === "unknown" && branchCoverage.status === "unknown") {
     return unknownCoverageMetric(requiredUnknownReason(statementCoverage, branchCoverage));
   }
   return combinedKnownCoverage(statementCoverage, branchCoverage);
 }
 
-function combinedKnownCoverage(statementCoverage: CoverageMetric, branchCoverage: CoverageMetric): CoverageMetric {
+function combinedKnownCoverage(
+  statementCoverage: CoverageMetric,
+  branchCoverage: CoverageMetric,
+): CoverageMetric {
   const measuredPercents = [statementCoverage, branchCoverage]
     .filter((metric) => metric.status === "measured")
-    .map((metric) => metric.percent!);
+    .flatMap((metric) => (metric.percent === null ? [] : [metric.percent]));
   if (measuredPercents.length > 0) {
     return measuredCoverageMetric(Math.min(...measuredPercents));
   }
@@ -79,7 +88,7 @@ function combinedKnownCoverage(statementCoverage: CoverageMetric, branchCoverage
     return {
       percent: 100,
       status: "structural_na",
-      unknownReason: null
+      unknownReason: null,
     };
   }
 
@@ -89,7 +98,9 @@ function combinedKnownCoverage(statementCoverage: CoverageMetric, branchCoverage
 function requiredUnknownReason(...metrics: CoverageMetric[]): CoverageUnknownReason {
   const invalidMetric = metrics.find(isUnknownMetricWithoutReason);
   if (invalidMetric !== undefined) {
-    throw new Error(`Expected unknown coverage metric to carry an unknown reason: ${formatMetric(invalidMetric)}`);
+    throw new Error(
+      `Expected unknown coverage metric to carry an unknown reason: ${formatMetric(invalidMetric)}`,
+    );
   }
   const reason = firstUnknownReason(metrics);
   if (reason !== null) {
@@ -114,7 +125,7 @@ function measuredCoverageMetric(percent: number): CoverageMetric {
   return {
     percent,
     status: "measured",
-    unknownReason: null
+    unknownReason: null,
   };
 }
 
@@ -122,7 +133,7 @@ function structuralNaCoverageMetric(): CoverageMetric {
   return {
     percent: null,
     status: "structural_na",
-    unknownReason: null
+    unknownReason: null,
   };
 }
 
@@ -130,7 +141,7 @@ function unknownCoverageMetric(reason: CoverageUnknownReason): CoverageMetric {
   return {
     percent: null,
     status: "unknown",
-    unknownReason: reason
+    unknownReason: reason,
   };
 }
 

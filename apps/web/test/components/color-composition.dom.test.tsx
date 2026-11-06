@@ -9,12 +9,16 @@ const value = [
 
 function setup() {
   const onChange = vi.fn();
-  const { container } = render(<ColorComposition value={value} onChange={onChange} onEdit={vi.fn()} onEmpty={vi.fn()} />);
+  const { container } = render(
+    <ColorComposition value={value} onChange={onChange} onEdit={vi.fn()} onEmpty={vi.fn()} />
+  );
   const slider = screen.getByRole('slider', { name: 'Amount boundary for Blue' });
   const capture = vi.fn();
   const captured = vi.fn(() => true);
   Object.assign(slider, { setPointerCapture: capture, hasPointerCapture: captured });
-  vi.spyOn(container.firstElementChild!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 30));
+  vi.spyOn(required(container.firstElementChild), 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 200, 30)
+  );
   // jsdom has no PointerEvent. Supply its coordinates on the dispatched DOM event.
   const pointer = (type: string, x: number) => {
     const event = new Event(type, { bubbles: true });
@@ -38,7 +42,8 @@ describe('Color boundary pointer adapter', () => {
     expect(onChange).not.toHaveBeenCalled();
     pointer('pointerup', 100);
     expect(onChange).toHaveBeenCalledExactlyOnceWith([
-      { ...value[0], percent: 50 }, { ...value[1], percent: 0 },
+      { ...value[0], percent: 50 },
+      { ...value[1], percent: 0 },
     ]);
     pointer('pointerup', 100);
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -59,3 +64,8 @@ describe('Color boundary pointer adapter', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

@@ -21,7 +21,12 @@ import {
   pictureSourceLayer,
   pictureCodecLayer,
 } from '../src/adapters/pictures/index.js';
-import { Profiles, profilesLayer, Identities, type ProfileOutcome } from '../src/capabilities/profile/index.js';
+import {
+  Profiles,
+  profilesLayer,
+  Identities,
+  type ProfileOutcome,
+} from '../src/capabilities/profile/index.js';
 import type { Config } from '../src/config.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
@@ -318,104 +323,107 @@ describe('Profile picture transactions and recovery', () => {
     }
   });
 
-  it.each([
-    'upload',
-    'remove',
-  ])('prevents a late initial import from overwriting manual %s', async (command) => {
-    initialImageUrl = 'https://img.clerk.com/slow-initial-picture';
-    const pending = await ensure();
-    const image = await sharp({
-      create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-    })
-      .png()
-      .toBuffer();
-    let release!: (response: Response) => void;
-    let started!: () => void;
-    const waiting = new Promise<void>((resolve) => {
-      started = resolve;
-    });
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
-      started();
-      return new Promise<Response>((resolve) => {
-        release = resolve;
+  it.each(['upload', 'remove'])(
+    'prevents a late initial import from overwriting manual %s',
+    async (command) => {
+      initialImageUrl = 'https://img.clerk.com/slow-initial-picture';
+      const pending = await ensure();
+      const image = await sharp({
+        create: { width: 2, height: 2, channels: 3, background: '#475b83' },
+      })
+        .png()
+        .toBuffer();
+      let release!: (response: Response) => void;
+      let started!: () => void;
+      const waiting = new Promise<void>((resolve) => {
+        started = resolve;
       });
-    });
-    const importing = importer.importPending();
-    try {
-      await waiting;
+      const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+        started();
+        return new Promise<Response>((resolve) => {
+          release = resolve;
+        });
+      });
+      const importing = importer.importPending();
+      try {
+        await waiting;
+        const response =
+          command === 'upload'
+            ? await upload(image, pending.version)
+            : await remove(pending.version);
+        const manual = response;
+        release(new Response(new Uint8Array(image)));
+        await importing;
+        expect(await ensure()).toEqual(manual);
+        expect(
+          await sql`select id from outbox_events where payload->'change'->>'source' = 'clerk-import'`
+        ).toHaveLength(0);
+        const [staged] = await sql`select * from profile_picture_assets where state = 'staged'`;
+        expect(staged).toBeDefined();
+        expect(await available(staged.id)).toBe(false);
+        expect(
+          (
+            await sql`select source_url, status from profile_picture_imports where profile_id = ${pending.id}`
+          )[0]
+        ).toEqual({ source_url: null, status: 'complete' });
+      } finally {
+        release?.(new Response(new Uint8Array(image)));
+        await importing;
+        fetcher.mockRestore();
+      }
+    }
+  );
+
+  it.each(['upload', 'remove'])(
+    'ends Clerk picture ownership atomically on manual %s, including null removal',
+    async (command) => {
+      initialImageUrl = 'https://img.clerk.com/initial-picture';
+      const pending = await ensure();
+      const image = await sharp({
+        create: { width: 2, height: 2, channels: 3, background: '#475b83' },
+      })
+        .png()
+        .toBuffer();
       const response =
         command === 'upload' ? await upload(image, pending.version) : await remove(pending.version);
       const manual = response;
-      release(new Response(new Uint8Array(image)));
-      await importing;
-      expect(await ensure()).toEqual(manual);
-      expect(
-        await sql`select id from outbox_events where payload->'change'->>'source' = 'clerk-import'`
-      ).toHaveLength(0);
-      const [staged] = await sql`select * from profile_picture_assets where state = 'staged'`;
-      expect(staged).toBeDefined();
-      expect(await available(staged.id)).toBe(false);
-      expect(
-        (
-          await sql`select source_url, status from profile_picture_imports where profile_id = ${pending.id}`
-        )[0]
-      ).toEqual({ source_url: null, status: 'complete' });
-    } finally {
-      release?.(new Response(new Uint8Array(image)));
-      await importing;
-      fetcher.mockRestore();
+      expect(manual).toMatchObject({
+        version: pending.version + 1,
+        pictureImportStatus: 'complete',
+        pictureAssetId: command === 'upload' ? expect.stringMatching(/^pic_/) : null,
+      });
+      const [job] =
+        await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
+      expect(job).toMatchObject({
+        status: 'complete',
+        source_url: null,
+        lease_token: null,
+        lease_until: null,
+      });
+      const [event] =
+        await sql`select payload from outbox_events where payload->'change'->>'type' = 'picture-changed'`;
+      expect(event.payload).toMatchObject({
+        change: {
+          type: 'picture-changed',
+          before: null,
+          after: manual.pictureAssetId,
+          source: command,
+        },
+        profile: { version: manual.version },
+      });
+      const fetcher = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('Clerk is no longer authoritative'));
+      try {
+        initialImageUrl = 'https://img.clerk.com/later-picture';
+        await importer.importPending();
+        expect(await ensure()).toEqual(manual);
+        expect(fetcher).not.toHaveBeenCalled();
+      } finally {
+        fetcher.mockRestore();
+      }
     }
-  });
-
-  it.each([
-    'upload',
-    'remove',
-  ])('ends Clerk picture ownership atomically on manual %s, including null removal', async (command) => {
-    initialImageUrl = 'https://img.clerk.com/initial-picture';
-    const pending = await ensure();
-    const image = await sharp({
-      create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-    })
-      .png()
-      .toBuffer();
-    const response =
-      command === 'upload' ? await upload(image, pending.version) : await remove(pending.version);
-    const manual = response;
-    expect(manual).toMatchObject({
-      version: pending.version + 1,
-      pictureImportStatus: 'complete',
-      pictureAssetId: command === 'upload' ? expect.stringMatching(/^pic_/) : null,
-    });
-    const [job] = await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
-    expect(job).toMatchObject({
-      status: 'complete',
-      source_url: null,
-      lease_token: null,
-      lease_until: null,
-    });
-    const [event] =
-      await sql`select payload from outbox_events where payload->'change'->>'type' = 'picture-changed'`;
-    expect(event.payload).toMatchObject({
-      change: {
-        type: 'picture-changed',
-        before: null,
-        after: manual.pictureAssetId,
-        source: command,
-      },
-      profile: { version: manual.version },
-    });
-    const fetcher = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValue(new Error('Clerk is no longer authoritative'));
-    try {
-      initialImageUrl = 'https://img.clerk.com/later-picture';
-      await importer.importPending();
-      expect(await ensure()).toEqual(manual);
-      expect(fetcher).not.toHaveBeenCalled();
-    } finally {
-      fetcher.mockRestore();
-    }
-  });
+  );
 
   it('imports the captured initial picture asynchronously using the latest Profile version', async () => {
     initialImageUrl = 'https://img.clerk.com/initial-picture?private=initial-secret';
@@ -533,7 +541,7 @@ describe('Profile picture transactions and recovery', () => {
       reason: 'version-conflict',
     });
     const winningResponse = results.find((result) => result._tag === 'Success');
-    if (!winningResponse || winningResponse._tag !== 'Success')
+    if (winningResponse?._tag !== 'Success')
       throw new Error('Expected one successful picture upload');
     const winner = winningResponse.profile;
     expect(await ensure()).toEqual(winner);

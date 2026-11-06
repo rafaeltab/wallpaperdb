@@ -74,125 +74,123 @@ describe('Profile picture processing', () => {
     { chunk: 'ALPH', offset: 0, bit: 128 },
     { chunk: 'ANMF', offset: 15, bit: 4 },
     { chunk: 'ANMF', offset: 15, bit: 128 },
-  ])('normalizes reader-ignored $chunk fields at $offset with bit $bit', async ({
-    chunk,
-    offset,
-    bit,
-  }) => {
-    const animatedPolicy = {
-      ...policy,
-      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
-      animation: { available: true },
-    };
-    const source =
-      chunk === 'ANMF'
-        ? (
-            await processProfilePicture(
-              readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
-              limits,
-              animatedPolicy
-            )
-          ).bytes
-        : await sharp({
-            create: {
-              width: 512,
-              height: 512,
-              channels: 4,
-              background: { r: 255, g: 255, b: 255, alpha: 0.5 },
-            },
-          })
-            .webp()
-            .toBuffer();
-    const expected = await sharp(source, { animated: true }).metadata();
-    const input = Buffer.from(source);
-    let position = 12;
-    while (input.toString('ascii', position, position + 4) !== chunk) {
-      const size = input.readUInt32LE(position + 4);
-      position += 8 + size + (size % 2);
-      expect(position).toBeLessThan(input.length);
-    }
-    input[position + 8 + offset] |= bit;
-    const result = await processProfilePicture(input, limits, animatedPolicy);
-    const metadata = await sharp(result.bytes, { animated: true }).metadata();
-    expect(metadata.width).toEqual(expected.width);
-    expect(metadata.height).toEqual(expected.height);
-    expect(metadata.hasAlpha).toEqual(expected.hasAlpha);
-    expect(metadata.pages).toEqual(expected.pages);
-    expect(metadata.delay).toEqual(expected.delay);
-    expect(metadata.loop).toEqual(expected.loop);
-    expect(result.bytes.equals(input)).toBe(false);
-    for (let pos = 12; pos < result.bytes.length; ) {
-      const type = result.bytes.toString('ascii', pos, pos + 4);
-      if (type === 'VP8X') {
-        expect(result.bytes[pos + 8] & 0xc1).toBe(0);
-        expect([...result.bytes.subarray(pos + 9, pos + 12)]).toEqual([0, 0, 0]);
+  ])(
+    'normalizes reader-ignored $chunk fields at $offset with bit $bit',
+    async ({ chunk, offset, bit }) => {
+      const animatedPolicy = {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+        animation: { available: true },
+      };
+      const source =
+        chunk === 'ANMF'
+          ? (
+              await processProfilePicture(
+                readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
+                limits,
+                animatedPolicy
+              )
+            ).bytes
+          : await sharp({
+              create: {
+                width: 512,
+                height: 512,
+                channels: 4,
+                background: { r: 255, g: 255, b: 255, alpha: 0.5 },
+              },
+            })
+              .webp()
+              .toBuffer();
+      const expected = await sharp(source, { animated: true }).metadata();
+      const input = Buffer.from(source);
+      let position = 12;
+      while (input.toString('ascii', position, position + 4) !== chunk) {
+        const size = input.readUInt32LE(position + 4);
+        position += 8 + size + (size % 2);
+        expect(position).toBeLessThan(input.length);
       }
-      if (type === 'ALPH') expect(result.bytes[pos + 8] & 0xc0).toBe(0);
-      if (type === 'ANMF') expect(result.bytes[pos + 23] & 0xfc).toBe(0);
-      const size = result.bytes.readUInt32LE(pos + 4);
-      pos += 8 + size + (size % 2);
-    }
-  });
-  it.each([
-    'repeated top-level',
-    'distinct top-level',
-    'distinct frame',
-  ])('normalizes %s WebP chunks within a constrained child heap', async (placement) => {
-    const animatedPolicy = {
-      ...policy,
-      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
-      animation: { available: true },
-    };
-    const canonical =
-      placement === 'distinct frame'
-        ? (
-            await processProfilePicture(
-              readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
-              limits,
-              animatedPolicy
-            )
-          ).bytes
-        : await sharp({ create: { width: 512, height: 512, channels: 3, background: '#ffffff' } })
-            .webp()
-            .toBuffer();
-    const expected = await sharp(canonical, { animated: true }).metadata();
-    const privateChunks = Buffer.alloc(600_000 * 8);
-    for (let i = 0; i < 600_000; i++) {
-      privateChunks[i * 8] = 122;
-      for (let digit = 0; digit < 3; digit++)
-        privateChunks[i * 8 + 1 + digit] =
-          placement === 'repeated top-level' ? 65 : 33 + (Math.floor(i / 90 ** digit) % 90);
-    }
-    let input: Buffer;
-    if (placement === 'distinct frame') {
-      let offset = 12;
-      while (canonical.toString('ascii', offset, offset + 4) !== 'ANMF') {
-        const size = canonical.readUInt32LE(offset + 4);
-        offset += 8 + size + (size % 2);
-      }
-      const size = canonical.readUInt32LE(offset + 4);
-      const end = offset + 8 + size;
-      input = Buffer.concat([canonical.subarray(0, end), privateChunks, canonical.subarray(end)]);
-      input.writeUInt32LE(size + privateChunks.length, offset + 4);
-    } else input = Buffer.concat([canonical, privateChunks]);
-    input.writeUInt32LE(input.length - 8, 4);
-    expect(input.length).toBeLessThan(limits.maxBytes);
-    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
-    try {
+      input[position + 8 + offset] |= bit;
       const result = await processProfilePicture(input, limits, animatedPolicy);
       const metadata = await sharp(result.bytes, { animated: true }).metadata();
-      expect(metadata).toMatchObject({
-        width: expected.width,
-        height: expected.height,
-      });
+      expect(metadata.width).toEqual(expected.width);
+      expect(metadata.height).toEqual(expected.height);
+      expect(metadata.hasAlpha).toEqual(expected.hasAlpha);
       expect(metadata.pages).toEqual(expected.pages);
       expect(metadata.delay).toEqual(expected.delay);
       expect(metadata.loop).toEqual(expected.loop);
-      expect(result.bytes.length).toBeLessThan(privateChunks.length);
-    } finally {
-      vi.unstubAllEnvs();
+      expect(result.bytes.equals(input)).toBe(false);
+      for (let pos = 12; pos < result.bytes.length; ) {
+        const type = result.bytes.toString('ascii', pos, pos + 4);
+        if (type === 'VP8X') {
+          expect(result.bytes[pos + 8] & 0xc1).toBe(0);
+          expect([...result.bytes.subarray(pos + 9, pos + 12)]).toEqual([0, 0, 0]);
+        }
+        if (type === 'ALPH') expect(result.bytes[pos + 8] & 0xc0).toBe(0);
+        if (type === 'ANMF') expect(result.bytes[pos + 23] & 0xfc).toBe(0);
+        const size = result.bytes.readUInt32LE(pos + 4);
+        pos += 8 + size + (size % 2);
+      }
     }
-  });
+  );
+  it.each(['repeated top-level', 'distinct top-level', 'distinct frame'])(
+    'normalizes %s WebP chunks within a constrained child heap',
+    async (placement) => {
+      const animatedPolicy = {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+        animation: { available: true },
+      };
+      const canonical =
+        placement === 'distinct frame'
+          ? (
+              await processProfilePicture(
+                readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
+                limits,
+                animatedPolicy
+              )
+            ).bytes
+          : await sharp({ create: { width: 512, height: 512, channels: 3, background: '#ffffff' } })
+              .webp()
+              .toBuffer();
+      const expected = await sharp(canonical, { animated: true }).metadata();
+      const privateChunks = Buffer.alloc(600_000 * 8);
+      for (let i = 0; i < 600_000; i++) {
+        privateChunks[i * 8] = 122;
+        for (let digit = 0; digit < 3; digit++)
+          privateChunks[i * 8 + 1 + digit] =
+            placement === 'repeated top-level' ? 65 : 33 + (Math.floor(i / 90 ** digit) % 90);
+      }
+      let input: Buffer;
+      if (placement === 'distinct frame') {
+        let offset = 12;
+        while (canonical.toString('ascii', offset, offset + 4) !== 'ANMF') {
+          const size = canonical.readUInt32LE(offset + 4);
+          offset += 8 + size + (size % 2);
+        }
+        const size = canonical.readUInt32LE(offset + 4);
+        const end = offset + 8 + size;
+        input = Buffer.concat([canonical.subarray(0, end), privateChunks, canonical.subarray(end)]);
+        input.writeUInt32LE(size + privateChunks.length, offset + 4);
+      } else input = Buffer.concat([canonical, privateChunks]);
+      input.writeUInt32LE(input.length - 8, 4);
+      expect(input.length).toBeLessThan(limits.maxBytes);
+      vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+      try {
+        const result = await processProfilePicture(input, limits, animatedPolicy);
+        const metadata = await sharp(result.bytes, { animated: true }).metadata();
+        expect(metadata).toMatchObject({
+          width: expected.width,
+          height: expected.height,
+        });
+        expect(metadata.pages).toEqual(expected.pages);
+        expect(metadata.delay).toEqual(expected.delay);
+        expect(metadata.loop).toEqual(expected.loop);
+        expect(result.bytes.length).toBeLessThan(privateChunks.length);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
   it.each([1, 2])('normalizes a still WebP with %s ignored ANIM chunks', async (count) => {
     const source = await sharp({
       create: {
@@ -243,57 +241,58 @@ describe('Profile picture processing', () => {
     expect(picture.bytes.includes(Buffer.from('ANIM'))).toBe(true);
     expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({ loop: 3 });
   });
-  it.each([
-    'comment',
-    'application',
-  ])('processes fragmented GIF %s metadata within a constrained child heap', async (extension) => {
-    const payload = Buffer.alloc(4 * 1024 * 1024);
-    for (let i = 0; i < payload.length; i += 2) {
-      payload[i] = 1;
-      payload[i + 1] = 65;
+  it.each(['comment', 'application'])(
+    'processes fragmented GIF %s metadata within a constrained child heap',
+    async (extension) => {
+      const payload = Buffer.alloc(4 * 1024 * 1024);
+      for (let i = 0; i < payload.length; i += 2) {
+        payload[i] = 1;
+        payload[i + 1] = 65;
+      }
+      const input = Buffer.concat([
+        Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+        extension === 'comment'
+          ? Buffer.from([0x21, 0xfe])
+          : Buffer.concat([Buffer.from([0x21, 0xff, 11]), Buffer.from('PRIVATEAPP1')]),
+        payload,
+        Buffer.from('002c00000000010001000002024401003b', 'hex'),
+      ]);
+      expect(input.length).toBeLessThan(limits.maxBytes);
+      vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+      try {
+        const result = await processProfilePicture(input, limits, {
+          ...policy,
+          acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+          animation: { available: true },
+        });
+        expect(await sharp(result.bytes).metadata()).toMatchObject({
+          format: 'webp',
+          width: 512,
+          height: 512,
+        });
+      } finally {
+        vi.unstubAllEnvs();
+      }
     }
-    const input = Buffer.concat([
-      Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
-      extension === 'comment'
-        ? Buffer.from([0x21, 0xfe])
-        : Buffer.concat([Buffer.from([0x21, 0xff, 11]), Buffer.from('PRIVATEAPP1')]),
-      payload,
-      Buffer.from('002c00000000010001000002024401003b', 'hex'),
-    ]);
-    expect(input.length).toBeLessThan(limits.maxBytes);
-    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
-    try {
-      const result = await processProfilePicture(input, limits, {
+  );
+  it.each([0, 49, 1, 113, 255])(
+    'handles the declared pixel aspect ratio %s in direct GIF normalization',
+    async (aspect) => {
+      const bytes = Buffer.from(
+        '47494638396101000100800000000000ffffff2c00000000010001000002024401003b',
+        'hex'
+      );
+      bytes[12] = aspect;
+      const animatedPolicy = {
         ...policy,
-        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
         animation: { available: true },
-      });
-      expect(await sharp(result.bytes).metadata()).toMatchObject({
-        format: 'webp',
-        width: 512,
-        height: 512,
-      });
-    } finally {
-      vi.unstubAllEnvs();
+      };
+      const process = processProfilePicture(bytes, limits, animatedPolicy);
+      if (aspect === 0 || aspect === 49) expect((await process).mimeType).toBe('image/webp');
+      else await expect(process).rejects.toThrow('pixel aspect ratio');
     }
-  });
-  it.each([
-    0, 49, 1, 113, 255,
-  ])('handles the declared pixel aspect ratio %s in direct GIF normalization', async (aspect) => {
-    const bytes = Buffer.from(
-      '47494638396101000100800000000000ffffff2c00000000010001000002024401003b',
-      'hex'
-    );
-    bytes[12] = aspect;
-    const animatedPolicy = {
-      ...policy,
-      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
-      animation: { available: true },
-    };
-    const process = processProfilePicture(bytes, limits, animatedPolicy);
-    if (aspect === 0 || aspect === 49) expect((await process).mimeType).toBe('image/webp');
-    else await expect(process).rejects.toThrow('pixel aspect ratio');
-  });
+  );
   it('normalizes repeated unknown top-level chunks in static and animated WebP', async () => {
     const animatedPolicy = {
       ...policy,
@@ -624,23 +623,23 @@ describe('Profile picture processing', () => {
       /orientation/
     );
   });
-  it.each([
-    'old',
-    'new',
-  ])('rejects the real Apple %s gain-map JPEG instead of storing only its SDR base', async (generation) => {
-    const input = await readFile(
-      new URL(`./fixtures/profile-picture-hdr/apple_gainmap_${generation}.jpg`, import.meta.url)
-    );
-    expect(await sharp(input).metadata()).toMatchObject({
-      format: 'jpeg',
-      space: 'srgb',
-      depth: 'uchar',
-    });
-    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
-    await expect(processProfilePicture(input, limits)).rejects.toThrow(
-      'Picture color interpretation is unsupported'
-    );
-  });
+  it.each(['old', 'new'])(
+    'rejects the real Apple %s gain-map JPEG instead of storing only its SDR base',
+    async (generation) => {
+      const input = await readFile(
+        new URL(`./fixtures/profile-picture-hdr/apple_gainmap_${generation}.jpg`, import.meta.url)
+      );
+      expect(await sharp(input).metadata()).toMatchObject({
+        format: 'jpeg',
+        space: 'srgb',
+        depth: 'uchar',
+      });
+      await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+      await expect(processProfilePicture(input, limits)).rejects.toThrow(
+        'Picture color interpretation is unsupported'
+      );
+    }
+  );
   it.each([
     [
       'Ultra HDR',
@@ -654,80 +653,90 @@ describe('Profile picture processing', () => {
       0xe2,
       Buffer.concat([Buffer.from('urn:iso:std:iso:ts:21496:-1\0'), Buffer.alloc(4)]),
     ],
-  ] as const)('rejects JPEGs declaring %s before the SDR decoder discards that declaration', async (_format, marker, payload) => {
-    const jpeg = await sharp({
-      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
-    })
-      .jpeg()
-      .toBuffer();
-    const header = Buffer.from([0xff, marker, 0, 0]);
-    header.writeUInt16BE(payload.length + 2, 2);
-    const input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
-    expect(await sharp(input).metadata()).toMatchObject({
-      format: 'jpeg',
-      space: 'srgb',
-      depth: 'uchar',
-    });
-    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
-    await expect(processProfilePicture(input, limits)).rejects.toThrow(
-      'Picture color interpretation is unsupported'
-    );
-  });
-  it.each([
-    'EXIF',
-    'XMP',
-  ])('normalizes SDR JPEG %s containing gain-map text without a gain-map declaration', async (metadataType) => {
-    const source = sharp({
-      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
-    });
-    const namespace = 'http://ns.adobe.com/hdr-gain-map/1.0/';
-    let input: Buffer;
-    if (metadataType === 'EXIF') {
-      input = await source
-        .withExifMerge({ IFD0: { Model: namespace } })
+  ] as const)(
+    'rejects JPEGs declaring %s before the SDR decoder discards that declaration',
+    async (_format, marker, payload) => {
+      const jpeg = await sharp({
+        create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+      })
         .jpeg()
         .toBuffer();
-    } else {
-      const jpeg = await source.jpeg({ progressive: true }).toBuffer();
-      const payload = Buffer.from(
-        `http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description>${namespace}</dc:description></rdf:Description></rdf:RDF></x:xmpmeta>`
-      );
-      const header = Buffer.from([0xff, 0xe1, 0, 0]);
+      const header = Buffer.from([0xff, marker, 0, 0]);
       header.writeUInt16BE(payload.length + 2, 2);
-      input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+      const input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+      expect(await sharp(input).metadata()).toMatchObject({
+        format: 'jpeg',
+        space: 'srgb',
+        depth: 'uchar',
+      });
+      await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+      await expect(processProfilePicture(input, limits)).rejects.toThrow(
+        'Picture color interpretation is unsupported'
+      );
     }
-    expect(input.includes(Buffer.from(namespace))).toBe(true);
-    const picture = await processProfilePicture(input, limits);
-    expect(await sharp(picture.bytes).metadata()).toMatchObject({
-      format: 'webp',
-      width: 512,
-      height: 512,
-      space: 'srgb',
-      depth: 'uchar',
-    });
-    expect((await sharp(picture.bytes).metadata()).xmp).toBeUndefined();
-    expect((await sharp(picture.bytes).metadata()).exif).toBeUndefined();
-    expect(picture.bytes.includes(Buffer.from(namespace))).toBe(false);
-  });
+  );
+  it.each(['EXIF', 'XMP'])(
+    'normalizes SDR JPEG %s containing gain-map text without a gain-map declaration',
+    async (metadataType) => {
+      const source = sharp({
+        create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+      });
+      const namespace = 'http://ns.adobe.com/hdr-gain-map/1.0/';
+      let input: Buffer;
+      if (metadataType === 'EXIF') {
+        input = await source
+          .withExifMerge({ IFD0: { Model: namespace } })
+          .jpeg()
+          .toBuffer();
+      } else {
+        const jpeg = await source.jpeg({ progressive: true }).toBuffer();
+        const payload = Buffer.from(
+          `http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description>${namespace}</dc:description></rdf:Description></rdf:RDF></x:xmpmeta>`
+        );
+        const header = Buffer.from([0xff, 0xe1, 0, 0]);
+        header.writeUInt16BE(payload.length + 2, 2);
+        input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+      }
+      expect(input.includes(Buffer.from(namespace))).toBe(true);
+      const picture = await processProfilePicture(input, limits);
+      expect(await sharp(picture.bytes).metadata()).toMatchObject({
+        format: 'webp',
+        width: 512,
+        height: 512,
+        space: 'srgb',
+        depth: 'uchar',
+      });
+      expect((await sharp(picture.bytes).metadata()).xmp).toBeUndefined();
+      expect((await sharp(picture.bytes).metadata()).exif).toBeUndefined();
+      expect(picture.bytes.includes(Buffer.from(namespace))).toBe(false);
+    }
+  );
   it.each([
     ['PQ', '0000000463494350091000014d2323fe'],
     ['HLG', '0000000463494350091200014ea7f790'],
-  ])('rejects %s HDR PNG16 despite the native decoder reporting ordinary RGB16', async (_transfer, chunk) => {
-    const png = await sharp({
-      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
-    })
-      .toColourspace('rgb16')
-      .png()
-      .toBuffer();
-    // Valid cICP chunks use the PQ/HLG declarations from the PNG specification.
-    // https://www.w3.org/TR/png-3/#cICP-chunk
-    const input = Buffer.concat([png.subarray(0, 33), Buffer.from(chunk, 'hex'), png.subarray(33)]);
-    expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
-    expect(await sharp(input).raw().toBuffer()).toHaveLength(3 * 2 * 3);
-    await expect(processProfilePicture(input, limits)).rejects.toThrow(
-      'Picture color interpretation is unsupported'
-    );
-  });
+  ])(
+    'rejects %s HDR PNG16 despite the native decoder reporting ordinary RGB16',
+    async (_transfer, chunk) => {
+      const png = await sharp({
+        create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+      })
+        .toColourspace('rgb16')
+        .png()
+        .toBuffer();
+      // Valid cICP chunks use the PQ/HLG declarations from the PNG specification.
+      // https://www.w3.org/TR/png-3/#cICP-chunk
+      const input = Buffer.concat([
+        png.subarray(0, 33),
+        Buffer.from(chunk, 'hex'),
+        png.subarray(33),
+      ]);
+      expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
+      expect(await sharp(input).raw().toBuffer()).toHaveLength(3 * 2 * 3);
+      await expect(processProfilePicture(input, limits)).rejects.toThrow(
+        'Picture color interpretation is unsupported'
+      );
+    }
+  );
   it('normalizes ordinary SDR PNG16 without confusing sample depth with HDR', async () => {
     const input = await sharp({
       create: {
@@ -912,19 +921,19 @@ describe('Profile picture processing', () => {
       processProfilePicture(Buffer.concat([webp, Buffer.from('hidden trailing bytes')]), limits)
     ).rejects.toThrow('Picture could not be decoded');
   });
-  it.each([
-    false,
-    true,
-  ])('preserves exact canonical static WebP bytes after fully decoding them with lossless=%s', async (lossless) => {
-    const input = await sharp({
-      create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
-    })
-      .webp({ quality: 73, lossless })
-      .toBuffer();
-    const picture = await processProfilePicture(input, limits);
-    expect(picture.bytes).toEqual(input);
-    expect(picture).toMatchObject({ width: 512, height: 512 });
-  });
+  it.each([false, true])(
+    'preserves exact canonical static WebP bytes after fully decoding them with lossless=%s',
+    async (lossless) => {
+      const input = await sharp({
+        create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
+      })
+        .webp({ quality: 73, lossless })
+        .toBuffer();
+      const picture = await processProfilePicture(input, limits);
+      expect(picture.bytes).toEqual(input);
+      expect(picture).toMatchObject({ width: 512, height: 512 });
+    }
+  );
   it('rejects oversized encoded pictures before decoding', async () => {
     const input = await sharp({
       create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
@@ -949,27 +958,27 @@ describe('Profile picture processing', () => {
     }
   });
 
-  it.each([
-    'webp',
-    'png',
-  ])('rejects animated %s instead of silently selecting its first frame', async (format) => {
-    // Two one-pixel frames with distinct colors.
-    const gif = Buffer.from(
-      '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b',
-      'hex'
-    );
-    const input =
-      format === 'webp'
-        ? await sharp(gif, { animated: true }).webp().toBuffer()
-        : Buffer.from(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAABAAAAAQAAAAAAAAAAAAEACgAAWn8w0AAAAA1JREFUeJxj+M/A8B8ABQAB/4mZPR0AAAAaZmNUTAAAAAEAAAABAAAAAQAAAAAAAAAAAAEACgAAwQzaBAAAABFmZEFUAAAAAnicY2Bg+P8fAAMCAf/1e6XXAAAAAElFTkSuQmCC',
-            'base64'
-          );
-    if (format === 'webp') expect((await sharp(input).metadata()).pages).toBe(2);
-    await expect(processProfilePicture(input, limits)).rejects.toThrow(
-      'Animated pictures are not accepted'
-    );
-  });
+  it.each(['webp', 'png'])(
+    'rejects animated %s instead of silently selecting its first frame',
+    async (format) => {
+      // Two one-pixel frames with distinct colors.
+      const gif = Buffer.from(
+        '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b',
+        'hex'
+      );
+      const input =
+        format === 'webp'
+          ? await sharp(gif, { animated: true }).webp().toBuffer()
+          : Buffer.from(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAABAAAAAQAAAAAAAAAAAAEACgAAWn8w0AAAAA1JREFUeJxj+M/A8B8ABQAB/4mZPR0AAAAaZmNUTAAAAAEAAAABAAAAAQAAAAAAAAAAAAEACgAAwQzaBAAAABFmZEFUAAAAAnicY2Bg+P8fAAMCAf/1e6XXAAAAAElFTkSuQmCC',
+              'base64'
+            );
+      if (format === 'webp') expect((await sharp(input).metadata()).pages).toBe(2);
+      await expect(processProfilePicture(input, limits)).rejects.toThrow(
+        'Animated pictures are not accepted'
+      );
+    }
+  );
 
   it.each(['svg', 'tiff'])('rejects unsupported %s pictures', async (format) => {
     const input =
@@ -988,80 +997,82 @@ describe('Profile picture processing', () => {
   it.each([
     ['pixel', { ...limits, maxPixels: 5 }],
     ['decoded byte', { ...limits, maxDecodedBytes: 17 }],
-  ] as const)('rejects pictures exceeding the configured %s limit', async (_name, configuredLimits) => {
-    const input = await sharp({
-      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
-    })
-      .png()
-      .toBuffer();
-    await expect(processProfilePicture(input, configuredLimits)).rejects.toThrow(/limit/);
-  });
-
-  it.each([
-    'jpeg',
-    'png',
-    'webp',
-  ] as const)('decodes %s and emits normalized WebP without source metadata', async (format) => {
-    const input = await sharp({
-      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
-    })
-      .withMetadata({ orientation: 6 })
-      .toFormat(format)
-      .toBuffer();
-    const picture = await processProfilePicture(input, limits);
-    const metadata = await sharp(picture.bytes).metadata();
-    expect(picture).toMatchObject({ mimeType: 'image/webp', width: 512, height: 512 });
-    expect(metadata).toMatchObject({ format: 'webp', width: 512, height: 512 });
-    expect(metadata.exif).toBeUndefined();
-    expect(metadata.icc).toBeUndefined();
-    expect(metadata.orientation).toBeUndefined();
-    expect(await sharp(picture.bytes).raw().toBuffer()).toHaveLength(512 * 512 * 3);
-  });
-  it.each([
-    'static',
-    'animated',
-  ])('kills and reaps its native encoder before interrupted %s work completes', async (source) => {
-    const input =
-      source === 'animated'
-        ? readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url))
-        : await sharp({
-            create: { width: 4000, height: 4000, channels: 3, background: '#3578aa' },
-          })
-            .png()
-            .toBuffer();
-    const abort = new AbortController();
-    const spawn = vi.spyOn(childProcess, 'spawn');
-    syncBuiltinESMExports();
-    const running = Effect.runPromise(
-      Effect.flatMap(PictureCodec, (codec) =>
-        codec.process(input, {
-          ...policy,
-          acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
-          animation: { available: true },
-        })
-      ).pipe(Effect.provide(pictureCodecLayer(limits))),
-      { signal: abort.signal }
-    );
-    const settled = running.then(
-      (value) => ({ value }),
-      (error) => ({ error })
-    );
-    try {
-      await vi.waitFor(() => expect(spawn).toHaveReturned(), { timeout: 3000, interval: 5 });
-      const result = spawn.mock.results[0];
-      if (!result || result.type !== 'return') throw new Error('Expected native encoder process');
-      const child = result.value;
-      abort.abort();
-      expect(await settled).toHaveProperty('error');
-      expect(child.signalCode).toBe('SIGKILL');
-      const pid = child.pid;
-      if (pid === undefined) throw new Error('Expected the native encoder process ID');
-      expect(() => process.kill(pid, 0)).toThrow();
-    } finally {
-      abort.abort();
-      await settled;
-      spawn.mockRestore();
-      syncBuiltinESMExports();
+  ] as const)(
+    'rejects pictures exceeding the configured %s limit',
+    async (_name, configuredLimits) => {
+      const input = await sharp({
+        create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+      })
+        .png()
+        .toBuffer();
+      await expect(processProfilePicture(input, configuredLimits)).rejects.toThrow(/limit/);
     }
-  });
+  );
+
+  it.each(['jpeg', 'png', 'webp'] as const)(
+    'decodes %s and emits normalized WebP without source metadata',
+    async (format) => {
+      const input = await sharp({
+        create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+      })
+        .withMetadata({ orientation: 6 })
+        .toFormat(format)
+        .toBuffer();
+      const picture = await processProfilePicture(input, limits);
+      const metadata = await sharp(picture.bytes).metadata();
+      expect(picture).toMatchObject({ mimeType: 'image/webp', width: 512, height: 512 });
+      expect(metadata).toMatchObject({ format: 'webp', width: 512, height: 512 });
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.icc).toBeUndefined();
+      expect(metadata.orientation).toBeUndefined();
+      expect(await sharp(picture.bytes).raw().toBuffer()).toHaveLength(512 * 512 * 3);
+    }
+  );
+  it.each(['static', 'animated'])(
+    'kills and reaps its native encoder before interrupted %s work completes',
+    async (source) => {
+      const input =
+        source === 'animated'
+          ? readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url))
+          : await sharp({
+              create: { width: 4000, height: 4000, channels: 3, background: '#3578aa' },
+            })
+              .png()
+              .toBuffer();
+      const abort = new AbortController();
+      const spawn = vi.spyOn(childProcess, 'spawn');
+      syncBuiltinESMExports();
+      const running = Effect.runPromise(
+        Effect.flatMap(PictureCodec, (codec) =>
+          codec.process(input, {
+            ...policy,
+            acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+            animation: { available: true },
+          })
+        ).pipe(Effect.provide(pictureCodecLayer(limits))),
+        { signal: abort.signal }
+      );
+      const settled = running.then(
+        (value) => ({ value }),
+        (error) => ({ error })
+      );
+      try {
+        await vi.waitFor(() => expect(spawn).toHaveReturned(), { timeout: 3000, interval: 5 });
+        const result = spawn.mock.results[0];
+        if (result?.type !== 'return') throw new Error('Expected native encoder process');
+        const child = result.value;
+        abort.abort();
+        expect(await settled).toHaveProperty('error');
+        expect(child.signalCode).toBe('SIGKILL');
+        const pid = child.pid;
+        if (pid === undefined) throw new Error('Expected the native encoder process ID');
+        expect(() => process.kill(pid, 0)).toThrow();
+      } finally {
+        abort.abort();
+        await settled;
+        spawn.mockRestore();
+        syncBuiltinESMExports();
+      }
+    }
+  );
 });

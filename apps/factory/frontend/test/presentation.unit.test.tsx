@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { operationsServer } from '../../src/http/index.js';
-import { type Job, type Intent, type Status } from '../../src/capabilities/job/index.js';
+import type { Job, Intent, Status } from '../../src/capabilities/job/index.js';
 const idle: Job = {
   resume: () => Effect.succeed({ kind: 'rejected' }),
   cancel: () => Effect.succeed({ kind: 'rejected' }),

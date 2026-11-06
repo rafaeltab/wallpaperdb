@@ -12,40 +12,57 @@ it.each([
   { mode: 'worker', count: 2 },
   { mode: 'fallback', count: 1 },
   { mode: 'fallback', count: 2 },
-])('accepts a still WebP with $count inactive ANIM chunks through $mode', async ({ mode, count }) => {
-  const canonical = await readFile(new URL('../fixtures/profile-canonical.webp', import.meta.url));
-  expect(canonical.toString('ascii', 12, 16)).toBe('VP8X');
-  expect(canonical[20] & 2).toBe(0);
-  const controls = Buffer.from('414e494d06000000000000000000', 'hex');
-  const input = Buffer.concat([canonical, ...Array.from({ length: count }, () => controls)]);
-  input.writeUInt32LE(input.length - 8, 4);
-  const preview = new Blob(['preview'], { type: 'image/png' });
-  const closed = vi.fn();
-  const decode = vi.fn(async () => ({ width: 512, height: 512, close: closed }));
-  vi.stubGlobal('createImageBitmap', decode);
-  vi.stubGlobal('HTMLImageElement', class {});
-  vi.stubGlobal('document', {
-    createElement: () => ({
-      getContext: () => ({ drawImage() {} }),
-      toBlob: (callback: (blob: Blob) => void) => callback(preview),
-    }),
-  });
-  vi.stubGlobal('OffscreenCanvas', mode === 'worker' ? class {} : undefined);
-  vi.stubGlobal('Worker', mode === 'worker' ? class {
-    onmessage: ((event: MessageEvent) => void) | null = null;
-    terminate() {}
-    postMessage() {
-      queueMicrotask(() => this.onmessage?.(new MessageEvent('message', {
-        data: { ok: true, blob: preview, width: 512, height: 512 },
-      })));
-    }
-  } : undefined);
-  const picture = await openPictureSource(new Blob([input], { type: 'image/webp' }), new AbortController().signal);
-  expect(picture).toMatchObject({ width: 512, height: 512, preview });
-  expect(decode).toHaveBeenCalledTimes(mode === 'fallback' ? 1 : 0);
-  expect(closed).toHaveBeenCalledTimes(mode === 'fallback' ? 1 : 0);
-  picture.dispose();
-});
+])(
+  'accepts a still WebP with $count inactive ANIM chunks through $mode',
+  async ({ mode, count }) => {
+    const canonical = await readFile(
+      new URL('../fixtures/profile-canonical.webp', import.meta.url)
+    );
+    expect(canonical.toString('ascii', 12, 16)).toBe('VP8X');
+    expect(canonical[20] & 2).toBe(0);
+    const controls = Buffer.from('414e494d06000000000000000000', 'hex');
+    const input = Buffer.concat([canonical, ...Array.from({ length: count }, () => controls)]);
+    input.writeUInt32LE(input.length - 8, 4);
+    const preview = new Blob(['preview'], { type: 'image/png' });
+    const closed = vi.fn();
+    const decode = vi.fn(async () => ({ width: 512, height: 512, close: closed }));
+    vi.stubGlobal('createImageBitmap', decode);
+    vi.stubGlobal('HTMLImageElement', class {});
+    vi.stubGlobal('document', {
+      createElement: () => ({
+        getContext: () => ({ drawImage() {} }),
+        toBlob: (callback: (blob: Blob) => void) => callback(preview),
+      }),
+    });
+    vi.stubGlobal('OffscreenCanvas', mode === 'worker' ? class {} : undefined);
+    vi.stubGlobal(
+      'Worker',
+      mode === 'worker'
+        ? class {
+            onmessage: ((event: MessageEvent) => void) | null = null;
+            terminate() {}
+            postMessage() {
+              queueMicrotask(() =>
+                this.onmessage?.(
+                  new MessageEvent('message', {
+                    data: { ok: true, blob: preview, width: 512, height: 512 },
+                  })
+                )
+              );
+            }
+          }
+        : undefined
+    );
+    const picture = await openPictureSource(
+      new Blob([input], { type: 'image/webp' }),
+      new AbortController().signal
+    );
+    expect(picture).toMatchObject({ width: 512, height: 512, preview });
+    expect(decode).toHaveBeenCalledTimes(mode === 'fallback' ? 1 : 0);
+    expect(closed).toHaveBeenCalledTimes(mode === 'fallback' ? 1 : 0);
+    picture.dispose();
+  }
+);
 
 it('rejects an ANMF frame even when a WebP has not declared animation', async () => {
   const canonical = await readFile(new URL('../fixtures/profile-canonical.webp', import.meta.url));
@@ -54,25 +71,42 @@ it('rejects an ANMF frame even when a WebP has not declared animation', async ()
   const decode = vi.fn();
   vi.stubGlobal('Worker', undefined);
   vi.stubGlobal('createImageBitmap', decode);
-  await expect(openPictureSource(new Blob([input]), new AbortController().signal)).rejects.toThrow('Animated WebP pictures are not supported');
+  await expect(openPictureSource(new Blob([input]), new AbortController().signal)).rejects.toThrow(
+    'Animated WebP pictures are not supported'
+  );
   expect(decode).not.toHaveBeenCalled();
 });
 
-it.each(['worker', 'fallback'])('rejects APNG before the %s decoder can flatten its animation', async (mode) => {
-  // Generated from the existing small PNG with valid acTL/fcTL chunks and CRCs.
-  const fixture = await readFile(new URL('../fixtures/profile-animated.png', import.meta.url));
-  const decode = vi.fn(() => { throw new Error('Source reached the decoder.'); });
-  const worker = vi.fn(function () { throw new Error('Source reached the worker.'); });
-  vi.stubGlobal('createImageBitmap', decode);
-  vi.stubGlobal('Worker', mode === 'worker' ? worker : undefined);
-  vi.stubGlobal('OffscreenCanvas', mode === 'worker' ? vi.fn() : undefined);
-  await expect(openPictureSource(new Blob([fixture], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Animated PNG pictures are not supported');
-  expect(decode).not.toHaveBeenCalled();
-  expect(worker).not.toHaveBeenCalled();
-});
+it.each(['worker', 'fallback'])(
+  'rejects APNG before the %s decoder can flatten its animation',
+  async (mode) => {
+    // Generated from the existing small PNG with valid acTL/fcTL chunks and CRCs.
+    const fixture = await readFile(new URL('../fixtures/profile-animated.png', import.meta.url));
+    const decode = vi.fn(() => {
+      throw new Error('Source reached the decoder.');
+    });
+    const worker = vi.fn(
+      class {
+        constructor() {
+          throw new Error('Source reached the worker.');
+        }
+      }
+    );
+    vi.stubGlobal('createImageBitmap', decode);
+    vi.stubGlobal('Worker', mode === 'worker' ? worker : undefined);
+    vi.stubGlobal('OffscreenCanvas', mode === 'worker' ? vi.fn() : undefined);
+    await expect(
+      openPictureSource(new Blob([fixture], { type: 'image/png' }), new AbortController().signal)
+    ).rejects.toThrow('Animated PNG pictures are not supported');
+    expect(decode).not.toHaveBeenCalled();
+    expect(worker).not.toHaveBeenCalled();
+  }
+);
 
 it('validates detected source bytes before decoding a misleading declared format', async () => {
-  await expect(openPictureSource(new Blob(['<svg/>'], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Choose a valid JPEG, PNG, WebP, or GIF picture.');
+  await expect(
+    openPictureSource(new Blob(['<svg/>'], { type: 'image/png' }), new AbortController().signal)
+  ).rejects.toThrow('Choose a valid JPEG, PNG, WebP, or GIF picture.');
 });
 
 it('rejects animated WebP instead of silently flattening it in the static editor', async () => {
@@ -80,30 +114,49 @@ it('rejects animated WebP instead of silently flattening it in the static editor
   bytes.set(new TextEncoder().encode('RIFF'), 0);
   bytes.set(new TextEncoder().encode('WEBPVP8X'), 8);
   bytes[20] = 2;
-  await expect(openPictureSource(new Blob([bytes], { type: 'image/webp' }), new AbortController().signal)).rejects.toThrow('Animated WebP pictures are not supported as an editor source.');
+  await expect(
+    openPictureSource(new Blob([bytes], { type: 'image/webp' }), new AbortController().signal)
+  ).rejects.toThrow('Animated WebP pictures are not supported as an editor source.');
 });
 
 it('honors cancellation before decoded source work can begin', async () => {
-  const controller = new AbortController(); controller.abort();
-  await expect(openPictureSource(new Blob([new Uint8Array([255, 216, 255])]), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    openPictureSource(new Blob([new Uint8Array([255, 216, 255])]), controller.signal)
+  ).rejects.toMatchObject({ name: 'AbortError' });
 });
-
 
 it('rejects detected animated PNG before a generic bitmap can flatten it', async () => {
   const bytes = new Uint8Array(20);
-  bytes.set([137,80,78,71,13,10,26,10]);
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
   bytes.set(new TextEncoder().encode('acTL'), 12);
-  await expect(openPictureSource(new Blob([bytes], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Animated PNG pictures are not supported as an editor source.');
+  await expect(
+    openPictureSource(new Blob([bytes], { type: 'image/png' }), new AbortController().signal)
+  ).rejects.toThrow('Animated PNG pictures are not supported as an editor source.');
 });
-it.each(['pq', 'hlg'])('rejects %s PNG16 color declarations before rasterizing the source', async (transfer) => {
-  // Generated RGB16 PNGs with valid CRCs and standard PQ/HLG cICP declarations.
-  const fixture = await readFile(new URL(`../fixtures/profile-${transfer}.png`, import.meta.url));
-  const decode = vi.fn(() => { throw new Error('Source reached the decoder.'); });
-  const worker = vi.fn(function () { throw new Error('Source reached the worker.'); });
-  vi.stubGlobal('createImageBitmap', decode);
-  vi.stubGlobal('Worker', worker);
-  vi.stubGlobal('OffscreenCanvas', class {});
-  await expect(openPictureSource(new Blob([fixture]), new AbortController().signal)).rejects.toThrow('color interpretation is not supported');
-  expect(decode).not.toHaveBeenCalled();
-  expect(worker).not.toHaveBeenCalled();
-});
+it.each(['pq', 'hlg'])(
+  'rejects %s PNG16 color declarations before rasterizing the source',
+  async (transfer) => {
+    // Generated RGB16 PNGs with valid CRCs and standard PQ/HLG cICP declarations.
+    const fixture = await readFile(new URL(`../fixtures/profile-${transfer}.png`, import.meta.url));
+    const decode = vi.fn(() => {
+      throw new Error('Source reached the decoder.');
+    });
+    const worker = vi.fn(
+      class {
+        constructor() {
+          throw new Error('Source reached the worker.');
+        }
+      }
+    );
+    vi.stubGlobal('createImageBitmap', decode);
+    vi.stubGlobal('Worker', worker);
+    vi.stubGlobal('OffscreenCanvas', class {});
+    await expect(
+      openPictureSource(new Blob([fixture]), new AbortController().signal)
+    ).rejects.toThrow('color interpretation is not supported');
+    expect(decode).not.toHaveBeenCalled();
+    expect(worker).not.toHaveBeenCalled();
+  }
+);

@@ -32,7 +32,7 @@ import {
 
 const filename = 'factory.sqlite';
 export function stateDirectory(directory: string) {
-  let existing = directory.startsWith('/') ? directory : process.cwd() + '/' + directory;
+  let existing = directory.startsWith('/') ? directory : `${process.cwd()}/${directory}`;
   const suffix: string[] = [];
   while (!existsSync(existing)) {
     suffix.unshift(basename(existing));
@@ -296,7 +296,7 @@ export async function requiredRecord(directory: string, name: string): Promise<u
 }
 export async function recordNames(directory: string): Promise<string[]> {
   return stateConnection(directory, (db, namespace) => {
-    const prefix = namespace ? namespace + '/' : '';
+    const prefix = namespace ? `${namespace}/` : '';
     return [
       ...new Set(
         db

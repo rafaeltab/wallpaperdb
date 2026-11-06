@@ -118,36 +118,34 @@ export async function provisionAssetBroker(
       await manager.streams.update(name, config);
     }
   }
-  {
-    for (const [stream, durable, subject] of [
-      [commands, `commands_${application.id}`, `asset.commands.${application.id}.*`],
-      [results, application.resultConsumer, application.resultSubject],
-    ] as const) {
-      const config = {
-        durable_name: durable,
-        filter_subject: subject,
-        ack_policy: AckPolicy.Explicit,
-        max_deliver: -1,
-        ack_wait: 30_000_000_000,
-        max_ack_pending: authority.broker.maxAckPending,
-        max_batch: 1,
-        max_expires: 30_000_000_000,
-      };
-      const existing = await manager.consumers.info(stream, durable).catch((error: unknown) => {
-        if (typeof error === 'object' && error !== null && 'code' in error && error.code === '404')
-          return null;
-        throw error;
-      });
-      if (!existing) await manager.consumers.add(stream, config);
-      else if (
-        existing.config.filter_subject !== subject ||
-        existing.config.ack_policy !== AckPolicy.Explicit ||
-        existing.config.deliver_subject ||
-        existing.config.filter_subjects?.length ||
-        existing.config.max_deliver !== -1
-      )
-        throw new Error(`Unsafe protected consumer: ${stream}/${durable}`);
-    }
+  for (const [stream, durable, subject] of [
+    [commands, `commands_${application.id}`, `asset.commands.${application.id}.*`],
+    [results, application.resultConsumer, application.resultSubject],
+  ] as const) {
+    const config = {
+      durable_name: durable,
+      filter_subject: subject,
+      ack_policy: AckPolicy.Explicit,
+      max_deliver: -1,
+      ack_wait: 30_000_000_000,
+      max_ack_pending: authority.broker.maxAckPending,
+      max_batch: 1,
+      max_expires: 30_000_000_000,
+    };
+    const existing = await manager.consumers.info(stream, durable).catch((error: unknown) => {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '404')
+        return null;
+      throw error;
+    });
+    if (!existing) await manager.consumers.add(stream, config);
+    else if (
+      existing.config.filter_subject !== subject ||
+      existing.config.ack_policy !== AckPolicy.Explicit ||
+      existing.config.deliver_subject ||
+      existing.config.filter_subjects?.length ||
+      existing.config.max_deliver !== -1
+    )
+      throw new Error(`Unsafe protected consumer: ${stream}/${durable}`);
   }
   const operatorConsumer = 'operator_notifications';
   const existing = await manager.consumers

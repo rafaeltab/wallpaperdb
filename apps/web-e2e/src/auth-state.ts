@@ -51,8 +51,8 @@ export function resolveAuthCredentials(
   }
 
   return {
-    email: env[persona.emailEnvKey]!.trim(),
-    password: env[persona.passwordEnvKey]!.trim(),
+    email: env[persona.emailEnvKey]?.trim() ?? "",
+    password: env[persona.passwordEnvKey]?.trim() ?? "",
   };
 }
 

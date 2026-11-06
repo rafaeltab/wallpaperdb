@@ -24,7 +24,7 @@ const hold = async (boundary) => {
 };
 appendFileSync(
   join(config.directory, 'calls.jsonl'),
-  JSON.stringify({ binary: basename(process.argv[1]), args }) + '\n'
+  `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
 );
 if (args[0] === 'acp-mcp-call' && args[1] === 't3_environment_read') {
   console.log(JSON.stringify({ structuredContent: { environmentId: 'controlled-environment' } }));
@@ -343,7 +343,7 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       body: state.evidence + (state.issueBodyContext?.[number] ?? ''),
       comments: state.issueComments?.[number] ?? [],
     };
-  else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');
+  else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += `\n${flag('--body')}`;
   else if (args[0] === 'api' && args[1] === 'graphql')
     result = { data: { repository: { issue: { parent: { number: 571 } } } } };
   else if (args[0] === 'api' && args[1].includes('dependencies'))
@@ -639,7 +639,7 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
       },
     });
 } else if (args.includes('--help'))
-  console.log('--worktree --model' + (config.idempotency ? ' --client-request-id' : ''));
+  console.log(`--worktree --model${config.idempotency ? ' --client-request-id' : ''}`);
 else if (args[1] === 'start') {
   if (
     flag('--model') !== 'gpt-6.1-sol' ||

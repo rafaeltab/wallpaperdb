@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { command } from '../../platform/index.js';
 import { ancestor } from './ancestry.js';
 import { landedPrerequisite } from './landed-prerequisite.js';

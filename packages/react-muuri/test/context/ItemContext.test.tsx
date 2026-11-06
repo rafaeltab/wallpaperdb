@@ -45,7 +45,7 @@ describe('ItemContext', () => {
       );
 
       expect(capturedContext).not.toBeNull();
-      expect(capturedContext!.itemKey).toBe('my-item-key');
+      expect(required<ItemContextValue | null>(capturedContext).itemKey).toBe('my-item-key');
     });
 
     it('should provide item as null initially (before Muuri adds it)', () => {
@@ -58,7 +58,7 @@ describe('ItemContext', () => {
       );
 
       expect(capturedContext).not.toBeNull();
-      expect(capturedContext!.item).toBeNull();
+      expect(required<ItemContextValue | null>(capturedContext).item).toBeNull();
     });
 
     it('should render children', () => {
@@ -125,3 +125,8 @@ describe('ItemContext', () => {
     });
   });
 });
+
+function required<T>(value: T): NonNullable<T> {
+  if (value === null || value === undefined) throw new Error('Expected a required test value');
+  return value;
+}

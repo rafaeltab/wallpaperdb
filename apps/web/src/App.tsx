@@ -28,7 +28,7 @@ function buildAppPath(path: string): string {
 }
 
 const clerkProviderProps = {
-  publishableKey: PUBLISHABLE_KEY!,
+  publishableKey: PUBLISHABLE_KEY,
   signInUrl: CLERK_SIGN_IN_URL || buildAppPath('/sign-in'),
   signUpUrl: CLERK_SIGN_UP_URL || buildAppPath('/sign-up'),
   signInFallbackRedirectUrl: CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || buildAppPath('/'),

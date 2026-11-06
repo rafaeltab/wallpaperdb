@@ -104,8 +104,9 @@ export function syncKnownSecretsToContent(existingContent, secrets) {
 	}
 
 	if (toAppend.length === 0) return existingContent;
-	const separator = existingContent && !existingContent.endsWith("\n") ? "\n" : "";
-	return existingContent + separator + toAppend.join("\n") + "\n";
+	const separator =
+		existingContent && !existingContent.endsWith("\n") ? "\n" : "";
+	return `${existingContent + separator + toAppend.join("\n")}\n`;
 }
 
 export function resolveGenerateMarker(content, secrets) {

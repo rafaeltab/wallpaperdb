@@ -2,7 +2,11 @@ import { and, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { ulid } from 'ulid';
 import { profilePictureAssets, profilePictureImports, profiles } from '../../db/schema.js';
-import { PictureStore, PictureUnavailable, type StoredPicture } from '../../capabilities/pictures/index.js';
+import {
+  PictureStore,
+  PictureUnavailable,
+  type StoredPicture,
+} from '../../capabilities/pictures/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 
 const logicalPicture = (asset: StoredPicture): StoredPicture => ({
@@ -75,8 +79,7 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
               // Recheck the current clock after lock acquisition; a queued candidate can expire.
               const startedAt = new Date(Math.max(now.getTime(), Date.now()));
               if (
-                !asset ||
-                asset.state !== 'uploading' ||
+                asset?.state !== 'uploading' ||
                 asset.uploadLeaseUntil ||
                 !asset.expiresAt ||
                 asset.expiresAt <= startedAt

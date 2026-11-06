@@ -60,10 +60,10 @@ export function definition(
 				"JS_IMPORT_COMBINED_CLAUSE",
 			].includes(n.kind),
 		);
-	if (clause)
+	if (clause?.source)
 		return {
 			type: "ImportBinding",
-			parent: { source: { value: stringValue(clause.source!.text) } },
+			parent: { source: { value: stringValue(clause.source.text) } },
 			node: {
 				type:
 					native.parent?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER"
@@ -154,20 +154,27 @@ export function resolveScope(
 		const clause = ancestors.find((n) =>
 			["JS_IMPORT_NAMED_CLAUSE", "JS_IMPORT_COMBINED_CLAUSE"].includes(n.kind),
 		);
-		if (clause && parent?.kind === "JS_NAMED_IMPORT_SPECIFIER") {
+		if (
+			clause?.source &&
+			parent?.kind === "JS_NAMED_IMPORT_SPECIFIER" &&
+			parent.name
+		) {
 			// The pinned Vitest parser accepts Identifier import names only.
 			if (clause.typeToken === "type" || /^["']/.test(parent.name?.text ?? ""))
 				return "local";
 			return {
-				source: stringValue(clause.source!.text),
-				imported: importedName(parent.name!),
+				source: stringValue(clause.source.text),
+				imported: importedName(parent.name),
 				local: identifier,
 			};
 		}
-		if (clause && parent?.kind === "JS_SHORTHAND_NAMED_IMPORT_SPECIFIER") {
+		if (
+			clause?.source &&
+			parent?.kind === "JS_SHORTHAND_NAMED_IMPORT_SPECIFIER"
+		) {
 			if (clause.typeToken === "type") return "local";
 			return {
-				source: stringValue(clause.source!.text),
+				source: stringValue(clause.source.text),
 				imported: identifier,
 				local: identifier,
 			};
@@ -216,7 +223,7 @@ export function resolveScope(
 						: undefined;
 			const source = imported?.arguments?.args[0];
 			const templateSource = staticTemplateValue(source);
-			let key = parent!.member ?? parent!.identifier;
+			let key = parent?.member ?? parent?.identifier;
 			if (key?.kind === "JS_COMPUTED_MEMBER_NAME") key = key.expression;
 			if (
 				(source?.kind === "JS_STRING_LITERAL_EXPRESSION" ||
@@ -224,7 +231,7 @@ export function resolveScope(
 				key
 			)
 				return {
-					source: templateSource ?? stringValue(source!.text),
+					source: templateSource ?? stringValue(source?.text ?? ""),
 					imported: importedName(key),
 					local: identifier,
 				};

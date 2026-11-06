@@ -181,7 +181,7 @@ describe('feature dependency enforcement', () => {
       ).toContain('cycle');
     }
   );
-  it.each(['import(variable);', 'import(`../../${feature}`);', 'require(variable);'])(
+  it.each(['import(variable);', `import(\`../../\${feature}\`);`, 'require(variable);'])(
     'rejects computed dependencies in feature adapters: %s',
     (content) => {
       expect(

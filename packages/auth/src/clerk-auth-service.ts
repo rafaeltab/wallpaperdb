@@ -12,7 +12,7 @@ export class ClerkAuthService implements IAuthService {
   getUser(request: FastifyRequest, options?: { optional: true }): User | null {
     const auth = (request as unknown as RequestWithAuth).auth;
 
-    if (!auth || !auth.userId) {
+    if (!auth?.userId) {
       if (options?.optional) {
         return null;
       }

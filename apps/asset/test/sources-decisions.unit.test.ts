@@ -26,7 +26,7 @@ it('records private temporary-input expiry separately and preserves it through c
   const f = fixture(policy, await clockRuntime.runPromise(Clock.Clock));
   try {
     await create(f, 'temporary-policy');
-    const candidate = structuredClone(f.state.candidates[0]!);
+    const candidate = structuredClone(f.state.candidates[0]);
     expect(candidate.temporaryExpiresAt).toBe('2026-10-23T00:00:01.000Z');
     expect(candidate.orphanExpiresAt).toBe('2026-10-24T00:00:00.000Z');
     const next = structuredClone(policy);
@@ -562,49 +562,48 @@ it.each([
   { first: [103, 100], next: [100, 100], accepted: true },
   { first: [100, 100], next: [1031, 1000], accepted: false },
   { first: [1031, 1000], next: [100, 100], accepted: false },
-])('checks inclusive extreme ratio after orientation: $first then $next', async ({
-  first,
-  next,
-  accepted,
-}) => {
-  const f = fixture();
-  const admit = async (key: string, dimensions: number[], revision: string) => {
-    const [width, height] = dimensions;
-    if (!width || !height) throw new Error('Missing dimensions');
-    f.setInspect(() =>
-      Effect.succeed({
-        kind: 'verified',
-        facts: {
-          width,
-          height,
-          orientation: 6,
-          model: 'sdr-png',
-          mimeType: 'image/png',
-          byteLength: 4,
-          digest: 'ignored',
-        },
-      })
-    );
-    const id = await create(f, key, revision);
-    await upload(f, id);
-    return f.call((s) =>
-      s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
-    );
-  };
-  try {
-    await admit('first', first, '0');
-    expect(await admit('next', next, '1')).toMatchObject({
-      candidate: accepted
-        ? { status: 'accepted' }
-        : { status: 'rejected', reason: 'aspect-ratio-limit' },
-    });
-    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
-      asset: { sourceSetRevision: accepted ? '2' : '1' },
-    });
-  } finally {
-    await f.close();
+])(
+  'checks inclusive extreme ratio after orientation: $first then $next',
+  async ({ first, next, accepted }) => {
+    const f = fixture();
+    const admit = async (key: string, dimensions: number[], revision: string) => {
+      const [width, height] = dimensions;
+      if (!width || !height) throw new Error('Missing dimensions');
+      f.setInspect(() =>
+        Effect.succeed({
+          kind: 'verified',
+          facts: {
+            width,
+            height,
+            orientation: 6,
+            model: 'sdr-png',
+            mimeType: 'image/png',
+            byteLength: 4,
+            digest: 'ignored',
+          },
+        })
+      );
+      const id = await create(f, key, revision);
+      await upload(f, id);
+      return f.call((s) =>
+        s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
+      );
+    };
+    try {
+      await admit('first', first, '0');
+      expect(await admit('next', next, '1')).toMatchObject({
+        candidate: accepted
+          ? { status: 'accepted' }
+          : { status: 'rejected', reason: 'aspect-ratio-limit' },
+      });
+      expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+        asset: { sourceSetRevision: accepted ? '2' : '1' },
+      });
+    } finally {
+      await f.close();
+    }
   }
-});
+);
 it('compares the full active set rather than chaining pairwise similar Sources', async () => {
   const f = fixture();
   const admit = async (key: string, width: number, revision: string) => {
@@ -690,60 +689,60 @@ it('bounds concurrent preparation and acceptance and refuses preparation at the 
     await f.close();
   }
 });
-it.each([
-  'count',
-  'ratio',
-])('rechecks effective %s policy at acceptance without withdrawing existing Sources', async (limit) => {
-  const f = fixture();
-  try {
-    const first = await create(f, 'first');
-    await upload(f, first);
-    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
-    f.setInspect(() =>
-      Effect.succeed({
-        kind: 'verified',
-        facts: {
-          width: 102,
-          height: 100,
-          model: 'sdr-png',
-          mimeType: 'image/png',
-          byteLength: 4,
-          digest: 'ignored',
+it.each(['count', 'ratio'])(
+  'rechecks effective %s policy at acceptance without withdrawing existing Sources',
+  async (limit) => {
+    const f = fixture();
+    try {
+      const first = await create(f, 'first');
+      await upload(f, first);
+      await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      f.setInspect(() =>
+        Effect.succeed({
+          kind: 'verified',
+          facts: {
+            width: 102,
+            height: 100,
+            model: 'sdr-png',
+            mimeType: 'image/png',
+            byteLength: 4,
+            digest: 'ignored',
+          },
+        })
+      );
+      const next = await create(f, 'next', '1');
+      await upload(f, next);
+      const policy = {
+        ...initialSourcePolicies.wallpaper,
+        ...(limit === 'count' ? { maxActiveSources: 1 } : { aspectRatioTolerance: 0.01 }),
+      };
+      const useNew = f.activate(policy);
+      await expect(
+        f.call((s) =>
+          s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+        )
+      ).rejects.toBeDefined();
+      useNew();
+      expect(
+        await f.call((s) =>
+          s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+        )
+      ).toMatchObject(
+        limit === 'count'
+          ? { kind: 'rejected', reason: 'source-count-limit' }
+          : { candidate: { status: 'rejected', reason: 'aspect-ratio-limit' } }
+      );
+      expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+        asset: {
+          sourceSetRevision: '1',
+          sources: [expect.objectContaining({ facts: expect.objectContaining({ width: 100 }) })],
         },
-      })
-    );
-    const next = await create(f, 'next', '1');
-    await upload(f, next);
-    const policy = {
-      ...initialSourcePolicies.wallpaper,
-      ...(limit === 'count' ? { maxActiveSources: 1 } : { aspectRatioTolerance: 0.01 }),
-    };
-    const useNew = f.activate(policy);
-    await expect(
-      f.call((s) =>
-        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
-      )
-    ).rejects.toBeDefined();
-    useNew();
-    expect(
-      await f.call((s) =>
-        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
-      )
-    ).toMatchObject(
-      limit === 'count'
-        ? { kind: 'rejected', reason: 'source-count-limit' }
-        : { candidate: { status: 'rejected', reason: 'aspect-ratio-limit' } }
-    );
-    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
-      asset: {
-        sourceSetRevision: '1',
-        sources: [expect.objectContaining({ facts: expect.objectContaining({ width: 100 }) })],
-      },
-    });
-  } finally {
-    await f.close();
+      });
+    } finally {
+      await f.close();
+    }
   }
-});
+);
 it('recovers stopped additional inspection by same-digest replay while fencing changed bytes and preserving accepted Sources', async () => {
   const f = fixture();
   try {
@@ -943,56 +942,56 @@ it('replaces the Default at the count limit only after preparation while retaini
 it.each([
   { width: 1030, accepted: true },
   { width: 1031, accepted: false },
-])('includes the replaced Source in the full oriented inclusive ratio check: $width', async ({
-  width,
-  accepted,
-}) => {
-  const f = fixture();
-  try {
-    const first = await create(f, 'ratio-first');
-    await upload(f, first);
-    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
-    const predecessor = f.state.sources[0];
-    if (!predecessor) throw new Error('Expected Source');
-    const replacement = {
-      operation: 'replace-one' as const,
-      expectedSourceSetRevision: '1',
-      targetSourceId: predecessor.sourceId,
-    };
-    const candidate = await f.call((s) =>
-      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'ratio-replace' })
-    );
-    if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
-    f.setInspect(() =>
-      Effect.succeed({
-        kind: 'verified',
-        facts: {
-          width,
-          height: 1000,
-          orientation: 6,
-          model: 'sdr-png',
-          mimeType: 'image/png',
-          byteLength: 4,
-          digest: 'ignored',
-        },
-      })
-    );
-    await upload(f, candidate.candidate.candidateId);
-    expect(
-      await f.call((s) =>
-        s.accept(owner, 'asset_one', candidate.candidate.candidateId, replacement)
-      )
-    ).toMatchObject({
-      candidate: accepted
-        ? { status: 'accepted' }
-        : { status: 'rejected', reason: 'aspect-ratio-limit' },
-    });
-    expect(f.state.sourceSetRevision).toBe(accepted ? '2' : '1');
-    expect(f.retirements).toHaveLength(accepted ? 1 : 0);
-  } finally {
-    await f.close();
+])(
+  'includes the replaced Source in the full oriented inclusive ratio check: $width',
+  async ({ width, accepted }) => {
+    const f = fixture();
+    try {
+      const first = await create(f, 'ratio-first');
+      await upload(f, first);
+      await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      const predecessor = f.state.sources[0];
+      if (!predecessor) throw new Error('Expected Source');
+      const replacement = {
+        operation: 'replace-one' as const,
+        expectedSourceSetRevision: '1',
+        targetSourceId: predecessor.sourceId,
+      };
+      const candidate = await f.call((s) =>
+        s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'ratio-replace' })
+      );
+      if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
+      f.setInspect(() =>
+        Effect.succeed({
+          kind: 'verified',
+          facts: {
+            width,
+            height: 1000,
+            orientation: 6,
+            model: 'sdr-png',
+            mimeType: 'image/png',
+            byteLength: 4,
+            digest: 'ignored',
+          },
+        })
+      );
+      await upload(f, candidate.candidate.candidateId);
+      expect(
+        await f.call((s) =>
+          s.accept(owner, 'asset_one', candidate.candidate.candidateId, replacement)
+        )
+      ).toMatchObject({
+        candidate: accepted
+          ? { status: 'accepted' }
+          : { status: 'rejected', reason: 'aspect-ratio-limit' },
+      });
+      expect(f.state.sourceSetRevision).toBe(accepted ? '2' : '1');
+      expect(f.retirements).toHaveLength(accepted ? 1 : 0);
+    } finally {
+      await f.close();
+    }
   }
-});
+);
 
 it('replaces a non-default independently and fences concurrent replacement, retargeting and late replay', async () => {
   const f = fixture();
@@ -1067,79 +1066,80 @@ it('replaces a non-default independently and fences concurrent replacement, reta
   }
 });
 
-it.each([
-  'ratio',
-  'count',
-  'operation',
-  'model',
-])('rechecks activated %s policy for replacement without retiring its predecessor', async (limit) => {
-  const f = fixture();
-  try {
-    const first = await create(f, 'first');
-    await upload(f, first);
-    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
-    const predecessor = f.state.sources[0];
-    if (!predecessor) throw new Error('Expected Source');
-    const replacement = {
-      operation: 'replace-one' as const,
-      expectedSourceSetRevision: '1',
-      targetSourceId: predecessor.sourceId,
-    };
-    const proposed = await f.call((s) =>
-      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'replace' })
-    );
-    if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
-    f.setInspect(() =>
-      Effect.succeed({
-        kind: 'verified',
-        facts: {
-          width: 102,
-          height: 100,
-          model: 'sdr-png',
-          mimeType: 'image/png',
-          byteLength: 4,
-          digest: 'ignored',
-        },
-      })
-    );
-    await upload(f, proposed.candidate.candidateId);
-    const useNew = f.activate({
-      ...initialSourcePolicies.wallpaper,
-      ...(limit === 'ratio' ? { aspectRatioTolerance: 0.01 } : {}),
-      ...(limit === 'count' ? { maxActiveSources: 1 } : {}),
-      ...(limit === 'operation' ? { operations: ['add'] } : {}),
-      ...(limit === 'model'
-        ? {
-            admission: { ...initialSourcePolicies.wallpaper.admission, sourceModels: ['sdr-jpeg'] },
-          }
-        : {}),
-    });
-    await expect(
-      f.call((s) => s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement))
-    ).rejects.toBeDefined();
-    useNew();
-    const outcome = await f.call((s) =>
-      s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement)
-    );
-    // One-for-one replacement still fits a newly lowered count of one.
-    expect(outcome).toMatchObject(
-      limit === 'count'
-        ? { candidate: { status: 'accepted' } }
-        : limit === 'operation'
-          ? { kind: 'rejected', reason: 'unsupported-operation' }
-          : {
-              candidate: {
-                status: 'rejected',
-                reason: limit === 'ratio' ? 'aspect-ratio-limit' : 'unsupported-source-model',
+it.each(['ratio', 'count', 'operation', 'model'])(
+  'rechecks activated %s policy for replacement without retiring its predecessor',
+  async (limit) => {
+    const f = fixture();
+    try {
+      const first = await create(f, 'first');
+      await upload(f, first);
+      await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      const predecessor = f.state.sources[0];
+      if (!predecessor) throw new Error('Expected Source');
+      const replacement = {
+        operation: 'replace-one' as const,
+        expectedSourceSetRevision: '1',
+        targetSourceId: predecessor.sourceId,
+      };
+      const proposed = await f.call((s) =>
+        s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'replace' })
+      );
+      if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
+      f.setInspect(() =>
+        Effect.succeed({
+          kind: 'verified',
+          facts: {
+            width: 102,
+            height: 100,
+            model: 'sdr-png',
+            mimeType: 'image/png',
+            byteLength: 4,
+            digest: 'ignored',
+          },
+        })
+      );
+      await upload(f, proposed.candidate.candidateId);
+      const useNew = f.activate({
+        ...initialSourcePolicies.wallpaper,
+        ...(limit === 'ratio' ? { aspectRatioTolerance: 0.01 } : {}),
+        ...(limit === 'count' ? { maxActiveSources: 1 } : {}),
+        ...(limit === 'operation' ? { operations: ['add'] } : {}),
+        ...(limit === 'model'
+          ? {
+              admission: {
+                ...initialSourcePolicies.wallpaper.admission,
+                sourceModels: ['sdr-jpeg'],
               },
             }
-    );
-    expect(f.retirements).toHaveLength(limit === 'count' ? 1 : 0);
-    if (limit !== 'count') expect(f.state.sources).toEqual([predecessor]);
-  } finally {
-    await f.close();
+          : {}),
+      });
+      await expect(
+        f.call((s) => s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement))
+      ).rejects.toBeDefined();
+      useNew();
+      const outcome = await f.call((s) =>
+        s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement)
+      );
+      // One-for-one replacement still fits a newly lowered count of one.
+      expect(outcome).toMatchObject(
+        limit === 'count'
+          ? { candidate: { status: 'accepted' } }
+          : limit === 'operation'
+            ? { kind: 'rejected', reason: 'unsupported-operation' }
+            : {
+                candidate: {
+                  status: 'rejected',
+                  reason: limit === 'ratio' ? 'aspect-ratio-limit' : 'unsupported-source-model',
+                },
+              }
+      );
+      expect(f.retirements).toHaveLength(limit === 'count' ? 1 : 0);
+      if (limit !== 'count') expect(f.state.sources).toEqual([predecessor]);
+    } finally {
+      await f.close();
+    }
   }
-});
+);
 
 it('fences late cancelled replacement inspection after a new candidate has won', async () => {
   const f = fixture();
@@ -1448,7 +1448,7 @@ describe('canonical picture replacement', () => {
       );
       expect(outcomes.filter((o) => o.kind === 'candidate')).toHaveLength(1);
       expect(outcomes).toContainEqual({ kind: 'rejected', reason: 'source-set-conflict' });
-      const winner = f.state.sources[0]!;
+      const winner = f.state.sources[0];
       expect(winner.sourceId).not.toBe(first.sourceId);
       expect(f.state.sources).toHaveLength(1);
       expect(f.state.defaultSourceId).toBe(winner.sourceId);
@@ -1469,7 +1469,8 @@ describe('canonical picture replacement', () => {
       expect(f.confirmations).toHaveLength(2);
       const loser = ids.find(
         (id) => id !== f.state.candidates.find((c) => c.sourceId === winner.sourceId)?.candidateId
-      )!;
+      );
+      if (!loser) throw new Error('Expected a losing candidate');
       expect(
         await f.call((s) =>
           s.accept(owner, 'asset_one', loser, { ...replacement, expectedSourceSetRevision: '2' })

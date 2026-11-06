@@ -370,9 +370,9 @@ async function main() {
 			`repos/${repo}/issues/${pr.number}`,
 			"-H",
 			"Accept: application/vnd.github.full+json",
-		]).body_html;
+		]);
 		const videos = [];
-		for (const url of videoReferences(body ?? ""))
+		for (const url of videoReferences(body.body_html ?? "", body.body ?? ""))
 			videos.push(await verifyVideo(url));
 		console.log(JSON.stringify({ pr: pr.url, videos }, null, 2));
 	} else if (action === "record-check") {

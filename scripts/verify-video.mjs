@@ -1,4 +1,4 @@
-export function videoReferences(html) {
+export function videoReferences(html, markdown = "") {
 	const urls = [];
 	for (const match of html.matchAll(/<video\b([^>]*)>([\s\S]*?)<\/video>/gi)) {
 		if (!/(?:^|\s)controls(?:\s|=|$)/i.test(match[1]))
@@ -7,7 +7,28 @@ export function videoReferences(html) {
 			/\bsrc\s*=\s*["']([^"']+)["']/i,
 		)?.[1];
 		if (!source) throw new Error("Video player lacks a source");
-		urls.push(source.replace(/&amp;/g, "&"));
+		const decoded = source.replace(/&amp;/g, "&");
+		const parsed = new URL(decoded);
+		if (
+			parsed.origin === "https://github.com" &&
+			parsed.pathname.startsWith("/user-attachments/assets/")
+		)
+			urls.push(decoded);
+		else if (
+			parsed.origin === "https://private-user-images.githubusercontent.com"
+		) {
+			const attachment = [
+				...markdown.matchAll(
+					/https:\/\/github\.com\/user-attachments\/assets\/([a-f0-9-]{36})/gi,
+				),
+			].find((match) => parsed.pathname.includes(match[1]));
+			if (!attachment)
+				throw new Error(
+					"Rendered video has no matching canonical attachment in the PR body",
+				);
+			urls.push(attachment[0]);
+		} else
+			throw new Error("Rendered video does not reference a GitHub attachment");
 	}
 	if (!urls.length) throw new Error("PR body has no rendered video player");
 	return urls;

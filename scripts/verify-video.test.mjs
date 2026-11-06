@@ -24,3 +24,10 @@ test("video verification requires controls and a public video response", async (
 		/public/,
 	);
 });
+
+test("rendered private CDN sources are verified through the original public attachment", () => {
+	const id = "a3789f14-1d13-4814-84f7-7d661eafae96";
+	const publicUrl = `https://github.com/user-attachments/assets/${id}`;
+	const html = `<video controls src="https://private-user-images.githubusercontent.com/1/123-${id}.mp4?jwt=signed"></video>`;
+	assert.deepEqual(videoReferences(html, publicUrl), [publicUrl]);
+});

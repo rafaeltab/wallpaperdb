@@ -56,7 +56,7 @@ export function makeBoard(config: {
         },
       };
     }
-    let current = { ...initial, snapshot: actions(initial.snapshot, input) };
+    let current = { ...initial, snapshot: actions(initial.snapshot, input, initial.details) };
     for (const detail of Object.values(current.details)) {
       const item = current.snapshot.entities.items[detail.itemId];
       if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
@@ -139,7 +139,7 @@ export function makeBoard(config: {
           };
         }
         revision++;
-        next.snapshot = actions({ ...next.snapshot, cursor: cursor() }, input);
+        next.snapshot = actions({ ...next.snapshot, cursor: cursor() }, input, next.details);
         for (const detail of Object.values(next.details)) {
           const item = next.snapshot.entities.items[detail.itemId];
           if (item) next.details[detail.itemId] = { ...detail, itemVersion: item.version };

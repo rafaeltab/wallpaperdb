@@ -15,3 +15,4 @@ export type {
   FactoryV2Snapshot,
   WorkItem,
 } from './v2/contract.js';
+export { liveV2Data } from './v2/live.js';

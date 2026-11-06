@@ -58,6 +58,8 @@ export type {
   FactoryV2PlanDetails,
   FactoryV2Problem,
 } from './model.js';
-export { liveBoard } from './implementation.js';
+export { makeBoard } from './implementation.js';
+export type { Board } from './implementation.js';
 export { BoardStore } from './contract.js';
 export type { BoardInput, BoardRecord, CommandRecord } from './contract.js';
+export { BoardCommands } from './contract.js';

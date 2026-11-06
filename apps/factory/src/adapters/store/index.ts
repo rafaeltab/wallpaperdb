@@ -3,3 +3,4 @@ export { sqliteAttemptStore } from './attempts.js';
 export { sqliteObservations, sqliteScheduleObservations } from './observations.js';
 export { sqliteLocalSnapshot } from './snapshots.js';
 export { sqliteThreads } from './threads.js';
+export { sqliteBoard } from './board.js';

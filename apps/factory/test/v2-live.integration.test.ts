@@ -11,6 +11,7 @@ import {
 import { Time } from '../src/capabilities/job/index.js';
 import { liveV2Data } from '../src/http/index.js';
 import type { ScheduleSnapshot } from '../src/capabilities/observe/index.js';
+import { AttemptStore, type PlanningAttempt } from '../src/capabilities/plan/index.js';
 
 const initial: ScheduleSnapshot = {
   state: { revision: -1, paused: true, concurrency: 1, allowance: 3, admissions: [] },
@@ -274,6 +275,7 @@ async function liveBoard(config: {
   commands?: BoardCommands;
   run?: typeof Effect.runPromise;
   autoExecute?: boolean;
+  attempts?: AttemptStore;
 }) {
   let saved: BoardRecord | undefined;
   const records = new Map<string, CommandRecord>();
@@ -305,17 +307,18 @@ async function liveBoard(config: {
       }),
     commands: () => Effect.succeed([...records.values()]),
   };
+  const build = makeBoard({ ...config, epoch: 'test' }).pipe(
+    Effect.provideService(BoardStore, store),
+    Effect.provideService(
+      BoardCommands,
+      config.commands ?? {
+        execute: () => Effect.succeed({ state: 'rejected', result: null, reasons: [] }),
+      }
+    ),
+    Effect.provideService(Time, { now: () => Effect.succeed(config.now?.() ?? 1000) })
+  );
   const board = await Effect.runPromise(
-    makeBoard({ ...config, epoch: 'test' }).pipe(
-      Effect.provideService(BoardStore, store),
-      Effect.provideService(
-        BoardCommands,
-        config.commands ?? {
-          execute: () => Effect.succeed({ state: 'rejected', result: null, reasons: [] }),
-        }
-      ),
-      Effect.provideService(Time, { now: () => Effect.succeed(config.now?.() ?? 1000) })
-    )
+    config.attempts ? build.pipe(Effect.provideService(AttemptStore, config.attempts)) : build
   );
   let pending: Promise<void> | undefined;
   const data = liveV2Data(board, Effect.runPromise, () => {
@@ -929,6 +932,71 @@ it('distinguishes failed CI without an actor from an owned automatic repair', as
       status: { code: 'repairing-ci' },
       attention: { state: 'none' },
     });
+  } finally {
+    await app.close();
+  }
+});
+
+it('retains an accepted preview basis when the plan becomes historical', async () => {
+  const old: PlanningAttempt = {
+    id: '00000000-0000-4000-8000-000000000011',
+    revision: 1,
+    startedAt: 1000,
+    deadline: 5000,
+    finishedAt: 2000,
+    phase: 'succeeded',
+  };
+  const attempts: AttemptStore = {
+    pending: () => Effect.succeed(undefined),
+    get: (id) => Effect.succeed(id === old.id ? old : undefined),
+    create: () => Effect.succeed(false),
+    save: () => Effect.succeed(false),
+  };
+  const board = await liveBoard({
+    scopeId: 'test',
+    initial,
+    attempts,
+    commands: {
+      execute: () =>
+        Effect.succeed({ state: 'succeeded', result: { planId: `plan:${old.id}` }, reasons: [] }),
+    },
+  });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const preview = Object.values(before.entities.actions).find((a) => a.kind === 'preview-plan');
+    if (preview?.availability.state !== 'available') throw new Error('Preview unavailable');
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: {
+            commandId: '00000000-0000-4000-8000-000000000012',
+            actionId: preview.id,
+            precondition: preview.availability.precondition,
+            kind: 'preview-plan',
+            payload: {},
+          },
+        })
+      ).statusCode
+    ).toBe(202);
+    await board.idle();
+    await board.publish(initial, old);
+    const url = `/api/v2/plans/${encodeURIComponent(`plan:${old.id}`)}`;
+    const current = (await app.inject(url)).json();
+    expect(current.attempt.basis).toMatchObject({
+      boardCursor: before.cursor,
+      controlVersion: before.meta.factory.version,
+    });
+    expect(current.attempt.applicability).toBe('current');
+    await board.publish(
+      { ...initial, state: { ...initial.state, revision: 1 } },
+      { ...old, id: '00000000-0000-4000-8000-000000000013', startedAt: 3000 }
+    );
+    const historical = (await app.inject(url)).json();
+    expect(historical.attempt.basis).toEqual(current.attempt.basis);
+    expect(historical.attempt.applicability).toBe('stale');
   } finally {
     await app.close();
   }

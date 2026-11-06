@@ -96,6 +96,10 @@ export function makeBoard(config: {
         receipts.set(record.request.commandId, interrupted);
       } else receipts.set(record.request.commandId, record);
     }
+    const planBasis = (id: string) =>
+      [...receipts.values()].find(
+        (r) => r.receipt.result && 'planId' in r.receipt.result && r.receipt.result.planId === id
+      )?.basis ?? undefined;
     let lastPlan: BoardPlan | undefined = config.initialPlan;
     const publish = (nextInput: ScheduleSnapshot, plan?: BoardPlan) =>
       Effect.gen(function* () {
@@ -117,12 +121,7 @@ export function makeBoard(config: {
             checkRuns: retainFact(current.details[id]?.checkRuns, detail.checkRuns),
           };
         if (lastPlan) {
-          const basis = [...receipts.values()].find(
-            (r) =>
-              r.receipt.result &&
-              'planId' in r.receipt.result &&
-              r.receipt.result.planId === `plan:${lastPlan?.id}`
-          )?.basis;
+          const basis = planBasis(`plan:${lastPlan.id}`);
           const detail = planDetails(
             lastPlan,
             next.snapshot,
@@ -330,7 +329,7 @@ export function makeBoard(config: {
             const old =
               id.startsWith('plan:') && attempts ? yield* attempts.get(id.slice(5)) : undefined;
             return old
-              ? planDetails(old, current.snapshot, undefined, planningIdentity(input))
+              ? planDetails(old, current.snapshot, planBasis(id), planningIdentity(input))
               : undefined;
           }
           const { issues, repositories, labels, users, sources, threads } =

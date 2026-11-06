@@ -1,0 +1,177 @@
+{
+	"nativeMakeArgv": [
+		"make",
+		"test-focused",
+		"PACKAGE=asset",
+		"ARGS=--config vitest.integration.config.ts test/broker-acquisition"
+	],
+	"expectedFiles": 6,
+	"collected": 18,
+	"failed": 16,
+	"passed": 2,
+	"expectedCaseSet": [
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-cleanup.integration.test.ts",
+			"name": "closes the native silent-peer socket after timeout",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-cleanup.integration.test.ts",
+			"name": "closes the native silent-peer socket after cancellation",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-cleanup.integration.test.ts",
+			"name": "closes the native silent-peer socket after disposal",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-commands.integration.test.ts",
+			"name": "closes the native silent-peer socket after timeout",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-commands.integration.test.ts",
+			"name": "closes the native silent-peer socket after cancellation",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-commands.integration.test.ts",
+			"name": "closes the native silent-peer socket after disposal",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-events.integration.test.ts",
+			"name": "closes the native silent-peer socket after timeout",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-events.integration.test.ts",
+			"name": "closes the native silent-peer socket after cancellation",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-events.integration.test.ts",
+			"name": "closes the native silent-peer socket after disposal",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-notifications.integration.test.ts",
+			"name": "closes the native silent-peer socket after timeout",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-notifications.integration.test.ts",
+			"name": "closes the native silent-peer socket after cancellation",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-notifications.integration.test.ts",
+			"name": "closes the native silent-peer socket after disposal",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-sources.integration.test.ts",
+			"name": "closes the native silent-peer socket after timeout",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-sources.integration.test.ts",
+			"name": "closes the native silent-peer socket after cancellation",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-sources.integration.test.ts",
+			"name": "closes the native silent-peer socket after disposal",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/fixtures/broker-acquisition.ts:35"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-errors.integration.test.ts",
+			"name": "closes the native silent-peer socket on explicit abort without dialing the remaining candidate",
+			"result": "failed",
+			"assertion": "native sockets.size expected 0, received 1 before cleanup",
+			"assertionAnchor": "test/broker-acquisition-errors.integration.test.ts:76"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-errors.integration.test.ts",
+			"name": "preserves authorization denial across multiple resolved address candidates without an abort signal",
+			"result": "passed"
+		},
+		{
+			"project": "asset-integration",
+			"file": "test/broker-acquisition-errors.integration.test.ts",
+			"name": "preserves healthy authenticated acquisition and native broker shutdown with multiple candidates",
+			"result": "passed"
+		}
+	],
+	"provenance": "Fixed #547 historical baseline contract. Asset has 18 collected cases, 16 assertion reds and two passing neighbors; the older descriptor text said15.",
+	"baselineSources": [
+		{
+			"path": "apps/asset/src/adapters/cleanup/worker.ts",
+			"sha256": "672b7a8989b64c1aa168894c1c3963104b5901187da4963b7e3bf733ae533935"
+		},
+		{
+			"path": "apps/asset/src/adapters/commands/notifications.ts",
+			"sha256": "3b0b6362a174c94567f0c3b8c08877b14ef8b1acd8559efd8e8defe724733db9"
+		},
+		{
+			"path": "apps/asset/src/adapters/commands/runtime.ts",
+			"sha256": "19cc580560977b9e43e61ce417d3ff87c169688cb6afe967535affc959e93eff"
+		},
+		{
+			"path": "apps/asset/src/adapters/events/broker.ts",
+			"sha256": "3e23fa7bc48761bb355a7449300acb5d931c6bc2c95932bede358d721fc44e27"
+		},
+		{
+			"path": "apps/asset/src/adapters/sources/publisher.ts",
+			"sha256": "02a8877ebb10c0ea50931a1565d80941483fde53e2426af3f12b3d8f00969f9a"
+		}
+	]
+}

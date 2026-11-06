@@ -1,0 +1,350 @@
+{
+	"version": 1,
+	"issue": "https://github.com/rafaeltab/wallpaperdb/issues/554",
+	"purpose": "Fixed historical source-intake workload for #557 hillclimb infrastructure qualification. Product source and tests are disposable inputs, not a production repair selection.",
+	"scope": "https://github.com/rafaeltab/wallpaperdb/issues/557#issuecomment-6543467933",
+	"infrastructurePullRequest": "https://github.com/rafaeltab/wallpaperdb/pull/614",
+	"infrastructureBase": "89b68d5307933704ee70e23e5658829746bd347e",
+	"productBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+	"initialOverlay": "c277c2c386e9d2fdcd56485e0594157e7c5a1d38",
+	"productReference": "f7aa51f319e10aebf51797e3f2409b0fc19106fe",
+	"referencePullRequest": "https://github.com/rafaeltab/wallpaperdb/pull/620",
+	"status": {
+		"definitionOnly": true,
+		"liveQualified": false,
+		"referenceState": "CLOSED",
+		"rootFirst547": "Repair remains under review. No qualification or integration inferred from this descriptor.",
+		"admission": "Root integrates only after two consecutive clean runs of each earlier subset in scope order: #547, then #548, then #551, then #554/#553 at five. Scout recommendation to start live #551 does not override the scope comment. Record actual reviewed infrastructure SHA at admission; infrastructureBase is historical, not a qualified head."
+	},
+	"constraints": [
+		"Commit only this descriptor in this task. No live app, browser, provider or paid operation, push, GitHub mutation, implementation fix, or new PR.",
+		"All 20 result PRs stay closed; product issues and #556/#557 stay open. #614 is the sole infrastructure PR. No merges or production selection.",
+		"Apply only listed product/test inputs in an isolated disposable #554 worktree. Keep #553 Asset state, databases, installs and Compose project separate. Never cherry-pick C620, which also carries infrastructure and tooling changes.",
+		"Agents/source/Git stay local; later authorized development and validation use ordinary Make on large workers. No manual artifact transfer, generated repair, hidden retry, application timeout increase, weakened assertion or ignored readiness failure.",
+		"No new runner or framework. This JSON is a reviewable definition, not an executable runner. Root owns later admission, recordings, accounting, worker lifecycle and independent review."
+	],
+	"inputs": {
+		"tests": [
+			{
+				"path": "apps/web/test/features/source-intake-capacity.test.ts",
+				"gitBlob": "dc94dca603d993514a8ac3cc7ee8b8ac21e74414",
+				"sha256": "f4da73f6b64148b0af0cf5ae75d03c9fddbc4609031d986c4c1197d455b9b255",
+				"productBase": null
+			},
+			{
+				"path": "apps/web/test/components/upload/wallpaper-source-management.dom.test.tsx",
+				"gitBlob": "5a1fbd25d1c2212a2501d7710051600b1ea52ebb",
+				"sha256": "504ff8e333edd39b5c8062770bf6453020c5abb2fb5c60ddc9fe3914eaf866bc",
+				"productBase": {
+					"gitBlob": "06392a86e493d2ff418bcfa828e988cdaa8250e2",
+					"sha256": "9f6e7030d61fe326e5c0d73e5a8de1c1ad02163f196dffa98c8a60e47a658aab"
+				}
+			},
+			{
+				"path": "apps/web/test/components/upload/wallpaper-sources.dom.test.tsx",
+				"gitBlob": "edc1761480a7dec3c7e1acf7bc25268476e9955d",
+				"sha256": "517446ce445524f974a555236afbccee59352ff1329c15746ce09ad6744a39a8",
+				"productBase": {
+					"gitBlob": "720fb147ca2b73775963b13c855c50b5e9b175b7",
+					"sha256": "acd000514578b47c5981395ca7385455184fdbd057d4e13b31634c3e703f6656"
+				}
+			},
+			{
+				"path": "apps/web-e2e/specs/source-intake-capacity.spec.ts",
+				"gitBlob": "1b5dde1982326e4c3453b158bcae2de647783969",
+				"sha256": "adeec2dd45fd24c59b5006df6bb10345c4f87c950ec59625e6c678a8de737b47",
+				"productBase": null
+			}
+		],
+		"repair": [
+			{
+				"path": "apps/web/src/features/wallpaper-creation/sources.ts",
+				"gitBlob": "35cd3b9cb4301170e537264f13f8eea5d824314b",
+				"sha256": "86efedcd55bbf2498ebe95440bfa7d1e1394b26dfbebafaf85d33a9e512e6de8",
+				"productBase": {
+					"gitBlob": "d9e9da19e4ff4cf4e79c95508f5bb9d37ff2b4e9",
+					"sha256": "af598f5891083c5578413ad54361bab198e594ecc990c3e045319ec3786e1b4c"
+				}
+			},
+			{
+				"path": "apps/web/src/components/upload/wallpaper-sources.tsx",
+				"gitBlob": "49a6e22663b4ed41f16cb7f715208c90783f6b74",
+				"sha256": "4cd2692bd04fbde0dc273fd168cbe7601ee8e46dc99944bb776291c092844f48",
+				"productBase": {
+					"gitBlob": "a3bf763993f584c68e1a591379f4c53fac4aa731",
+					"sha256": "e652613ab44a8dfc323cb35d6d8905cd054e79bf26f6ce7621ef5ec989e33d5f"
+				}
+			}
+		],
+		"unchangedControls": [
+			{
+				"path": "apps/web/test/features/wallpaper-sources.test.ts",
+				"gitBlob": "4683dae3785c835080a0ffdbd29876e25e671759",
+				"sha256": "b30b25102c9b8e892dec27a8da4e8edb4c9face905fb6747d6472d3ec5d12070",
+				"productBase": {
+					"gitBlob": "4683dae3785c835080a0ffdbd29876e25e671759",
+					"sha256": "b30b25102c9b8e892dec27a8da4e8edb4c9face905fb6747d6472d3ec5d12070"
+				}
+			},
+			{
+				"path": "apps/web/src/features/wallpaper-creation/adapters/http.ts",
+				"gitBlob": "0927679c985f6ce907b79510add1faf3a80f4528",
+				"sha256": "92faa1066a3c41683c754872c3e31e9516cbf994922cf0fc1d96307d98d84c78",
+				"productBase": {
+					"gitBlob": "0927679c985f6ce907b79510add1faf3a80f4528",
+					"sha256": "92faa1066a3c41683c754872c3e31e9516cbf994922cf0fc1d96307d98d84c78"
+				}
+			}
+		],
+		"image": {
+			"path": "apps/web-e2e/fixtures/profile-small.png",
+			"gitBlob": "44c1b8aabe0ff5dec6cd9c376de49e6fb0c2e6bd",
+			"sha256": "cc63bf6f2decbb595dbfb90bc895d9f08de313358e7ff1aa1400037b42c445a8",
+			"productBase": {
+				"gitBlob": "44c1b8aabe0ff5dec6cd9c376de49e6fb0c2e6bd",
+				"sha256": "cc63bf6f2decbb595dbfb90bc895d9f08de313358e7ff1aa1400037b42c445a8"
+			},
+			"bytes": 136,
+			"width": 32,
+			"height": 48
+		}
+	},
+	"staging": {
+		"method": "Read exact productReference:path bytes with git show, verify gitBlob and SHA256, and write locally only at these allowlisted paths. productBase records the exact pre-repair file identity; null means absent. Verify infrastructure product paths match productBase and stop on unexpected edits. Do not restore older manifests, lockfiles, fixture-cache changes or infrastructure overlays from C620.",
+		"allowlist": [
+			"apps/web/test/features/source-intake-capacity.test.ts",
+			"apps/web/test/components/upload/wallpaper-source-management.dom.test.tsx",
+			"apps/web/test/components/upload/wallpaper-sources.dom.test.tsx",
+			"apps/web-e2e/specs/source-intake-capacity.spec.ts",
+			"apps/web/src/features/wallpaper-creation/sources.ts",
+			"apps/web/src/components/upload/wallpaper-sources.tsx"
+		],
+		"order": [
+			"Freeze infrastructure HEAD, descriptor SHA256, input blobs and clean local baseline. Retain full original overlay-to-reference comparison outside Git; inspect the six-path full-index binary diff separately.",
+			"Stage the four owning tests only. Keep both repair paths at productBase. Run focused tests and the real authenticated baseline scenario; retain expected product failures independently of infrastructure failures. On baseline, the retained-history workflow case fails the add expectation and the management DOM case fails input availability. The ambiguous-initial test is a valid neighboring control that may pass baseline; it failed the historical intermediate implementation, not necessarily productBase.",
+			"Baseline real UI accepts sixteen images then withdraws one. Confirm real authenticated Sources GET reports 15, revision 17 while add and replacement remain disabled. Do not force-enable inputs to claim product behavior. Stop baseline business sequence here; use fresh isolated data for green replay.",
+			"Stage the two fixed repair files. Run the same focused tests, full browser journey and live control sequence. Prove intended source bytes reached the running Web service through ordinary Make watch.",
+			"Perform HMR mutations/restoration and aligned forced validation with development still active. Restore workload-owned edits only, remove created files, and retain baseline restoration hashes. Do not commit disposable product changes."
+		],
+		"patchIdentity": {
+			"command": "git diff --full-index --binary c277c2c386e9d2fdcd56485e0594157e7c5a1d38 f7aa51f319e10aebf51797e3f2409b0fc19106fe -- apps/web/test/features/source-intake-capacity.test.ts apps/web/test/components/upload/wallpaper-source-management.dom.test.tsx apps/web/test/components/upload/wallpaper-sources.dom.test.tsx apps/web-e2e/specs/source-intake-capacity.spec.ts apps/web/src/features/wallpaper-creation/sources.ts apps/web/src/components/upload/wallpaper-sources.tsx",
+			"sha256": "13897f1c6e8ad29b6885136cb039701dab4f4b610a7ffea78de1f7e91b361cd9",
+			"bytes": 20815,
+			"originalUnrestrictedSha256": "52dafdf0ab30cc401d50b1a2684d8c80f17e95b6dea1da259d0c542e40a73130",
+			"originalUnrestrictedBytes": 29947,
+			"policy": "Inspect the full original comparison for provenance; only the six-path patch is disposable input. Never apply the unrestricted diff."
+		}
+	},
+	"commands": {
+		"sources": {
+			"make": "Makefile",
+			"routing": "scripts/boat-route.mk",
+			"setup": "CONTRIBUTING.md#set-up-a-checkout",
+			"checks": "CONTRIBUTING.md#check-a-change",
+			"live": "CONTRIBUTING.md#live-application-verification",
+			"browser": "apps/web-e2e/README.md",
+			"browserScript": "apps/web-e2e/package.json",
+			"browserConfig": "apps/web-e2e/src/playwright-config.ts",
+			"browserEnvironment": "apps/web-e2e/src/environment-contract.ts",
+			"browserVerification": "apps/web-e2e/src/verify-environment.ts",
+			"browserDotenv": "apps/web-e2e/playwright.config.ts",
+			"controller": "scripts/boat.mjs",
+			"generatedIngress": "scripts/setup-worktree.mjs",
+			"authentication": "apps/web-e2e/specs/base-user.setup.ts",
+			"readiness": "apps/web-e2e/src/environment-contract.ts",
+			"http": "apps/web/src/features/wallpaper-creation/adapters/http.ts",
+			"routes": "infra/caddy/Caddyfile"
+		},
+		"focused": "make test-focused PACKAGE=web ARGS='test/features/source-intake-capacity.test.ts test/features/wallpaper-sources.test.ts test/components/upload/wallpaper-source-management.dom.test.tsx test/components/upload/wallpaper-sources.dom.test.tsx'",
+		"checks": ["make check PACKAGE=web", "make check PACKAGE=web-e2e"],
+		"worker-ingressE2E": "make run PACKAGE=web-e2e SCRIPT=test:e2e PLAYWRIGHT_BASE_URL=http://localhost:<owned-worker-INGRESS_PORT>/web ARGS='specs/source-intake-capacity.spec.ts --retries=0'",
+		"isolatedBrowserAlternative": "make test-e2e PACKAGE=web-e2e ARGS='specs/source-intake-capacity.spec.ts --retries=0'",
+		"browserDistinction": "worker-ingressE2E is a command template. Before execution replace <owned-worker-INGRESS_PORT> with the decimal ingress port from the owned worktree generated .worktree, verified against the worker generated ingress. Pass PLAYWRIGHT_BASE_URL as a Make command-line assignment, not only a coordinator environment variable. Makefile forwards MAKEOVERRIDES to scripts/boat.mjs; command() quotes and passes those assignments to worker Make, which exports command-line variables to the run recipe. Both verify-environment.ts and playwright.config.ts load dotenv without override, preserving this explicit URL. Worker localhost reaches the owned worker Caddy ingress and its active development stack. It does not reach the coordinator-local protected preview proxy, which binds 127.0.0.1 on the coordinator. Root must separately exercise and record the actual authenticated protected local preview, full live control sequence, same-document HMR and concurrent-health gates through make boat-preview. A worker browser pass cannot satisfy those preview gates. The isolated E2E target owns a separate non-watching stack and cannot satisfy the active development/HMR/concurrent-health gate. Keep auth setup and environment verification enabled for worker-ingress E2E; a setup-only pass is not the Source scenario. Record the resolved URL, execution host and command with the worker result, and the separate coordinator preview URL and recording with root evidence.",
+		"prerequisites": [
+			"make toolchain",
+			"make run PACKAGE=web SCRIPT=test:browser:install",
+			"make run PACKAGE=web-e2e SCRIPT=test:browser:install"
+		],
+		"prerequisitePolicy": "Future authorized trial only. Use managed configured development Clerk credentials and seeded account; keep credentials and storage state private. Do not install or read credentials for descriptor validation. Fail missing browser/OS dependencies explicitly.",
+		"startup": ["make infra-start", "make dev", "make boat-preview"],
+		"startupPolicy": "Use coordinator-enrolled MODE=development worktree and its generated ingress. Retain foreground make dev for the entire observation. Record provider ready, image load, app readiness and authenticated preview as separate milestones. No watcher retirement/restart workaround.",
+		"fullCI": "make ci FORCE=1",
+		"cleanup": ["make apps-stop", "make infra-stop"],
+		"inspection": "make boat-status"
+	},
+	"automatedExpectations": {
+		"beforeProduct": "The retained-history workflow case fails add after sixteen outcomes; subsequent replace/resume assertions may not execute after that first failure. DOM regression sees input disabled after withdrawal. Baseline has no remainingCapacity/canRetry behavior. The ambiguous-initial case is a neighboring valid control; its historical red belongs to the first replay implementation and is not evidence that productBase fails recovery. Retain actual assertion output, not merely any nonzero exit.",
+		"afterFixedReplay": "Historical focused selection passed 19 cases; rerun exact tests against pinned fixed sources and record actual names/counts. The workflow reserves at most 16 unresolved slots, keeps an ambiguous initial slot recoverable, and never repeats an accepted upload while retrying failed work or resuming saved work.",
+		"browser": "C620 spec accepts 16 serial files, withdraws to 15, adds to 16 with 17 accepted outcomes, replaces at 16 with 18 accepted outcomes, and compares performance.timeOrigin. It does not implement the extra retry/saved/server controls below.",
+		"limits": [
+			"Historical DOM management regression waits for row lengths 17/18 and enabled inputs. Those checks alone do not establish completed successful acceptance or backend membership. Require the live HTTP/member-ID and accepted-outcome assertions below.",
+			"Source-intake-capacity workflow uses controlled adapters, not server enforcement. Do not call its mock acceptance a server-limit proof.",
+			"Earlier browser assertion gave the entire serial batch one five-second deadline and reached only seven completions. C620 observes every completion with the existing assertion deadline then requires 16 accepted. Preserve that correction; no new timeout, retry or skipped auth.",
+			"The first historical over-limit attempt has an empty rejection receipt. A generic failed row is insufficient to prove the server cause. Freeze HTTP 409 and unchanged revision/member IDs for both over-limit controls."
+		]
+	},
+	"live": {
+		"fixture": "Use inputs.image bytes, sixteen copies for initial intake, then the same valid PNG for add/replacement/recovery controls. Use fresh owned Wallpaper/Asset identifiers per round; record them without reusing historical IDs.",
+		"document": "Open /web/upload through the authenticated private preview. Record performance.timeOrigin and a document-local random sentinel before intake. Require the same document, Wallpaper and Asset through the full sequence. No page.goto/reload after initial open, no new tab/session or preview restart to complete it.",
+		"locators": {
+			"region": "Create one Wallpaper with multiple Sources",
+			"input": "Choose initial Sources for one Wallpaper",
+			"outcomes": "data-testid=source-upload-outcome",
+			"withdraw": "button[aria-label^=\"Withdraw Source\"]:enabled",
+			"replace": "label /^Replace Source / input",
+			"retry": "Retry <failed filename> within the specific failed outcome row",
+			"saved": "Retry or resume this Source with its image within the exact saved candidate row"
+		},
+		"evidence": "At each settled step record UTC, document sentinel/timeOrigin, actual authenticated Sources GET HTTP status, sourceSetRevision, sorted member IDs, default ID, accepted/failed outcome counts, busy state, enabled inputs and mutation request statuses. Real UI drives mutations except the explicit saved-candidate setup. No routed/mocked HTTP, DOM state injection or direct DB membership seeding.",
+		"steps": [
+			{
+				"step": "initial",
+				"action": "Select sixteen copies of image through initial file input. Observe each serial completion with existing deadlines.",
+				"members": 16,
+				"revision": "16",
+				"acceptedOutcomes": 16,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "withdraw",
+				"action": "Capture an enabled non-default Source ID and click its Withdraw control. Assert this ID disappears while all other member IDs remain.",
+				"members": 15,
+				"revision": "17",
+				"acceptedOutcomes": 16,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "add",
+				"action": "Require initial input enabled. Select one PNG through it, await successful new outcome and exactly one added member.",
+				"members": 16,
+				"revision": "18",
+				"acceptedOutcomes": 17,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "replace",
+				"action": "Capture active target ID. Select PNG through its Replace Source input. Require old target removed, new ID accepted, other members unchanged, and original remains active until successful replacement.",
+				"members": 16,
+				"revision": "19",
+				"acceptedOutcomes": 18,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "server-limit-1",
+				"action": "With no unresolved UI work, initial input remains enabled. Select another PNG. Require actual POST source-candidates HTTP 409 for current revision, failed row with limit/conflict message and exactly unchanged member IDs/revision. No acceptance is permitted.",
+				"members": 16,
+				"revision": "19",
+				"acceptedOutcomes": 18,
+				"failedOutcomes": 1
+			},
+			{
+				"step": "retry-space",
+				"action": "Withdraw a non-default member through UI, keeping failed history visible.",
+				"members": 15,
+				"revision": "20",
+				"acceptedOutcomes": 18,
+				"failedOutcomes": 1
+			},
+			{
+				"step": "independent-retry",
+				"action": "Click Retry inside that exact failed row. Require one new member and that row accepted, no new history row and no uploads/acceptance replay for the earlier 18 successes. Retain request/candidate identities.",
+				"members": 16,
+				"revision": "21",
+				"acceptedOutcomes": 19,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "saved-space",
+				"action": "Capture an enabled non-default Source ID from the current 16 members at revision 21 and click its Withdraw control in the UI. Require successful withdrawal, that ID absent, every other member ID and the default ID unchanged, exactly 15 members at revision 22, and the same 19 accepted outcomes with no failed outcomes. Do not create or recover a candidate in this step.",
+				"members": 15,
+				"revision": "22",
+				"acceptedOutcomes": 19,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "saved-candidate",
+				"action": "Using current browser authentication, POST /asset/assets/<asset>/source-candidates with fresh Idempotency-Key and JSON {operation:add, expectedSourceSetRevision:22}, with revision encoded as a string. Require HTTP 201, awaiting-bytes and record returned candidateId. Do not upload/accept through HTTP. Wait for its saved row to appear through normal query refetch without reload. Select PNG through that row recovery input; require same candidate ID accepted and one new member.",
+				"members": 16,
+				"revision": "23",
+				"acceptedOutcomes": 20,
+				"failedOutcomes": 0
+			},
+			{
+				"step": "server-limit-2",
+				"action": "Select one more PNG through enabled input. Require real POST HTTP 409, same member IDs/revision, 20 accepted history rows retained plus exactly one failed row. Add, replacement and saved recovery availability must derive from unresolved capacity rather than retained history.",
+				"members": 16,
+				"revision": "23",
+				"acceptedOutcomes": 20,
+				"failedOutcomes": 1
+			}
+		],
+		"boundedWorkControl": "At the public workflow boundary, initial sixteen unresolved files fill capacity and extra add is rejected. With ambiguous initial acceptance plus fifteen waiting files, reject new intake but allow retry of that initial row; status recovery must unblock all fifteen without reuploading the first. Busy state fences commands. Use existing source-intake-capacity and wallpaper-sources tests rather than manufacturing sixteen concurrent UI uploads.",
+		"revisionPolicy": "Exact values assume a fresh empty Wallpaper with no competing mutation, matching the historical sequence. Reject unexpected mutations and isolate/reset the scenario; do not normalize away mismatched revisions.",
+		"recording": "Root retains a fresh recording of actual UI controls, command logs and source restoration, with tested infrastructure SHA and descriptor digest. Historical C620 video is provenance only."
+	},
+	"hmr": {
+		"source": "apps/web/src/components/upload/wallpaper-sources.tsx",
+		"baseline": "inputs.repair entry for wallpaper-sources.tsx is the byte-exact restoration target.",
+		"sameDocument": "After fixed live sequence retain the same document sentinel, timeOrigin, Wallpaper, Asset and outcomes. Record before/after each mutation. Do not navigate, reload, recreate preview, retire watcher or restart services. A changed served module alone is insufficient.",
+		"observationDeadlineSeconds": 30,
+		"textEdit": {
+			"find": "Technical admission does not compare image content.",
+			"replace": "Technical admission does not compare image content. 554-hmr-edited",
+			"occurrences": 1,
+			"restore": "Restore exact pinned component bytes; observe original text and absence of marker in the same document within the same bound."
+		},
+		"creation": {
+			"path": "apps/web/src/components/upload/boat-replay-554-marker.ts",
+			"initialState": "absent",
+			"utf8": "export const replay554Marker = '554-source-created';\n",
+			"sha256": "2394a1fee709e95bdff523983d5c02ee28f6f6b583b2ef8f3879e8355de64134",
+			"import": "import { replay554Marker } from './boat-replay-554-marker';\n",
+			"insertImport": "Prepend exact import to pinned component.",
+			"jsx": "<span data-testid=\"boat-replay-554-marker\">{replay554Marker}</span>",
+			"insertJSX": "Insert exact JSX immediately after the single </h3> in the pinned component.",
+			"expect": "Untracked locally created module reaches worker via normal source projection; marker 554-source-created renders in the same document. Retain create/write/observed timestamps and remote projected file hash."
+		},
+		"deletion": "Restore pinned component bytes, then delete only the created module locally. Observe marker removal in the same document and prove projected module absent on the worker. File deletion is source projection evidence, not merely disappearance of unreferenced DOM. Retain deletion event/absence receipt without manual remote transfer.",
+		"failurePolicy": "Retain missed edit/restoration, stale document, missing creation/deletion, auth loss or restart as a failed round. Restore owned local edits safely even on failure; restoration does not erase the failure. HMR timing is an observation bound, never an application timeout change.",
+		"workerInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web sha256sum src/components/upload/wallpaper-sources.tsx src/components/upload/boat-replay-554-marker.ts'",
+		"deletionInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web test ! -e src/components/upload/boat-replay-554-marker.ts'",
+		"inspectionPolicy": "Run these only during an authorized active-worker trial before cleanup, from the owning checkout with its generated Compose project. Also compare component hash to pinned restoration hash after removal. No remote shell transfer or restart. These inspection commands are planned, not executed during descriptor preparation."
+	},
+	"concurrentValidation": {
+		"command": "make check PACKAGE=web FORCE=1",
+		"windowSeconds": 120,
+		"cohort": {
+			"547": "make check PACKAGE=user FORCE=1",
+			"548": "make check PACKAGE=asset FORCE=1",
+			"551": "make check PACKAGE=wallpaper FORCE=1",
+			"553": "make check PACKAGE=asset FORCE=1",
+			"554": "make check PACKAGE=web FORCE=1"
+		},
+		"start": "Coordinator freezes exact infrastructure/input identities and aligns command launches on all five isolated workers after readiness and authenticated scenario gates. New output directory per round; never rerun or overwrite the historical run-concurrent-validation.py receipt.",
+		"health": "Development watchers and protected previews stay active for the entire fixed 120-second window. Probe /web/ and every readiness route in apps/web-e2e/src/environment-contract.ts with a 5-second per-request bound; require HTTP 200, and separately prove authenticated UI remains usable so a login redirect or shell cannot pass. Use existing 10-second aligned sampling plus continuous owned Compose lifecycle/restart/error events and browser network observations to catch short disruptions. Require no unrelated restart/recreate/stop/start, HMR disconnect or service churn caused by unchanged-source checks.",
+		"pass": "All five commands exit zero. Record launch/end/exit and command-active intervals separately from the 120-second observation. Keep observing when checks finish early; extend observations to command completion if necessary without replacing the fixed window. No busywork to simulate load. Require product input hashes unchanged after validation; unexpected source rewrites invalidate the frozen round rather than being silently restored to claim a pass.",
+		"historicalLimit": "C had all five commands exit zero but only nine of twelve healthy rounds; first three readiness dips during dependency-triggered restarts fail this gate. Later infrastructure fixes and the final C620 full CI pass do not retroactively qualify that window.",
+		"fullCI": "Run fullCI once per admitted issue at the frozen infrastructure/workload revision with watcher active, separately from forced-check window. Repeat only after relevant changes/failure. Keep infrastructure and product outcomes distinct."
+	},
+	"cleanup": {
+		"restore": "Stop only owned foreground watcher/preview after observations. Remove workload-owned files and restore baseline product bytes. Run scoped cleanup commands and verify no owned containers or helpers, developmentWanted=false, hashes restored and created module absent.",
+		"inspection": "Use non-resuming status and root-owned stopped-worker receipt. A routed make docker-run inventory can resume a stopped worker on historical infrastructure and cannot be used as passive proof. Retain cleanup failures; root owns provider stop and accounting. No provider action is authorized by descriptor preparation."
+	},
+	"promotion": "Definition validation alone is not product or infrastructure qualification. Root requires two consecutive clean complete observed rounds, cold/restored then warm, with fresh scenario data and the exact same reviewed infrastructure SHA and descriptor identities. Reset affected earliest-subset clean counts on infrastructure changes. Keep product expected red/green separate from Boat faults; no accumulating partial passes across failed rounds.",
+	"provenance": {
+		"scout": "/tmp/boat-hillclimb-replay-research-20261031.md",
+		"historicalEvidence": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c",
+		"historicalLiveReceipt": "/tmp/554-live-evidence.json",
+		"historicalFailureLogs": [
+			"/tmp/554-capacity-red.log",
+			"/tmp/554-dom-red.log",
+			"/tmp/554-recovery-red.log",
+			"/tmp/554-ci.log",
+			"/tmp/554-ci-rerun.log",
+			"/tmp/554-browser.log",
+			"/tmp/554-browser-rerun.log"
+		],
+		"externalFixtures": "None required. Inputs are retained Git blobs and committed profile-small.png. Historical logs/receipt are provenance only, not imported scripts or asserted fresh results. No untracked fixture runner or archive is needed to execute the described UI actions.",
+		"historicalHMRLimit": "An old document across preview restart did not receive HMR. Fresh-document later C recordings do not satisfy this replay unless its own same-document edit/restoration and file creation/deletion pass."
+	}
+}

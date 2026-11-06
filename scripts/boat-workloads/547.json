@@ -1,0 +1,298 @@
+{
+	"version": 1,
+	"issue": "https://github.com/rafaeltab/wallpaperdb/issues/547",
+	"purpose": "Fixed historical workload replay for #557 infrastructure qualification. This is not an independent implementation or a production repair selection.",
+	"infrastructureBase": "89b68d5307933704ee70e23e5658829746bd347e",
+	"productBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+	"productReference": "a4ced82443384b8e3dfa55144d85aebdbcdbbdf0",
+	"referencePullRequest": "https://github.com/rafaeltab/wallpaperdb/pull/623",
+	"constraints": [
+		"No product commits in #614; stage product inputs only as disposable worktree edits.",
+		"Copy only listed source paths, never cherry-pick reference commits or infrastructure history.",
+		"Keep all disposable result PRs closed, no new PR, push, issue mutation, or provider operation."
+	],
+	"inputs": {
+		"tests": [
+			{
+				"path": "apps/asset/test/broker-acquisition-cleanup.integration.test.ts",
+				"gitBlob": "329058964c3ef7ebf7ddf8b999308c0bbb3aa78f",
+				"sha256": "c2a3136968725f4bdfa34adc7aaf9b5cd46732fc69f492d6b6e6988ce299d9b7"
+			},
+			{
+				"path": "apps/asset/test/broker-acquisition-commands.integration.test.ts",
+				"gitBlob": "56759d8cc878148a6b0fe690b769e4fdcd78c344",
+				"sha256": "45837de06821c63cc87104d792ffa70f707841c9f34edb0d5a7e5384a16c8591"
+			},
+			{
+				"path": "apps/asset/test/broker-acquisition-errors.integration.test.ts",
+				"gitBlob": "8a0b1d689a3ea7ee983ea3f789969e966128424f",
+				"sha256": "d46cb16a453b5676bf9c0c5072baca688c1cd3fb74a428092dfa11650f1a8136"
+			},
+			{
+				"path": "apps/asset/test/broker-acquisition-events.integration.test.ts",
+				"gitBlob": "4c27478bb317196e12b22a2d79403eadc8a91d43",
+				"sha256": "53ee06e2578674963f8e07b083f5233b02e616132c9bc63685d34166731d4365"
+			},
+			{
+				"path": "apps/asset/test/broker-acquisition-notifications.integration.test.ts",
+				"gitBlob": "b50a4adc9da75c18cefc2dcb60948f55b1d5c7f6",
+				"sha256": "ba02bba2a75b396057486e8148360dc6b17296d901e3783872e0adf1bf5be97d"
+			},
+			{
+				"path": "apps/asset/test/broker-acquisition-sources.integration.test.ts",
+				"gitBlob": "728731b3aa71cf3b68482e2b8020c05eff9b2e2b",
+				"sha256": "f9c91e8dd8beb8be1b05ba1b0120276435ca452cedc5c5ead7f8f1d657b9621e"
+			},
+			{
+				"path": "apps/asset/test/fixtures/broker-acquisition.ts",
+				"gitBlob": "11ec06e95318ca6dd938c0627c3531da3aee2323",
+				"sha256": "0d10ff12484263d1ef87022328cf93211c6acdbedb40113617533eaccf97dd08"
+			},
+			{
+				"path": "apps/asset/test/fixtures/broker-addresses.ts",
+				"gitBlob": "ae7158d38b646eead28771fc7aeb54fda2054528",
+				"sha256": "3525f70590d6cd31ac09fdcaea5b9849b3cc5d5a9253693b52d4d74b723b8548"
+			},
+			{
+				"path": "apps/user/test/broker-acquisition.integration.test.ts",
+				"gitBlob": "c7853d9d15db41a964b79a2de118d24db1fb5a99",
+				"sha256": "a402a797d4a25feec322afbeaf1967d6df2686dbc3b0df9a16445e4b6123b7ac"
+			},
+			{
+				"path": "apps/wallpaper/test/broker-acquisition.integration.test.ts",
+				"gitBlob": "20b9ed63b68b54f9655aa8d1785813cc1e9b169f",
+				"sha256": "b2c242370dee2e574e0f8cf8e18dd09887873adf8923ea94e4b9af40f182cf83"
+			}
+		],
+		"repair": [
+			{
+				"path": "apps/asset/src/adapters/cleanup/worker.ts",
+				"gitBlob": "fc475b0d54c82cd98bfe8ceb295ca094a3d49ee9",
+				"sha256": "f1a228a54b86b9c03bba5c9adf42543720464277fef34b3748d3a00396e29d7a"
+			},
+			{
+				"path": "apps/asset/src/adapters/commands/notifications.ts",
+				"gitBlob": "58a626c59fb9f8f2ff8fb14c2be8abd6826ac0ae",
+				"sha256": "30d45909603103ddd6ad9c40a1fee06cda0cdb3a250d56a0e1b7e381e1e5f303"
+			},
+			{
+				"path": "apps/asset/src/adapters/commands/runtime.ts",
+				"gitBlob": "ac9586a2305e9816d42acff6062ab3a8577ca15d",
+				"sha256": "074317c9e0e20379ae398ede3213318f93e4b8a725a5aa2f807fc72705b15068"
+			},
+			{
+				"path": "apps/asset/src/adapters/events/broker.ts",
+				"gitBlob": "cbc9262c9833356b95f870e36e88f99604864337",
+				"sha256": "d79d1b931d356ac780185f723aadf5cf251f9badd21cad25c709e7a535a73996"
+			},
+			{
+				"path": "apps/asset/src/adapters/sources/publisher.ts",
+				"gitBlob": "7b379f07672211eef96cd25702ca9e101719d7aa",
+				"sha256": "f95d5dc6a83293fe99dd3f056d668461f0f0bcd5ae05dca149975a5b9dee92c3"
+			},
+			{
+				"path": "apps/user/src/adapters/picture-attachments/index.ts",
+				"gitBlob": "15b1399b7582155efa79b9bdc1cc0c72c6abaa08",
+				"sha256": "d6494c5e370d6928956d058e873de091a9ed9b7b0bdb5a47c8b00df030980089"
+			},
+			{
+				"path": "apps/wallpaper/src/adapters/asset-workflow/index.ts",
+				"gitBlob": "4f99cfd2def758562ac1b1eb470889c89c572ebc",
+				"sha256": "05973b4a7f8ff7b163ef4092ffeb48f153ea0a2a360e5821e6347120f4af5ee0"
+			},
+			{
+				"path": "patches/nats-2.29.3.patch",
+				"gitBlob": "1e8c0ddb51c5e4a039f43b94543e5b84bf6b2be2",
+				"sha256": "6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe"
+			},
+			{
+				"path": "pnpm-workspace.yaml",
+				"gitBlob": "c3eedc77ae967c270085386145a342f911784aa4",
+				"sha256": "5b47423059af3e024825c8c5e687dd18ceca4b4918c16b2f2cdcb6279ea989d8"
+			}
+		],
+		"initialLock": {
+			"path": "pnpm-lock.yaml",
+			"gitBlob": "801b80af115c2e255a9129fc7b0df42f2bbb667f",
+			"sha256": "21d2c8f020733411d01b9e61466af7a110004b60e4d326d908b57a69c12a9e3d",
+			"revision": "89b68d5307933704ee70e23e5658829746bd347e",
+			"selection": "Confirmed by git hash-object pnpm-lock.yaml: 801b80af115c2e255a9129fc7b0df42f2bbb667f. This current 89b68d53 lock already contains the scripts esbuild importer entry; older productBase lock 7cadca99 lacks it. Preserve the current lock until generation."
+		},
+		"unchangedProtectedControl": {
+			"path": "apps/asset/test/protected-broker.integration.test.ts",
+			"gitBlob": "a4232c197018b5ef95a431dfce030a03a458d61b",
+			"sha256": "e5a52c408f8b02f9b9091280e520c53a09dd2a01d89db0454b83a5779d7ca92e"
+		},
+		"referenceFinalLockDiagnosticOnly": {
+			"path": "pnpm-lock.yaml",
+			"gitBlob": "6f3d0212c19f0dadf734f28791362595836df08b",
+			"sha256": "7da6e13214526bc950e78d3593de12fd94ee1137a75c93f5bd66684b47b91776"
+		},
+		"productBaseLockDiagnosticOnly": {
+			"path": "pnpm-lock.yaml",
+			"gitBlob": "7cadca99a87f9e0bcd93902b9c5e04c16ed610c3",
+			"sha256": "7eef177ff390418b58da35da7db75c21597429671abef35feb3d13d3eebecad4"
+		}
+	},
+	"staging": {
+		"method": "Read each path from productReference using git show <revision>:<path> and write those exact bytes to the same relative path. Verify pinned git blob and SHA256. Preserve any unexpected edits and stop on a baseline mismatch.",
+		"order": [
+			"Confirm clean infrastructure worktree. Owning apps product paths match productBase; preserve infrastructure-owned scripts manifest and its existing esbuild lock entry. initialLock is the infrastructure baseline lock, not the older productBase lock.",
+			"Stage tests only. Run native reproduction commands against unpatched productBase sources and baseline lock; retain product failures.",
+			"Stage repair inputs. Leave pnpm-lock.yaml at initialLock. Assert it is still byte-identical before the generator.",
+			"Run dependencies:lock through public Make with stale initialLock, then the routed forced build to require automatic frozen preparation. Never copy the reference final lock or invoke a remote install script.",
+			"Record local returned lock and remote installed dependency fingerprints; run focused controls, owning checks, and live probes.",
+			"Remove only workload-owned disposable paths/edits, restore baseline product bytes, and verify source/HMR restoration."
+		]
+	},
+	"generator": {
+		"command": "make run PACKAGE=scripts SCRIPT=dependencies:lock",
+		"installCommand": "make build PACKAGE=vitest-config FORCE=1",
+		"expected": [
+			"Exit zero and return the newly generated lock to local source authority without coordinator file transfer.",
+			"Lock differs from initialLock and contains nats 2.29.3 patch hash 6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe in patchedDependencies and relevant consumer resolutions.",
+			"Preserve the infrastructure esbuild importer entry and inspect all native lock changes. The maintainer approved the documented three Vitest peer-context links and seventeen registry deprecation fields produced by pinned native resolution in this disposable workload. Retain complete before/after evidence without trimming. Final reference lock is diagnostic, never an input.",
+			"Routed forced build automatically performs frozen preparation and exits zero. Assert remote installed NATS patch resolutions and loadedRuntime protocol/transport hashes after preparation. make install is intentionally local and is not this preparation command."
+		],
+		"scriptCommit": "21a7f8c42bb5b737348c316bdd8a38995be2403c"
+	},
+	"validation": {
+		"nativeCommands": [
+			"make test-focused PACKAGE=user ARGS='--config vitest.integration.config.ts test/broker-acquisition'",
+			"make test-focused PACKAGE=wallpaper ARGS='--config vitest.integration.config.ts test/broker-acquisition'",
+			"make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/broker-acquisition'"
+		],
+		"authorizationCommand": "make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/protected-broker.integration.test.ts test/broker-acquisition-errors.integration.test.ts'",
+		"checkCommands": [
+			"make check PACKAGE=user",
+			"make check PACKAGE=wallpaper",
+			"make check PACKAGE=asset"
+		],
+		"expected": [
+			"Unpatched baseline fails native closure assertions; keep before-repair logs.",
+			"Corrected repair passes native cases: User 3, Wallpaper 3, Asset 15.",
+			"Authorization selection passes all 6 owning/new cases, including unchanged protected-broker revocation and deterministic two-candidate denial.",
+			"Timeout closure is observed before explicit runtime disposal; cancellation/disposal poll closure before awaiting completion.",
+			"Abort must preserve Effect interruption and native closure within the existing shorter deadline; cleanup cannot count as observed closure.",
+			"Healthy authenticated connection remains usable and broker-observed shutdown completes."
+		],
+		"historicalRed": {
+			"measuredPatchSha256": "608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653",
+			"expected": "Measured patch returned CANCELLED for authorization denial. The corrected replay must preserve AUTHORIZATION_VIOLATION. This diagnostic history does not replace baseline reproduction."
+		}
+	},
+	"loadedRuntime": {
+		"patchSha256": "6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe",
+		"protocolSha256": "5131b57e27718183bf5b34f5abceafdb47f7d62976e0a27a99e88b464edc3b7e",
+		"transportSha256": "05598cade2b5722f0d623dffac040b92e81b349982872a565bdf4dfc052bb6da",
+		"proof": "Log real resolved NATS path, source patch SHA256, root and installed lock hashes, and loaded protocol/transport hashes inside the process exercising NATS. Root and installed lock YAML need not be byte-identical. Compare their patched resolutions. Do not infer loaded SDK identity from source lock alone."
+	},
+	"live": {
+		"sourceAvailability": "Historical untracked originals and exact staged corrections are retained in the pinned external archive on this host. Historical paths below recover provenance; fresh clones need this archive. Retain this one archive and correction patch without parallel shadow implementations.",
+		"fixtures": [
+			{
+				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/user.ts",
+				"destination": "apps/user/src/boat-live-547.ts",
+				"sha256": "2f273a02bed8f913cf278f1ff62cb4387046d3ce58e31d62bf3bf721e7a18e36",
+				"historicalSource": "/tmp/547-live-probes/user.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/user.ts",
+				"stagedSha256": "0b3163257ffa0f393227470c98cf157d2dc0d394c2c9f6fe9b49651172b0f877"
+			},
+			{
+				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/wallpaper.ts",
+				"destination": "apps/wallpaper/src/boat-live-547.ts",
+				"sha256": "eb25eb27619d721c22ce1be60a8a4e04111050a17db4fe1376f8d1794446b52a",
+				"historicalSource": "/tmp/547-live-probes/wallpaper.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/wallpaper.ts",
+				"stagedSha256": "0329aa9616c5b2f0cc690661a5ceb8609939f02317362bc871c90f2f594d2d45"
+			},
+			{
+				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/asset.ts",
+				"destination": "apps/asset/src/boat-live-547.ts",
+				"sha256": "ebb9d55feb87fa7e1152b1c3e8ea62f2d2b40954030b35df89d20d730c28c454",
+				"historicalSource": "/tmp/547-live-probes/asset.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/asset.ts",
+				"stagedSha256": "aa6eb023541d9aa06acf3855c9461c6df55cbaae5806360f8d77ec8c55348906"
+			},
+			{
+				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/remediation-live.mjs",
+				"destination": "apps/asset/test/fixtures/remediation-live.mjs",
+				"sha256": "9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e",
+				"historicalSource": "/tmp/547-remediation-live-source/remediation-live.mjs",
+				"provenance": "PR #623 corrective SDK live verification at a4ced824",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/remediation-live.mjs",
+				"stagedSha256": "9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e"
+			},
+			{
+				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/remediation-sdk-proof.ts",
+				"destination": "apps/asset/test/fixtures/remediation-sdk-proof.ts",
+				"sha256": "d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+				"historicalSource": "/tmp/547-remediation-live-source/remediation-sdk-proof.ts",
+				"provenance": "PR #623 corrective SDK live verification at a4ced824",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/remediation-sdk-proof.ts",
+				"stagedSha256": "d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70"
+			}
+		],
+		"stage": "Copy hash-verified stagedSource bytes to each destination locally. Copy unchanged remediation-sdk-proof.ts next to each container probe as boat-sdk-proof-547.ts. Corrected probes already import it. Ordinary Make projection carries staged sources to the worker without manual remote transfer.",
+		"startupCommands": [
+			"make infra-start",
+			"make dev"
+		],
+		"readiness": "Use generated worktree ingress and the User, Wallpaper, Asset readiness routes from Caddy configuration. Require 200 before scenario; retain failures. Use the owned COMPOSE_PROJECT_NAME from generated .worktree, never the historical project name.",
+		"containerCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T <user|wallpaper|asset> node --import tsx src/boat-live-547.ts'",
+		"authorizationCommand": "make docker-run ARGS='pnpm --filter @wallpaperdb/asset exec tsx test/fixtures/remediation-live.mjs'",
+		"expected": [
+			"Production acquisition paths use real PostgreSQL, NATS account configuration and dependencies; silent peer sees native close for timeout, cancellation and disposal for all seven acquisition paths.",
+			"Every cancellation acquisition must have an Effect Failure with Cause.hasInterrupts true. Corrected callback rejects other exits and returns true only for interruption. Enclosing exercise requires successful true cancellation outcome; generic rejected acquisitions cannot satisfy it. Require cancellationInterrupted true logs too.",
+			"Every silent-peer scenario ends with zero accepted sockets remaining before fixture cleanup.",
+			"Each healthy control opens real broker connection IDs, uses the connection, then leaves zero added connections.",
+			"Corrective SDK probe observes AUTHORIZATION_VIOLATION with no signal and two address candidates; valid credential remains usable and closes; explicit abort observes CANCELLED, exactly one accepted connection and zero sockets before cleanup.",
+			"Use corrected loaded-runtime hashes inside every actual probe process. Earlier measured recording has no retrospective loaded-SDK guarantee."
+		],
+		"recording": "Record actual Make commands/stdout and inspect frames before sharing. Root owns the live recording transport. Retain tested infrastructure revision, staged source hashes, generated lock hashes, cold/warm state, scenario timings, health and cleanup. Do not replay historical output as a new measurement.",
+		"historicalRecordings": {
+			"measuredApplication": "https://github.com/user-attachments/assets/d3bacf18-6221-4a6c-a47f-a49f03d1658b",
+			"correctiveSDK": "https://github.com/user-attachments/assets/d35f418e-e20a-4f89-a731-463dcb376902"
+		},
+		"cleanupCommands": [
+			"make apps-stop",
+			"make infra-stop"
+		],
+		"cleanup": "Verify only owned containers/peers/clients are gone, local product bytes restored, foreground watcher stopped, developmentWanted=false and coordinator stopped-worker receipt. Worker provider operations remain coordinator-owned.",
+		"correction": {
+			"patch": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/547-live-fixtures.patch",
+			"sha256": "c251d3dcdd10faad07a3bd619706da2b36be3ba563fd46e1f0540d196fac46d5",
+			"format": "Unified diff from original archived basenames to corrected-v1. Adds fingerprint imports and explicit interrupted-outcome assertions. These are probe corrections, not product fixes.",
+			"portRegex": "Original remediation-live.mjs contains one literal backslash before d, byte sequence 92,100. It is already the numeric digit regex; JSON/cat capture escaping is not source drift. Preserve its bytes and verify using synthetic nonsecret input.",
+			"recovery": "Apply exact patch to a scratch copy of original archived basenames or use corrected-v1. Verify stagedSha256 before copying to destination. Use unchanged remediation-sdk-proof.ts for each apps/<workspace>/src/boat-sdk-proof-547.ts.",
+			"verification": {
+				"command": "mise exec -- node /home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/verify-fixture-corrections.mjs",
+				"sha256": "5c3c8a174ad9db5e059578847a89377bb35781a3532a0acafc0277bb7e049c57",
+				"observed": "Passed without dependencies, applications or compute. Original port regex accepts synthetic 9703 and rejects malformed input; double-backslash mutation rejects digits. All seven corrected interruption callbacks reject ordinary failure and success exits; all three enclosing outcome checks reject false success and swallowed rejection."
+			}
+		}
+	},
+	"resolutionDiagnostic": {
+		"purpose": "Discriminate native pinned pnpm full resolution from a Boat or NATS-specific mutation. These controls do not normalize or promote a new baseline.",
+		"command": "make run PACKAGE=scripts SCRIPT=dependencies:lock",
+		"baselineLockBlob": "801b80af115c2e255a9129fc7b0df42f2bbb667f",
+		"baselineWorkspaceBlob": "1fdec36161cf21da362515a7af7bf8d02443c9aa",
+		"forcedScript": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts --resolution-only",
+		"cases": [
+			"B0: restore the exact unpatched baseline lock and workspace, remove the disposable NATS patch, and run the unmodified registered generator. Retain the full returned output.",
+			"B1: restore the same baseline inputs. Change only the disposable scripts manifest's dependencies:lock script to forcedScript. Invoke the same public command and retain raw and semantic diffs.",
+			"B1R: repeat forced resolution with B1's unedited returned lock and otherwise identical inputs. Compare every peer edge and all metadata; do not retry until a favorable output appears.",
+			"P1: only after stable B1/B1R, retain that output as a diagnostic seed, restore the original generator script, add the exact NATS patch and workspace declaration, then invoke the same public command. Compare against the seed without editing either result."
+		],
+		"assertions": [
+			"No dependency, version pin, resolution policy or metadata-trimming change is authorized by a diagnostic control.",
+			"The explicit --resolution-only mutation is test input in a disposable checkout; it is not a production generator default or an extra controller ARGS override.",
+			"Retain the original and generated lockfiles separately, command statuses, full timings, script and source hashes, and all failures.",
+			"The completed controls establish native-resolution attribution, not semantic equivalence. The maintainer explicitly approved this documented native output and delegated routine necessary package/lockfile churn to engineering judgment with tests and evidence. Do not reopen incidental version questions or silently trim output. Material scope, compatibility/security/billing commitments or new capabilities still require decisions."
+		]
+	},
+	"promotion": "Two consecutive clean observed runs of this subset, cold/warm conditions recorded, no unplanned infrastructure intervention or unrelated steady-state churn. Product outcomes and infrastructure failures remain separate. Diagnostic resolver controls cannot promote a baseline or waive preservation."
+}

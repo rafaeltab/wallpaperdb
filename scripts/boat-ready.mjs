@@ -16,6 +16,7 @@ while (Date.now() - started < 600000) {
 		break;
 	} catch (error) {
 		failure = error;
+		if (process.argv.includes("--once")) break;
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 	}
 }

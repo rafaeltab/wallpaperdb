@@ -119,6 +119,9 @@ function makeEnvironment(directory) {
 		MAKEFLAGS: "",
 		MFLAGS: "",
 		MAKELEVEL: "0",
+		// These fixtures assert execution side effects and absolute coverage paths.
+		// Keep cache reuse within the temporary repository that owns those files.
+		TURBO_CACHE: "local:rw",
 		// This is the reviewed configuration copied into our own temporary fixture.
 		MISE_TRUSTED_CONFIG_PATHS: [
 			process.env.MISE_TRUSTED_CONFIG_PATHS,

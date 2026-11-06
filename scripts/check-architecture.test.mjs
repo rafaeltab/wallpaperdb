@@ -137,6 +137,7 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 	project.write(
 		"turbo.json",
 		JSON.stringify({
+			futureFlags: { experimentalObservability: true },
 			tasks: {
 				"//#architecture:workspaces":
 					productionTasks["//#architecture:workspaces"],

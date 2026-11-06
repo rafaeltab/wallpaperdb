@@ -22,7 +22,7 @@ COPY --parents apps/docs/source.config.ts apps/docs/content \
 
 COPY patches/ ./patches/
 
-RUN pnpm install --frozen-lockfile && \
+RUN --mount=type=cache,id=wallpaperdb-pnpm-v10,target=/pnpm/store,sharing=locked pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
 
 # Application edits reuse the dependency installation above.

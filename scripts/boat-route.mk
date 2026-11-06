@@ -22,13 +22,29 @@ endif
 endif
 endif
 
-.PHONY: boat-enroll boat-status boat-stop boat-delete boat-preview boat-settle boat-test boat-cache
-boat-enroll: boat-bootstrap ## Enroll this isolated worktree (MODE=validation/development; SIZE=large; COHORT=smoke)
-	@node scripts/boat.mjs enroll "$(or $(MODE),validation)" "$(or $(SIZE),large)" "$(or $(COHORT),smoke)"
+.PHONY: boat-enroll boat-prepare-toolchain boat-prepare-workspace boat-prepare-chromium boat-prepare-infra-images boat-prepare-app-images boat-status boat-stop boat-observe-stop boat-delete boat-preview boat-settle boat-test boat-cache
+boat-enroll: boat-bootstrap ## Enroll this isolated worktree (MODE=validation/development; SIZE=large; COHORT=smoke; LIFECYCLE=snapshot/fresh-after-stop)
+	@node scripts/boat.mjs enroll "$(or $(MODE),validation)" "$(or $(SIZE),large)" "$(or $(COHORT),smoke)" "$(or $(LIFECYCLE),snapshot)"
+boat-prepare-toolchain: ## Prepare only this enrolled worker's locked tools, without dependencies or applications
+	@node scripts/boat.mjs command -- boat-prepare-toolchain
+boat-prepare-workspace: ## Frozen-prepare the owned workspace without cache or development restoration
+	@node scripts/boat.mjs command -- boat-prepare-workspace
+boat-prepare-chromium: ## Install the pinned Chromium and system dependencies without restoring development
+	@node scripts/boat.mjs command -- boat-prepare-chromium
+boat-prepare-app-images: ## Build owned development images without starting apps or restoring development
+	@node scripts/boat.mjs command -- boat-prepare-app-images
+boat-prepare-infra-images: ## Acquire and verify default infrastructure images without starting containers
+ifeq ($(BOAT_EXEC),worker)
+	@node scripts/boat.mjs prepare-infra-images "$(COMPOSE_PROJECT_NAME)"
+else
+	@node scripts/boat.mjs command -- boat-prepare-infra-images
+endif
 boat-status: ## Show this enrolled worker and experiment accounting
 	@node scripts/boat.mjs status
-boat-stop: ## Stop only this enrolled worker
+boat-stop: ## Stop only this enrolled worker (optional BOAT_EXPECTED_WORKER_ID and BOAT_EXPECTED_ADMISSION guards)
 	@node scripts/boat.mjs stop
+boat-observe-stop: ## Reconcile an existing completed stop with exact worker/admission/stop IDs; never submit a stop
+	@node scripts/boat.mjs observe-stop
 boat-delete: ## Delete only this enrolled worker at worktree teardown
 	@node scripts/boat.mjs delete
 boat-preview: ## Open a private localhost proxy to healthy remote ingress
@@ -40,8 +56,15 @@ boat-test: ## Run prototype orchestration tests locally
 boat-cache: ## Start the private cohort cache gateway without a worker
 	@node scripts/boat.mjs cache
 .PHONY: boat-await
+.PHONY: boat-sample
+boat-sample: ## Collect aligned read-only host, worker and application samples (ARGS=inventory output)
+	@node scripts/boat-sample.mjs $(ARGS)
 boat-await: ## Wait for coordinator enrollment before measured implementation
 	@while [ ! -f .boat/launch-ready ]; do sleep 1; done
 .PHONY: boat-bootstrap
 boat-bootstrap: ## Install the checksum-pinned prototype Boat CLI privately
 	@sh scripts/boat-bootstrap.sh
+
+.PHONY: boat-hillclimb-547
+boat-hillclimb-547: ## Execute fixed #547 preparation and optional startup (BOAT_HILLCLIMB_CONFIG=JSON path)
+	@node scripts/boat-hillclimb.mjs

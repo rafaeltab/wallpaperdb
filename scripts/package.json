@@ -8,16 +8,30 @@
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
+		"boat:prepare-source": "cd .. && node scripts/boat-prepare-source.mjs",
+		"boat:stop-watch": "cd .. && node scripts/boat-stop-watch.mjs",
+		"boat:cache-proof": "cd .. && node scripts/boat-cache-proof.mjs",
 		"boat:watch": "node boat-watch.mjs",
 		"boat:probe": "node boat-probe.mjs",
 		"boat:ready": "cd .. && node --experimental-strip-types scripts/boat-ready.mjs",
-		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs",
+		"boat:observe-preview": "python boat-preview-observation.py",
+		"boat:lint": "biome lint boat-prepare-source.mjs boat-source-identity.test.mjs boat-source-preparation.test.mjs lib/boat-source-identity.mjs lib/boat-source-preparation.mjs test-fixtures/source-preparation.mjs boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs lib/boat-snapshot.mjs lib/boat-reconstruction.mjs lib/boat-shutdown.mjs lib/boat-preview.mjs test-fixtures/preview-claim-observer.mjs test-fixtures/preview-reaping-observer.mjs lib/boat-source-generation.mjs lib/boat-source-command.mjs lib/boat-source-command.test.mjs lib/boat-source-ownership.test.mjs lib/boat-asset-migration.mjs boat-hillclimb.mjs boat-hillclimb.test.mjs lib/boat-capture.mjs lib/boat-547-baseline.mjs lib/boat-hillclimb.mjs boat-547-preparation.test.mjs test-fixtures/547-preparation.mjs lib/boat-547-preparation.mjs boat-workloads/547-runtime.cjs boat-workloads/547-web-source.cjs lib/boat-547-source.mjs test-fixtures/547-make-effect.cjs lib/boat-547-startup.mjs test-fixtures/547-serving-effect.mjs test-fixtures/547-docker-effect.cjs",
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
+		"test:boat-bootstrap": "node --test boat-bootstrap.test.mjs",
+		"test:asset-migration": "node --test --test-name-pattern='Asset migration' boat.test.mjs",
+		"test:boat-reconstruction": "node --test --test-name-pattern='^fresh lifecycle' boat.test.mjs",
+		"test:boat-focused": "node --test",
+		"test:source-preparation": "cd .. && node --test scripts/boat-source-identity.test.mjs scripts/boat-source-preparation.test.mjs scripts/makefile.test.mjs",
+		"test:boat-pending-evidence": "node --test --test-name-pattern='^pending-preview evidence' boat.test.mjs",
+		"test:boat-pending-cleanup": "node --test --test-name-pattern='^pending-upgrade fixture' boat.test.mjs",
+		"test:boat-pending-diagnostic": "node --test --test-name-pattern='^(pending-upgrade|preview forwards downstream|preview retains)' boat.test.mjs",
+		"test:boat-sample": "node --test boat-sample.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",
 		"test:toolchain": "cd .. && node --test scripts/toolchain.test.mjs",
+		"test:compose-watch": "cd .. && node --test scripts/compose-watch.test.mjs",
 		"test:pr-history": "cd .. && node --test scripts/pr-history.test.mjs",
 		"test:pr-history-status": "cd .. && node --test scripts/pr-history-status.test.mjs",
 		"check:pr-history": "node check-pr-history.mjs",
@@ -25,7 +39,11 @@
 		"test:mutation": "node mutation.mjs",
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "node --test operator-inbox.test.mjs"
+		"test:operator-inbox": "node --test operator-inbox.test.mjs",
+		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts",
+		"test:boat-hillclimb": "cd .. && node --test scripts/boat-hillclimb.test.mjs scripts/boat-547-preparation.test.mjs scripts/makefile.test.mjs",
+		"lint:files": "biome lint",
+		"test:boat-preview-browser": "BOAT_PREVIEW_BROWSER_CONTROL=1 node --test --test-name-pattern=\"^actual Vite\" boat.test.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
@@ -34,6 +52,7 @@
 		"@stryker-mutator/vitest-runner": "10.0.0"
 	},
 	"devDependencies": {
+		"esbuild": "^0.27.2",
 		"@biomejs/biome": "2.6.2",
 		"@types/istanbul-lib-coverage": "2.0.6",
 		"@types/node": "^26.0.1",

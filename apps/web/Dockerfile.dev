@@ -36,7 +36,7 @@ COPY patches/ ./patches/
 
 # Install all workspace dependencies and record the lockfile hash so the
 # entrypoint can detect changes and re-install when the lockfile is synced.
-RUN pnpm install --frozen-lockfile && \
+RUN --mount=type=cache,id=wallpaperdb-pnpm-v10,target=/pnpm/store,sharing=locked pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
 
 # Application edits reuse the dependency installation above.

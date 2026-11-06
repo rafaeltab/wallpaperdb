@@ -1,0 +1,226 @@
+{
+	"version": 1,
+	"issue": "https://github.com/rafaeltab/wallpaperdb/issues/551",
+	"purpose": "Fixed historical #551 workload definition for authorized #557 hillclimb, solely infrastructure PR #614. Declarative replay, not an implementation, repair selection, runner, or qualification result.",
+	"scope": "https://github.com/rafaeltab/wallpaperdb/issues/557#issuecomment-6543467933",
+	"infrastructureBase": "89b68d5307933704ee70e23e5658829746bd347e",
+	"productBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+	"productReference": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+	"referencePullRequest": "https://github.com/rafaeltab/wallpaperdb/pull/619",
+	"constraints": [
+		"Root first completes the #547 transaction and independent reviews. It is not qualified by this definition or by review alone. Scope order remains #547, #548, #551, then #554/#553; preparing this definition does not promote any subset.",
+		"All result PRs stay closed. No paid compute, provider operations, push, PR/issue mutation, implementation repair, or application validation is authorized by this preparation task.",
+		"Root owns workers, cache, tunnels, preview lifecycle, authentication provisioning and admission. Agents use ordinary Make. make install is local, never a remote installation command.",
+		"Product sources are disposable inputs only. Never commit them to #614, select them as a production winner, merge them, cherry-pick a reference head, or include historical infrastructure in a product overlay.",
+		"Never preload runtime private auth, storage state, tokens or credentials. Root supplies an authorized protected session at runtime; evidence contains no private auth. Missing auth is an unmet scenario, not permission to install or copy it."
+	],
+	"inputs": {
+		"method": "Only copy exact listed reference blobs to their identical relative paths after verifying the baseline and both digests. Reject extra paths, traversal, symlinks, byte mismatches and unexpected edits. Tests first, then repair inputs. Record source identity in the running app as well as local files.",
+		"comparisonBase": "c277c2c386e9d2fdcd56485e0594157e7c5a1d38",
+		"comparisonPurpose": "Historical overlay comparison identifies five product paths; productBase remains the frozen application baseline. Do not copy tooling or lockfile changes from the reference head.",
+		"tests": [
+			{
+				"path": "apps/wallpaper/test/creation-http.test.ts",
+				"revision": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+				"gitBlob": "ba810a0c3a02be2f06160c36d8e784d63d63b395",
+				"sha256": "a25892ecdbc560dad55056f37540dda1d8f01c2df46505a2a647c4e8b152b554",
+				"baseline": {
+					"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+					"gitBlob": "67fd18950bba66768a2b19ae55389bac287fec6a",
+					"sha256": "da9dcad7455da108c3601cf6a40f7f375c90a91df02652d967f65462239e7f7e"
+				}
+			},
+			{
+				"path": "apps/wallpaper/test/workflow-store.integration.test.ts",
+				"revision": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+				"gitBlob": "992d58a21131d94b397c6ff3060482c2246b5cc5",
+				"sha256": "e10f7dd0e32543bfc961cecc196d59e0efc3f2443ad3631b6eb2249740ec5339",
+				"baseline": {
+					"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+					"gitBlob": "9a54163d6e951259a24cfa8bfedf3a8c0b5c2499",
+					"sha256": "7926f9831fb870f9878d634e6f1ff006b4445df0eb5d2abde5217d694c8b3530"
+				}
+			},
+			{
+				"path": "apps/web/test/components/upload/recent-creations.dom.test.tsx",
+				"revision": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+				"gitBlob": "3053e2a07bf671affa4fd05cd9ca6584810ecb9d",
+				"sha256": "1c9394c1a05d291fc88fe849b35e38579621c4933cf1d4a3dcc904ff7d1bbfce",
+				"baseline": {
+					"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+					"gitBlob": "aad4c4ce967c893d1d61c5cb7125867a4b242dab",
+					"sha256": "ff64e2849ce1428f3df64a210a308435b0d0b4f74b0a329a960eb531a09b24ed"
+				}
+			}
+		],
+		"repair": [
+			{
+				"path": "apps/wallpaper/src/adapters/workflow/index.ts",
+				"revision": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+				"gitBlob": "f7c4dbf1f9f469c17964c44ed4af7b96c0692b99",
+				"sha256": "674d7a56683fe69eef29b0f75e35f71f9455082d8798b3380128cf981be11c60",
+				"baseline": {
+					"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+					"gitBlob": "a3de3b0ce69690f0fd8d463b3242e1ce3f241675",
+					"sha256": "3ebd5d5bffd4e18fd541cf69a01b93eedf0254cefab1b32297b788a29d4562b8"
+				}
+			},
+			{
+				"path": "apps/wallpaper/src/http/creation.ts",
+				"revision": "1374b988bedbc542e8fe290e3c54fd56444deed2",
+				"gitBlob": "0c442580f5c94d988470312e6943bed955ce4a61",
+				"sha256": "743acd8395669afc926f4ce0c7c9b736d3bd781fbc00f56410a4db3a391b837e",
+				"baseline": {
+					"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+					"gitBlob": "8c693103ef79704f39a5e75cd378ea5dfaa9e4c0",
+					"sha256": "b27764fd3bbef44408db03a8fc7263599ae8360a4564b527a78f020056ff2eb9"
+				}
+			}
+		],
+		"hmr": {
+			"path": "apps/web/src/components/upload/recent-creations.tsx",
+			"revision": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+			"gitBlob": "ec14fd04545a0666d02281ef836884eb6c7fdf94",
+			"sha256": "a1f3a10b1a1678863c320648a3920e9858b182867418ae556e2f1e5d86f23d19",
+			"from": "Recent creations",
+			"to": "Recent creations [boat-551-hmr]",
+			"method": "Replace only the single h2 text occurrence, then restore the entire original byte sequence. This is a disposable mutation, not a reference repair input."
+		},
+		"diagnosticFixture": {
+			"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/551-live-source/boat-c-551-probe.mjs",
+			"historicalSource": "/tmp/boat-c-551-probe.mjs",
+			"destination": "apps/wallpaper/test/boat-live-551-probe.mjs",
+			"sha256": "43ea9da8f4b6fe12ce4a08736f380e3d75cef848ddc435180e78907f5ace7bf0",
+			"gitBlob": null,
+			"provenance": "Untracked historical C #619 live probe, retained on this host. /tmp/boat-c-551-verified-release.log records the final successful before-unlock observation. Not recoverable from the reference Git tree.",
+			"usage": "Stage these exact hash-verified bytes at destination solely to exercise source projection/deletion. Do not execute as an acceptance test. The manual two-session SQL procedure supplies corrected assertions. A future corrected fixture must retain original provenance plus exact correction diff and hashes externally before use; this definition does not authorize writing it."
+		}
+	},
+	"staging": [
+		"Use a root-provided isolated disposable checkout and remote stack. Freeze infrastructure SHA separately from the unchanged productBase and verify owning product paths match baseline hashes. Never modify the infrastructure checkout with product inputs.",
+		"Copy only test inputs and run the focused commands against baseline production paths. Retain actual failures or unexpected passes. The UI lifetime test may already pass baseline; never invent a red result.",
+		"Copy only repair inputs and repeat unchanged commands and controls. No lock, schema, migration, dependency or common fixture changes are in the product allowlist.",
+		"Stage the archived diagnostic source at its exact destination locally without executing it. Verify hash and presence in projected worker source through ordinary Make. Keep dev/watch active for live observation and concurrent validation. Root serializes lifecycle mutations. No ad hoc SSH, manual remote file transfer, worker command or remote install.",
+		"After evidence capture, remove only the disposable diagnostic source if staged, observe its deletion in projected source and runtime, restore the HMR document bytes and all owned product inputs to baseline. Preserve unexpected edits."
+	],
+	"validation": {
+		"nativeCommands": [
+			"make test-focused PACKAGE=wallpaper ARGS='test/creation-http.test.ts'",
+			"make test-focused PACKAGE=wallpaper ARGS='--config vitest.integration.config.ts test/workflow-store.integration.test.ts'",
+			"make test-focused PACKAGE=web ARGS='test/components/upload/recent-creations.dom.test.tsx'"
+		],
+		"checkCommands": [
+			"make check PACKAGE=wallpaper",
+			"make check PACKAGE=web"
+		],
+		"fullCiCommand": "make ci FORCE=1",
+		"browserPrerequisiteCommand": "make run PACKAGE=web SCRIPT=test:browser:install",
+		"expected": [
+			"Real HTTP completed-upload disconnect interrupts pending authentication and listing. Shutdown uses the existing five-second bound and retains a successful-request control. Adjacent mutation cancellation/commit fencing remains covered by the owning suite.",
+			"Locked PostgreSQL cases cover one list, ten lists, and ten lists with immediate runtime disposal. Capture exact PIDs, interrupt, require all PIDs absent within the existing 1000 ms bound before blocker ROLLBACK; await disposal and verify successful unlocked list control where runtime remains open.",
+			"UI test observes a fresh non-aborted signal, owner/session replacement aborts the previous request and leaves the replacement live; unmount aborts the replacement.",
+			"Exit zero alone cannot establish the live backend or UI assertions. Preserve command logs, actual case counts and failures. No weakened assertions, timeout increase, hidden retries or product repair."
+		]
+	},
+	"live": {
+		"authorization": "Not executed by this task. Future execution belongs to root under the existing authorized hillclimb and paid-runtime limits.",
+		"startupCommands": [
+			"make infra-start",
+			"make dev"
+		],
+		"preview": "Use the protected preview URL and runtime session supplied by root. Root owns make boat-preview and tunnel lifecycle. Verify authentication succeeds without exposing session material.",
+		"readiness": "Record generated ingress, Compose project/database identities, infrastructure revision and baseline/reference source hashes. Require the owned application readiness routes to return 200 before the scenario; HTTP readiness is separate from a successful authenticated list.",
+		"listRoute": "/wallpaper/wallpapers",
+		"uiRoute": "/web/upload",
+		"psqlCommand": "make psql DB=wallpaper",
+		"psqlSessions": "Open two independent persistent Make psql sessions against only this isolated owned stack. Use ON_ERROR_STOP and UTC timestamped transcripts. Session A holds the transaction; session B observes in autocommit, never a stale transaction snapshot. Do not use database names, ports or project names from historical receipts.",
+		"orderedCancellation": [
+			{
+				"step": 1,
+				"action": "In the signed-in protected browser, visit /web/upload. Observe a real successful GET /wallpaper/wallpapers with status 200 and decoded list payload for this owner. Record request identity and timing, with credentials redacted."
+			},
+			{
+				"step": 2,
+				"session": "A",
+				"sql": [
+					"SET application_name = 'boat551-locker';",
+					"BEGIN;",
+					"LOCK TABLE wallpaper_intents IN ACCESS EXCLUSIVE MODE;",
+					"SELECT pg_backend_pid() AS blocker;"
+				],
+				"assert": "Record blocker PID and acquired lock timestamp before initiating the blocked browser request."
+			},
+			{
+				"step": 3,
+				"action": "Keep one signed-in owner/tab only. Wait for the actual RecentCreations polling list request or enter the upload route by client navigation. Record its exact URL, method, request identity and start time. Never substitute a synthetic fetch, health/GraphQL call, or network interception."
+			},
+			{
+				"step": 4,
+				"session": "B",
+				"sql": [
+					"SELECT pid, backend_start, datname, state, wait_event_type, wait_event, query_start, query, pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE datname=current_database() AND pid <> pg_backend_pid();"
+				],
+				"assert": "Select exactly one active backend whose full owner-filtered list SQL is exactListSql, wait_event_type=Lock, wait_event=relation, and blockers includes the step-2 PID. Correlate query_start with the browser request; record backend_start to exclude PID reuse. Ambiguous/no target is a failed assertion."
+			},
+			{
+				"step": 5,
+				"action": "Navigate away through the application UI so RecentCreations unmounts, without closing or reloading the browser document. Capture the actual list request cancellation event and timestamp. UI session replacement is separately covered by the DOM test; do not claim live sign-out coverage from navigation."
+			},
+			{
+				"step": 6,
+				"session": "B",
+				"sql": [
+					"SELECT pid, backend_start, state, query FROM pg_stat_activity WHERE pid = <exact_list_pid>;",
+					"SELECT pid, mode, granted FROM pg_locks WHERE pid = <blocker_pid> AND relation = 'wallpaper_intents'::regclass;"
+				],
+				"assert": "Poll exact PID in autocommit at 10 ms intervals, deadline 1000 ms from browser cancellation. Require ZERO activity rows for that PID while blocker still holds granted AccessExclusiveLock. Idle, no longer blocked, interrupted promise or a cancelled HTTP request alone is insufficient. Timestamp absence BEFORE unlocking. Never cancel/terminate backend manually."
+			},
+			{
+				"step": 7,
+				"session": "A",
+				"sql": [
+					"ROLLBACK;"
+				],
+				"assert": "Only after step-6 successful absence evidence release the owned lock and close both sessions. On failure retain failed evidence FIRST, then roll back for cleanup; cleanup is never a successful before-unlock observation."
+			},
+			{
+				"step": 8,
+				"action": "Return through client navigation to /web/upload. Require the actual owner list GET to complete with HTTP 200, valid list payload and rendered Recent creations. No lock remains. Record healthy controls before and after cancellation."
+			}
+		],
+		"exactListSql": "select \"state\" from \"wallpaper_intents\" where (\"wallpaper_intents\".\"owner_namespace\" = $1 and \"wallpaper_intents\".\"contributor_id\" = $2) order by \"wallpaper_intents\".\"state\"->>'createdAt' desc limit $3",
+		"hmr": {
+			"document": "Record performance.timeOrigin plus a document-instance marker after authentication. Preserve both across navigation, visible edit and restoration. Reload, fresh page, or preview replacement cannot pass same-document HMR.",
+			"procedure": "While the original document renders Recent creations, apply the exact hmr text mutation locally. Record local write timestamp, served module identity, DOM observation and WebSocket events. Poll DOM at 100 ms and require the changed heading within 10000 ms. Restore original bytes and require original heading within 10000 ms using the same document. Record upper-bound latencies and final source hash. Do not raise deadlines after a failure.",
+			"deletion": "Remove the exact staged diagnostic source locally inside the 120-second window. Require local absence and run sourceDeletionCommand after ordinary projection; retain command output/exit and before-deletion sourcePresenceCommand hash. The diagnostic module has no runtime import and must never run. Its deletion proves source projection, while the separate visible edit/restoration proves the live consumer. Never delete an unrelated file or treat process shutdown as source deletion."
+		},
+		"concurrent": {
+			"windowSeconds": 120,
+			"command": "make check PACKAGE=wallpaper FORCE=1",
+			"procedure": "Start forced Wallpaper check with dev/watch and the original authenticated browser document active. During this same 120-second observation window perform protected cancellation, successful 200 control, HMR edit/restoration and staged-source deletion. Record exact command start/end separately from the window. A short check does not imply 120 seconds of continuous load; no no-op padding.",
+			"health": "Record bounded route probes at least every 10 seconds plus restart/error events continuously. Require owned readiness and protected list controls healthy except the intentionally blocked/cancelled request. Unexpected service restart, failed health probe, stale document, source mismatch or runtime repair makes the round unclean. Retain failures even if the check exits zero."
+		},
+		"cleanupCommands": [
+			"make apps-stop",
+			"make infra-stop"
+		],
+		"cleanup": "After observation, close owned SQL sessions/browser probes, confirm lock and backend absence, stop owned watch through root, restore product bytes and HMR source, remove disposable probe source. Root records developmentWanted=false, non-resuming stopped inspection and explicit wanted-environment stop/resume separately. No worker/cache/tunnel operation by this sub-agent.",
+		"sourcePresenceCommand": "make docker-run ARGS='sha256sum apps/wallpaper/test/boat-live-551-probe.mjs'",
+		"sourceDeletionCommand": "make docker-run ARGS='test ! -e apps/wallpaper/test/boat-live-551-probe.mjs'"
+	},
+	"evidence": {
+		"historicalRoot": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c",
+		"historicalReceipt": "retained-child-logs/551/boat-c-551-verified-release.log",
+		"historicalOnly": "Exact list PID 1291 blocked by 1318; cancellation at 00:16:53.137Z, absence 00:16:53.199Z, confirmed 00:16:53.203Z, unlock 00:16:53.205Z on 2026-10-31. This is provenance, never a new run result.",
+		"required": "Fresh external per-round receipts contain infrastructure/workload hashes, cold/warm state, local and running source identity, exact commands/exits/case results, protected browser request events, ordered SQL transcripts, PID/backend_start, lock proof, HMR/document timestamps, 120-second probes/events, recording, source deletion/restoration, cleanup and root accounting. Redact auth; do not overwrite historical evidence.",
+		"unsafeOrMissingAssertions": [
+			"Historical probe logs no-list-observed without throwing; times out with target still pending without throwing; logs removed:false without failing. Its zero exit is not acceptance.",
+			"Historical target selection uses only SQL prefix and blocker. Corrected observation requires exact SQL, owned database, unique browser-correlated target, PID plus backend_start, active relation-lock wait and granted blocker lock.",
+			"Historical pending-ended accepts idle or unblocked states; /tmp/boat-c-551-verified-live.log recorded sessionRemoved:false and unlocked. Only disappearance before unlock qualifies.",
+			"Historical 120000 ms probe timeout is setup/watch time, not a cancellation allowance. Corrected deadline is 1000 ms from browser cancellation; always record cleanup after any failed assertion.",
+			"Native locked-list tests assert Exit.isFailure without checking Cause.hasInterrupts in those cases. Preserve frozen test bytes and record this assertion limit; do not repair product tests here.",
+			"Historical final full CI retains a Chromium fallback-codec coalescing timeout; integration history includes broker/deployment timing failures. Neither historical passing subsets nor forced checks erase them. Fresh results must be recorded independently."
+		]
+	},
+	"qualification": "Definition only. No application/browser/provider execution performed. Root requires two consecutive clean observed rounds at the current authorized subset and exact infrastructure/workload identities; no promotion, wait gate or universal reliability claim is supplied here."
+}

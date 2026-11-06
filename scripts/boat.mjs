@@ -1,5 +1,5 @@
 // Throwaway #557 controller. Only enrolled linked worktrees may create workers.
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -1118,7 +1118,7 @@ async function reconcileDevelopment(
 			state.developmentDependencies?.dependencies !== dependencies;
 		delete state.watcher;
 		save(state);
-		const command = `export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`;
+		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && ${rebuild ? "" : `COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-app-images && `}make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`;
 		for (let attempt = 1; ; attempt++) {
 			let diagnostic = "";
 			try {
@@ -1776,6 +1776,47 @@ async function applicationImageCommand(id, admission, command, engineBaseline) {
 				: {}),
 		});
 	}
+}
+
+async function waitApplicationImages() {
+	const project = process.env.COMPOSE_PROJECT_NAME;
+	if (process.env.WALLPAPERDB_BOAT_WORKER !== "1" || !project)
+		throw new Error(
+			"Application image restoration requires the selected worker",
+		);
+	const images = execFileSync(
+		"docker",
+		[
+			"compose",
+			"-p",
+			project,
+			"-f",
+			"infra/docker-compose.apps.yml",
+			"config",
+			"--images",
+		],
+		{ encoding: "utf8", maxBuffer: 65536, timeout: 5000 },
+	)
+		.trim()
+		.split(/\r?\n/)
+		.filter(Boolean);
+	if (!images.length) throw new Error("No application images selected");
+	const deadline = Date.now() + 120000;
+	console.log("Waiting for restored application images");
+	for (const image of images) {
+		for (;;) {
+			const remaining = deadline - Date.now();
+			if (remaining <= 0)
+				throw new Error("Application image restoration exceeded 120 seconds");
+			const result = spawnSync("docker", ["image", "inspect", image], {
+				stdio: "ignore",
+				timeout: Math.min(1000, remaining),
+			});
+			if (result.status === 0) break;
+			await wait(Math.min(500, Math.max(0, deadline - Date.now())));
+		}
+	}
+	console.log("Restored application images ready");
 }
 
 function applicationImageCommands() {
@@ -2591,6 +2632,7 @@ async function watchDevelopment(id) {
 }
 try {
 	if (action === "prepare-infra-images") prepareInfraImages();
+	else if (action === "wait-app-images") await waitApplicationImages();
 	else if (action === "enroll") {
 		const [
 			mode = "validation",

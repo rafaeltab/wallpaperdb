@@ -1,5 +1,8 @@
 export { Observations, ObservationSource, ObservationStore, LocalSnapshot } from './contract.js';
 export type {
+  ObservedUser,
+  ObservedLabel,
+  ObservedChoice,
   IssueObservation,
   PullObservation,
   Facts,

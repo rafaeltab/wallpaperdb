@@ -1,9 +1,10 @@
 import { Effect } from 'effect';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { ObservationStore } from '../../capabilities/observe/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import {
   stateConnection,
+  records,
   githubIssues,
   githubPulls,
   observationRefresh as table,
@@ -25,12 +26,19 @@ export function sqliteObservations(directory: string): ObservationStore {
             failedAt: row?.failedAt ?? undefined,
             error: row?.error ?? undefined,
             facts:
-              row?.observedAt == null
+              (db
+                .select()
+                .from(records)
+                .where(
+                  and(eq(records.namespace, 'observations'), eq(records.name, 'facts-v2.json'))
+                )
+                .get()?.value as import('../../capabilities/observe/index.js').Facts | undefined) ??
+              (row?.observedAt == null
                 ? undefined
                 : {
                     issues: db.select().from(githubIssues).all(),
                     pullRequests: db.select().from(githubPulls).all(),
-                  },
+                  }),
             jobs: row?.jobs ?? undefined,
             recoveries: row?.recoveries ?? undefined,
             jobsObservedAt: row?.jobsObservedAt ?? undefined,
@@ -51,6 +59,13 @@ export function sqliteObservations(directory: string): ObservationStore {
                 : {}),
             };
             if (value.facts) {
+              tx.insert(records)
+                .values({ namespace: 'observations', name: 'facts-v2.json', value: value.facts })
+                .onConflictDoUpdate({
+                  target: [records.namespace, records.name],
+                  set: { value: value.facts },
+                })
+                .run();
               tx.delete(githubIssues).run();
               tx.delete(githubPulls).run();
               for (const issue of value.facts.issues) tx.insert(githubIssues).values(issue).run();

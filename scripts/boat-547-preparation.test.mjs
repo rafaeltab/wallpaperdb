@@ -235,7 +235,7 @@ test("547 reused wanted development prepares workspace and images before its fir
 			2,
 		);
 		const prep = json(path.join(f.config.evidence, "preparation-result.json"));
-		assert.equal(prep.coldDeadline - prep.coldStarted, 1200);
+		assert.equal(prep.coldDeadline, prep.coldStarted + 1200);
 		assert.ok(prep.phases.every((p) => p.deadline <= prep.coldDeadline));
 	} finally {
 		if (outcome.value) await outcome.value.serving.stop();
@@ -318,7 +318,7 @@ test("547 ready milestone owns real Make serving captures and publishes readines
 	t.after(() => result.serving.stop());
 	assert.equal(result.status, "PASS_STARTUP_READY");
 	assert.equal(result.owner.worker, "controlled-worker");
-	assert.equal(result.deadline - result.started, 600);
+	assert.equal(result.deadline, result.started + 600);
 	assert.equal(result.containers.length, 10);
 	assert.deepEqual(result.containers.map((x) => x.service).sort(), [
 		"asset",
@@ -431,7 +431,7 @@ test("547 startup awaits serial owned image preparation before launching Watch",
 		const completed = await operation;
 		assert.ifError(completed.error);
 		assert.equal(completed.value.status, "PASS_STARTUP_READY");
-		assert.equal(completed.value.deadline - completed.value.started, 600);
+		assert.equal(completed.value.deadline, completed.value.started + 600);
 		assert.equal(
 			json(
 				path.join(f.config.evidence, "prepare-startup-app-images/result.json"),
@@ -474,14 +474,14 @@ test("547 ready image provisioning can exceed600 inside the original cold1200 de
 			},
 		});
 		assert.equal(result.status, "PASS_STARTUP_READY");
-		assert.equal(result.deadline - result.started, 600);
+		assert.equal(result.deadline, result.started + 600);
 		const image = json(
 			path.join(f.config.evidence, "prepare-startup-app-images/result.json"),
 		);
 		const preparation = json(
 			path.join(f.config.evidence, "preparation-result.json"),
 		);
-		assert.equal(preparation.coldDeadline - preparation.coldStarted, 1200);
+		assert.equal(preparation.coldDeadline, preparation.coldStarted + 1200);
 		assert.equal(image.deadline, preparation.coldDeadline);
 		assert.ok(result.started >= image.acceptedAt);
 		assert.equal(
@@ -621,7 +621,7 @@ test("547 replacement hands the owned serving lifetime to one new ordinary previ
 			generation: old.generation,
 		});
 		assert.equal(changed.status, "PASS_PREVIEW_REPLACEMENT");
-		assert.equal(changed.deadline - changed.started, 600);
+		assert.equal(changed.deadline, changed.started + 600);
 		assert.ok(changed.acceptedAt < changed.deadline);
 		assert.notEqual(changed.preview.generation, old.generation);
 		assert.notEqual(changed.preview.pid, old.pid);
@@ -1567,7 +1567,7 @@ const r=cp.spawnSync(${JSON.stringify(make)},['-f',native?'Makefile':'controlled
 				)?.sha256,
 				"0b3163257ffa0f393227470c98cf157d2dc0d394c2c9f6fe9b49651172b0f877",
 			);
-			assert.equal(ready.deadline - ready.started, 600);
+			assert.equal(ready.deadline, ready.started + 600);
 			assert.equal(ready.containers.length, 10);
 			assert.equal(ready.routes.length, 8);
 			assert.deepEqual(json(path.join(f.root, "native-app-start.json")), [

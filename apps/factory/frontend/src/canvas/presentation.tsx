@@ -71,17 +71,30 @@ export function Threads({
         if (thread?.metadata.state !== 'known') return <span key={id}>T3 unavailable</span>;
         if (thread.association.state !== 'confirmed')
           return <span key={id}>T3 association {thread.association.state}</span>;
-        const meta = thread.metadata.value;
-        const href = native ? (meta.nativeUrl ?? meta.webUrl) : (meta.webUrl ?? meta.nativeUrl);
-        if (!href) return <span key={id}>T3 link unavailable · {meta.title}</span>;
-        return (
-          <External key={id} href={href}>
-            T3 · {meta.title}
-          </External>
-        );
+        return <ThreadLink key={id} thread={thread} native={native} />;
       })}
     </>
   );
+}
+export function ThreadLink({
+  thread,
+  native = false,
+  label,
+}: {
+  thread: Board['entities']['threads'][keyof Board['entities']['threads']];
+  native?: boolean;
+  label?: string;
+}) {
+  if (thread.metadata.state !== 'known') return <span>{label ?? 'T3'} unavailable</span>;
+  const meta = thread.metadata.value;
+  const href = native ? (meta.nativeUrl ?? meta.webUrl) : (meta.webUrl ?? meta.nativeUrl);
+  if (!href)
+    return (
+      <span>
+        {label ?? 'T3'} link unavailable · {meta.title}
+      </span>
+    );
+  return <External href={href}>{label ?? `T3 · ${meta.title}`}</External>;
 }
 export function Labels({ board, item }: { board: Board; item: WorkItem }) {
   const issue = metadataIssue(board, item),

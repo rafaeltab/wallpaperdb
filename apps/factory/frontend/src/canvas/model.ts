@@ -328,3 +328,38 @@ export function layout(board: Board, collapsed: ReadonlySet<string>): Layout {
     ),
   };
 }
+
+/** Reveal required-attention work without expanding unrelated namespaces. */
+export function expandAttention(board: Board, collapsed: ReadonlySet<string>) {
+  const keys = new Set<string>(),
+    parents = new Map<Issue['id'], Issue['id']>();
+  for (const edge of Object.values(board.entities.relationships))
+    if (edge.kind === 'parent' && !parents.has(edge.childIssueId))
+      parents.set(edge.childIssueId, edge.parentIssueId);
+  for (const item of Object.values(board.entities.items)) {
+    if (item.attention.state !== 'required') continue;
+    if (item.section === 'in-review' && item.subject.kind === 'pull-request') {
+      const prId = item.subject.pullRequestId;
+      const stack = Object.values(board.entities.stacks).find((s) =>
+        s.pullRequestIdsBaseToTip.includes(prId)
+      );
+      if (stack) {
+        keys.add(`${item.section}:${stack.id}`);
+        continue;
+      }
+    }
+    const issue = metadataIssue(board, item);
+    let parent = issue ? parents.get(issue.id) : undefined;
+    if (!parent || !board.entities.issues[parent]) {
+      keys.add(`${item.section}:loose`);
+      continue;
+    }
+    const seen = new Set<Issue['id']>();
+    while (parent && !seen.has(parent)) {
+      seen.add(parent);
+      keys.add(`${item.section}:${parent}`);
+      parent = parents.get(parent);
+    }
+  }
+  return new Set([...collapsed].filter((key) => !keys.has(key)));
+}

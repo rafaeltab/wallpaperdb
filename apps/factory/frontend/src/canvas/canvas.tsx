@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Action, WorkItem } from '../../../src/http/index.js';
-import { type Board, layout, related, relatedItems, subject, title } from './model';
+import {
+  type Board,
+  layout,
+  related,
+  relatedItems,
+  subject,
+  title,
+  expandAttention,
+} from './model';
 import { CardContent, Icon, External, Threads, actionLabel } from './presentation';
 export function Canvas({
   board,
@@ -20,7 +28,7 @@ export function Canvas({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<WorkItem['id']>();
   const [selectedGroup, setSelectedGroup] = useState<string>();
-  const [direction, setDirection] = useState<'prerequisites' | 'dependants'>('prerequisites');
+  const [direction, setDirection] = useState<'prerequisites' | 'dependants' | 'both'>('both');
   const [attention, setAttention] = useState(false);
   const [view, setView] = useState({ x: 16, y: 16, scale: 0.8 });
   const viewport = useRef<HTMLDivElement>(null),
@@ -29,15 +37,30 @@ export function Canvas({
   const item = selected ? board.entities.items[selected] : undefined;
   const selectedSubject = item ? subject(board, item) : undefined;
   const group = graph.groups.find((g) => g.key === selectedGroup);
-  const relatives = useMemo(
+  const prerequisites = useMemo(
     () =>
       item
-        ? related(board, item, direction)
+        ? related(board, item, 'prerequisites')
         : group
-          ? relatedItems(board, group.items, direction)
+          ? relatedItems(board, group.items, 'prerequisites')
           : new Set<string>(),
-    [board, item, group, direction]
+    [board, item, group]
   );
+  const dependants = useMemo(
+    () =>
+      item
+        ? related(board, item, 'dependants')
+        : group
+          ? relatedItems(board, group.items, 'dependants')
+          : new Set<string>(),
+    [board, item, group]
+  );
+  const relatives =
+    direction === 'both'
+      ? new Set([...prerequisites, ...dependants])
+      : direction === 'prerequisites'
+        ? prerequisites
+        : dependants;
   const seedIds = new Set<string>(item ? [item.id] : (group?.items.map((i) => i.id) ?? []));
   const attentionItems = Object.values(board.entities.items).filter(
     (i) => i.attention.state === 'required'
@@ -106,7 +129,17 @@ export function Canvas({
   return (
     <section className="fc-canvas-shell" aria-label="Factory canvas">
       <div className="fc-canvas-toolbar">
-        <button type="button" aria-pressed={attention} onClick={() => setAttention(!attention)}>
+        <button
+          type="button"
+          aria-pressed={attention}
+          onClick={() => {
+            if (!attention) setCollapsed((current) => expandAttention(board, current));
+            setSelected(undefined);
+            setSelectedGroup(undefined);
+            setDirection('both');
+            setAttention(!attention);
+          }}
+        >
           {attentionItems.length}
           {board.meta.coverage.state !== 'complete' ? '+' : ''} need attention
         </button>
@@ -248,6 +281,8 @@ export function Canvas({
                   onClick={() => {
                     setSelected(undefined);
                     setSelectedGroup(group.key);
+                    setDirection('both');
+                    setAttention(false);
                   }}
                 >
                   <span>
@@ -345,6 +380,8 @@ export function Canvas({
                   onClick={() => {
                     setSelectedGroup(undefined);
                     setSelected(card.item.id);
+                    setDirection('both');
+                    setAttention(false);
                   }}
                 />
                 <CardContent board={board} item={card.item} native={native} />
@@ -378,14 +415,28 @@ export function Canvas({
           <button
             type="button"
             aria-pressed={direction === 'prerequisites'}
-            onClick={() => setDirection('prerequisites')}
+            title={
+              direction === 'prerequisites'
+                ? 'Click again to show both directions'
+                : 'Highlight prerequisites'
+            }
+            onClick={() =>
+              setDirection((current) => (current === 'prerequisites' ? 'both' : 'prerequisites'))
+            }
           >
             Prerequisites {relatedItems(board, group.items, 'prerequisites').size}
           </button>
           <button
             type="button"
             aria-pressed={direction === 'dependants'}
-            onClick={() => setDirection('dependants')}
+            title={
+              direction === 'dependants'
+                ? 'Click again to show both directions'
+                : 'Highlight dependants'
+            }
+            onClick={() =>
+              setDirection((current) => (current === 'dependants' ? 'both' : 'dependants'))
+            }
           >
             Dependants {relatedItems(board, group.items, 'dependants').size}
           </button>
@@ -426,14 +477,28 @@ export function Canvas({
           <button
             type="button"
             aria-pressed={direction === 'prerequisites'}
-            onClick={() => setDirection('prerequisites')}
+            title={
+              direction === 'prerequisites'
+                ? 'Click again to show both directions'
+                : 'Highlight prerequisites'
+            }
+            onClick={() =>
+              setDirection((current) => (current === 'prerequisites' ? 'both' : 'prerequisites'))
+            }
           >
             Prerequisites {related(board, item, 'prerequisites').size}
           </button>
           <button
             type="button"
             aria-pressed={direction === 'dependants'}
-            onClick={() => setDirection('dependants')}
+            title={
+              direction === 'dependants'
+                ? 'Click again to show both directions'
+                : 'Highlight dependants'
+            }
+            onClick={() =>
+              setDirection((current) => (current === 'dependants' ? 'both' : 'dependants'))
+            }
           >
             Dependants {related(board, item, 'dependants').size}
           </button>

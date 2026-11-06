@@ -10,7 +10,15 @@ import type { FactoryClient } from './client';
 import type { Factory } from './use-factory';
 import { CommandFeedback } from './feedback';
 import { type Board, type Issue, subject, title, metadataIssue, issueIds } from './model';
-import { Checks, External, Reviews, Threads, comparisonLabel, actionLabel } from './presentation';
+import {
+  Checks,
+  External,
+  Reviews,
+  Threads,
+  comparisonLabel,
+  actionLabel,
+  ThreadLink,
+} from './presentation';
 export function Panel({
   name,
   close,
@@ -486,7 +494,9 @@ export function Plan({
   client,
   factory,
   close,
+  native,
 }: {
+  native: boolean;
   board: Board;
   client: FactoryClient;
   factory: Factory;
@@ -548,15 +558,7 @@ export function Plan({
             Started {attempt.startedAt} · Deadline {attempt.deadline}
           </p>
           {plannerThread && (
-            <External
-              href={
-                plannerThread.metadata.state === 'known'
-                  ? plannerThread.metadata.value.webUrl
-                  : null
-              }
-            >
-              Planner in T3
-            </External>
+            <ThreadLink thread={plannerThread} native={native} label="Planner in T3" />
           )}
           {result && (
             <>

@@ -372,6 +372,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       })),
   };
   const v2 = await v2Producer({
+    runSync: (effect) => runtime.runSync(effect),
     planner: await runtime.runPromise(IPlanner),
     directory: configuration.FACTORY_STATE,
     scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,

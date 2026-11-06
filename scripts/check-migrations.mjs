@@ -44,26 +44,6 @@ export function checkMigrations(directory) {
 			errors.push(`${directory}: SQL ${file} is absent from the journal`);
 	return errors;
 }
-export function checkSchemaColumns(snapshot, actual) {
-	const errors = [];
-	const observed = new Map(
-		actual.map((column) => [
-			`${column.schema}.${column.table}.${column.column}`,
-			column.notNull,
-		]),
-	);
-	for (const table of Object.values(snapshot.tables))
-		for (const column of Object.values(table.columns)) {
-			const key = `${table.schema || "public"}.${table.name}.${column.name}`;
-			if (!observed.has(key)) errors.push(`Missing replayed column ${key}`);
-			else if (observed.get(key) !== column.notNull)
-				errors.push(`Replayed nullability differs for ${key}`);
-			observed.delete(key);
-		}
-	for (const key of observed.keys())
-		errors.push(`Unexpected replayed column ${key}`);
-	return errors;
-}
 export function checkSchemaDump(expected, actual) {
 	// PostgreSQL's random psql safety token is the only volatile dump content.
 	const normalize = (dump) =>

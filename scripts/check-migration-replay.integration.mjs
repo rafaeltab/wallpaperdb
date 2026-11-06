@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import test from "node:test";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
@@ -37,10 +38,27 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 		path.join(root, "apps/fixture/drizzle/meta/_journal.json"),
 		JSON.stringify({ entries: [initial] }),
 	);
-	fs.copyFileSync(
-		path.join(repository, "apps/asset/drizzle/meta/0000_snapshot.json"),
-		path.join(root, "apps/fixture/drizzle/meta/0000_snapshot.json"),
+	const assetRequire = createRequire(
+		path.join(repository, "apps/asset/package.json"),
 	);
+	const { pgView, text } = assetRequire("drizzle-orm/pg-core");
+	const { sql: sqlExpression } = assetRequire("drizzle-orm");
+	const { generateDrizzleJson } = assetRequire("drizzle-kit/api");
+	const summary = pgView("variant_summary", { id: text("id") }).as(
+		sqlExpression`SELECT id FROM variants`,
+	);
+	const snapshot = JSON.parse(
+		fs.readFileSync(
+			path.join(repository, "apps/asset/drizzle/meta/0000_snapshot.json"),
+			"utf8",
+		),
+	);
+	snapshot.views = generateDrizzleJson({ summary }).views;
+	fs.writeFileSync(
+		path.join(root, "apps/fixture/drizzle/meta/0000_snapshot.json"),
+		JSON.stringify(snapshot),
+	);
+	const viewSql = "CREATE VIEW variant_summary AS SELECT id FROM variants;";
 	fs.writeFileSync(
 		path.join(root, "generated.config.json"),
 		JSON.stringify({
@@ -56,10 +74,23 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 		'"height" integer NOT NULL,\n\t"width" integer NOT NULL,',
 	);
 	assert.notEqual(reordered, sql);
-	for (const [label, migration, expectedStatus] of [
+	for (const [label, migration, expectedStatus, viewDefinition = viewSql] of [
 		["matching", sql, 0],
 		["matching with different physical column order", reordered, 0],
 		["type", sql.replace('"width" integer', '"width" text'), 1],
+		["missing column", `${sql}\nALTER TABLE variants DROP COLUMN width;`, 1],
+		[
+			"nullability",
+			`${sql}\nALTER TABLE variants ALTER COLUMN width DROP NOT NULL;`,
+			1,
+		],
+		[
+			"changed view",
+			sql,
+			1,
+			"CREATE VIEW variant_summary AS SELECT storage_key AS id FROM variants;",
+		],
+		["missing view", sql, 1, ""],
 		[
 			"residual column",
 			`${sql}\nALTER TABLE variants ADD COLUMN unexpected text;`,
@@ -81,7 +112,7 @@ test("PostgreSQL replay rejects SQL-only schema drift and accepts the matching s
 	]) {
 		fs.writeFileSync(
 			path.join(root, "apps/fixture/drizzle", `${initial.tag}.sql`),
-			migration,
+			`${migration}\n${viewDefinition}`,
 		);
 		const result = spawnSync(
 			process.execPath,

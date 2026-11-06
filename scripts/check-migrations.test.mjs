@@ -28,39 +28,3 @@ test("migration metadata requires SQL, ordered journals and linked snapshots", (
 	});
 	assert.ok(checkMigrations(root).some((e) => e.includes("index")));
 });
-
-import { checkSchemaColumns } from "./check-migrations.mjs";
-test("replayed columns retain snapshot nullability and membership", () => {
-	const snapshot = {
-		tables: {
-			"public.example": {
-				schema: "",
-				name: "example",
-				columns: { id: { name: "id", notNull: true } },
-			},
-		},
-	};
-	assert.deepEqual(
-		checkSchemaColumns(snapshot, [
-			{ schema: "public", table: "example", column: "id", notNull: true },
-		]),
-		[],
-	);
-	assert.ok(
-		checkSchemaColumns(snapshot, [
-			{ schema: "public", table: "example", column: "id", notNull: false },
-		]).length,
-	);
-	assert.ok(checkSchemaColumns(snapshot, []).length);
-	assert.ok(
-		checkSchemaColumns(snapshot, [
-			{ schema: "public", table: "example", column: "id", notNull: true },
-			{
-				schema: "public",
-				table: "example",
-				column: "unexpected",
-				notNull: false,
-			},
-		]).length,
-	);
-});

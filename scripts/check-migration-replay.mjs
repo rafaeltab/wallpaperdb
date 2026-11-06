@@ -5,11 +5,7 @@ import { execFileSync } from "node:child_process";
 import { setTimeout } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import {
-	checkMigrations,
-	checkSchemaColumns,
-	checkSchemaDump,
-} from "./check-migrations.mjs";
+import { checkMigrations, checkSchemaDump } from "./check-migrations.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const name = `wallpaperdb-migration-replay-${randomUUID()}`;
 const docker = (args, options = {}) =>
@@ -110,14 +106,9 @@ try {
 			);
 			const columns = JSON.parse(
 				sql(
-					`SELECT coalesce(json_agg(json_build_object('schema', table_schema, 'table', table_name, 'column', column_name, 'notNull', is_nullable = 'NO', 'ordinal', ordinal_position)), '[]') FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema');`,
+					`SELECT coalesce(json_agg(json_build_object('schema', table_schema, 'table', table_name, 'column', column_name, 'ordinal', ordinal_position)), '[]') FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema');`,
 				),
 			);
-			const differences = checkSchemaColumns(snapshot, columns);
-			if (differences.length)
-				throw new Error(
-					`${workspace}: schema differs from snapshot: ${differences.join("\n")}`,
-				);
 			// Snapshot property order follows schema source order, while ALTER TABLE
 			// appends physical columns. Compare schema semantics without that ordering.
 			const ordinals = new Map(

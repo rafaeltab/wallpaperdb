@@ -283,3 +283,32 @@ it('collects comparison-bound PR titles, drafts, mergeability, checks and review
       reviewers: [{ user: { login: 'reviewer' }, state: 'requested', head: null }],
     });
   }));
+
+it('indexes non-ready open issues locally without fetching per-issue context for them', async () =>
+  withGithub(async (host) => {
+    await host.save({
+      planning: {
+        candidates: [],
+        issues: [
+          {
+            ...issue,
+            number: 91,
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/91',
+            labels: [],
+            updatedAt: '2026-11-06T12:00:00Z',
+          },
+        ],
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.issues).toMatchObject([
+      { number: 91, candidate: false, title: 'Complete requirements' },
+    ]);
+    expect(
+      (await host.calls()).filter(
+        (c) => c.binary === 'gh' && c.args.join(' ').includes('issue(number:91)')
+      )
+    ).toHaveLength(0);
+  }));

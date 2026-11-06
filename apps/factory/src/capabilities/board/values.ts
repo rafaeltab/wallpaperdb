@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Fact, Source, Entity } from './model.js';
+/** Pure SHA-256 content identity. No keys, provider access or random generation. */
 export const version = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function entity<T extends { id: string }>(value: T): T & Entity<T['id']> {

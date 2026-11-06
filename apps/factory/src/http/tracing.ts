@@ -4,8 +4,9 @@ import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 
 const propagator = new W3CTraceContextPropagator();
+export type RequestHeaders = Record<string, string | string[] | undefined>;
 export function requestOperation<A, E>(
-  headers: Record<string, string | string[] | undefined>,
+  headers: RequestHeaders,
   name: string,
   operation: Effect.Effect<A, E>
 ) {

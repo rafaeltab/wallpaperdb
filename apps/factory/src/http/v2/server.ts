@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { FactoryV2Changes, FactoryV2Delta, FactoryV2Problem } from './contract.js';
 import { fakeState } from './fake-state.js';
+import type { RequestHeaders } from '../tracing.js';
 import {
   changesQuery,
   commandSchema,
@@ -44,22 +45,38 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
   return app;
 }
-export type V2Data = Omit<ReturnType<typeof fakeState>, 'submit' | 'plan' | 'receipt'> & {
+export type V2Data = Omit<
+  ReturnType<typeof fakeState>,
+  'submit' | 'plan' | 'receipt' | 'snapshot' | 'changes' | 'details' | 'search' | 'subscribe'
+> & {
+  snapshot(headers?: RequestHeaders): import('./contract.js').FactoryV2Snapshot;
+  changes(after: string, headers?: RequestHeaders): FactoryV2Changes | FactoryV2Problem;
+  details(
+    id: string,
+    headers?: RequestHeaders
+  ): import('./contract.js').FactoryV2ItemDetails | undefined;
+  search(
+    query: string,
+    limit: number,
+    token?: string,
+    headers?: RequestHeaders
+  ): import('./contract.js').FactoryV2IssueSearch | FactoryV2Problem;
+  subscribe(listener: () => void, headers?: RequestHeaders): () => void;
   receipt(
     id: string,
-    headers?: Record<string, string | string[] | undefined>
+    headers?: RequestHeaders
   ):
     | ReturnType<ReturnType<typeof fakeState>['receipt']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['receipt']>>;
   plan(
     id: string,
-    headers?: Record<string, string | string[] | undefined>
+    headers?: RequestHeaders
   ):
     | ReturnType<ReturnType<typeof fakeState>['plan']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['plan']>>;
   submit(
     command: import('./contract.js').FactoryV2Command,
-    headers?: Record<string, string | string[] | undefined>
+    headers?: RequestHeaders
   ):
     | ReturnType<ReturnType<typeof fakeState>['submit']>
     | Promise<ReturnType<ReturnType<typeof fakeState>['submit']>>;
@@ -126,7 +143,7 @@ export function registerV2Routes(
     data.close();
   });
   app.get('/api/v2/board', (request, reply) => {
-    const snapshot = data.snapshot();
+    const snapshot = data.snapshot(request.headers);
     const etag = `"${snapshot.cursor}"`;
     reply.header('etag', etag);
     return matches(request.headers['if-none-match'], etag, true)
@@ -137,7 +154,7 @@ export function registerV2Routes(
     const parsed = changesQuery.safeParse(request.query);
     if (!parsed.success) return invalid(reply);
     const { after, waitMs } = parsed.data;
-    const initial = data.changes(after);
+    const initial = data.changes(after, request.headers);
     if ('code' in initial || initial.kind !== 'unchanged' || waitMs === 0)
       return sendChanges(reply, initial);
     if (waiting.size >= 64)
@@ -157,15 +174,15 @@ export function registerV2Routes(
       }
       waiting.add(finish);
       reply.raw.on('close', finish);
-      unsubscribe = data.subscribe(finish);
+      unsubscribe = data.subscribe(finish, request.headers);
       // Subscribe before re-reading to close the initial-read/registration gap.
-      const current = data.changes(after);
+      const current = data.changes(after, request.headers);
       if ('code' in current || current.kind !== 'unchanged') finish();
     });
     if (reply.raw.destroyed) return reply;
     return closing
       ? sendProblem(reply, problem(503, 'unavailable', 'The v2 server is closing.'))
-      : sendChanges(reply, data.changes(after));
+      : sendChanges(reply, data.changes(after, request.headers));
   });
   app.get('/api/v2/board/events', (request, reply) => {
     const parsed = eventsQuery.safeParse(request.query);
@@ -174,7 +191,7 @@ export function registerV2Routes(
     const after = typeof header === 'string' && header.trim() ? header.trim() : parsed.data.after;
     if (!after || after.length > 512)
       return invalid(reply, 'An initial cursor or Last-Event-ID is required.');
-    const initial = data.changes(after);
+    const initial = data.changes(after, request.headers);
     if ('code' in initial || initial.kind === 'resync-required') return sendChanges(reply, initial);
     if (waiting.size >= 64)
       return sendProblem(reply, problem(503, 'unavailable', 'Too many update connections.'));
@@ -232,7 +249,7 @@ export function registerV2Routes(
       if (stopped) return;
       let more = true;
       while (more && !stopped) {
-        const result = data.changes(position);
+        const result = data.changes(position, request.headers);
         if ('code' in result) {
           resync('reset');
           return;
@@ -249,7 +266,7 @@ export function registerV2Routes(
     waiting.add(stop);
     reply.raw.on('close', stop);
     reply.raw.on('error', stop);
-    unsubscribe = data.subscribe(send);
+    unsubscribe = data.subscribe(send, request.headers);
     write(': connected\n\n');
     send();
     if (!stopped) {
@@ -263,13 +280,18 @@ export function registerV2Routes(
   app.get('/api/v2/issues/search', (request, reply) => {
     const parsed = searchQuery.safeParse(request.query);
     if (!parsed.success) return invalid(reply);
-    const result = data.search(parsed.data.q, parsed.data.limit, parsed.data.pageToken);
+    const result = data.search(
+      parsed.data.q,
+      parsed.data.limit,
+      parsed.data.pageToken,
+      request.headers
+    );
     return 'code' in result ? sendProblem(reply, result) : result;
   });
   app.get('/api/v2/items/:id', (request, reply) => {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
-    const result = data.details(parsed.data.id);
+    const result = data.details(parsed.data.id, request.headers);
     if (!result) return sendProblem(reply, problem(404, 'not-found', 'Unknown item.'));
     if (!request.headers['if-match'])
       return invalid(reply, 'If-Match with the item version is required.');

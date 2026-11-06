@@ -131,7 +131,7 @@ export function populateCards(context: ProjectionContext) {
     const linked = Object.values(tables.items).some(
       (c) => c.subject.kind === 'pull-request' && c.subject.issueIds.includes(i.id)
     );
-    if (linked) continue;
+    if (linked && jobs.length === 0) continue;
     if (jobs.some((j) => !j.cancelled)) card({ kind: 'issue', issueId: i.id }, 'working', jobs);
     else if (
       facts?.issues.some((raw) => raw.number === i.number && raw.candidate && raw.open) &&

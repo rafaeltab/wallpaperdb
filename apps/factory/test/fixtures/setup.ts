@@ -2,6 +2,7 @@ import { mkdtemp, writeFile, chmod, copyFile, readFile, rm, rename } from 'node:
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { runProtocol } from './protocol.mjs';
 export async function protocol() {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
@@ -35,6 +36,21 @@ export async function protocol() {
     configFile,
     config,
     binary: join(directory, 't3'),
+    readGitHub: async (args: string[], signal?: AbortSignal) => {
+      signal?.throwIfAborted();
+      const output: string[] = [];
+      const errors: string[] = [];
+      const code = await runProtocol(
+        { FACTORY_FIXTURE: configFile },
+        [process.execPath, 'gh', ...args],
+        { log: (text: string) => output.push(text), error: (text: string) => errors.push(text) },
+        signal
+      );
+      signal?.throwIfAborted();
+      if (code !== 0)
+        throw new Error(`Controlled GitHub protocol exited ${code}: ${errors.join('\n')}`);
+      return JSON.parse(output.join('\n'));
+    },
     save: async (patch: object) => {
       const next = `${configFile}.next`;
       await writeFile(next, JSON.stringify({ ...config, ...patch }));

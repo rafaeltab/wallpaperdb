@@ -2098,7 +2098,7 @@ it('bounds landing facts to the affected family despite retained unrelated landi
     });
     const config = { ...f.config, prerequisites };
     for (let i = 0; i < 2; i++) {
-      const issues = githubIssues(config);
+      const issues = githubIssues(config, f.readGitHub);
       await Effect.runPromise(required(issues.reconcile)());
       expect(
         await Effect.runPromise(

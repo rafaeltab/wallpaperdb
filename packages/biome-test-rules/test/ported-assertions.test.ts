@@ -29,7 +29,7 @@ for (const [rule, group] of Object.entries(fixtures))
 	test(`configured upstream ${rule} fixtures`, () => {
 		const failures = [];
 		const batch =
-			rule === "valid-expect"
+			rule === "valid-expect" || rule === "valid-expect-in-promise"
 				? lint(group.cases.map((fixture) => fixture.source))
 				: undefined;
 		for (const [index, fixture] of group.cases.entries()) {

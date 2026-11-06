@@ -11,6 +11,7 @@ import {
 import { Time, Unavailable } from '../capabilities/job/index.js';
 import {
   AttemptStore,
+  IPlanner,
   type Scheduler,
   type AttemptSubmission,
 } from '../capabilities/plan/index.js';
@@ -24,6 +25,7 @@ export async function v2Producer(config: {
   scopeId: string;
   base: string;
   scheduler: Scheduler;
+  planner: IPlanner;
   read: () => Effect.Effect<ScheduleSnapshot, Unavailable>;
   submitPlan: (parent?: Tracer.Span) => Promise<AttemptSubmission>;
   run: <A>(effect: Effect.Effect<A, Unavailable>) => Promise<A>;
@@ -35,7 +37,8 @@ export async function v2Producer(config: {
     Layer.succeed(BoardStore, sqliteBoard(config.directory, config.scopeId)),
     Layer.succeed(BoardCommands, commandAdapter(config)),
     Layer.succeed(Time, systemTime),
-    Layer.succeed(AttemptStore, sqliteAttemptStore(config.directory))
+    Layer.succeed(AttemptStore, sqliteAttemptStore(config.directory)),
+    Layer.succeed(IPlanner, config.planner)
   );
   const run = config.run;
   const attemptStore = sqliteAttemptStore(config.directory);

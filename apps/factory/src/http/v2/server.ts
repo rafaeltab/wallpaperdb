@@ -1,3 +1,4 @@
+import { Unavailable } from '../../capabilities/job/index.js';
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -43,7 +44,12 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
   return app;
 }
-export type V2Data = Omit<ReturnType<typeof fakeState>, 'submit' | 'plan'> & {
+export type V2Data = Omit<ReturnType<typeof fakeState>, 'submit' | 'plan' | 'receipt'> & {
+  receipt(
+    id: string
+  ):
+    | ReturnType<ReturnType<typeof fakeState>['receipt']>
+    | Promise<ReturnType<ReturnType<typeof fakeState>['receipt']>>;
   plan(
     id: string
   ):
@@ -86,15 +92,25 @@ export function registerV2Routes(
   app.setErrorHandler((error, _request, reply) => {
     const status = z.object({ statusCode: z.number() }).safeParse(error);
     const code =
-      status.success && [400, 413, 415].includes(status.data.statusCode)
-        ? status.data.statusCode
-        : 500;
+      error instanceof Unavailable
+        ? 503
+        : status.success && [400, 413, 415].includes(status.data.statusCode)
+          ? status.data.statusCode
+          : 500;
     return sendProblem(
       reply,
       problem(
         code,
-        code === 415 ? 'unsupported' : code === 500 ? 'unavailable' : 'invalid-request',
-        code === 500 ? 'Unexpected v2 server failure.' : 'Invalid or unsupported request.'
+        code === 415
+          ? 'unsupported'
+          : code === 500 || code === 503
+            ? 'unavailable'
+            : 'invalid-request',
+        code === 503
+          ? 'The local projection or command ledger is unavailable.'
+          : code === 500
+            ? 'Unexpected v2 server failure.'
+            : 'Invalid or unsupported request.'
       )
     );
   });
@@ -268,15 +284,15 @@ export function registerV2Routes(
     const result = await data.plan(parsed.data.id);
     return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown plan.'));
   });
-  app.get('/api/v2/commands/:id', (request, reply) => {
+  app.get('/api/v2/commands/:id', async (request, reply) => {
     const parsed = receiptParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     return (
-      data.receipt(parsed.data.id) ??
+      (await data.receipt(parsed.data.id)) ??
       sendProblem(reply, problem(404, 'not-found', 'Unknown command.'))
     );
   });
-  app.post('/api/v2/commands', async (request, reply) => {
+  app.post('/api/v2/commands', { bodyLimit: 131072 }, async (request, reply) => {
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
       return sendProblem(reply, problem(415, 'unsupported', 'JSON required.'));
     const parsed = commandSchema.safeParse(request.body);

@@ -38,7 +38,13 @@ export function planDetails(
     deadline: new Date(attempt.deadline).toISOString(),
     finishedAt: timestamp(attempt.finishedAt),
     phase:
-      attempt.launch?.phase === 'uncertain' || attempt.launch?.phase === 'launch-intent'
+      attempt.launch?.phase === 'uncertain' ||
+      attempt.launch?.phase === 'launch-intent' ||
+      (!!attempt.finishedAt &&
+        !!attempt.launch &&
+        !attempt.launch.retired &&
+        attempt.launch.phase !== 'succeeded' &&
+        attempt.launch.phase !== 'failed')
         ? 'uncertain'
         : attempt.phase,
     progress: attempt.detail ?? attempt.phase,

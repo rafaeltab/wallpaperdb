@@ -102,16 +102,25 @@ export function publishMarkdown(input, run = command) {
 					]),
 				).body;
 		}
-		const expected = input.attach
-			? body.replace(`![](${input.attach})`, "")
-			: body;
-		const actual = input.attach
-			? String(readback).replace(
-					/https:\/\/github\.com\/user-attachments\/assets\/[^\s]+/g,
-					"",
-				)
-			: readback;
-		if (actual !== expected)
+		let verified = readback === body;
+		if (input.attach) {
+			const marker = `![](${input.attach})`;
+			const parts = body.split(marker);
+			if (parts.length !== 2)
+				throw new Error("Expected exactly one attachment reference");
+			const [before, after] = parts;
+			const uploaded = String(readback).slice(
+				before.length,
+				String(readback).length - after.length,
+			);
+			verified =
+				String(readback).startsWith(before) &&
+				String(readback).endsWith(after) &&
+				/^https:\/\/github\.com\/user-attachments\/assets\/[^\s]+$/.test(
+					uploaded,
+				);
+		}
+		if (!verified)
 			throw new Error(
 				"Published Markdown readback differs; inspect remote state before retrying",
 			);

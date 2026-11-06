@@ -1,3 +1,4 @@
+import { videoReferences, verifyVideo } from "./verify-video.mjs";
 import { guardedPush } from "./guarded-push.mjs";
 import { githubFeedback } from "./collect-feedback.mjs";
 import { publishMarkdown } from "./publish-markdown.mjs";
@@ -318,6 +319,20 @@ async function main() {
 			() => readPr(input.pr),
 		);
 		console.log(JSON.stringify(result, null, 2));
+	} else if (action === "verify-video") {
+		const pr = readPr(subject);
+		const parsed = new URL(pr.url);
+		const repo = parsed.pathname.split("/").slice(1, 3).join("/");
+		const body = github([
+			"api",
+			`repos/${repo}/issues/${pr.number}`,
+			"-H",
+			"Accept: application/vnd.github.full+json",
+		]).body_html;
+		const videos = [];
+		for (const url of videoReferences(body ?? ""))
+			videos.push(await verifyVideo(url));
+		console.log(JSON.stringify({ pr: pr.url, videos }, null, 2));
 	} else
 		throw new Error("Expected issue-preflight, pr-snapshot or review-evidence");
 }

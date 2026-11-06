@@ -3756,16 +3756,13 @@ it('finishes scheduler admission when an admitted repair waits for COMPLEX desce
       restack: undefined,
     };
     await writeFile(parentConfig, JSON.stringify(parentProtocol));
-    const parentBinary = join(f.host.directory, 'parent-t3');
-    await writeFile(
-      parentBinary,
-      `#!/usr/bin/env node
-const { spawnSync } = require('node:child_process');
-const result = spawnSync(process.execPath, [${JSON.stringify(f.host.binary)}, ...process.argv.slice(2)], { env: { ...process.env, FACTORY_FIXTURE: ${JSON.stringify(parentConfig)} }, stdio: 'inherit' });
+    const parentBinary = await f.host.nodeCommand(
+      'parent-t3',
+      `const { spawnSync } = require('node:child_process');
+const result = spawnSync(${JSON.stringify(f.host.binary)}, process.argv.slice(2), { env: { ...process.env, FACTORY_FIXTURE: ${JSON.stringify(parentConfig)} }, stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `
     );
-    await chmod(parentBinary, 0o700);
     const execution = t3Execution({
       project: f.host.repository,
       projectId: 'project-id',

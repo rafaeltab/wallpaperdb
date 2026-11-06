@@ -12,7 +12,7 @@ import { connect } from 'nats';
 import { Pool } from 'pg';
 import { expect, it } from 'vitest';
 import { z } from 'zod';
-import { createOperatorInbox } from '../../../scripts/operator-inbox.ts';
+import { createOperatorInbox } from '../../../scripts/operator-inbox.js';
 import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
 import {
   protectedCommandsLayer,

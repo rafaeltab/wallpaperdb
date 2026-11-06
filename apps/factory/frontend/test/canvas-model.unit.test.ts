@@ -53,3 +53,15 @@ it('routes around an intervening card and ends its arrow on the prerequisite', (
   expect(graph[0].points.at(-1)?.y).toBe(110);
   expect(graph[0].points.some((p) => p.y > 210 || p.y < 50)).toBe(true);
 });
+it('distinguishes current, previous, and head-only provider evidence', async () => {
+  const { comparisonLabel } = await import('../src/canvas/presentation');
+  const board = await sample(),
+    pr = board.entities.pullRequests['pr:2003'];
+  if (pr.metadata.state !== 'known') throw new Error('Expected current PR metadata');
+  const current = pr.metadata.value.comparison;
+  expect(comparisonLabel(pr, current)).toBe('Current comparison');
+  expect(comparisonLabel(pr, { ...current, headOid: 'previous-head' })).toBe('Previous comparison');
+  expect(comparisonLabel(pr, { ...current, baseOid: null, baseRef: null })).toBe(
+    'Head-only evidence; tested base unknown'
+  );
+});

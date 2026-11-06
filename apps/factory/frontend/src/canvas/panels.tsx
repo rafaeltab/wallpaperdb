@@ -10,7 +10,7 @@ import type { FactoryClient } from './client';
 import type { Factory } from './use-factory';
 import { CommandFeedback } from './feedback';
 import { type Board, type Issue, subject, title, metadataIssue, issueIds } from './model';
-import { Checks, External, Reviews, Threads } from './presentation';
+import { Checks, External, Reviews, Threads, comparisonLabel } from './presentation';
 export function Panel({
   name,
   close,
@@ -451,7 +451,10 @@ export function Details({
             <ul>
               {details.checkRuns.value.map((run) => (
                 <li key={run.id}>
-                  <External href={run.url}>{run.name}</External> · {run.state}
+                  <External href={run.url}>{run.name}</External> · {run.state} ·{' '}
+                  {pr
+                    ? comparisonLabel(pr, run.comparison)
+                    : `Head ${run.comparison.headOid.slice(0, 7)} · base ${run.comparison.baseOid?.slice(0, 7) ?? 'unknown'}`}
                 </li>
               ))}
             </ul>

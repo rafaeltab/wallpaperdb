@@ -2343,14 +2343,17 @@ it.each([false, true])(
         f.joinState.prs[104].base = 'main';
         await saveLanding(f, { join: f.joinState, landing: { merge: f.merged, head: f.a } });
       }
-      const issues = githubIssues({
-        ...f.config,
-        prerequisites: f.config.prerequisites.map(({ issue, pr, commit }) => ({
-          issue,
-          pr,
-          commit,
-        })),
-      });
+      const issues = githubIssues(
+        {
+          ...f.config,
+          prerequisites: f.config.prerequisites.map(({ issue, pr, commit }) => ({
+            issue,
+            pr,
+            commit,
+          })),
+        },
+        f.readGitHub
+      );
       if (!issues.reconcile) throw new Error('Missing reconciliation');
       await Effect.runPromise(issues.reconcile());
       const head = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];

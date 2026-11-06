@@ -103,5 +103,6 @@ export interface ValidationRecord {
 export interface Generator {
 	script: string;
 	outputs: string[];
+	committed?: boolean;
 }
 export type Generators = Record<string, Record<string, Generator>>;

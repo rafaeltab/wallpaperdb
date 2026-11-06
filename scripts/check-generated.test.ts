@@ -59,3 +59,40 @@ test("generation preserves pnpm executable paths in a temporary workspace", (t) 
 		"correct",
 	);
 });
+
+test("build-generated outputs may be absent or stale but must be produced deterministically", (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "generated-untracked-"));
+	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
+	const artifact = path.join(root, "artifact.txt");
+	const generate = (directory: string) =>
+		fs.writeFileSync(path.join(directory, "artifact.txt"), "correct");
+	expect(
+		checkGenerated(root, ["artifact.txt"], generate, { committed: false }),
+	).toStrictEqual([]);
+	expect(fs.existsSync(artifact)).toBe(false);
+	expect(
+		checkGenerated(root, ["artifact.txt"], generate).some((e) =>
+			e.includes("stale"),
+		),
+	).toBe(true);
+	fs.writeFileSync(artifact, "stale");
+	expect(
+		checkGenerated(root, ["artifact.txt"], generate, { committed: false }),
+	).toStrictEqual([]);
+	expect(fs.readFileSync(artifact, "utf8")).toBe("stale");
+	fs.rmSync(artifact);
+	expect(
+		checkGenerated(
+			root,
+			["artifact.txt"],
+			(directory) =>
+				fs.appendFileSync(path.join(directory, "artifact.txt"), "!"),
+			{ committed: false },
+		).some((e) => e.includes("deterministic")),
+	).toBe(true);
+	expect(
+		checkGenerated(root, ["artifact.txt"], () => {}, { committed: false }).some(
+			(e) => e.includes("missing generated"),
+		),
+	).toBe(true);
+});

@@ -22,6 +22,7 @@ export function checkGenerated(
 	workspace: string,
 	outputs: string[],
 	generate: (directory: string) => void,
+	{ committed = true }: { committed?: boolean } = {},
 ) {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "generated-check-"));
 	const directory = path.join(temporary, "workspace");
@@ -63,11 +64,18 @@ export function checkGenerated(
 		}
 		const before = snapshot(directory, outputs);
 		generate(directory);
+		const missing = new Set(
+			outputs.filter((output) => !fs.existsSync(path.join(directory, output))),
+		);
 		const first = snapshot(directory, outputs);
 		generate(directory);
+		for (const output of outputs)
+			if (!fs.existsSync(path.join(directory, output))) missing.add(output);
 		const second = snapshot(directory, outputs);
 		const errors = [];
-		if (before !== first)
+		for (const output of missing)
+			errors.push(`${workspace}: missing generated artifact ${output}`);
+		if (committed && before !== first)
 			errors.push(
 				`${workspace}: stale generated artifacts in ${outputs.join(", ")}`,
 			);
@@ -95,7 +103,7 @@ if (
 	);
 	if (!entries.length) throw new Error(`No ${kind} generator for ${selected}`);
 	const errors = [];
-	for (const [directory, { script, outputs }] of entries)
+	for (const [directory, { script, outputs, committed }] of entries)
 		errors.push(
 			...checkGenerated(
 				path.join(repository, directory),
@@ -111,6 +119,7 @@ if (
 						},
 					});
 				},
+				{ committed },
 			),
 		);
 	if (errors.length) {

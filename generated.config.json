@@ -2,6 +2,7 @@
   "routes": {
     "apps/web": {
       "script": "generate:routes",
+      "committed": false,
       "outputs": [
         "src/routeTree.gen.ts"
       ]

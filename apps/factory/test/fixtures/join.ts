@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { githubIssues } from '../../src/adapters/github/index.js';
 import { initializeState } from '../../src/platform/index.js';
 import { protocol } from './setup.js';
-import { runProtocol } from './protocol.mjs';
 export async function joinFixture(
   options: {
     inProcess?: boolean;
@@ -146,23 +145,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
         mcpAuthorizationFile: join(host.directory, 'mcp-auth'),
       }
     : {};
-  const read = options.inProcess
-    ? async (args: string[], signal?: AbortSignal) => {
-        signal?.throwIfAborted();
-        const output: string[] = [];
-        const errors: string[] = [];
-        const code = await runProtocol(
-          { FACTORY_FIXTURE: host.configFile },
-          [process.execPath, 'gh', ...args],
-          { log: (text: string) => output.push(text), error: (text: string) => errors.push(text) },
-          signal
-        );
-        signal?.throwIfAborted();
-        if (code !== 0)
-          throw new Error(`Controlled GitHub protocol exited ${code}: ${errors.join('\n')}`);
-        return JSON.parse(output.join('\n'));
-      }
-    : undefined;
+  const read = options.inProcess ? host.readGitHub : undefined;
   const issues = githubIssues(
     {
       project: host.repository,

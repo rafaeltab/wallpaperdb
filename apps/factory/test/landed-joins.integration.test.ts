@@ -117,21 +117,24 @@ async function fixture(
     join: state,
   };
   await host.save(config);
-  const issues = (selectedBase = base, selectedTarget = target) =>
-    githubIssues({
-      project: host.repository,
-      base: selectedBase,
-      prBase: selectedTarget,
-      prerequisites: [
-        { issue: 2, pr: 102, commit: b },
-        { issue: 3, pr: 103, commit: c },
-      ],
-      joins: {
-        directory: join(host.directory, 'joins'),
-        binary: host.binary,
-        projectId: 'project-id',
+  const issues = (selectedBase = base, selectedTarget = target, inProcess = false) =>
+    githubIssues(
+      {
+        project: host.repository,
+        base: selectedBase,
+        prBase: selectedTarget,
+        prerequisites: [
+          { issue: 2, pr: 102, commit: b },
+          { issue: 3, pr: 103, commit: c },
+        ],
+        joins: {
+          directory: join(host.directory, 'joins'),
+          binary: host.binary,
+          projectId: 'project-id',
+        },
       },
-    });
+      inProcess ? host.readGitHub : undefined
+    );
   return {
     host,
     git,
@@ -176,7 +179,8 @@ it.each([false, true])(
   async (pin) => {
     const f = await fixture(pin);
     try {
-      const issues = f.issues();
+      // Keep the unpinned journey on the CLI; reuse the protocol for the operator-pin case.
+      const issues = f.issues(f.base, f.target, pin);
       if (!issues.prepare) throw new Error('Missing preparation');
       await Effect.runPromise(issues.prepare(4));
       const ready = await Effect.runPromise(issues.inspect(4));

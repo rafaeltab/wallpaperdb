@@ -48,3 +48,23 @@ test("check records distinguish expected failures, success and source changes du
 		false,
 	);
 });
+
+test("a new check invalidates old evidence before execution starts", (t) => {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "pending-check-"));
+	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	const output = path.join(directory, "evidence.json");
+	fs.writeFileSync(output, JSON.stringify({ expectationMet: true }));
+	const request = { command: ["make", "test"], output, expect: "success" };
+	const result = recordCheck(
+		request,
+		() => {
+			const pending = JSON.parse(fs.readFileSync(output, "utf8"));
+			assert.equal(pending.expectationMet, false);
+			assert.equal(pending.state, "running");
+			assert.ok(fs.existsSync(pending.checks[0].artifact.path));
+			return { status: 0, stdout: "done" };
+		},
+		() => ({ head: "a".repeat(40), tree: "b".repeat(40), sourceDigest: "c" }),
+	);
+	assert.equal(result.state, "completed");
+});

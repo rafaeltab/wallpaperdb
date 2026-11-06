@@ -44,16 +44,47 @@ export function recordCheck(
 		throw new Error("Keep check evidence outside the repository");
 	const before = snapshot();
 	const startedAt = new Date().toISOString();
-	const result = execute("make", request.command.slice(1), {
-		cwd: repository,
-		encoding: "utf8",
-		timeout: request.timeoutMs ?? 3_600_000,
-		maxBuffer: 64 * 1024 * 1024,
-	});
-	const after = snapshot();
-	const log = String(result.stdout ?? "") + String(result.stderr ?? "");
 	const logFile = `${output}.${randomUUID()}.log`;
-	fs.writeFileSync(logFile, log, { mode: 0o600 });
+	const descriptor = fs.openSync(logFile, "wx", 0o600);
+	fs.writeFileSync(
+		output,
+		JSON.stringify(
+			{
+				...before,
+				startedAt,
+				state: "running",
+				expectationMet: false,
+				checks: [
+					{
+						command: request.command,
+						exitCode: null,
+						artifact: { path: logFile },
+					},
+				],
+			},
+			null,
+			2,
+		) + "\n",
+		{ mode: 0o600 },
+	);
+	let result;
+	try {
+		result = execute("make", request.command.slice(1), {
+			cwd: repository,
+			encoding: "utf8",
+			timeout: request.timeoutMs ?? 3_600_000,
+			stdio: ["ignore", descriptor, descriptor],
+		});
+	} finally {
+		fs.closeSync(descriptor);
+	}
+	if (result.stdout || result.stderr)
+		fs.appendFileSync(
+			logFile,
+			String(result.stdout ?? "") + String(result.stderr ?? ""),
+		);
+	const after = snapshot();
+	const log = fs.readFileSync(logFile);
 	const stable = JSON.stringify(before) === JSON.stringify(after);
 	const completed =
 		Number.isInteger(result.status) && !result.error && !result.signal;
@@ -65,6 +96,7 @@ export function recordCheck(
 		...before,
 		startedAt,
 		finishedAt: new Date().toISOString(),
+		state: "completed",
 		expect: request.expect,
 		expectationMet,
 		stable,

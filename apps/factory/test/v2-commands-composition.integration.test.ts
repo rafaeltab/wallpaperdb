@@ -145,3 +145,43 @@ it('starts one real composed job with the v2 context and replays its UUID after 
         .consumed
     ).toBe(1);
   }));
+
+it('cancels the composed owning job without refunding its admission and replays cancellation', () =>
+  composed(async ({ running, host }) => {
+    await start(running);
+    const request = {
+      ...(await action(running, 'cancel', 'job:rafaeltab/wallpaperdb/577')),
+      commandId: '00000000-0000-4000-8000-000000000032',
+      kind: 'cancel',
+      payload: {},
+    };
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+        .statusCode
+    ).toBe(202);
+    const result = await receipt(running, request.commandId);
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          cancelled: true,
+          occupiesCapacity: false,
+        });
+        expect(board.meta.factory.admission.consumed).toBe(1);
+      },
+      { timeout: 5000, interval: 40 }
+    );
+    const interrupts = (await host.calls()).filter(
+      (c) =>
+        c.binary === 't3' && c.args[0] === 'acp-mcp-call' && c.args[1] === 't3_thread_interrupt'
+    );
+    expect(interrupts.length).toBeGreaterThan(0);
+    expect(interrupts.every((c) => JSON.parse(c.args[2]).threadId === 'thread-live')).toBe(true);
+    const replay = await running.app.inject({
+      method: 'POST',
+      url: '/api/v2/commands',
+      payload: request,
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual(result);
+  }));

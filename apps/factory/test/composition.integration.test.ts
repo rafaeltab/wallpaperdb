@@ -19,6 +19,8 @@ it('validates host configuration before serving and composes the real driving an
       startFactory({ ...configuration, FACTORY_HOST: '100.97.invalid.test' })
     ).rejects.toThrow();
     const previous = process.env.FACTORY_FIXTURE;
+    const previousPath = process.env.PATH;
+    process.env.PATH = host.directory + ':' + previousPath;
     process.env.FACTORY_FIXTURE = host.configFile;
     try {
       const running = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });
@@ -34,6 +36,7 @@ it('validates host configuration before serving and composes the real driving an
         await running.close();
       }
     } finally {
+      process.env.PATH = previousPath;
       if (previous === undefined) delete process.env.FACTORY_FIXTURE;
       else process.env.FACTORY_FIXTURE = previous;
     }

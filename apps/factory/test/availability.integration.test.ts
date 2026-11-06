@@ -149,8 +149,10 @@ it('keeps telemetry disabled despite an ambient OTLP endpoint', async () => {
   const previous = {
     fixture: process.env.FACTORY_FIXTURE,
     endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    path: process.env.PATH,
   };
   process.env.FACTORY_FIXTURE = host.configFile;
+  process.env.PATH = host.directory + ':' + previous.path;
   let exports = 0;
   const collector = createServer((request, response) => {
     exports++;
@@ -179,6 +181,7 @@ it('keeps telemetry disabled despite an ambient OTLP endpoint', async () => {
     await new Promise<void>((resolve) => collector.close(() => resolve()));
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;
+    process.env.PATH = previous.path;
     if (previous.endpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = previous.endpoint;
     await host.cleanup();

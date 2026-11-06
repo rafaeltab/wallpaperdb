@@ -322,3 +322,42 @@ it('indexes non-ready open issues locally without fetching per-issue context for
       )
     ).toHaveLength(0);
   }));
+
+it('collects a shared related PR once without nesting check/review connections in each issue query', async () =>
+  withGithub(async (host) => {
+    const second = {
+      ...issue,
+      number: 2,
+      url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+    };
+    const related = {
+      ...pr(42, 'MERGED'),
+      title: 'Shared prerequisite',
+      isDraft: false,
+      updatedAt: '2026-11-06T12:00:00Z',
+    };
+    await host.save({
+      planning: {
+        candidates: [1, 2],
+        issues: [issue, second],
+        nativePulls: { 1: [related], 2: [related] },
+        openPulls: [pr(42, 'OPEN')],
+        hydratedPulls: { 42: related },
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests).toMatchObject([
+      { number: 42, state: 'MERGED', linkedIssues: [1, 2], title: 'Shared prerequisite' },
+    ]);
+    const calls = (await host.calls()).filter((c) => c.binary === 'gh' && c.args[1] === 'graphql');
+    expect(calls.filter((c) => c.args.join(' ').includes('pullRequest(number:42)'))).toHaveLength(
+      1
+    );
+    expect(
+      calls
+        .filter((c) => /issue\(number:\d+\)/.test(c.args.join(' ')))
+        .every((c) => !c.args.join(' ').includes('reviews(first:'))
+    ).toBe(true);
+  }));

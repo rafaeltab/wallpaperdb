@@ -388,3 +388,112 @@ it('preserves the chosen cancel action and precondition while confirmation is op
     precondition: 'second-original',
   });
 });
+it('shows both relationship directions initially and restores both when the active filter is clicked again', async () => {
+  let board = await sample();
+  const edge = board.entities.relationships['relationship:blocker'];
+  if (edge.kind !== 'prerequisite') throw new Error('Expected prerequisite');
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      relationships: {
+        ...board.entities.relationships,
+        'relationship:middle': {
+          ...edge,
+          id: 'relationship:middle',
+          prerequisiteIssueId: 'issue:1003',
+          dependantIssueId: 'issue:1002',
+        },
+      },
+    },
+  };
+  const user = userEvent.setup();
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  await user.click(
+    await screen.findByRole('button', { name: 'Select Implement the command centre' })
+  );
+  const filter = screen.getByRole('button', { name: 'Prerequisites 1' });
+  expect(filter.getAttribute('aria-pressed')).toBe('false');
+  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(3);
+  await user.click(filter);
+  expect(filter.getAttribute('aria-pressed')).toBe('true');
+  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(2);
+  await user.click(filter);
+  expect(filter.getAttribute('aria-pressed')).toBe('false');
+  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(3);
+});
+it('reveals collapsed items when attention highlighting is enabled', async () => {
+  const board = await sample(),
+    user = userEvent.setup();
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  await screen.findByText('Implement the command centre');
+  const collapse = screen.getAllByRole('button', { name: 'Collapse all' });
+  await user.click(collapse[1]);
+  await user.click(collapse[2]);
+  expect(screen.queryByRole('button', { name: 'Select Reconcile a paused worker' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: '2 need attention' }));
+  await screen.findByRole('button', { name: 'Select Reconcile a paused worker' });
+  expect(document.querySelectorAll('.fc-card.fc-highlight')).toHaveLength(2);
+});
+it.each([
+  { preferNative: false, web: null },
+  { preferNative: true, web: 'https://example.invalid/planner' },
+])(
+  'keeps the planner thread accessible with native preference $preferNative and web URL $web',
+  async ({ preferNative, web }) => {
+    let board = await sample();
+    const thread = board.entities.threads['thread:1002'];
+    if (thread.metadata.state !== 'known') throw new Error('Expected thread metadata');
+    const planner = {
+      ...thread,
+      metadata: {
+        ...thread.metadata,
+        value: { ...thread.metadata.value, webUrl: web, nativeUrl: 't3code://threads/env/planner' },
+      },
+    };
+    const attempt = {
+      id: 'plan:links',
+      version: '1',
+      startedAt: board.committedAt,
+      deadline: board.committedAt,
+      finishedAt: board.committedAt,
+      phase: 'succeeded',
+      progress: 'Advisory only',
+      threadId: thread.id,
+      basis: {
+        boardCursor: board.cursor,
+        inputVersion: '1',
+        controlVersion: board.meta.factory.version,
+      },
+      applicability: 'current',
+      result: { selected: [], deferred: [], rejected: [] },
+    } satisfies import('../../src/http/index.js').FactoryV2PlanDetails['attempt'];
+    board = {
+      ...board,
+      meta: { ...board.meta, currentPlanId: attempt.id },
+      entities: { ...board.entities, plans: { [attempt.id]: attempt } },
+    };
+    const details = {
+      apiVersion: 2,
+      attempt,
+      entities: {
+        repositories: board.entities.repositories,
+        issues: board.entities.issues,
+        labels: board.entities.labels,
+        users: board.entities.users,
+        sources: board.entities.sources,
+        threads: { [planner.id]: planner },
+      },
+    };
+    const client = new FactoryClient(async (path) =>
+      json(String(path).includes('/plans/') ? details : board)
+    );
+    const user = userEvent.setup();
+    render(<FactoryApp client={client} />);
+    await screen.findByText('Implement the command centre');
+    if (preferNative) await user.click(screen.getByLabelText('Open T3 links in app'));
+    await user.click(screen.getByRole('button', { name: 'Plan preview' }));
+    const link = await screen.findByRole('link', { name: /Planner in T3/ });
+    expect(link.getAttribute('href')).toBe('t3code://threads/env/planner');
+  }
+);

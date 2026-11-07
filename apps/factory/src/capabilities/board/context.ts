@@ -25,10 +25,7 @@ export function source(
           ? ('refreshing' as const)
           : ('idle' as const),
     lastAttemptAt: timestamp(input.startedAt),
-    nextAttemptAt:
-      input.startedAt === undefined || kind === 'factory'
-        ? null
-        : timestamp(input.startedAt + 120000),
+    nextAttemptAt: null,
     failure: input.error
       ? {
           code: 'provider-unavailable',

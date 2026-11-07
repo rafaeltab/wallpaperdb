@@ -1078,11 +1078,14 @@ async function sourceCommandContract() {
    fs.writeFileSync(file+'.tmp',JSON.stringify({pid:process.pid,monoMs:Number(process.hrtime.bigint()/1000000n)}));fs.renameSync(file+'.tmp',file);process.exit(74);
   });
   cp.spawn(process.execPath,['-e','('+sourceLocalPipeHolder.toString()+')('+JSON.stringify(control)+')'],{env:process.env,stdio:['ignore',1,2]});
+  // Deliver the valid boundary before timing disposal. Bulk frame transfer is
+  // not yet an overflow; the independently released final byte is the fault.
+  const chunk='x'.repeat(1024*1024);
+  for(let i=1;i<=8;i++)emit('attach',{type:'stdout',data:chunk,nextOffset:i*chunk.length});
   while(!flag('source-fault-release'))await new Promise(resolve=>setTimeout(resolve,5));
   fs.writeFileSync(path.join(control,'writer-active'),'yes');
-  const data='x'.repeat(8*1024*1024+1);
   fs.writeFileSync(path.join(control,'source-fault-lower'),String(Number(process.hrtime.bigint()/1000000n)));
-  emit('attach',{type:'stdout',data,nextOffset:Buffer.byteLength(data)});
+  emit('attach',{type:'stdout',data:'x',nextOffset:8*1024*1024+1});
   await new Promise(()=>setInterval(()=>{},1000));
  }
  if(flag('source-silent-attach'))await sourceSilentAttach(control,start,fs.readFileSync(path.join(control,'source-silent-attach'),'utf8'));
@@ -10000,7 +10003,27 @@ async function assertSourceTransportFailure(t, fault) {
 	const alive = (expected) =>
 		fixtureProcess(expected.pid)?.startTicks === expected.startTicks;
 	const receipt = () => f.json(".boat/source-writer.json");
-	if (fault !== "capture-overflow") {
+	if (fault === "capture-overflow") {
+		await f.readiness.wait(() => {
+			assert.equal(command.terminal, null, command.output());
+			const directory = fs
+				.readdirSync(path.join(f.root, ".boat"), { withFileTypes: true })
+				.find(
+					(entry) =>
+						entry.isDirectory() && entry.name.startsWith("source-command-"),
+				);
+			if (!directory) return false;
+			const decoded = path.join(
+				f.root,
+				".boat",
+				directory.name,
+				"attach.decoded-stdout",
+			);
+			return (
+				fs.existsSync(decoded) && fs.statSync(decoded).size === 8 * 1024 * 1024
+			);
+		}, "valid decoded boundary consumed before the single overflow byte");
+	} else {
 		await f.readiness.wait(() => {
 			assert.equal(command.terminal, null, command.output());
 			return (

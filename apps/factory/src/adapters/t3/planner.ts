@@ -188,7 +188,25 @@ export function t3Planner(config: {
         }
         throw new Error('Planner did not complete');
       }
-      if (Date.now() >= bound.deadline) throw new ModelDeadline('Model deadline exceeded');
+      if (Date.now() >= bound.deadline) {
+        try {
+          await mcpCall(
+            config,
+            't3_thread_interrupt',
+            {
+              threadId: run.threadId,
+              runId: run.runId,
+              reason: 'Factory model deadline exceeded',
+            },
+            signal
+          );
+        } catch (cause) {
+          throw new ModelDeadline('Model deadline exceeded; interruption is unconfirmed', {
+            cause,
+          });
+        }
+        throw new ModelDeadline('Model deadline exceeded');
+      }
       if (!['preparing', 'queued', 'starting', 'running'].includes(detail.thread.status))
         throw new Error('Planner did not complete');
       await setTimeout(1000, undefined, { signal });

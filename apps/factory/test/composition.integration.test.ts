@@ -13,7 +13,6 @@ it('validates host configuration before serving and composes the real driving an
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    ...host.mcpEnvironment,
     FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   };
@@ -59,7 +58,6 @@ it('continues admitted work through publication without an operations-page obser
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    ...host.mcpEnvironment,
     FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   });
@@ -282,7 +280,6 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
-    ...host.mcpEnvironment,
     FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   });
@@ -335,7 +332,6 @@ it('serves the live v2 producer and executes durable control commands on the exi
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
-      ...host.mcpEnvironment,
       FACTORY_STATE: host.directory + '/state',
       FACTORY_PORT: '0',
     });

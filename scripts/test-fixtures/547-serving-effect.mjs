@@ -77,7 +77,9 @@ else if (mode === "dev") {
 				const p = ".boat/preview-process.json";
 				const state = JSON.parse(fs.readFileSync(p));
 				state.captured.push(historical);
-				fs.writeFileSync(p, JSON.stringify(state));
+				const temporary = `${p}.${process.pid}.tmp`;
+				fs.writeFileSync(temporary, JSON.stringify(state));
+				fs.renameSync(temporary, p);
 				console.log("Controlled preview ready");
 			},
 		});

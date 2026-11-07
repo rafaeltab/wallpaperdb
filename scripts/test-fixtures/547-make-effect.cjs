@@ -6,7 +6,11 @@ const { createHash } = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const assert = require("node:assert/strict");
 const read = (p) => JSON.parse(fs.readFileSync(p));
-const save = (p, v) => fs.writeFileSync(p, JSON.stringify(v));
+const save = (p, v) => {
+	const temporary = `${p}.${process.pid}.tmp`;
+	fs.writeFileSync(temporary, JSON.stringify(v));
+	fs.renameSync(temporary, p);
+};
 const args = JSON.parse(process.env.CONTROL_MAKE_ARGV);
 const repository = process.env.CONTROL_REPOSITORY;
 const data = read(

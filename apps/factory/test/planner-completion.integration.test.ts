@@ -164,3 +164,75 @@ it.each([false, true])(
     }
   }
 );
+
+it.each([false, true])(
+  'interrupts the exact model at its deadline and retains ownership until terminal, lost response=%s',
+  async (interruptFails) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
+    const host = await protocol();
+    const previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    let pending: Promise<unknown> | undefined;
+    const proposal = { selected: [], deferred: [] };
+    try {
+      await host.save({
+        holds: ['planner-observation'],
+        planner: { status: 'running', proposal, interruptFails },
+      });
+      const planner = t3Planner({
+        ...host.mcp,
+        binary: host.binary,
+        project: host.repository,
+        projectId: 'project-id',
+        stateDirectory: `${host.directory}/planner-state`,
+      });
+      const result = Effect.runPromise(
+        planner.propose({
+          issues: [],
+          job: { kind: 'empty' },
+          capacity: { concurrency: 1, admission: 2 },
+        })
+      ).then(
+        (value) => ({ value }),
+        (error) => ({ error })
+      );
+      pending = result;
+      await vi.waitFor(
+        async () =>
+          expect(await readFile(`${host.directory}/held-planner-observation`, 'utf8')).toBe(
+            'planner-observation'
+          ),
+        { timeout: 5000, interval: 20 }
+      );
+      const ownership = await Effect.runPromise(planner.ownership(false));
+      if (ownership?.deadline === undefined) throw new Error('Expected a bound deadline');
+      vi.setSystemTime(ownership.deadline + 1);
+      await writeFile(`${host.directory}/release-planner-observation`, 'expire model');
+      expect(await result).toMatchObject({ error: { operation: 'model-deadline' } });
+      const interrupts = (await host.calls()).filter(
+        (call) => call.args[1] === 't3_thread_interrupt'
+      );
+      expect(interrupts).toHaveLength(1);
+      expect(JSON.parse(interrupts[0].args[2])).toMatchObject({
+        threadId: 'planner-thread',
+        runId: 'planner-run',
+      });
+      expect((await Effect.runPromise(planner.ownership(false)))?.retired).not.toBe(true);
+      await host.save({ planner: { status: 'interrupted', proposal } });
+      expect(await Effect.runPromise(planner.ownership())).toMatchObject({
+        retired: true,
+        phase: 'failed',
+        deadline: ownership.deadline,
+      });
+      expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    } finally {
+      await writeFile(`${host.directory}/release-planner-observation`, 'cleanup');
+      await pending;
+      vi.useRealTimers();
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
+  }
+);

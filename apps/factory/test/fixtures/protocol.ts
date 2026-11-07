@@ -150,6 +150,11 @@ export async function runProtocol(
       console.log(JSON.stringify({ structuredContent: { sequence: 1 } }));
       process.exit(0);
     }
+    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_interrupt' && JSON.parse(args[2]).threadId === 'planner-thread') {
+      if (config.planner?.interruptFails) throw new Error('Controlled planner interruption failure');
+      console.log(JSON.stringify({ structuredContent: { status: 'interrupt_requested', threadId: 'planner-thread' } }));
+      process.exit(0);
+    }
     const earlyFlag = (name: string) => args[args.indexOf(name) + 1];
     if (
       basename(process.argv[1]) === 'gh' &&

@@ -242,33 +242,42 @@ it.each([
   { head: 'unknown', previousBase: false, qualifier: 'Reviewed head unknown', approved: false },
   { head: 'current', previousBase: true, qualifier: 'Previous comparison', approved: false },
 ])('qualifies an approval for $head head and previous base $previousBase', async (scenario) => {
-  const board = await sample(),
-    pr = board.entities.pullRequests['pr:2003'];
+  const seed = await sample(),
+    pr = seed.entities.pullRequests['pr:2003'];
   if (pr.metadata.state !== 'known' || pr.reviews.state !== 'known')
     throw new Error('Expected current PR metadata and reviews');
   const comparison = pr.metadata.value.comparison;
-  board.entities.pullRequests[pr.id] = {
-    ...pr,
-    reviews: {
-      ...pr.reviews,
-      value: {
-        ...pr.reviews.value,
-        comparison: scenario.previousBase
-          ? { ...comparison, baseOid: 'previous-base' }
-          : comparison,
-        reviewers: [
-          {
-            userId: 'user:demo',
-            state: 'approved',
-            submittedAt: null,
-            reviewedHeadOid:
-              scenario.head === 'unknown'
-                ? null
-                : scenario.head === 'previous'
-                  ? 'previous-head'
-                  : comparison.headOid,
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      pullRequests: {
+        ...seed.entities.pullRequests,
+        [pr.id]: {
+          ...pr,
+          reviews: {
+            ...pr.reviews,
+            value: {
+              ...pr.reviews.value,
+              comparison: scenario.previousBase
+                ? { ...comparison, baseOid: 'previous-base' }
+                : comparison,
+              reviewers: [
+                {
+                  userId: 'user:demo',
+                  state: 'approved',
+                  submittedAt: null,
+                  reviewedHeadOid:
+                    scenario.head === 'unknown'
+                      ? null
+                      : scenario.head === 'previous'
+                        ? 'previous-head'
+                        : comparison.headOid,
+                },
+              ],
+            },
           },
-        ],
+        },
       },
     },
   };

@@ -12,6 +12,37 @@ function layout(board: FactoryV2Snapshot, collapsed: Set<string>) {
   });
 }
 import { routeCanvas } from '../src/canvas/routing';
+function routeLayout(graph: ReturnType<typeof canvasLayout>) {
+  return routeCanvas(
+    [
+      ...graph.boxes,
+      ...graph.headerNodes,
+      ...graph.aggregateNodes,
+      ...graph.groups
+        .filter((g) => !g.parent)
+        .map((g, i) => ({
+          id: -4_000_000 - i,
+          x: g.x,
+          y: g.y,
+          width: g.collapsed ? g.headingWidth : g.width,
+          height: g.head,
+        })),
+      ...graph.panels.map((p, i) => ({ id: -500 - i, x: p.x, y: p.y, width: p.width, height: 32 })),
+      ...graph.areas.map((a, i) => ({ id: -100 - i, x: 20, y: a.y - 10, width: 310, height: 20 })),
+      ...[...graph.groups, ...graph.panels].flatMap((g, i) =>
+        [
+          [g.x, g.y],
+          [g.x + g.width, g.y],
+          [g.x, g.y + g.height],
+          [g.x + g.width, g.y + g.height],
+        ].map(([x, y], j) => ({ id: -1000 - i * 4 - j, x, y, width: 0, height: 0 }))
+      ),
+    ],
+    graph.routingConnections,
+    graph.width,
+    graph.height
+  );
+}
 async function sample() {
   const app = fakeV2Server({ epoch: 'layout' });
   try {
@@ -262,26 +293,7 @@ it.each([
   }
   const board: FactoryV2Snapshot = { ...base, entities: { ...base.entities, relationships } },
     graph = layout(board, new Set());
-  const routes = routeCanvas(
-    [
-      ...graph.boxes,
-      ...graph.headerNodes,
-      ...graph.aggregateNodes,
-      ...graph.panels.map((p, i) => ({ id: -500 - i, x: p.x, y: p.y, width: p.width, height: 32 })),
-      ...graph.areas.map((a, i) => ({ id: -100 - i, x: 20, y: a.y - 10, width: 310, height: 20 })),
-      ...[...graph.groups, ...graph.panels].flatMap((g, i) =>
-        [
-          [g.x, g.y],
-          [g.x + g.width, g.y],
-          [g.x, g.y + g.height],
-          [g.x + g.width, g.y + g.height],
-        ].map(([x, y], j) => ({ id: -1000 - i * 4 - j, x, y, width: 0, height: 0 }))
-      ),
-    ],
-    graph.routingConnections,
-    graph.width,
-    graph.height
-  );
+  const routes = routeLayout(graph);
   expect(routes).toHaveLength(scenario.routes);
   expect(routes.every((route) => !route.failed)).toBe(true);
   if (scenario.gap !== undefined)
@@ -289,6 +301,78 @@ it.each([
       for (let i = 1; i < panel.rows.length; i++)
         expect(panel.rows[i].y - panel.rows[i - 1].y - panel.rows[i - 1].height).toBe(scenario.gap);
 });
+
+it.each(['expanded', 'target collapsed', 'all collapsed'])(
+  'routes ancestry above the next packed panel with %s',
+  async (visibility) => {
+    const seed = await sample(),
+      stackIds = [
+        [10, 11],
+        [12, 13],
+        [14, 15],
+        [16, 17],
+        [18, 19],
+      ],
+      numbers = [...stackIds.flat(), ...Array.from({ length: 90 }, (_, i) => 1000 + i)];
+    const base = scenarioBoard(seed, {
+      items: numbers.map((n) => ({
+        id: n,
+        ...(n < 1000 ? { pr: n } : {}),
+        stage: n < 1000 ? 'review' : 'planned',
+        status: 'Needs review',
+        deps: [],
+      })),
+      metadata: Object.fromEntries(
+        numbers.map((n) => [
+          n,
+          { number: n, title: `PR ${n}`, url: '', labels: [], priority: null, size: null },
+        ])
+      ),
+      parentIds: [],
+      parentOf: {},
+      synthetic: true,
+      stackSpecs: stackIds.map((ids, i) => ({ key: `s${i}`, ids, stacked: true })),
+    });
+    type Relationship =
+      FactoryV2Snapshot['entities']['relationships'][keyof FactoryV2Snapshot['entities']['relationships']];
+    const relationships: Record<Relationship['id'], Relationship> = {};
+    for (const [from, to] of [...stackIds, [11, 12], [11, 14]]) {
+      const id: Relationship['id'] = `relationship:packed-${from}-${to}`;
+      relationships[id] = {
+        id,
+        version: '1',
+        kind: 'pr-base',
+        basePullRequestId: `pr:visual-${from}`,
+        tipPullRequestId: `pr:visual-${to}`,
+        evidence: {
+          state: 'known',
+          value: 'git-ancestry',
+          sourceId: 'source:github',
+          observedAt: seed.committedAt,
+        },
+      };
+    }
+    const board: FactoryV2Snapshot = { ...base, entities: { ...base.entities, relationships } },
+      graph = layout(
+        board,
+        new Set(
+          visibility === 'all collapsed'
+            ? stackIds.map((_, i) => `stack:stack:s${i}`)
+            : visibility === 'target collapsed'
+              ? ['stack:stack:s1']
+              : []
+        )
+      ),
+      target = graph.panels.find((p) => p.key === 'stack:s1'),
+      next = graph.panels.find((p) => p.key === 'stack:s4');
+    if (!target || !next) throw new Error('Expected packed target and following panel');
+    expect(next.x).toBe(target.x);
+    expect(next.y).toBeGreaterThanOrEqual(target.y + target.height + 20);
+    const routes = routeLayout(graph);
+    expect(routes).toHaveLength(2);
+    expect(routes.every((route) => !route.failed)).toBe(true);
+  }
+);
 
 it('displays a cyclic prerequisite component beside another dependency chain', async () => {
   const seed = await sample(),

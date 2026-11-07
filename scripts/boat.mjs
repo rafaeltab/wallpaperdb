@@ -999,6 +999,11 @@ async function generate(id, started, kind) {
 							});
 					},
 					prepare: async (kind) => {
+						// Worker install regenerates private worktree configuration.
+						// The next ordinary command must project coordinator inputs again,
+						// even when repeat generation leaves public dependencies unchanged.
+						if (kind === "migrations")
+							fs.rmSync(path.join(dir, "prepared.json"), { force: true });
 						await ssh(
 							id,
 							`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && ${kind === "lock" ? "mise install --locked" : "make install BOAT_EXEC=worker"}`,

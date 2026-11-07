@@ -95,6 +95,8 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
 });
 
 it('keeps metadata demand for an open event stream and releases it after disconnect', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));
   const host = await protocol(),
     previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = host.directory + ':' + previous.path;

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { expect, it, vi } from 'vitest';
 import { protocol } from './fixtures/setup.js';
+import { stopOwnedProcesses, stopProcess as stop } from './fixtures/processes.js';
 it('retains a parked job across process loss and never repeats an uncertain resume delivery', async () => {
   const host = await protocol();
   const socket = createServer().listen(0, '127.0.0.1');
@@ -30,12 +31,15 @@ it('retains a parked job across process loss and never repeats an uncertain resu
     FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
     FACTORY_T3_MCP_AUTHORIZATION_FILE: authorization,
   };
-  const launch = () => spawn(process.execPath, [resolve('dist/main.js')], { env, stdio: 'ignore' });
-  const stop = async (child: ChildProcess) => {
-    if (child.exitCode !== null) return;
-    const exit = once(child, 'exit');
-    child.kill('SIGKILL');
-    await exit;
+  const children: ChildProcess[] = [];
+  const launch = () => {
+    const child = spawn(process.execPath, [resolve('dist/main.js')], {
+      env,
+      stdio: 'ignore',
+      detached: true,
+    });
+    children.push(child);
+    return child;
   };
   const ready = () =>
     vi.waitFor(async () => expect((await fetch(`${origin}/health`)).ok).toBe(true), {
@@ -116,7 +120,7 @@ it('retains a parked job across process loss and never repeats an uncertain resu
       clientRequestId: `${initial.intent.id}:stage:1`,
     });
   } finally {
-    await stop(child);
+    await stopOwnedProcesses(children);
     await host.cleanup();
   }
 });

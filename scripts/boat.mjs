@@ -1139,7 +1139,7 @@ async function reconcileDevelopment(
 					)
 					.join(" && ")
 			: `COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-app-images`;
-		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && ${imagePreparation} && make apps-start ARGS=--no-build BOAT_EXEC=worker`;
+		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && ${imagePreparation} && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`;
 		for (let attempt = 1; ; attempt++) {
 			let diagnostic = "";
 			try {
@@ -2204,6 +2204,11 @@ async function command() {
 			if (!/^[a-f0-9]{24}$/.test(artifactToken ?? ""))
 				throw new Error("Invalid artifact preparation receipt");
 		}
+		const workerTargets =
+			targets[0] === "dev" &&
+			targets.slice(1).every((value) => value === "ARGS=--no-up")
+				? ["run", "PACKAGE=scripts", "SCRIPT=boat:watch"]
+				: targets;
 		const result = await boat(
 			[
 				"exec",
@@ -2214,7 +2219,7 @@ async function command() {
 				"--",
 				"bash",
 				"-lc",
-				`${workerEnvironment}; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+				`${workerEnvironment}; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${workerTargets.map(quote).join(" ")}`,
 			],
 			{
 				allowFailure: true,

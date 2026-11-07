@@ -16,7 +16,9 @@ const selectors = [
 // Only the declared, instrumented owning test produces this artifact.
 export function artifactCommand(root, targets) {
 	return (
-		JSON.stringify(targets) === JSON.stringify(selectors) &&
+		targets.length === selectors.length &&
+		targets[0] === selectors[0] &&
+		selectors.slice(1).every((selector) => targets.includes(selector)) &&
 		digest(
 			fs.readFileSync(
 				path.join(root, "apps/asset/test/source-storage.integration.test.ts"),

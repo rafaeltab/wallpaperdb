@@ -8,7 +8,6 @@ import {
   ObservationStore,
   ObservationSource,
   LocalSnapshot,
-  observationRefreshIntervalMs,
 } from '../capabilities/observe/index.js';
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -61,6 +60,7 @@ import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
 import { v2Producer } from './v2.js';
 import { planningWorker } from './planning.js';
+import { observationWorker } from './refresh.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
@@ -231,6 +231,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     ),
     Layer.succeed(JobPool, pool)
   );
+  let planningDemand = () => {};
   const planningDeps = Layer.mergeAll(
     Layer.effect(
       PlanningSource,
@@ -256,6 +257,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         return {
           read: () =>
             Effect.gen(function* () {
+              yield* Effect.sync(() => planningDemand());
               const input = yield* source.read();
               const state = yield* scheduleStore.read();
               const jobs = [];
@@ -357,10 +359,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     cancel: (id) => scheduler.cancel(id),
   };
   const requests = new AbortController();
-  const attempts = await planningWorker({
-    attempts: await runtime.runPromise(Attempts),
-    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
-  });
   const observations = await runtime.runPromise(Observations);
   const threadService = await runtime.runPromise(Threads);
   const threads = {
@@ -371,6 +369,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
       })),
   };
+  const refreshes = observationWorker(() =>
+    runtime.runPromise(
+      Effect.all([observations.refresh(), threads.refresh()], { concurrency: 2 }).pipe(
+        Effect.asVoid,
+        Effect.catch(Effect.logError)
+      ),
+      { signal: requests.signal }
+    )
+  );
+  planningDemand = refreshes.demand;
+  const attempts = await planningWorker({
+    attempts: await runtime.runPromise(Attempts),
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+  });
   const v2 = await v2Producer({
     runSync: (effect) => runtime.runSync(effect),
     planner: await runtime.runPromise(IPlanner),
@@ -392,12 +404,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     requests.abort();
     await Promise.allSettled([
       attempts.close(),
+      refreshes.close(),
       runtime.dispose(),
       ...[...workers.values()].map((worker) => worker.dispose()),
     ]);
     throw cause;
   });
   const app = operationsServer({
+    clientActivity: refreshes.client,
     v2: v2.data,
     threads: threads.snapshot,
     base: configuration.FACTORY_BASE,
@@ -423,6 +437,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       requests.abort();
       await v2.close();
       await attempts.close();
+      await refreshes.close();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }
@@ -456,40 +471,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       });
     void observing.catch(() => undefined);
   }, 1000);
-  let refreshing: Promise<unknown> | undefined;
-  const refresh = () => {
-    if (refreshing) return;
-    refreshing = runtime
-      .runPromise(observations.refresh().pipe(Effect.catch(Effect.logError)), {
-        signal: requests.signal,
-      })
-      .finally(() => {
-        refreshing = undefined;
-      });
-    void refreshing.catch(() => undefined);
-  };
-  refresh();
-  const refreshTimer = setInterval(refresh, observationRefreshIntervalMs);
-  let refreshingThreads: Promise<unknown> | undefined;
-  const refreshThreads = () => {
-    if (refreshingThreads) return;
-    refreshingThreads = runtime
-      .runPromise(threads.refresh().pipe(Effect.catch(Effect.logError)), {
-        signal: requests.signal,
-      })
-      .finally(() => {
-        refreshingThreads = undefined;
-      });
-    void refreshingThreads.catch(() => undefined);
-  };
-  refreshThreads();
-  const threadTimer = setInterval(refreshThreads, observationRefreshIntervalMs);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
       clearInterval(observationTimer);
-      clearInterval(refreshTimer);
-      clearInterval(threadTimer);
       // Reserve the remaining shutdown budget for bounded exporter disposal.
       const deadline = setTimeout(() => {
         requests.abort();
@@ -499,13 +484,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         await app.close();
       } finally {
         try {
-          await Promise.allSettled([
-            v2.close(),
-            attempts.close(),
-            observing,
-            refreshing,
-            refreshingThreads,
-          ]);
+          await Promise.allSettled([v2.close(), attempts.close(), observing, refreshes.close()]);
         } finally {
           clearTimeout(deadline);
           requests.abort();

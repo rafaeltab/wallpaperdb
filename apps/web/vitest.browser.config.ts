@@ -12,7 +12,10 @@ export default mergeConfig(
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     optimizeDeps: {
       include: [
+        'react-dom/client',
         '@tanstack/react-router',
+        '@tanstack/react-query-devtools',
+        '@tanstack/router-devtools',
         'react-markdown',
         'rehype-sanitize',
         'remark-gfm',

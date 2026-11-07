@@ -1212,6 +1212,7 @@ async function lockGenerationCheckout(
 		"scripts/boat-route.mk",
 		"scripts/boat.mjs",
 		"scripts/boat-stop-watch.mjs",
+		"scripts/boat-watch.mjs",
 		"scripts/boat-owners.py",
 		"scripts/docker-validation.mjs",
 		"scripts/lib/docker-queue.mjs",
@@ -5644,8 +5645,9 @@ const command=argv.at(-1)`,
 		`#!/bin/bash
 exec -a docker-compose '${process.execPath}' - "$@" <<'NODE'
 const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL,argv=process.argv.slice(2);
-const apps=argv.includes('infra/docker-compose.apps.yml')||argv.includes('.boat/development-compose.json');
+const apps=argv.some(value=>value.endsWith('infra/docker-compose.apps.yml')||value.endsWith('.boat/development-compose.json'));
 fs.appendFileSync(path.join(control,'docker'),JSON.stringify(argv)+'\\n');
+if(argv.includes('config')){if(argv.includes('--images'))console.log('fixture/web:1');else console.log(JSON.stringify({name:process.env.COMPOSE_PROJECT_NAME,services:{web:{build:{context:'.'},develop:{watch:[{action:'sync',path:'apps/web/src',target:'/app/apps/web/src'}]}}}}));process.exit(0);}
 if(argv.includes('up')&&apps&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
 if(argv.includes('down')&&fs.existsSync(path.join(control,'shutdown-hang-cleanup'))){
  const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
@@ -5773,9 +5775,14 @@ for (const targets of [
 				fs.readFileSync(path.join(f.control, "docker"), "utf8"),
 				before,
 			);
-			assert.equal(
+			assert.deepEqual(
 				f.json(".boat/state.json").developmentDependencies,
-				undefined,
+				targets.length === 1
+					? {
+							id: "fake-worker",
+							dependencies: f.json(".boat/prepared.json").dependencies,
+						}
+					: undefined,
 			);
 			assert.equal(
 				f
@@ -5827,12 +5834,32 @@ for (const targets of [
 			assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 		});
 
-test("awake healthy preview leaves unknown images alone without saved development intent", async (t) => {
+test("awake healthy preview fulfills explicit startup without saved development intent", async (t) => {
 	const f = await developmentCheckout(t);
 	const preview = await f.run("boat-preview").done;
 	assert.match(preview.output, /fixture ends preview at readiness/);
-	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
-	assert.equal(f.json(".boat/state.json").developmentDependencies, undefined);
+	const commands = fs
+		.readFileSync(path.join(f.control, "docker"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const build = commands.findIndex((argv) => argv.includes("build"));
+	const infra = commands.findIndex(
+		(argv) => argv.includes("up") && argv.includes("infra/docker-compose.yml"),
+	);
+	const apps = commands.findIndex(
+		(argv) =>
+			argv.includes("up") && argv.includes("infra/docker-compose.apps.yml"),
+	);
+	assert.ok(
+		build >= 0 && build < infra && infra < apps,
+		"build images before starting infrastructure and applications",
+	);
+	assert.equal(f.json(".boat/state.json").developmentWanted, undefined);
+	assert.deepEqual(f.json(".boat/state.json").developmentDependencies, {
+		id: "fake-worker",
+		dependencies: f.json(".boat/prepared.json").dependencies,
+	});
 });
 
 test("initial preview uses ordinary startup when readiness fails without a recovery obligation", async (t) => {
@@ -6038,8 +6065,11 @@ for (const failure of ["fail-build", "fail-apps", "fail-watch"])
 		assert.equal(
 			f
 				.transport()
-				.filter((argv) => argv.at(-1).includes("make apps-start ARGS=--build"))
-				.length,
+				.filter((argv) =>
+					argv
+						.at(-1)
+						.includes("make 'apps-build' 'SERVICE=web' BOAT_EXEC=worker"),
+				).length,
 			2,
 		);
 		assert.equal(

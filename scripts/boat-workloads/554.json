@@ -294,20 +294,21 @@
 			"restore": "Restore exact pinned component bytes; observe original text and absence of marker in the same document within the same bound."
 		},
 		"creation": {
-			"path": "apps/web/src/components/upload/boat-replay-554-marker.ts",
+			"path": "apps/web/src/components/upload/boat-replay-554-marker.tsx",
 			"initialState": "absent",
-			"utf8": "export const replay554Marker = '554-source-created';\n",
-			"sha256": "2394a1fee709e95bdff523983d5c02ee28f6f6b583b2ef8f3879e8355de64134",
-			"import": "import { replay554Marker } from './boat-replay-554-marker';\n",
+			"utf8": "export function Replay554Marker() {\n  return <span data-testid=\"boat-replay-554-marker\">554-source-created</span>;\n}\n",
+			"sha256": "49c5aeafebfa1a5ec94152734a97f74a546cff2a2a1cf94b99e3fb227a2f414e",
+			"import": "import { Replay554Marker } from './boat-replay-554-marker';\n",
 			"insertImport": "Prepend exact import to pinned component.",
-			"jsx": "<span data-testid=\"boat-replay-554-marker\">{replay554Marker}</span>",
+			"jsx": "<Replay554Marker />",
 			"insertJSX": "Insert exact JSX immediately after the single </h3> in the pinned component.",
-			"expect": "Untracked locally created module reaches worker via normal source projection; marker 554-source-created renders in the same document. Retain create/write/observed timestamps and remote projected file hash."
+			"expect": "Untracked locally created module reaches worker via normal source projection; marker 554-source-created renders in the same document. Retain create/write/observed timestamps and remote projected file hash.",
+			"boundary": "Use a React component export so React Refresh accepts the imported module. A constant-only module can trigger a native Vite full reload on unlink and cannot qualify the same-document gate."
 		},
 		"deletion": "Restore pinned component bytes, then delete only the created module locally. Observe marker removal in the same document and prove projected module absent on the worker. File deletion is source projection evidence, not merely disappearance of unreferenced DOM. Retain deletion event/absence receipt without manual remote transfer.",
 		"failurePolicy": "Retain missed edit/restoration, stale document, missing creation/deletion, auth loss or restart as a failed round. Restore owned local edits safely even on failure; restoration does not erase the failure. HMR timing is an observation bound, never an application timeout change.",
-		"workerInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web sha256sum src/components/upload/wallpaper-sources.tsx src/components/upload/boat-replay-554-marker.ts'",
-		"deletionInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web test ! -e src/components/upload/boat-replay-554-marker.ts'",
+		"workerInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web sha256sum src/components/upload/wallpaper-sources.tsx src/components/upload/boat-replay-554-marker.tsx'",
+		"deletionInspectionCommandTemplate": "make docker-run ARGS='docker compose -p <owned COMPOSE_PROJECT_NAME> -f infra/docker-compose.apps.yml exec -T web test ! -e src/components/upload/boat-replay-554-marker.tsx'",
 		"inspectionPolicy": "Run these only during an authorized active-worker trial before cleanup, from the owning checkout with its generated Compose project. Also compare component hash to pinned restoration hash after removal. No remote shell transfer or restart. These inspection commands are planned, not executed during descriptor preparation."
 	},
 	"concurrentValidation": {

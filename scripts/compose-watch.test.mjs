@@ -268,9 +268,9 @@ for (const mode of ["foreground", "managed"]) {
 					path: path.join(root, "packages"),
 					target: "/app/packages",
 					ignore: [
-						"**/node_modules/**",
-						"**/coverage/**",
-						"**/.turbo/**",
+						"**/node_modules/",
+						"**/coverage/",
+						"**/.turbo/",
 						"**/*.tsbuildinfo",
 						"vitest-config/dist/",
 					],

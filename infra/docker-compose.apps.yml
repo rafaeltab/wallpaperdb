@@ -37,9 +37,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -81,9 +81,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -114,9 +114,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -147,9 +147,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -180,9 +180,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -215,9 +215,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -255,9 +255,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -292,9 +292,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync
@@ -332,9 +332,9 @@ services:
           path: ../packages
           target: /app/packages
           ignore:
-            - "**/node_modules/**"
-            - "**/coverage/**"
-            - "**/.turbo/**"
+            - "**/node_modules/"
+            - "**/coverage/"
+            - "**/.turbo/"
             - "**/*.tsbuildinfo"
             - "vitest-config/dist/"
         - action: sync

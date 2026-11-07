@@ -1,7 +1,7 @@
 import { defineConfig, mergeConfig } from 'vitest/config';
 import unit from './vitest.config.ts';
 
-export default defineConfig(async (environment) => {
+export default defineConfig(async (environment: any) => {
   const base = typeof unit === 'function' ? await unit(environment) : await unit;
   return mergeConfig(base, {
     test: {

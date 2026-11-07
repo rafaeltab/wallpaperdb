@@ -6,5 +6,5 @@ if ! command -v mise >/dev/null 2>&1; then
 fi
 export MISE_AUTO_INSTALL=false
 export MISE_LOCKED=true
-mise exec -- node scripts/toolchain.mjs --pins
+mise exec -- node scripts/toolchain.ts --pins
 exec mise exec -- sh "$@"

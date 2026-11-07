@@ -1,43 +1,66 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
-  applyOverrides,
-  extractKeys,
-  filterApplicableSecrets,
-  knownUserSecrets,
-  parseEnvValues,
-  resolveGenerateMarker,
-  syncKnownSecretsToContent,
-} from './env-pipeline.mjs';
+	applyOverrides,
+	extractKeys,
+	filterApplicableSecrets,
+	knownUserSecrets,
+	parseEnvValues,
+	resolveGenerateMarker,
+	syncKnownSecretsToContent,
+} from "./env-pipeline.ts";
 
-describe('Profile picture service credentials', () => {
-  it('adds the service token without changing an existing secret lacking a final newline', () => {
-    const previous = 'CLERK_SECRET_KEY=test-existing-clerk-secret';
-    const updated = parseEnvValues(syncKnownSecretsToContent(previous, knownUserSecrets));
-    expect(updated.CLERK_SECRET_KEY).toBe('test-existing-clerk-secret');
-    expect(updated.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
-  });
+describe("Profile picture service credentials", () => {
+	it("adds the service token without changing an existing secret lacking a final newline", () => {
+		const previous = "CLERK_SECRET_KEY=test-existing-clerk-secret";
+		const updated = parseEnvValues(
+			syncKnownSecretsToContent(previous, knownUserSecrets),
+		);
+		expect(updated.CLERK_SECRET_KEY).toBe("test-existing-clerk-secret");
+		expect(updated.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
+	});
 
-  it('generates one persistent token shared by User and Asset only', () => {
-    const content = syncKnownSecretsToContent('', knownUserSecrets);
-    const secrets = parseEnvValues(content);
-    expect(secrets.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
-    expect(syncKnownSecretsToContent(content, knownUserSecrets)).toBe(content);
+	it("generates one persistent token shared by User and Asset only", () => {
+		const content = syncKnownSecretsToContent("", knownUserSecrets);
+		const secrets = parseEnvValues(content);
+		expect(secrets.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
+		expect(syncKnownSecretsToContent(content, knownUserSecrets)).toBe(content);
 
-    for (const service of ['apps/user', 'apps/asset']) {
-      const example = 'USER_MEDIA_SERVICE_TOKEN=\n';
-      const applicable = filterApplicableSecrets(secrets, extractKeys(example), service, () => {});
-      expect(parseEnvValues(applyOverrides(example, applicable, {})).USER_MEDIA_SERVICE_TOKEN)
-        .toBe(secrets.USER_MEDIA_SERVICE_TOKEN);
-    }
+		for (const service of ["apps/user", "apps/asset"]) {
+			const example = "USER_MEDIA_SERVICE_TOKEN=\n";
+			const applicable = filterApplicableSecrets(
+				secrets,
+				extractKeys(example),
+				service,
+				() => {},
+			);
+			expect(
+				parseEnvValues(applyOverrides(example, applicable, {}))
+					.USER_MEDIA_SERVICE_TOKEN,
+			).toBe(secrets.USER_MEDIA_SERVICE_TOKEN);
+		}
 
-    const webSecrets = filterApplicableSecrets(secrets, extractKeys('VITE_USER_URL=/user\n'), 'apps/web', () => {});
-    expect(webSecrets).not.toHaveProperty('USER_MEDIA_SERVICE_TOKEN');
-  });
+		const webSecrets = filterApplicableSecrets(
+			secrets,
+			extractKeys("VITE_USER_URL=/user\n"),
+			"apps/web",
+			() => {},
+		);
+		expect(webSecrets).not.toHaveProperty("USER_MEDIA_SERVICE_TOKEN");
+	});
 
-  it('supports explicit token regeneration and preserves an existing configured token', () => {
-    const regenerated = resolveGenerateMarker('USER_MEDIA_SERVICE_TOKEN={GENERATE}\n', knownUserSecrets);
-    expect(regenerated.secrets).toHaveProperty('USER_MEDIA_SERVICE_TOKEN', expect.stringMatching(/^[a-f0-9]{64}$/));
-    const preserved = resolveGenerateMarker(regenerated.content, knownUserSecrets);
-    expect(preserved).toEqual(regenerated);
-  });
+	it("supports explicit token regeneration and preserves an existing configured token", () => {
+		const regenerated = resolveGenerateMarker(
+			"USER_MEDIA_SERVICE_TOKEN={GENERATE}\n",
+			knownUserSecrets,
+		);
+		expect(regenerated.secrets).toHaveProperty(
+			"USER_MEDIA_SERVICE_TOKEN",
+			expect.stringMatching(/^[a-f0-9]{64}$/),
+		);
+		const preserved = resolveGenerateMarker(
+			regenerated.content,
+			knownUserSecrets,
+		);
+		expect(preserved).toEqual(regenerated);
+	});
 });

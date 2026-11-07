@@ -149,12 +149,12 @@ services:
   asset-operator-inbox:
     image: node:22.22.3-alpine
     restart: unless-stopped
-    command: ["node", "/scripts/operator-inbox.mjs"]
+    command: ["node", "/scripts/operator-inbox.ts"]
     environment:
       OPERATOR_INBOX_CONFIG: /config/operator-inbox.json
       OPERATOR_INBOX_DATA: /data
     volumes:
-      - ../scripts/operator-inbox.mjs:/scripts/operator-inbox.mjs:ro
+      - ../scripts/operator-inbox.ts:/scripts/operator-inbox.ts:ro
       - ./.operator-inbox.json:/config/operator-inbox.json:ro
       - asset-operator-receipts:/data
     healthcheck:

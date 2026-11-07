@@ -97,7 +97,7 @@ it('renews exhausted User notices through the supported inbox without changing t
     const directory = await mkdtemp(join(tmpdir(), 'user-quarantine-receipts-'));
     releases.push(() => rm(directory, { recursive: true, force: true }));
     const { createOperatorInbox } = await import(
-      new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+      new URL('../../../scripts/operator-inbox.ts', import.meta.url).href
     );
     const closeInbox = async (server: Server) => {
       if (!server.listening) return;

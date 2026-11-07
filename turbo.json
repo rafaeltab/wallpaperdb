@@ -79,14 +79,14 @@
             ],
             "inputs": [
                 "$TURBO_DEFAULT$",
-                "$TURBO_ROOT$/scripts/check-architecture.mjs"
+                "$TURBO_ROOT$/scripts/check-architecture.ts"
             ]
         },
         "//#architecture:workspaces": {
             "inputs": [
                 "$TURBO_DEFAULT$",
-                "$TURBO_ROOT$/scripts/check-architecture-workspaces.mjs",
-                "$TURBO_ROOT$/scripts/check-architecture.mjs",
+                "$TURBO_ROOT$/scripts/check-architecture-workspaces.ts",
+                "$TURBO_ROOT$/scripts/check-architecture.ts",
                 "$TURBO_ROOT$/apps/*/package.json",
                 "$TURBO_ROOT$/apps/*/Dockerfile",
                 "$TURBO_ROOT$/apps/*/quality.config.json",
@@ -255,7 +255,9 @@
             "outputs": []
         },
         "@wallpaperdb/scripts#test:unit": {
-            "dependsOn": ["^build"],
+            "dependsOn": [
+                "^build"
+            ],
             "cache": false
         },
         "@wallpaperdb/scripts#check-types": {
@@ -266,9 +268,14 @@
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/crap.config.mts",
                 "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
-                "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
-            ],
-            "outputs": []
+                "$TURBO_ROOT$/packages/crap-typescript-core/package.json",
+                "$TURBO_ROOT$/apps/*/scripts/**",
+                "$TURBO_ROOT$/apps/factory/test/fixtures/protocol.ts",
+                "$TURBO_ROOT$/packages/testcontainers/test/fixtures/start-container.ts",
+                "$TURBO_ROOT$/.agents/skills/**/*.ts",
+                "$TURBO_ROOT$/apps/*/package.json",
+                "$TURBO_ROOT$/packages/*/package.json"
+            ]
         },
         "@wallpaperdb/asset#test:integration": {
             "cache": true,
@@ -318,14 +325,16 @@
             "outputs": []
         },
         "@wallpaperdb/biome-test-rules#test:unit": {
-            "dependsOn": ["^build"],
+            "dependsOn": [
+                "^build"
+            ],
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/crap.config.mts",
                 "$TURBO_ROOT$/scripts/crap.mts",
                 "$TURBO_ROOT$/mutation.inventory.json",
-                "$TURBO_ROOT$/scripts/mutation.mjs",
-                "$TURBO_ROOT$/scripts/lib/mutation-*.mjs",
+                "$TURBO_ROOT$/scripts/mutation.ts",
+                "$TURBO_ROOT$/scripts/lib/mutation-*.ts",
                 "$TURBO_ROOT$/apps/*/mutation.config.json",
                 "$TURBO_ROOT$/packages/*/mutation.config.json",
                 "$TURBO_ROOT$/experiments/*/package.json",
@@ -334,7 +343,7 @@
                 "$TURBO_ROOT$/mise.lock",
                 "$TURBO_ROOT$/.npmrc",
                 "$TURBO_ROOT$/scripts/mise-shell.sh",
-                "$TURBO_ROOT$/scripts/toolchain.mjs",
+                "$TURBO_ROOT$/scripts/toolchain.ts",
                 "$TURBO_ROOT$/biome.json",
                 "$TURBO_ROOT$/.gitignore",
                 "$TURBO_ROOT$/scripts/biome.json",

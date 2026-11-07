@@ -49,11 +49,11 @@ function isolatedRepository() {
 		"mise.lock",
 		".npmrc",
 		"scripts/mise-shell.sh",
-		"scripts/toolchain.mjs",
+		"scripts/toolchain.ts",
 		"scripts/crap.mts",
 		"mutation.inventory.json",
-		"scripts/mutation.mjs",
-		"scripts/lib/mutation-catalog.mjs",
+		"scripts/mutation.ts",
+		"scripts/lib/mutation-catalog.ts",
 	]) {
 		if (!existsSync(join(repository, name))) continue;
 		mkdirSync(dirname(join(directory, name)), { recursive: true });
@@ -473,8 +473,8 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 		"crap.config.mts",
 		"scripts/crap.mts",
 		"mutation.inventory.json",
-		"scripts/mutation.mjs",
-		"scripts/lib/mutation-catalog.mjs",
+		"scripts/mutation.ts",
+		"scripts/lib/mutation-catalog.ts",
 		"packages/profile-markdown/mutation.config.json",
 		// Present after the independent locked-toolchain change lands.
 		...[
@@ -482,7 +482,7 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 			"mise.lock",
 			".npmrc",
 			"scripts/mise-shell.sh",
-			"scripts/toolchain.mjs",
+			"scripts/toolchain.ts",
 		].filter((path) => existsSync(join(repository, path))),
 	])
 		test(path, () => {
@@ -496,7 +496,7 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path.endsWith(".mjs") || path.endsWith(".mts")
+					path.endsWith(".mjs") || path.endsWith(".mts") || path.endsWith(".ts")
 						? readFileSync(config, "utf8") +
 								(path === "scripts/crap.mts"
 									? "\nthrow new Error('Collector changed after caching');\n"

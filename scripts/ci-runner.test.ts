@@ -18,7 +18,7 @@ function runCi(force: string, failingStage: string) {
 	try {
 		writeFileSync(join(directory, "Makefile"), makefile);
 		mkdirSync(join(directory, "scripts/lib"), { recursive: true });
-		for (const name of ["docker-validation.mjs", "lib/docker-queue.mjs"]) {
+		for (const name of ["docker-validation.ts", "lib/docker-queue.ts"]) {
 			cpSync(new URL(name, import.meta.url), join(directory, "scripts", name));
 		}
 		writeFileSync(
@@ -81,16 +81,16 @@ describe.each(["", "1"])("ci FORCE=%s failure propagation", (force) => {
 	it.each([
 		{ stage: "workspace", calls: ["workspace"] },
 		{ stage: "coverage", calls: ["workspace", "coverage"] },
-	])("stops after $stage fails and does not report success", ({
-		stage,
-		calls,
-	}) => {
-		const result = runCi(force, stage);
-		expect(result.status).not.toBe(0);
-		expect(result.calls).toEqual(calls);
-		expect(result.output).not.toContain("All local CI checks passed");
-		expect(result.output).not.toContain("Coverage report:");
-	});
+	])(
+		"stops after $stage fails and does not report success",
+		({ stage, calls }) => {
+			const result = runCi(force, stage);
+			expect(result.status).not.toBe(0);
+			expect(result.calls).toEqual(calls);
+			expect(result.output).not.toContain("All local CI checks passed");
+			expect(result.output).not.toContain("Coverage report:");
+		},
+	);
 
 	it("reports success only after every stage succeeds", () => {
 		const result = runCi(force, "none");

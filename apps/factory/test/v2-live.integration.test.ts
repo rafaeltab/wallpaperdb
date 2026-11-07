@@ -883,6 +883,53 @@ it('keeps a parked owning job visible when its bound PR is closed', async () => 
   }
 });
 
+it('clears a cancelled job question from attention while retaining independent recovery obligations', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42, { linkedIssues: [1] }), true);
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  const itemId = 'item:pr:rafaeltab/wallpaperdb/42';
+  try {
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[itemId]
+    ).toMatchObject({ status: { code: 'awaiting-answer' }, attention: { state: 'required' } });
+    const cancelled = {
+      ...input,
+      localWork: input.localWork.map((work) => ({
+        ...work,
+        control: { ...work.control, cancelled: true },
+      })),
+    };
+    await board.publish(cancelled);
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1']).toMatchObject({
+      cancelled: true,
+      question: { id: 'q1' },
+    });
+    expect(snapshot.entities.items[itemId]).toMatchObject({
+      status: { code: 'cancelled' },
+      attention: { state: 'none' },
+    });
+    await board.publish({
+      ...cancelled,
+      recoveries: [
+        {
+          issue: 2,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+          progress: 'Independent recovery',
+          active: false,
+          phase: 'manual-recovery',
+        },
+      ],
+    });
+    expect(
+      (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities.items[itemId]
+    ).toMatchObject({ status: { code: 'manual-recovery' }, attention: { state: 'required' } });
+  } finally {
+    await app.close();
+  }
+});
+
 it('shows an unbound parked job alongside another PR associated with its issue', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const input = parkedSnapshot(pullObservation(42, { linkedIssues: [1] }), false);

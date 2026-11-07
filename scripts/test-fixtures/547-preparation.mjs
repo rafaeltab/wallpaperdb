@@ -96,7 +96,7 @@ export function preparationFixture(t, nativeObjects = false) {
 		])
 			fs.writeFileSync(
 				path.join(root, file),
-				execFileSync("git", ["cat-file", "blob", blob], { cwd: repository }),
+				objects547.readBlob(blob),
 			);
 	} else {
 		for (const item of objects547.baselineApps()) {

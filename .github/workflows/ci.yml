@@ -89,6 +89,8 @@ jobs:
           path: |
             apps/*/coverage/**/lcov.info
             packages/*/coverage/**/lcov.info
+            apps/*/coverage/**/coverage-final.json
+            packages/*/coverage/**/coverage-final.json
           if-no-files-found: error
 
   ci:

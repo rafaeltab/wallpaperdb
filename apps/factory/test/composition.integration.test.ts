@@ -240,6 +240,8 @@ it('continuously admits a validated semantic plan through production adapters wi
 });
 
 it('refreshes on API demand while keeping idle metadata quiet and HTTP local', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = host.directory + ':' + previous.path;

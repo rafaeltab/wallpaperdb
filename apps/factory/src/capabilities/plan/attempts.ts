@@ -53,7 +53,8 @@ export const AttemptsLive = Layer.effect(
             id,
             revision: 0,
             startedAt,
-            deadline: startedAt + 600000,
+            // Retain the old storage shape without inventing a model deadline.
+            deadline: 0,
             phase: 'discovery',
           };
           const created = yield* store.create(attempt);
@@ -71,6 +72,7 @@ export const AttemptsLive = Layer.effect(
           const now = yield* time.now();
           return {
             ...attempt,
+            deadline: launch?.deadline ?? null,
             phase:
               attempt.phase === 'discovery' &&
               launch &&
@@ -86,31 +88,16 @@ export const AttemptsLive = Layer.effect(
         Effect.gen(function* () {
           const attempt = yield* store.get(id);
           if (!attempt || attempt.finishedAt !== undefined) return;
-          const original = attempt;
           const operation = Effect.gen(function* () {
-            const now = yield* time.now();
-            if (now >= original.deadline)
-              return yield* Effect.fail(
-                new Unavailable({ operation: 'planning-deadline', cause: null })
-              );
-            const result = yield* plan
-              .preview({
-                requestId: id,
-                deadline: original.deadline,
-                progress: (phase) =>
-                  Effect.gen(function* () {
-                    const current = yield* store.get(id);
-                    if (!current) return yield* conflict();
-                    yield* save({ ...current, revision: current.revision + 1, phase });
-                  }),
-              })
-              .pipe(
-                Effect.timeoutOrElse({
-                  duration: original.deadline - now,
-                  orElse: () =>
-                    Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
-                })
-              );
+            const result = yield* plan.preview({
+              requestId: id,
+              progress: (phase) =>
+                Effect.gen(function* () {
+                  const current = yield* store.get(id);
+                  if (!current) return yield* conflict();
+                  yield* save({ ...current, revision: current.revision + 1, phase });
+                }),
+            });
             const current = yield* store.get(id);
             if (!current) return yield* conflict();
             yield* save({
@@ -148,11 +135,8 @@ export const AttemptsLive = Layer.effect(
                   phase: 'failed',
                   finishedAt: yield* time.now(),
                   detail:
-                    error.operation === 'planning-deadline'
-                      ? deadlineDetail(
-                          current.phase,
-                          ownership?.requestId === id ? ownership : undefined
-                        )
+                    error.operation === 'model-deadline'
+                      ? deadlineDetail(ownership?.requestId === id ? ownership : undefined)
                       : ownership?.requestId === id && ownership.detail
                         ? ownership.detail
                         : 'Planning dependency failed. No implementation dispatched.',
@@ -165,19 +149,11 @@ export const AttemptsLive = Layer.effect(
   })
 );
 
-function deadlineDetail(phase: PlanningAttempt['phase'], ownership?: PlannerOwnership) {
+function deadlineDetail(ownership?: PlannerOwnership) {
   if (ownership && !ownership.retired) {
     return ownership.run
-      ? 'Overall planning deadline exceeded. This attempt has a bound advisory run whose launch ownership remains outstanding; observe the run before retrying.'
-      : 'Overall planning deadline exceeded after launch intent. This attempt has an uncertain launch outcome; operator reconciliation is required before retrying.';
+      ? 'Model deadline exceeded. The bound advisory run remains outstanding; observe it before retrying.'
+      : 'Model deadline exceeded after launch intent. Operator reconciliation is required before retrying the uncertain launch.';
   }
-  if (phase === 'freshness')
-    return 'Overall planning deadline exceeded during freshness validation. The advisory proposal is not validated; no implementation was dispatched.';
-  if (ownership?.run)
-    return 'Overall planning deadline exceeded after the advisory run. Its launch ownership is retired; no validated preview is available.';
-  if (ownership)
-    return "Overall planning deadline exceeded before a planner run was bound. This attempt's launch ownership is retired; no launch reconciliation is required.";
-  if (phase === 'handoff')
-    return 'Overall planning deadline exceeded during handoff before recorded launch ownership. No planner launch was recorded; no launch reconciliation is required.';
-  return 'Overall planning deadline exceeded during discovery before planner launch. No planner launch was recorded for this attempt; no launch reconciliation is required.';
+  return 'Model deadline exceeded. No validated proposal is available; no implementation was dispatched.';
 }

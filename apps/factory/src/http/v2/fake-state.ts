@@ -255,7 +255,7 @@ export function fakeState(epoch: string, now: () => number, historyLimit: number
         id,
         version,
         startedAt: at,
-        deadline: new Date(now() + 60000).toISOString(),
+        deadline: null,
         finishedAt: at,
         phase: 'succeeded',
         progress: 'Simulated advisory plan. Nothing was dispatched.',

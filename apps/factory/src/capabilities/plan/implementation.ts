@@ -113,13 +113,12 @@ export const PlanLive = Layer.effect(
             return yield* Effect.fail(new Unavailable({ operation: 'plan-busy', cause: null }));
           pending = true;
           return yield* Effect.gen(function* () {
-            const deadline = attempt?.deadline ?? Date.now() + 600000;
             if (attempt) yield* attempt.progress('discovery');
             const input = yield* source.read();
             if (attempt) yield* attempt.progress('handoff');
             const proposal = yield* planner.propose(input, {
               requestId: attempt?.requestId,
-              deadline,
+              automatic: attempt?.automatic,
             });
             if (attempt) yield* attempt.progress('freshness');
             const current = yield* source.read();
@@ -140,14 +139,7 @@ export const PlanLive = Layer.effect(
               })
             )
           );
-        }).pipe(
-          Effect.timeoutOrElse({
-            duration: attempt ? Math.max(0, attempt.deadline - Date.now()) : 600000,
-            orElse: () =>
-              Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
-          }),
-          Effect.withSpan('factory.plan.preview')
-        ),
+        }).pipe(Effect.withSpan('factory.plan.preview')),
     };
   })
 );

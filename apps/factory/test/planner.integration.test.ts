@@ -16,6 +16,7 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
@@ -110,6 +111,7 @@ it('translates a bound assistant proposal and rejects malformed or user messages
           binary: host.binary,
           project: host.repository,
           projectId: 'project-id',
+          ...host.mcp,
           stateDirectory: `${host.directory}/planner-state`,
         }).propose(input),
         { signal: AbortSignal.timeout(5000) }
@@ -150,6 +152,7 @@ it('retains uncertain launch responsibility after a lost start response', async 
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
@@ -170,6 +173,7 @@ it('retains uncertain launch responsibility after a lost start response', async 
           binary: host.binary,
           project: host.repository,
           projectId: 'project-id',
+          ...host.mcp,
           stateDirectory: `${host.directory}/planner-state`,
         }).propose(input)
       )
@@ -195,6 +199,7 @@ it('returns Unavailable when the planner exits before consuming large context', 
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     });
     await expect(
@@ -253,6 +258,7 @@ it('bounds one outstanding advisory request across polling iterations and concur
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     });
     const input = {
@@ -300,6 +306,7 @@ it('reserves one durable launch across competing planner adapters', async () => 
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const input = {
@@ -333,6 +340,7 @@ it.each(['{', JSON.stringify({ revision: 1, requestId: 'saved', input: '{}', dea
         binary: host.binary,
         project: host.repository,
         projectId: 'project-id',
+        ...host.mcp,
         stateDirectory: directory,
       });
       await expect(
@@ -360,6 +368,7 @@ it('retires a confirmed validation rejection and permits a fresh normal proposal
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const input = {
@@ -394,6 +403,7 @@ it('rejects an oversized prompt before launch intent and retains a useful termin
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const input = {
@@ -464,6 +474,7 @@ it('reconciles late completion after the original deadline but retains active bo
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const journal = plannerState(config.stateDirectory);
@@ -518,6 +529,7 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const input = {
@@ -563,6 +575,7 @@ it('reattaches an exact bound attempt when only incidental job elapsed time adva
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     const job = {
@@ -683,6 +696,7 @@ it('sends the complete flat metadata index over stdin without bodies or duplicat
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
       stateDirectory: `${host.directory}/planner-state`,
     };
     await Effect.runPromise(t3Planner(config).propose(input));

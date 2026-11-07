@@ -356,7 +356,8 @@ export interface Action extends Entity<ActionId> {
 
 export interface PlanAttempt extends Entity<EntityId<'plan'>> {
   readonly startedAt: Timestamp;
-  readonly deadline: Timestamp;
+  /** Model deadline, null until durable model handoff; not a discovery/freshness deadline. */
+  readonly deadline: Timestamp | null;
   readonly finishedAt: Timestamp | null;
   readonly phase: 'discovery' | 'handoff' | 'freshness' | 'succeeded' | 'failed' | 'uncertain';
   readonly progress: string;

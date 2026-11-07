@@ -24,6 +24,8 @@ export async function protocol() {
     encoding: 'utf8',
   }).trim();
   const configFile = join(directory, 'config.json');
+  const authorizationFile = join(directory, 'mcp-authorization');
+  await writeFile(authorizationFile, 'Bearer controlled-fixture', { mode: 0o600 });
   const config = {
     directory,
     repository,
@@ -81,6 +83,11 @@ export async function protocol() {
       if (code !== 0)
         throw new Error(`Controlled GitHub protocol exited ${code}: ${errors.join('\n')}`);
       return JSON.parse(output.join('\n'));
+    },
+    mcp: { mcpEndpoint: 'http://controlled.invalid/mcp', mcpAuthorizationFile: authorizationFile },
+    mcpEnvironment: {
+      FACTORY_T3_MCP_ENDPOINT: 'http://controlled.invalid/mcp',
+      FACTORY_T3_MCP_AUTHORIZATION_FILE: authorizationFile,
     },
     save: async (patch: object) => {
       const next = `${configFile}.next`;

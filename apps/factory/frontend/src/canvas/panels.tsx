@@ -612,7 +612,8 @@ export function Plan({
           <p>{attempt.progress}</p>
           <p>Applicability: {attempt.applicability}</p>
           <p>
-            Started {attempt.startedAt} · Deadline {attempt.deadline}
+            Started {attempt.startedAt}
+            {attempt.deadline !== null && <> · Model deadline {attempt.deadline}</>}
           </p>
           {plannerThread && (
             <ThreadLink thread={plannerThread} native={native} label="Planner in T3" />

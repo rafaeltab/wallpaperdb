@@ -929,7 +929,7 @@ it('does not admit work when completed observation publication fails', async () 
   }
 });
 
-it('includes automatic preflight discovery in the model overall deadline', async () => {
+it('does not pass the preflight discovery clock as a model deadline', async () => {
   const { vi } = await import('vitest');
   let now = 1000;
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -938,7 +938,7 @@ it('includes automatic preflight discovery in the model overall deadline', async
       now += 30000;
     },
     propose: (deadline) => {
-      expect(deadline).toBe(601000);
+      expect(deadline).toBeUndefined();
     },
   });
   try {

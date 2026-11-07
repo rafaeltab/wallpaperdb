@@ -56,4 +56,7 @@ export interface BoardCommands {
 }
 export const BoardCommands = Context.Service<BoardCommands>('wallpaperdb.factory.BoardCommands');
 
-export type BoardPlan = PlanningAttempt & { launch?: import('../plan/index.js').PlannerOwnership };
+export type BoardPlan = Omit<PlanningAttempt, 'deadline'> & {
+  deadline: number | null;
+  launch?: import('../plan/index.js').PlannerOwnership;
+};

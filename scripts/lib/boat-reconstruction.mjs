@@ -161,6 +161,7 @@ export async function freshWorker({
 				"--ttl",
 				"2100",
 				"--no-env",
+				"--no-snapshots",
 				"--name",
 				admission.name,
 			]);

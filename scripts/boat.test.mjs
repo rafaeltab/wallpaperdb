@@ -14774,6 +14774,7 @@ test("fresh lifecycle completed stop reconstructs before toolchain-only stale lo
 		false,
 	);
 	assert.equal(creates[0].includes("--from"), false);
+	assert.equal(creates[0].includes("--no-snapshots"), true);
 	assert.equal(creates[0][creates[0].indexOf("--type") + 1], "large");
 	assert.equal(creates[0][creates[0].indexOf("--ttl") + 1], "2100");
 	const creationState = JSON.parse(

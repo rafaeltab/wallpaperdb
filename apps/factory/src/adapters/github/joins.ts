@@ -1319,8 +1319,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     ].join('\n');
     if (body.includes(item.next) && body.includes(item.url)) return true;
     if (!(await claimEvidence(item, dir))) return false;
-    await command(
-      'gh',
+    await gh(
       [
         'issue',
         'comment',
@@ -1330,7 +1329,6 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         '--body',
         `Verified issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Original independent review commit ${reviewOrigin(item)}; prior published head ${item.commit}. Automatic replays retain original review; conflict recovery records classification and applicable review separately in durable operation state.`,
       ],
-      project,
       signal
     );
     return true;

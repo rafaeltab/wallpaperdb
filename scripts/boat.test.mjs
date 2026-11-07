@@ -1324,6 +1324,7 @@ if(argv.includes('--lockfile-only')){
 		"-qm",
 		"fixture",
 	);
+	git("update-ref", "refs/remotes/origin/main", "HEAD");
 	fs.cpSync(root, worker, { recursive: true });
 	const env = {
 		...process.env,

@@ -143,6 +143,16 @@ for (const [target, composeFile] of [
 
 for (const mode of ["foreground", "managed"]) {
 	const initial_sync = mode === "managed";
+	test(`${mode} Web keeps the container-owned generated route tree out of source synchronization`, () => {
+		const rule = watches(mode === "managed" ? managed : foreground, "web").find(
+			(item) => item.path === path.join(root, "apps/web/src"),
+		);
+		assert.ok(rule);
+		assert.equal(rule.action, "sync");
+		assert.deepEqual(rule.ignore, ["routeTree.gen.ts"]);
+		for (const source of ["routes/__root.tsx", "routes/upload.tsx", "App.tsx"])
+			assert.equal(rule.ignore.includes(source), false);
+	});
 	for (const [source, target] of [
 		[
 			"drizzle/9999_watch_delivery.sql",
@@ -251,6 +261,7 @@ for (const mode of ["foreground", "managed"]) {
 					path: path.join(root, `apps/${app}/src`),
 					target: `/app/apps/${app}/src`,
 					initial_sync,
+					...(app === "web" ? { ignore: ["routeTree.gen.ts"] } : {}),
 				},
 				{
 					action: "sync+restart",

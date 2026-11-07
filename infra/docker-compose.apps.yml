@@ -321,6 +321,10 @@ services:
         - action: sync
           path: ../apps/web/src
           target: /app/apps/web/src
+          # The container's router plugin generates this from synchronized routes.
+          # Host builds must not invalidate App.tsx and discard live UI state.
+          ignore:
+            - "routeTree.gen.ts"
         - action: sync
           path: ../apps/web/public
           target: /app/apps/web/public

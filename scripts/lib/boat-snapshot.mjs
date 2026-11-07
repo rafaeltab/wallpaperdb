@@ -154,7 +154,19 @@ export function snapshotLifecycle({ load, persist }) {
 			const inspectWorker = async (phase) => {
 				attempt.phase = phase;
 				persistAttempt();
-				const info = await inspect({ shutdown: budget.phase(phase) });
+				let info;
+				try {
+					info = await inspect({ shutdown: budget.phase(phase) });
+				} catch (error) {
+					// Disposable workers disappear after an acknowledged stop. A
+					// rejected or interrupted submission must still remain uncertain.
+					if (error.code !== "not_found" || !attempt.submissionAcknowledged)
+						throw error;
+					return {
+						status: "deleted",
+						absence: { code: "not_found", afterAcknowledgedSubmission: true },
+					};
+				}
 				const worker = info?.sandbox ?? info;
 				if (worker?.id !== undefined && worker.id !== workerId) {
 					const error = new Error(
@@ -173,12 +185,19 @@ export function snapshotLifecycle({ load, persist }) {
 					workerId,
 					status: observation.status,
 					observedAt: new Date().toISOString(),
-					provider: {
-						id: observation.worker?.id,
-						state: observation.worker?.state,
-						status: observation.worker?.status,
-						stop: observation.worker?.stop,
-					},
+					...(observation.absence
+						? {
+								absence: observation.absence,
+								accountingBasis: "observed-absence",
+							}
+						: {
+								provider: {
+									id: observation.worker?.id,
+									state: observation.worker?.state,
+									status: observation.worker?.status,
+									stop: observation.worker?.stop,
+								},
+							}),
 				};
 				persistAttempt();
 				const current = load();
@@ -214,7 +233,8 @@ export function snapshotLifecycle({ load, persist }) {
 				failure(error);
 				if (error.code === "wrong_worker") throw error;
 			}
-			if (stopped(initial?.status)) return complete(initial, true);
+			if (stopped(initial?.status) || initial?.absence)
+				return complete(initial, true);
 			const earlierSubmission = attempt.status !== "not-submitted";
 			const cleanupSkipped = stopping(initial?.status) || earlierSubmission;
 			if (!cleanupSkipped) {
@@ -239,6 +259,8 @@ export function snapshotLifecycle({ load, persist }) {
 				persistAttempt();
 				try {
 					await request({ shutdown: budget.phase("submission") });
+					attempt.submissionAcknowledged = true;
+					persistAttempt();
 				} catch (error) {
 					failure(error);
 				}
@@ -252,7 +274,7 @@ export function snapshotLifecycle({ load, persist }) {
 			try {
 				while (budget.remaining("observation") > 0) {
 					const observation = await inspectWorker("observation");
-					if (stopped(observation.status))
+					if (stopped(observation.status) || observation.absence)
 						return complete(observation, cleanupSkipped);
 					if (!stopping(observation.status))
 						throw new Error(

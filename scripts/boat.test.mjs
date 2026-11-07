@@ -6583,6 +6583,58 @@ test("stop observation settles exact completed proof once without any stop or wa
 	);
 });
 
+test("stop absence observation retires only the missing owned identity without another stop", async (t) => {
+	const f = await stopObservationCheckout(t);
+	delete f.env.BOAT_EXPECTED_STOP_ID;
+	f.env.BOAT_EXPECTED_ABSENCE = "1";
+	fs.writeFileSync(path.join(f.control, "info-error"), "not_found");
+	const before = f.json(".boat/state.json");
+	const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+	assert.equal(result.status, 0, result.output);
+	const after = f.json(".boat/state.json");
+	assert.deepEqual(
+		JSON.parse(
+			fs.readFileSync(
+				path.join(
+					f.directory,
+					"home/.local/state/wallpaperdb-boat/557/fixture.worker.json",
+				),
+				"utf8",
+			),
+		),
+		after,
+	);
+	assert.equal(after.snapshotRecovery.status, "RECONSTRUCTING");
+	assert.equal(after.id, undefined);
+	assert.equal(after.runningSince, null);
+	assert.ok(after.cost > before.cost);
+	assert.equal(after.retiredWorkers.at(-1).id, before.id);
+	assert.equal(after.retiredWorkers.at(-1).reason, "not_found");
+	assert.deepEqual(after.shutdownAttempt, before.shutdownAttempt);
+	assert.equal(after.developmentWanted, before.developmentWanted);
+	assert.deepEqual(
+		shutdownCalls(f).map((a) => a.slice(-2)),
+		[["info", before.id]],
+	);
+});
+
+for (const scenario of ["still present", "wrong admission"])
+	test(`stop absence observation refuses ${scenario} without lifecycle effects`, async (t) => {
+		const f = await stopObservationCheckout(t);
+		delete f.env.BOAT_EXPECTED_STOP_ID;
+		f.env.BOAT_EXPECTED_ABSENCE = "1";
+		if (scenario === "wrong admission")
+			f.env.BOAT_EXPECTED_ADMISSION = "foreign-admission";
+		const before = f.json(".boat/state.json");
+		const result = await shutdownResult(t, f, f.run("boat-observe-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(
+			shutdownCalls(f).map((a) => a.slice(-2)),
+			scenario === "still present" ? [["info", before.id]] : [],
+		);
+	});
+
 for (const missing of [
 	"BOAT_EXPECTED_WORKER_ID",
 	"BOAT_EXPECTED_ADMISSION",

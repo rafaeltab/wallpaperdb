@@ -1296,6 +1296,7 @@ async function stop(
 		expectedAdmissionToken,
 		observeOnly = false,
 		expectedStopId,
+		expectAbsence = false,
 	} = {},
 ) {
 	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
@@ -1345,6 +1346,7 @@ async function stop(
 						typeof attempt.submittedAt !== "string" ||
 						!Number.isFinite(Date.parse(attempt.submittedAt)) ||
 						(attempt.completion &&
+							!expectAbsence &&
 							attempt.completion.provider?.stop?.id !== expectedStopId) ||
 						(attempt.accountingAppliedAt && current.runningSince != null) ||
 						![
@@ -1356,6 +1358,27 @@ async function stop(
 						throw new Error(
 							"Stop observation requires an existing submitted owning attempt",
 						);
+					if (expectAbsence) {
+						try {
+							await json(["info", current.id], {
+								shutdown: budget.phase("initial"),
+							});
+						} catch (error) {
+							if (error.code !== "not_found") throw error;
+							const retired = snapshots.inspectIdentity({ error });
+							event("worker-absence-observed", {
+								id: current.id,
+								observation: retired.retiredWorkers.at(-1),
+							});
+							console.log(
+								"Observed owned worker absence; accounting retired conservatively; no stop submitted.",
+							);
+							return;
+						}
+						throw new Error(
+							"Expected worker absence; resource still exists, no accounting changed",
+						);
+					}
 					const info = await json(["info", current.id], {
 						shutdown: budget.phase("initial"),
 					});
@@ -2821,9 +2844,23 @@ try {
 		const expectedStopId = observeOnly
 			? process.env.BOAT_EXPECTED_STOP_ID
 			: undefined;
+		const expectAbsence =
+			observeOnly && process.env.BOAT_EXPECTED_ABSENCE === "1";
 		if (
 			observeOnly &&
-			(!expectedWorkerId || !expectedAdmissionToken || !expectedStopId)
+			process.env.BOAT_EXPECTED_ABSENCE !== undefined &&
+			!expectAbsence
+		)
+			throw new Error("BOAT_EXPECTED_ABSENCE must be 1 when supplied");
+		if (expectAbsence && expectedStopId)
+			throw new Error(
+				"Select either a stop operation or an absent worker observation",
+			);
+		if (
+			observeOnly &&
+			(!expectedWorkerId ||
+				!expectedAdmissionToken ||
+				(!expectedStopId && !expectAbsence))
 		)
 			throw new Error(
 				"Stop observation requires exact worker, admission and stop identities",
@@ -2835,6 +2872,7 @@ try {
 			expectedAdmissionToken,
 			observeOnly,
 			expectedStopId,
+			expectAbsence,
 		});
 		if (stopped === false)
 			throw new Error("Expected stop ownership changed; no stop executed");

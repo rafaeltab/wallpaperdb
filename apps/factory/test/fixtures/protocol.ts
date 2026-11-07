@@ -146,7 +146,11 @@ export async function runProtocol(
       if (input.action !== 'settle' || input.threadId !== 'planner-thread')
         throw new Error('Unexpected planner cleanup');
       if (config.planner?.settleFails) throw new Error('Controlled settlement failure');
-      writeFileSync(join(config.directory, 'planner-settled'), 'true');
+      if (config.planner?.settleDelayMs) {
+        const { setTimeout } = await import('node:timers/promises');
+        await setTimeout(config.planner.settleDelayMs, undefined, { signal });
+      }
+      if (!config.planner?.settleUnconfirmed) writeFileSync(join(config.directory, 'planner-settled'), 'true');
       console.log(JSON.stringify({ structuredContent: { sequence: 1 } }));
       process.exit(0);
     }
@@ -606,6 +610,7 @@ export async function runProtocol(
     const reply = (value: unknown) => console.log(JSON.stringify(value));
     if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
       if (args[1] === 'list') {
+        await hold('planning-read');
         await hold(existsSync(join(config.directory, 'planner.json')) ? 'planning-freshness' : 'planning-discovery');
         reply(
           (

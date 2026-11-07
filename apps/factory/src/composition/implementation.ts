@@ -244,6 +244,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     Layer.succeed(JobPool, pool)
   );
   let planningDemand = () => {};
+  const planner = t3Planner({
+    mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+    mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+    stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
+    project,
+    binary: configuration.FACTORY_T3_BINARY,
+    projectId: configuration.FACTORY_T3_PROJECT_ID,
+  });
   const planningDeps = Layer.mergeAll(
     Layer.effect(
       PlanningSource,
@@ -275,17 +283,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         };
       })
     ),
-    Layer.succeed(
-      IPlanner,
-      t3Planner({
-        mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-        mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-        stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
-        project,
-        binary: configuration.FACTORY_T3_BINARY,
-        projectId: configuration.FACTORY_T3_PROJECT_ID,
-      })
-    )
+    Layer.succeed(IPlanner, planner)
   ).pipe(Layer.provideMerge(jobLayer));
   const observationStore = sqliteObservations(configuration.FACTORY_STATE);
   const observationLayer = ObservationsLive.pipe(
@@ -450,6 +448,18 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   }
 
   let observing: Promise<unknown> | undefined;
+  let recoveringPlanner: Promise<unknown> | undefined;
+  // Owned model deadlines and terminal cleanup continue independently of admissions
+  // and quota-paced GitHub discovery. This worker can only reconcile an existing run.
+  const plannerTimer = setInterval(() => {
+    if (recoveringPlanner) return;
+    recoveringPlanner = runtime
+      .runPromise(planner.reconcile(), { signal: requests.signal })
+      .finally(() => {
+        recoveringPlanner = undefined;
+      });
+    void recoveringPlanner.catch(() => undefined);
+  }, 1000);
   const observationTimer = setInterval(() => {
     if (observing) return;
     observing = runtime
@@ -480,6 +490,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const close = () =>
     (closing ??= (async () => {
       clearInterval(observationTimer);
+      clearInterval(plannerTimer);
       // Reserve the remaining shutdown budget for bounded exporter disposal.
       const deadline = setTimeout(() => {
         requests.abort();
@@ -489,7 +500,13 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         await app.close();
       } finally {
         try {
-          await Promise.allSettled([v2.close(), attempts.close(), observing, refreshes.close()]);
+          await Promise.allSettled([
+            v2.close(),
+            attempts.close(),
+            observing,
+            recoveringPlanner,
+            refreshes.close(),
+          ]);
         } finally {
           clearTimeout(deadline);
           requests.abort();

@@ -28,15 +28,7 @@ export const AttemptsLive = Layer.effect(
           const existing = yield* pending();
           if (existing) return { kind: 'busy' as const, id: existing.id };
           // A bound worker can finish after a deadline. Reconcile it before deciding busy.
-          const ownership = yield* planner.ownership().pipe(
-            Effect.timeoutOrElse({
-              duration: 1000,
-              orElse: () =>
-                Effect.fail(
-                  new Unavailable({ operation: 'planner-observation-timeout', cause: null })
-                ),
-            })
-          );
+          const ownership = yield* planner.ownership();
           if (ownership && !ownership.retired) {
             const known = yield* store.get(ownership.requestId);
             return known

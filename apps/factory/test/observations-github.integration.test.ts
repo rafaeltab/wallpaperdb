@@ -223,3 +223,220 @@ it.each(['parent', 'blocker'])(
       ).rejects.toMatchObject({ _tag: 'Unavailable' });
     })
 );
+
+it.each(['wallpaperdb', 'other-repo'])(
+  'validates the repository of a non-ready indexed issue parent in %s',
+  async (repository) =>
+    withGithub(async (host) => {
+      await host.save({
+        planning: {
+          candidates: [],
+          issues: [
+            {
+              ...issue,
+              labels: [],
+              parent: {
+                number: 2,
+                url: `https://github.com/rafaeltab/${repository}/issues/2`,
+              },
+            },
+            {
+              ...issue,
+              number: 2,
+              url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+              labels: [],
+            },
+          ],
+        },
+      });
+      const result = Effect.runPromise(
+        githubObservations(host.repository, () => Effect.succeed([])).read()
+      );
+      if (repository === 'wallpaperdb') {
+        expect((await result).issues.find((value) => value.number === 1)).toMatchObject({
+          candidate: false,
+          nativeParent: 2,
+          parents: [2],
+        });
+      } else {
+        await expect(result).rejects.toMatchObject({ _tag: 'Unavailable' });
+      }
+    })
+);
+
+it('collects comparison-bound PR titles, drafts, mergeability, checks and reviewer identities', async () =>
+  withGithub(async (host) => {
+    const pull = {
+      ...pr(43, 'OPEN'),
+      title: 'Public v2 board',
+      isDraft: true,
+      updatedAt: '2026-11-06T12:00:00Z',
+      mergeable: 'CONFLICTING',
+      labels: connection([{ id: 'L1', name: 'backend', color: 'abcdef' }]),
+      reviewRequests: connection([
+        {
+          requestedReviewer: {
+            __typename: 'User',
+            id: 'U1',
+            login: 'reviewer',
+            name: null,
+            avatarUrl: 'https://github.com/avatar.png',
+            url: 'https://github.com/reviewer',
+          },
+        },
+      ]),
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: 'a'.repeat(40),
+              statusCheckRollup: {
+                state: 'SUCCESS',
+                contexts: connection([
+                  {
+                    __typename: 'CheckRun',
+                    id: 'C1',
+                    name: 'typecheck',
+                    status: 'COMPLETED',
+                    conclusion: 'SUCCESS',
+                    detailsUrl: 'https://github.com/check/1',
+                    startedAt: '2026-11-06T11:00:00Z',
+                    completedAt: '2026-11-06T11:01:00Z',
+                  },
+                ]),
+              },
+            },
+          },
+        ],
+      },
+    };
+    await host.save({
+      planning: { candidates: [], issues: [], openPulls: [pull], requiredChecks: { C1: true } },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]).toMatchObject({
+      title: 'Public v2 board',
+      draft: true,
+      mergeability: 'CONFLICTING',
+      labelDetails: [{ id: 'L1', name: 'backend', color: 'abcdef' }],
+      checkRuns: [
+        {
+          id: 'C1',
+          name: 'typecheck',
+          state: 'passed',
+          head: 'a'.repeat(40),
+          requirement: 'required',
+        },
+      ],
+      reviewers: [{ user: { login: 'reviewer' }, state: 'requested', head: null }],
+    });
+  }));
+
+it('indexes non-ready open issues locally without fetching per-issue context for them', async () =>
+  withGithub(async (host) => {
+    await host.save({
+      planning: {
+        candidates: [],
+        issues: [
+          {
+            ...issue,
+            number: 91,
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/91',
+            labels: [],
+            updatedAt: '2026-11-06T12:00:00Z',
+          },
+        ],
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.issues).toMatchObject([
+      { number: 91, candidate: false, title: 'Complete requirements' },
+    ]);
+    expect(
+      (await host.calls()).filter(
+        (c) => c.binary === 'gh' && c.args.join(' ').includes('issue(number:91)')
+      )
+    ).toHaveLength(0);
+  }));
+
+it('collects a shared related PR once without nesting check/review connections in each issue query', async () =>
+  withGithub(async (host) => {
+    const second = {
+      ...issue,
+      number: 2,
+      url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+    };
+    const related = {
+      ...pr(42, 'MERGED'),
+      title: 'Shared prerequisite',
+      isDraft: false,
+      updatedAt: '2026-11-06T12:00:00Z',
+    };
+    await host.save({
+      planning: {
+        candidates: [1, 2],
+        issues: [issue, second],
+        nativePulls: { 1: [related], 2: [related] },
+        openPulls: [pr(42, 'OPEN')],
+        hydratedPulls: { 42: related },
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests).toMatchObject([
+      { number: 42, state: 'MERGED', linkedIssues: [1, 2], title: 'Shared prerequisite' },
+    ]);
+    const calls = (await host.calls()).filter((c) => c.binary === 'gh' && c.args[1] === 'graphql');
+    expect(calls.filter((c) => c.args.join(' ').includes('pullRequest(number:42)'))).toHaveLength(
+      1
+    );
+    expect(
+      calls
+        .filter((c) => /issue\(number:\d+\)/.test(c.args.join(' ')))
+        .every((c) => !c.args.join(' ').includes('reviews(first:'))
+    ).toBe(true);
+  }));
+
+it('reports incomplete reviewer identities when GitHub requests review from a team', async () =>
+  withGithub(async (host) => {
+    const pull = {
+      ...pr(43, 'OPEN'),
+      reviewRequests: connection([{ requestedReviewer: { __typename: 'Team', id: 'TEAM1' } }]),
+    };
+    await host.save({ planning: { candidates: [], issues: [], openPulls: [pull] } });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]).toMatchObject({ reviewers: [], reviewersComplete: false });
+  }));
+
+it('collects local closing issue context while ignoring foreign repository references', async () =>
+  withGithub(async (host) => {
+    await host.save({
+      planning: {
+        candidates: [],
+        issues: [{ ...issue, labels: [] }],
+        openPulls: [
+          {
+            ...pr(43, 'OPEN'),
+            closingIssuesReferences: connection([
+              { number: 1, url: issue.url },
+              { number: 9999, url: 'https://github.com/another/repository/issues/9999' },
+            ]),
+          },
+        ],
+      },
+    });
+    const facts = await Effect.runPromise(
+      githubObservations(host.repository, () => Effect.succeed([])).read()
+    );
+    expect(facts.pullRequests[0]?.linkedIssues).toEqual([1]);
+    const calls = (await host.calls()).filter((c) => c.binary === 'gh');
+    expect(calls.some((c) => c.args.join(' ').includes('issue(number:1)'))).toBe(true);
+    expect(calls.some((c) => c.args.join(' ').includes('issue(number:9999)'))).toBe(false);
+  }));

@@ -1,8 +1,10 @@
+import { Unavailable } from '../../capabilities/job/index.js';
 import { randomUUID } from 'node:crypto';
-import Fastify, { type FastifyReply } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { FactoryV2Changes, FactoryV2Delta, FactoryV2Problem } from './contract.js';
 import { fakeState } from './fake-state.js';
+import type { RequestHeaders } from '../tracing.js';
 import {
   changesQuery,
   commandSchema,
@@ -39,6 +41,52 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     });
   const data = fakeState(config.epoch, options.now ?? Date.now, config.historyLimit);
   const app = Fastify({ bodyLimit: 131072, forceCloseConnections: 'idle' });
+  registerV2Routes(app, data, config, 'fake');
+  app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
+  return app;
+}
+export type V2Data = Omit<
+  ReturnType<typeof fakeState>,
+  'submit' | 'plan' | 'receipt' | 'snapshot' | 'changes' | 'details' | 'search' | 'subscribe'
+> & {
+  snapshot(headers?: RequestHeaders): import('./contract.js').FactoryV2Snapshot;
+  changes(after: string, headers?: RequestHeaders): FactoryV2Changes | FactoryV2Problem;
+  details(
+    id: string,
+    headers?: RequestHeaders
+  ): import('./contract.js').FactoryV2ItemDetails | undefined;
+  search(
+    query: string,
+    limit: number,
+    token?: string,
+    headers?: RequestHeaders
+  ): import('./contract.js').FactoryV2IssueSearch | FactoryV2Problem;
+  subscribe(listener: () => void, headers?: RequestHeaders): () => void;
+  receipt(
+    id: string,
+    headers?: RequestHeaders
+  ):
+    | ReturnType<ReturnType<typeof fakeState>['receipt']>
+    | Promise<ReturnType<ReturnType<typeof fakeState>['receipt']>>;
+  plan(
+    id: string,
+    headers?: RequestHeaders
+  ):
+    | ReturnType<ReturnType<typeof fakeState>['plan']>
+    | Promise<ReturnType<ReturnType<typeof fakeState>['plan']>>;
+  submit(
+    command: import('./contract.js').FactoryV2Command,
+    headers?: RequestHeaders
+  ):
+    | ReturnType<ReturnType<typeof fakeState>['submit']>
+    | Promise<ReturnType<ReturnType<typeof fakeState>['submit']>>;
+};
+export function registerV2Routes(
+  app: FastifyInstance,
+  data: V2Data,
+  config = { heartbeatMs: 15000, maxFrameBytes: 65536 },
+  mode: 'fake' | 'live' = 'live'
+) {
   const waiting = new Set<() => void>();
   let closing = false;
   const sendProblem = (reply: FastifyReply, value: FactoryV2Problem) =>
@@ -50,9 +98,9 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   const invalid = (reply: FastifyReply, detail = 'Invalid request.') =>
     sendProblem(reply, problem(400, 'invalid-request', detail));
   app.addHook('onRequest', async (request, reply) => {
-    reply.header('x-factory-data', 'fake').header('cache-control', 'private, no-cache');
+    reply.header('x-factory-data', mode).header('cache-control', 'private, no-cache');
     if (closing)
-      return sendProblem(reply, problem(503, 'unavailable', 'The sample server is closing.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'The v2 server is closing.'));
     const origin = request.headers.origin;
     if (
       request.method === 'POST' &&
@@ -64,29 +112,38 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   app.setErrorHandler((error, _request, reply) => {
     const status = z.object({ statusCode: z.number() }).safeParse(error);
     const code =
-      status.success && [400, 413, 415].includes(status.data.statusCode)
-        ? status.data.statusCode
-        : 500;
+      error instanceof Unavailable
+        ? 503
+        : status.success && [400, 413, 415].includes(status.data.statusCode)
+          ? status.data.statusCode
+          : 500;
     return sendProblem(
       reply,
       problem(
         code,
-        code === 415 ? 'unsupported' : code === 500 ? 'unavailable' : 'invalid-request',
-        code === 500 ? 'Unexpected sample server failure.' : 'Invalid or unsupported request.'
+        code === 415
+          ? 'unsupported'
+          : code === 500 || code === 503
+            ? 'unavailable'
+            : 'invalid-request',
+        code === 503
+          ? 'The local projection or command ledger is unavailable.'
+          : code === 500
+            ? 'Unexpected v2 server failure.'
+            : 'Invalid or unsupported request.'
       )
     );
   });
   app.setNotFoundHandler((_request, reply) =>
-    sendProblem(reply, problem(404, 'not-found', 'Unknown sample resource.'))
+    sendProblem(reply, problem(404, 'not-found', 'Unknown resource.'))
   );
   app.addHook('preClose', async () => {
     closing = true;
     for (const stop of [...waiting]) stop();
     data.close();
   });
-  app.get('/health', () => ({ status: 'ok', apiVersion: 2, dataMode: 'fake' }));
   app.get('/api/v2/board', (request, reply) => {
-    const snapshot = data.snapshot();
+    const snapshot = data.snapshot(request.headers);
     const etag = `"${snapshot.cursor}"`;
     reply.header('etag', etag);
     return matches(request.headers['if-none-match'], etag, true)
@@ -97,11 +154,11 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     const parsed = changesQuery.safeParse(request.query);
     if (!parsed.success) return invalid(reply);
     const { after, waitMs } = parsed.data;
-    const initial = data.changes(after);
+    const initial = data.changes(after, request.headers);
     if ('code' in initial || initial.kind !== 'unchanged' || waitMs === 0)
       return sendChanges(reply, initial);
     if (waiting.size >= 64)
-      return sendProblem(reply, problem(503, 'unavailable', 'Too many sample update connections.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'Too many update connections.'));
     await new Promise<void>((resolve) => {
       let done = false;
       let unsubscribe = () => {};
@@ -117,15 +174,15 @@ export function fakeV2Server(options: FakeV2Options = {}) {
       }
       waiting.add(finish);
       reply.raw.on('close', finish);
-      unsubscribe = data.subscribe(finish);
+      unsubscribe = data.subscribe(finish, request.headers);
       // Subscribe before re-reading to close the initial-read/registration gap.
-      const current = data.changes(after);
+      const current = data.changes(after, request.headers);
       if ('code' in current || current.kind !== 'unchanged') finish();
     });
     if (reply.raw.destroyed) return reply;
     return closing
-      ? sendProblem(reply, problem(503, 'unavailable', 'The sample server is closing.'))
-      : sendChanges(reply, data.changes(after));
+      ? sendProblem(reply, problem(503, 'unavailable', 'The v2 server is closing.'))
+      : sendChanges(reply, data.changes(after, request.headers));
   });
   app.get('/api/v2/board/events', (request, reply) => {
     const parsed = eventsQuery.safeParse(request.query);
@@ -134,17 +191,17 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     const after = typeof header === 'string' && header.trim() ? header.trim() : parsed.data.after;
     if (!after || after.length > 512)
       return invalid(reply, 'An initial cursor or Last-Event-ID is required.');
-    const initial = data.changes(after);
+    const initial = data.changes(after, request.headers);
     if ('code' in initial || initial.kind === 'resync-required') return sendChanges(reply, initial);
     if (waiting.size >= 64)
-      return sendProblem(reply, problem(503, 'unavailable', 'Too many sample update connections.'));
+      return sendProblem(reply, problem(503, 'unavailable', 'Too many update connections.'));
     reply.hijack();
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'private, no-cache, no-transform',
       connection: 'keep-alive',
       'x-accel-buffering': 'no',
-      'x-factory-data': 'fake',
+      'x-factory-data': mode,
     });
     let position = after,
       stopped = false;
@@ -192,7 +249,7 @@ export function fakeV2Server(options: FakeV2Options = {}) {
       if (stopped) return;
       let more = true;
       while (more && !stopped) {
-        const result = data.changes(position);
+        const result = data.changes(position, request.headers);
         if ('code' in result) {
           resync('reset');
           return;
@@ -209,7 +266,7 @@ export function fakeV2Server(options: FakeV2Options = {}) {
     waiting.add(stop);
     reply.raw.on('close', stop);
     reply.raw.on('error', stop);
-    unsubscribe = data.subscribe(send);
+    unsubscribe = data.subscribe(send, request.headers);
     write(': connected\n\n');
     send();
     if (!stopped) {
@@ -223,14 +280,19 @@ export function fakeV2Server(options: FakeV2Options = {}) {
   app.get('/api/v2/issues/search', (request, reply) => {
     const parsed = searchQuery.safeParse(request.query);
     if (!parsed.success) return invalid(reply);
-    const result = data.search(parsed.data.q, parsed.data.limit, parsed.data.pageToken);
+    const result = data.search(
+      parsed.data.q,
+      parsed.data.limit,
+      parsed.data.pageToken,
+      request.headers
+    );
     return 'code' in result ? sendProblem(reply, result) : result;
   });
   app.get('/api/v2/items/:id', (request, reply) => {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
-    const result = data.details(parsed.data.id);
-    if (!result) return sendProblem(reply, problem(404, 'not-found', 'Unknown sample item.'));
+    const result = data.details(parsed.data.id, request.headers);
+    if (!result) return sendProblem(reply, problem(404, 'not-found', 'Unknown item.'));
     if (!request.headers['if-match'])
       return invalid(reply, 'If-Match with the item version is required.');
     const etag = `"${result.itemVersion}"`;
@@ -241,26 +303,26 @@ export function fakeV2Server(options: FakeV2Options = {}) {
       );
     return reply.header('etag', etag).send(result);
   });
-  app.get('/api/v2/plans/:id', (request, reply) => {
+  app.get('/api/v2/plans/:id', async (request, reply) => {
     const parsed = entityParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
-    const result = data.plan(parsed.data.id);
-    return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown sample plan.'));
+    const result = await data.plan(parsed.data.id, request.headers);
+    return result ?? sendProblem(reply, problem(404, 'not-found', 'Unknown plan.'));
   });
-  app.get('/api/v2/commands/:id', (request, reply) => {
+  app.get('/api/v2/commands/:id', async (request, reply) => {
     const parsed = receiptParams.safeParse(request.params);
     if (!parsed.success) return invalid(reply);
     return (
-      data.receipt(parsed.data.id) ??
-      sendProblem(reply, problem(404, 'not-found', 'Unknown sample command.'))
+      (await data.receipt(parsed.data.id, request.headers)) ??
+      sendProblem(reply, problem(404, 'not-found', 'Unknown command.'))
     );
   });
-  app.post('/api/v2/commands', (request, reply) => {
+  app.post('/api/v2/commands', { bodyLimit: 131072 }, async (request, reply) => {
     if (!request.headers['content-type']?.toLowerCase().startsWith('application/json'))
       return sendProblem(reply, problem(415, 'unsupported', 'JSON required.'));
     const parsed = commandSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, 'Invalid command payload.');
-    const result = data.submit(parsed.data);
+    const result = await data.submit(parsed.data, request.headers);
     return 'code' in result
       ? sendProblem(reply, result)
       : reply

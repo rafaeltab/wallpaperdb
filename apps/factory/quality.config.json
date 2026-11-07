@@ -8,5 +8,9 @@
     "composition",
     "adapters/clock"
   ],
-  "allowedCapabilityDependencies": { "restack": ["job"], "observe": ["job", "plan"] }
+  "allowedCapabilityDependencies": {
+    "board": ["observe", "job", "plan", "node:crypto"],
+    "restack": ["job"],
+    "observe": ["job", "plan"]
+  }
 }

@@ -19,6 +19,7 @@ import {
   Issues,
   Job,
   JobLive,
+  eligible,
   JobStore,
   Time,
   Unavailable,
@@ -58,6 +59,7 @@ import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
+import { v2Producer } from './v2.js';
 import { planningWorker } from './planning.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
@@ -290,8 +292,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
         Layer.succeed(
           ObservationSource,
-          githubObservations(project, () =>
-            Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue))
+          githubObservations(
+            project,
+            () => Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
+            (number) =>
+              Effect.gen(function* () {
+                const issues = yield* Issues;
+                const observed = yield* issues.inspect(number);
+                return {
+                  allowed: eligible(observed),
+                  blockersReady: observed.blockersReady,
+                  verifiedAt: yield* systemTime.now(),
+                  evidence: observed.prerequisite?.evidence,
+                };
+              }).pipe(Effect.provide(deps))
           )
         )
       )
@@ -357,7 +371,34 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
       })),
   };
+  const v2 = await v2Producer({
+    runSync: (effect) => runtime.runSync(effect),
+    planner: await runtime.runPromise(IPlanner),
+    directory: configuration.FACTORY_STATE,
+    scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,
+    base: configuration.FACTORY_BASE,
+    scheduler,
+    read: () =>
+      Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
+        Effect.map(({ schedule, threads }) => ({
+          ...schedule,
+          threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
+        }))
+      ),
+    submitPlan: (parent) => attempts.submit(parent),
+    observePlan: async (id) => (await attempts.observe(id))?.launch,
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+  }).catch(async (cause) => {
+    requests.abort();
+    await Promise.allSettled([
+      attempts.close(),
+      runtime.dispose(),
+      ...[...workers.values()].map((worker) => worker.dispose()),
+    ]);
+    throw cause;
+  });
   const app = operationsServer({
+    v2: v2.data,
     threads: threads.snapshot,
     base: configuration.FACTORY_BASE,
     job,
@@ -380,6 +421,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       await app.close();
     } finally {
       requests.abort();
+      await v2.close();
+      await attempts.close();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }
@@ -447,21 +490,30 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       clearInterval(observationTimer);
       clearInterval(refreshTimer);
       clearInterval(threadTimer);
+      // Reserve the remaining shutdown budget for bounded exporter disposal.
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
-      }, 5000);
+      }, 3000);
       try {
         await app.close();
       } finally {
-        clearTimeout(deadline);
-        requests.abort();
-        await attempts.close();
-        await observing?.catch(() => undefined);
-        await refreshing?.catch(() => undefined);
-        await refreshingThreads?.catch(() => undefined);
-        await runtime.dispose();
-        await Promise.all([...workers.values()].map((worker) => worker.dispose()));
+        try {
+          await Promise.allSettled([
+            v2.close(),
+            attempts.close(),
+            observing,
+            refreshing,
+            refreshingThreads,
+          ]);
+        } finally {
+          clearTimeout(deadline);
+          requests.abort();
+          await Promise.allSettled([
+            runtime.dispose(),
+            ...[...workers.values()].map((worker) => worker.dispose()),
+          ]);
+        }
       }
     })());
   return { app, close };

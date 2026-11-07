@@ -400,6 +400,9 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
   const specs = fixture.stackSpecs;
   const columns = fixture.items.length >= 100 ? Math.min(3, specs.length) : specs.length;
   const columnY = Array<number>(columns).fill(y + 32);
+  const incoming = new Set(connections.map((edge) => edge.target));
+  // Match issue-group clearance for the router's 20px bottom port and 32px turning room.
+  const bottomPortClearance = 20 + 32;
   for (const [index, spec] of specs.entries()) {
     const column = index % columns,
       x = 32 + column * (PR_W + 96),
@@ -411,11 +414,13 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
     for (const id of ids) {
       const item = records.find((i) => i.id === id);
       if (!item) continue;
+      const previous = rows.at(-1);
+      if (previous && !spec.stacked)
+        offset += incoming.has(previous.item.id) ? bottomPortClearance : 12;
       const height = prHeight(item);
       rows.push({ item, key: String(id), y: rowY + offset, offset, height });
-      offset += height + (spec.stacked ? 0 : 12);
+      offset += height;
     }
-    if (!spec.stacked && !isCollapsed) offset -= 12;
     const panel: Panel = {
       ...spec,
       name: spec.stacked ? 'PR stack' : 'Independent pull requests',
@@ -440,7 +445,15 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
         });
     maxBottom = Math.max(maxBottom, rowY + offset);
     maxRight = Math.max(maxRight, x + PR_W);
-    columnY[column] = rowY + offset + 12;
+    const collapsedTarget =
+      isCollapsed &&
+      connections.some((edge) => spec.ids.includes(edge.target) && !spec.ids.includes(edge.source));
+    columnY[column] = Math.max(
+      rowY + offset + (collapsedTarget ? bottomPortClearance : 12),
+      ...rows
+        .filter((row) => incoming.has(row.item.id))
+        .map((row) => row.y + row.height + bottomPortClearance)
+    );
   }
   areas.push({
     id: 'review',

@@ -1,7 +1,49 @@
 import type { ScheduleStatus } from '../plan/index.js';
 import { Context, type Effect } from 'effect';
 import type { Unavailable, Status } from '../job/index.js';
+export interface ObservedUser {
+  id: string;
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  url: string;
+}
+export interface ObservedLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+export interface ObservedChoice {
+  id: string;
+  name: string;
+  rank: number | null;
+}
 export interface IssueObservation {
+  author?: string;
+  evaluation?: {
+    allowed: boolean;
+    blockersReady: boolean;
+    verifiedAt: number;
+    prerequisites: readonly {
+      issue: number;
+      pr: number;
+      commit: string;
+      parent?: string;
+      prBase?: string;
+      basis: 'verified-unmerged' | 'verified-landed';
+    }[];
+  };
+  updatedAt?: string;
+  labelDetails?: readonly ObservedLabel[];
+  assigneeDetails?: readonly ObservedUser[];
+  projectDetails?: {
+    projectId: string | null;
+    status: ObservedChoice | null;
+    priority: ObservedChoice | null;
+    size: ObservedChoice | null;
+  };
+  nativeParent?: number | null;
+  nativeBlockers?: readonly number[];
   number: number;
   url: string;
   title: string;
@@ -18,6 +60,28 @@ export interface IssueObservation {
   pullRequests: readonly number[];
 }
 export interface PullObservation {
+  title?: string;
+  draft?: boolean;
+  updatedAt?: string;
+  mergeability?: 'MERGEABLE' | 'CONFLICTING' | 'UNKNOWN';
+  labelDetails?: readonly ObservedLabel[];
+  checkRuns?: readonly {
+    requirement?: 'required' | 'optional' | 'unknown';
+    id: string;
+    name: string;
+    state: 'passed' | 'failed' | 'running' | 'queued' | 'skipped' | 'neutral' | 'unknown';
+    url: string | null;
+    head: string;
+    startedAt: string | null;
+    completedAt: string | null;
+  }[];
+  reviewersComplete?: boolean;
+  reviewers?: readonly {
+    user: ObservedUser;
+    state: 'requested' | 'approved' | 'changes-requested' | 'commented' | 'dismissed';
+    submittedAt: string | null;
+    head: string | null;
+  }[];
   number: number;
   url: string;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
@@ -33,6 +97,7 @@ export interface PullObservation {
   evidenceHead: string;
 }
 export interface Facts {
+  verifiedPrBases?: readonly { base: number; tip: number }[];
   issues: readonly IssueObservation[];
   pullRequests: readonly PullObservation[];
 }

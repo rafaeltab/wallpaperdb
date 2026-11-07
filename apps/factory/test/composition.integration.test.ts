@@ -19,6 +19,8 @@ it('validates host configuration before serving and composes the real driving an
       startFactory({ ...configuration, FACTORY_HOST: '100.97.invalid.test' })
     ).rejects.toThrow();
     const previous = process.env.FACTORY_FIXTURE;
+    const previousPath = process.env.PATH;
+    process.env.PATH = host.directory + ':' + previousPath;
     process.env.FACTORY_FIXTURE = host.configFile;
     try {
       const running = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });
@@ -34,6 +36,7 @@ it('validates host configuration before serving and composes the real driving an
         await running.close();
       }
     } finally {
+      process.env.PATH = previousPath;
       if (previous === undefined) delete process.env.FACTORY_FIXTURE;
       else process.env.FACTORY_FIXTURE = previous;
     }
@@ -287,6 +290,77 @@ it('refreshes GitHub observations without clients and keeps HTTP local', async (
     expect((await host.calls()).filter((c) => c.binary === 'gh').length).toBe(count);
   } finally {
     await running.close();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
+it('serves the live v2 producer and executes durable control commands on the existing origin', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: host.directory + '/state',
+      FACTORY_PORT: '0',
+    });
+    const board = (await running.app.inject('/api/v2/board')).json();
+    expect(board.meta.dataMode).toBe('live');
+    const action = Object.values(board.entities.actions).find(
+      (a: unknown) => typeof a === 'object' && a !== null && 'kind' in a && a.kind === 'configure'
+    );
+    if (!action || typeof action !== 'object' || !('id' in action) || !('availability' in action))
+      throw new Error('Configure missing');
+    const availability = action.availability;
+    if (!availability || typeof availability !== 'object' || !('precondition' in availability))
+      throw new Error('Configure disabled');
+    const request = {
+      commandId: '00000000-0000-4000-8000-000000000007',
+      actionId: action.id,
+      precondition: availability.precondition,
+      kind: 'configure',
+      payload: {
+        paused: true,
+        concurrency: { kind: 'limited', maximum: 2 },
+        admissionAllowance: { kind: 'limited', maximum: 4 },
+      },
+    };
+    expect(
+      (
+        await running.app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: request,
+          headers: { origin: 'https://untrusted.invalid' },
+        })
+      ).statusCode
+    ).toBe(403);
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+        .statusCode
+    ).toBe(202);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running!.app.inject(`/api/v2/commands/${request.commandId}`)).json()
+        ).toMatchObject({ state: 'succeeded' }),
+      { timeout: 5000, interval: 20 }
+    );
+    expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
+      paused: true,
+      concurrency: 2,
+      allowance: 4,
+    });
+  } finally {
+    await running?.close();
     process.env.PATH = previous.path;
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;

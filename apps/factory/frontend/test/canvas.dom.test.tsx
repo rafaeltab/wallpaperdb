@@ -236,6 +236,56 @@ it('keeps failed checks and detail check names visible without URLs', async () =
   await screen.findByText('Check without a provider link');
 });
 
+it.each([
+  { head: 'current', previousBase: false, qualifier: 'Current comparison', approved: true },
+  { head: 'previous', previousBase: false, qualifier: 'Previous comparison', approved: false },
+  { head: 'unknown', previousBase: false, qualifier: 'Reviewed head unknown', approved: false },
+  { head: 'current', previousBase: true, qualifier: 'Previous comparison', approved: false },
+])('qualifies an approval for $head head and previous base $previousBase', async (scenario) => {
+  const seed = await sample(),
+    pr = seed.entities.pullRequests['pr:2003'];
+  if (pr.metadata.state !== 'known' || pr.reviews.state !== 'known')
+    throw new Error('Expected current PR metadata and reviews');
+  const comparison = pr.metadata.value.comparison;
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      pullRequests: {
+        ...seed.entities.pullRequests,
+        [pr.id]: {
+          ...pr,
+          reviews: {
+            ...pr.reviews,
+            value: {
+              ...pr.reviews.value,
+              comparison: scenario.previousBase
+                ? { ...comparison, baseOid: 'previous-base' }
+                : comparison,
+              reviewers: [
+                {
+                  userId: 'user:demo',
+                  state: 'approved',
+                  submittedAt: null,
+                  reviewedHeadOid:
+                    scenario.head === 'unknown'
+                      ? null
+                      : scenario.head === 'previous'
+                        ? 'previous-head'
+                        : comparison.headOid,
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  };
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  const reviewer = await screen.findByLabelText(`demo-reviewer · approved · ${scenario.qualifier}`);
+  expect(!!reviewer.querySelector('b.approved')).toBe(scenario.approved);
+});
+
 it('retains supported browser links when native T3 links are unavailable', async () => {
   const board = await sample(),
     client = new FactoryClient(async () => json(board));

@@ -192,6 +192,9 @@ export function t3Restacker(
     ).question?.text;
   };
   const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => ({
+    phase: observed.thread.pendingRequestCount
+      ? ('awaiting-answer' as const)
+      : ('resolving' as const),
     bindingAvailable: true,
     progress: `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`,
     threadId: observed.thread.threadId,

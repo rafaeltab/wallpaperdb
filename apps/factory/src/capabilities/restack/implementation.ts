@@ -11,9 +11,19 @@ export const RestackLive = Layer.effect(
           if (!resolution.classification || !resolution.commit)
             return { ...resolution, ready: false };
           if (resolution.classification === 'COMPLEX' && !(yield* ports.review(resolution.commit)))
-            return { ...resolution, progress: 'Awaiting independent review-loop', ready: false };
+            return {
+              ...resolution,
+              phase: 'reviewing' as const,
+              progress: 'Awaiting independent review-loop',
+              ready: false,
+            };
           const ready = yield* ports.verify(resolution.commit);
-          return { ...resolution, progress: ready ? 'Verified' : 'Awaiting CI', ready };
+          return {
+            ...resolution,
+            phase: ready ? ('complete' as const) : ('verifying' as const),
+            progress: ready ? 'Verified' : 'Awaiting CI',
+            ready,
+          };
         }).pipe(Effect.withSpan('factory.restack.advance')),
     };
   })

@@ -1,8 +1,22 @@
 # Factory public interface v2
 
-Status: proposed live contract with runnable fake HTTP transports. The declarations are in [the v2 contract](../apps/factory/src/http/v2/contract.ts). [The public HTTP entry](../apps/factory/src/http/index.ts) exports those types and `fakeV2Server`. The fake server implements the routes below against an isolated, process-local sample. The production factory still serves v1. There is no live v2 producer, collector, persistent command ledger, UI migration or deployment change.
+Status: live producer with isolated fake transports for client development. [The public HTTP entry](../apps/factory/src/http/index.ts) exports the [v2 contract](../apps/factory/src/http/v2/contract.ts), `operationsServer`, `liveV2Data` and `fakeV2Server`. [Factory composition](../apps/factory/src/composition/implementation.ts) serves v1 and live v2 on the same maintainer-only origin. UI migration and activation of a new deployed release are separate work.
 
 The target is the selected [canvas prototype at ecd35afb5](https://github.com/rafaeltab/wallpaperdb/blob/ecd35afb51aab61bb9132690d26330c36165ec99/apps/factory/frontend/src/factory-canvas-prototype.tsx), preserved in [PR #677](https://github.com/rafaeltab/wallpaperdb/pull/677). The audited factory baseline is merged `main` at [7e6f0dcab](https://github.com/rafaeltab/wallpaperdb/tree/7e6f0dcab791b28ab6cb6d59d0a087c8861605ac).
+
+## Live producer
+
+[The producer lifetime](../apps/factory/src/composition/v2.ts) publishes a local normalized board from existing factory observations, journals, T3 metadata and planning attempts. [GitHub collection](../apps/factory/src/adapters/github/observations.ts) adds an open-issue search index, PR titles/draft state, labels and project choices, comparison-bound checks/reviewers, required-check flags and verified ancestry. Issue-context queries collect scalar PR associations; rich PR metadata is collected once per PR per refresh to avoid multiplying GraphQL cost through timelines. Candidate eligibility uses the existing factory inspection policy. Snapshot, detail, search and update handlers never collect provider data or advance execution.
+
+The live producer supports conditional snapshots, bounded changes polling, long polling and SSE through [the shared transport](../apps/factory/src/http/v2/server.ts). [The board capability](../apps/factory/src/capabilities/board/index.ts) commits complete revisions before notifying readers. Unchanged fact payloads keep their versions when source freshness advances. Missing historical context, unobserved evidence and old cache formats remain explicitly unknown or partial.
+
+[SQLite persistence](../apps/factory/src/adapters/store/board.ts) retains the snapshot, its detail versions and 64 atomic change batches across restart. Compare-and-set publication preserves replay when producers overlap. Command UUIDs bind the full request before effects; an atomic claim prevents another worker from executing the same accepted command. Receipts are retained without automatic expiry, including uncertain responsibility. Identical retries return the retained receipt before checking a stale action token. A process interrupted before recording its outcome leaves an uncertain receipt. Reconcile the owning factory operation before deliberately requesting further work; neither a missing thread nor a missing receipt authorizes another launch.
+
+The [live producer](../apps/factory/src/capabilities/board/implementation.ts) permits 64 outstanding commands per producer. At that limit, new commands receive `503 unavailable` before acceptance. Identical retries still replay their existing receipts and do not add worker queue entries. Completed commands release pending capacity; their durable receipts remain available.
+
+Live configure/start/resume/cancel/preview commands invoke the existing factory operations. They preserve control revisions, stage/run/question selectors and permanent admission consumption. Preview remains advisory. New v2 previews retain their originating board and planning basis. Older v1 attempts without that basis report unknown applicability. Legacy recovery records without structured phases remain unknown until fresh observations provide them.
+
+The existing [startup entry](../apps/factory/src/main.ts) and [SQLite migration workflow](../apps/factory/src/composition/state.ts) apply the generated migrations; use the repository's existing factory installation/activation workflow for a deployed release. No separate public listener, browser credential, database reset or live dispatch is needed to consume v2. Provider refresh cadence and source age remain independent of update-stream connectivity.
 
 ## Run the fake transports
 
@@ -182,7 +196,7 @@ An uncertain external outcome remains `uncertain` with reconciliation instructio
 
 Keep v1 paths and existing clients working. Add v2 as a read projection over current journals, observations and planning attempts, translating private records at the HTTP seam. Do not make the UI import capability internals or replace execution policy with the presentation model. Public v2 response types are independent of Effect, Fastify, React and storage schemas. Unknown native states have explicit public fallbacks; additions to closed public unions or removals require a new major contract version.
 
-The fake server advertises both polling and SSE. A first live producer can support conditional snapshots and changes polling; SSE is advertised only when that producer implements it. Missing collectors must produce unknown/partial facts, not placeholders that look successful. Do not switch the chosen UI to live data until these scenarios can be demonstrated through the public interface:
+Both producers advertise polling and SSE. Missing evidence produces unknown/partial facts. The following scenarios define the public behavior required by the UI:
 
 - The same projection supplies all labels, rankings, parent copies, PR/draft markers, reviewer avatars, CI tooltips, stack summaries, links and action decisions without provider requests per card.
 - Native/fallback parent and prerequisite edges remain distinct. A verified unmerged prerequisite is satisfied; an older passing head, ambiguous stack or missing PR remains unknown/blocked. A fork does not duplicate PR cards in two display stacks.
@@ -194,4 +208,4 @@ The fake server advertises both polling and SSE. A first live producer can suppo
 - Conflicting commands, expired action tokens and duplicate command IDs cannot start or resume work twice. An uncertain response remains observable without creating another admission. A GET cannot advance execution.
 - Benchmark initial compressed snapshot size, single-PR delta size, publication-to-client delay, provider refresh lag and graph recomputation separately for 100/300-item boards. No unmeasured latency claim is part of this proposal.
 
-The fake transports exercise the wire protocol and simulated state changes. The scenarios involving actual factory policy, provider evidence, persistence and performance remain acceptance criteria for the live producer.
+The fake transports exercise simulated state changes. [Live HTTP tests](../apps/factory/test/v2-live.integration.test.ts), [composition tests](../apps/factory/test/composition.integration.test.ts) and [GitHub adapter tests](../apps/factory/test/observations-github.integration.test.ts) cover the live producer, durable command handling and provider translation. Existing factory policy and T3 adapter suites retain their owning verification responsibilities.

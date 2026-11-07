@@ -1,6 +1,7 @@
 import { Context, type Effect } from 'effect';
 import type { Unavailable } from '../job/index.js';
 export interface Resolution {
+  readonly phase?: import('../job/index.js').RecoveryStatus['phase'];
   readonly classification?: 'SIMPLE' | 'COMPLEX';
   readonly commit?: string;
   readonly progress: string;

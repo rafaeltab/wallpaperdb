@@ -479,7 +479,41 @@ if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
           },
         ]
       );
-    else {
+    else if (/pullRequest\(number:\d+\)/.test(args.join(' '))) {
+      const n = Number(args.join(' ').match(/pullRequest\(number:(\d+)\)/)[1]);
+      const pr =
+        config.planning.hydratedPulls?.[n] ??
+        [
+          ...(config.planning.openPulls ?? []),
+          ...Object.values(config.planning.nativePulls ?? {}).flat(),
+        ].find((pr) => pr.number === n);
+      reply({ data: { repository: { pullRequest: pr ?? null } } });
+    } else if (args.join(' ').includes('c0:node(id:')) {
+      const values = {};
+      for (const match of args.join(' ').matchAll(/(c\d+):node\(id:"([^"]+)"/g))
+        values[match[1]] =
+          typeof config.planning.requiredChecks?.[match[2]] === 'boolean'
+            ? { isRequired: config.planning.requiredChecks[match[2]] }
+            : null;
+      reply({ data: values });
+    } else if (args.join(' ').includes('issues(first:100,states:OPEN')) {
+      const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
+      const nodes = config.planning.issues.map((issue) => ({
+        ...issue,
+        parent: issue.parent ?? null,
+        labels: conn(issue.labels),
+        assignees: conn([]),
+        comments: { totalCount: issue.comments.length },
+        projectItems: conn(config.planning.projectItems ?? []),
+      }));
+      reply([
+        {
+          data: {
+            repository: { issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } },
+          },
+        },
+      ]);
+    } else {
       const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
       const issue = config.planning.issues.find((i) => i.number === n) ?? config.planning.context;
       const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });

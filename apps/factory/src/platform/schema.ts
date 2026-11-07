@@ -5,6 +5,7 @@ import {
   text,
   integer,
   uniqueIndex,
+  index,
   check,
 } from 'drizzle-orm/sqlite-core';
 export const records = sqliteTable(
@@ -103,5 +104,36 @@ export const t3Observations = sqliteTable('t3_observations', {
   id: integer('id').primaryKey(),
   value: text('value', { mode: 'json' })
     .$type<import('../capabilities/observe/index.js').ThreadState>()
+    .notNull(),
+});
+
+export const v2Board = sqliteTable('v2_board', {
+  scope: text('scope').primaryKey(),
+  value: text('value', { mode: 'json' })
+    .$type<import('../capabilities/board/index.js').BoardRecord>()
+    .notNull(),
+});
+export const v2Commands = sqliteTable(
+  'v2_commands',
+  {
+    planId: text('plan_id').generatedAlwaysAs(sql`json_extract(receipt, '$.result.planId')`),
+    basis: text('basis', { mode: 'json' }).$type<
+      import('../capabilities/board/index.js').PlanAttempt['basis']
+    >(),
+    id: text('id').primaryKey(),
+    scope: text('scope').notNull(),
+    request: text('request', { mode: 'json' })
+      .$type<import('../capabilities/board/index.js').BoardCommand>()
+      .notNull(),
+    receipt: text('receipt', { mode: 'json' })
+      .$type<import('../capabilities/board/index.js').CommandReceipt>()
+      .notNull(),
+  },
+  (table) => [index('v2_commands_plan').on(table.scope, table.planId)]
+);
+export const githubRichFacts = sqliteTable('github_rich_facts', {
+  id: integer('id').primaryKey(),
+  value: text('value', { mode: 'json' })
+    .$type<{ observedAt: number; facts: import('../capabilities/observe/index.js').Facts }>()
     .notNull(),
 });

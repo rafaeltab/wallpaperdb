@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { Effect, Layer, Tracer } from 'effect';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import {
@@ -11,9 +13,12 @@ import { once } from 'node:events';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
+import type { FactoryV2Snapshot } from '../src/http/index.js';
 it('exports telemetry with incoming trace context through the composed runtime and closes its exporter', async () => {
   const host = await protocol();
   const prior = process.env.FACTORY_FIXTURE;
+  const previousPath = process.env.PATH;
+  process.env.PATH = host.directory + ':' + previousPath;
   process.env.FACTORY_FIXTURE = host.configFile;
   const payloads: string[] = [];
   const collector = createServer((request, response) => {
@@ -42,6 +47,14 @@ it('exports telemetry with incoming trace context through the composed runtime a
       FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
     });
     const traceId = '12345678901234567890123456789012';
+    const commandTraceId = '22345678901234567890123456789012';
+    const receiptTraceId = '32345678901234567890123456789012';
+    const readTraceIds = [
+      '42345678901234567890123456789012',
+      '52345678901234567890123456789012',
+      '62345678901234567890123456789012',
+      '72345678901234567890123456789012',
+    ];
     try {
       expect(
         (
@@ -51,61 +64,137 @@ it('exports telemetry with incoming trace context through the composed runtime a
           })
         ).statusCode
       ).toBe(200);
+      const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const reads = [
+        { url: '/api/v2/board', status: 200 },
+        { url: `/api/v2/board/changes?after=${encodeURIComponent(board.cursor)}`, status: 200 },
+        { url: '/api/v2/issues/search?q=trace', status: 200 },
+        { url: '/api/v2/items/item%3Amissing', status: 404 },
+      ];
+      for (const [index, read] of reads.entries())
+        expect(
+          (
+            await running.app.inject({
+              url: read.url,
+              headers: { traceparent: `00-${readTraceIds[index]}-1234567890123456-01` },
+            })
+          ).statusCode
+        ).toBe(read.status);
+      const configure = Object.values(board.entities.actions).find((a) => a.kind === 'configure');
+      if (configure?.availability.state !== 'available') throw new Error('Configure unavailable');
+      const commandId = '00000000-0000-4000-8000-000000000008';
+      expect(
+        (
+          await running.app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            headers: { traceparent: `00-${commandTraceId}-1234567890123456-01` },
+            payload: {
+              commandId,
+              actionId: configure.id,
+              precondition: configure.availability.precondition,
+              kind: 'configure',
+              payload: {
+                paused: true,
+                concurrency: { kind: 'limited', maximum: 2 },
+                admissionAllowance: { kind: 'limited', maximum: 4 },
+              },
+            },
+          })
+        ).statusCode
+      ).toBe(202);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (
+              await running.app.inject({
+                url: `/api/v2/commands/${commandId}`,
+                headers: { traceparent: `00-${receiptTraceId}-1234567890123456-01` },
+              })
+            ).json()
+          ).toMatchObject({ state: 'succeeded' }),
+        { timeout: 5000 }
+      );
     } finally {
       await running.close();
     }
     expect(payloads.length).toBeGreaterThan(0);
     expect(payloads.join('')).toContain(traceId);
+    // Context survives both the durable HTTP boundary and background execution.
+    expect(payloads.join('').split(commandTraceId).length - 1).toBeGreaterThan(1);
+    expect(payloads.join('')).toContain(receiptTraceId);
+    for (const id of readTraceIds) expect(payloads.join('')).toContain(id);
   } finally {
     collector.closeAllConnections();
     await new Promise<void>((resolve) => collector.close(() => resolve()));
+    process.env.PATH = previousPath;
     if (prior === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = prior;
     await host.cleanup();
   }
 });
 
-it('bounds a stalled collector during cleanup without leaving exporter sockets', async () => {
-  const host = await protocol();
-  const prior = process.env.FACTORY_FIXTURE;
-  process.env.FACTORY_FIXTURE = host.configFile;
-  const sockets = new Set<import('node:net').Socket>();
-  const collector = createServer((request, response) => {
-    request.resume();
-    response.writeHead(200);
-    response.write(' ');
-  });
-  collector.on('connection', (socket) => {
-    sockets.add(socket);
-    socket.once('close', () => sockets.delete(socket));
-  });
-  collector.listen(0, '127.0.0.1');
-  await once(collector, 'listening');
-  const address = collector.address();
-  if (!address || typeof address === 'string') throw new Error('Missing collector');
-  try {
-    const running = await startFactory({
-      FACTORY_PROJECT: host.repository,
-      FACTORY_T3_PROJECT_ID: 'project-id',
-      FACTORY_BASE: host.base,
-      FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: host.directory + '/state',
-      FACTORY_PORT: '0',
-      FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
+it.each([false, true])(
+  'bounds a stalled collector with blocked worker %s during cleanup without leaving exporter sockets',
+  async (blockedWorker) => {
+    const host = await protocol();
+    const prior = process.env.FACTORY_FIXTURE;
+    const priorPath = process.env.PATH;
+    process.env.PATH = host.directory + ':' + priorPath;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const sockets = new Set<import('node:net').Socket>();
+    const collector = createServer((request, response) => {
+      request.resume();
+      response.writeHead(200);
+      response.write(' ');
     });
-    await running.app.inject('/api/job');
-    const started = performance.now();
-    await running.close();
-    expect(performance.now() - started).toBeLessThan(6000);
-    await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 1000 });
-  } finally {
-    collector.closeAllConnections();
-    await new Promise<void>((resolve) => collector.close(() => resolve()));
-    if (prior === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = prior;
-    await host.cleanup();
+    collector.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+    });
+    collector.listen(0, '127.0.0.1');
+    await once(collector, 'listening');
+    const address = collector.address();
+    if (!address || typeof address === 'string') throw new Error('Missing collector');
+    try {
+      const running = await startFactory({
+        FACTORY_PROJECT: host.repository,
+        FACTORY_T3_PROJECT_ID: 'project-id',
+        FACTORY_BASE: host.base,
+        FACTORY_T3_BINARY: host.binary,
+        FACTORY_STATE: host.directory + '/state',
+        FACTORY_PORT: '0',
+        FACTORY_OTEL_ENDPOINT: `http://127.0.0.1:${address.port}`,
+      });
+      if (blockedWorker) {
+        expect(
+          (await running.app.inject({ method: 'POST', url: '/api/job', payload: { issue: 576 } }))
+            .statusCode
+        ).toBe(202);
+        await host.save({ delayObserve: true });
+        await vi.waitFor(
+          async () =>
+            expect(
+              Number(await readFile(join(host.directory, 'observing.pid'), 'utf8'))
+            ).toBeGreaterThan(0),
+          { timeout: 5000 }
+        );
+      }
+      await running.app.inject('/api/job');
+      const started = performance.now();
+      await running.close();
+      expect(performance.now() - started).toBeLessThan(6000);
+      await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 1000 });
+    } finally {
+      process.env.PATH = priorPath;
+      collector.closeAllConnections();
+      await new Promise<void>((resolve) => collector.close(() => resolve()));
+      if (prior === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = prior;
+      await host.cleanup();
+    }
   }
-});
+);
 
 it('preserves the incoming trace through nested recovery execution', async () => {
   const f = await joinFixture({ conflict: true, restack: { outcome: 'SIMPLE' } });

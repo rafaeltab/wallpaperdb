@@ -94,6 +94,66 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
   }
 });
 
+it('coalesces empty automatic discovery while continuing scheduler reconciliation', async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
+  const host = await protocol(),
+    previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    await host.save({ planning: { candidates: [], issues: [], openPulls: [] } });
+    running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: host.directory + '/state',
+      FACTORY_PORT: '0',
+    });
+    const discoveries = async () =>
+      (await host.calls()).filter(
+        (call) => call.binary === 'gh' && call.args[0] === 'issue' && call.args[1] === 'list'
+      );
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(async () => expect(await discoveries()).toHaveLength(1), {
+      timeout: 5000,
+      interval: 20,
+    });
+    for (let tick = 0; tick < 3; tick++) {
+      const target = Date.now() + 1000;
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.waitFor(
+        async () => {
+          const snapshot = (await running!.app.inject('/api/scheduler')).json();
+          expect(snapshot.observations.jobsObservedAt).toBeGreaterThanOrEqual(target);
+          expect(snapshot.state.admissions).toEqual([]);
+        },
+        { timeout: 5000, interval: 20 }
+      );
+    }
+    expect(await discoveries()).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(300_000);
+    await vi.waitFor(async () => expect(await discoveries()).toHaveLength(2), {
+      timeout: 5000,
+      interval: 20,
+    });
+    expect(
+      (await host.calls()).filter(
+        (call) => call.binary === 't3' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(0);
+  } finally {
+    await running?.close();
+    vi.useRealTimers();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
 it('keeps metadata demand for an open event stream and releases it after disconnect', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));

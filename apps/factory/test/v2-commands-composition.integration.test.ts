@@ -191,6 +191,11 @@ it('submits one retained advisory preview through v2 while the composed factory 
       const calls = await host.calls();
       expect(
         calls.filter(
+          (call) => call.binary === 'gh' && call.args[0] === 'issue' && call.args[1] === 'list'
+        )
+      ).toHaveLength(2);
+      expect(
+        calls.filter(
           (c) =>
             c.binary === 't3' &&
             c.args[1] === 'start' &&

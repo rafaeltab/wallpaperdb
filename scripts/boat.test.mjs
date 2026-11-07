@@ -16062,7 +16062,7 @@ async function infraImagesCheckout(t, fresh = false) {
 const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
 const log=stage=>{const s=fs.readFileSync('/proc/self/stat','utf8'),v=s.slice(s.lastIndexOf(')')+2).split(' ');fs.appendFileSync(path.join(c,'image-log'),JSON.stringify({stage,argv:a,profiles:process.env.COMPOSE_PROFILES,pid:process.pid,startTicks:v[19]})+'\\n');};
 const model=()=>JSON.parse(fs.readFileSync('infra/docker-compose.yml','utf8'));
-if(a[0]==='compose'&&a.includes('config')){log('config');console.log(JSON.stringify(model()));process.exit(0);}
+if(a[0]==='compose'&&a.includes('config')&&a.includes('infra/docker-compose.yml')){log('config');console.log(JSON.stringify(model()));process.exit(0);}
 if(a[0]==='compose'&&a.includes('pull')){
  log('pull-entered');console.log('pull reported success before actual acquisition');fs.writeFileSync(path.join(c,'image-entered'),'yes');
  while(fs.existsSync(path.join(c,'hold-images'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
@@ -17600,6 +17600,10 @@ function assertPreparationDefersDevelopment(f) {
 
 async function preparedNextOrdinaryUser(t, f) {
 	const at = f.log().length;
+	// The failed preparation is already asserted. Recover its controlled native
+	// dependency before checking that an ordinary command rebuilds and restores.
+	for (const name of ["fail-asset-build", "fail-app-build", "fail-images"])
+		fs.rmSync(path.join(f.control, name), { force: true });
 	f.local("package.json", '{"private":true,"nextOrdinary":true}\n');
 	await toolchainUser(t, f);
 	const stages = f

@@ -445,8 +445,11 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
         });
     maxBottom = Math.max(maxBottom, rowY + offset);
     maxRight = Math.max(maxRight, x + PR_W);
+    const collapsedTarget =
+      isCollapsed &&
+      connections.some((edge) => spec.ids.includes(edge.target) && !spec.ids.includes(edge.source));
     columnY[column] = Math.max(
-      rowY + offset + 12,
+      rowY + offset + (collapsedTarget ? bottomPortClearance : 12),
       ...rows
         .filter((row) => incoming.has(row.item.id))
         .map((row) => row.y + row.height + bottomPortClearance)

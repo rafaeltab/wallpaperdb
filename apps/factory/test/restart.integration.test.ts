@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { expect, it, vi } from 'vitest';
 import { protocol } from './fixtures/setup.js';
+import { stopOwnedProcesses, stopProcess as stop } from './fixtures/processes.js';
 it('a fresh process reconciles publication after a lost response without repeating threads, stages or PRs', async () => {
   const host = await protocol();
   await host.save({ base: host.base });
@@ -31,21 +32,18 @@ it('a fresh process reconciles publication after a lost response without repeati
     FACTORY_HOST: '127.0.0.1',
   };
   let diagnostics = '';
+  const children: ChildProcess[] = [];
   const launch = () => {
     const process = spawn(globalThis.process.execPath, [resolve('dist/main.js')], {
       env,
       stdio: 'pipe',
+      detached: true,
     });
     process.stderr.on('data', (chunk) => {
       diagnostics += chunk.toString();
     });
+    children.push(process);
     return process;
-  };
-  const stop = async (child: ChildProcess) => {
-    if (child.exitCode !== null) return;
-    const exited = once(child, 'exit');
-    child.kill('SIGKILL');
-    await exited;
   };
   const origin = `http://127.0.0.1:${port}`;
   const ready = () =>
@@ -272,7 +270,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     const demonstrated = await (await fetch(`${origin}/api/job`)).json();
     process.stdout.write(`Factory composition demonstration: ${JSON.stringify(demonstrated)}\n`);
   } finally {
-    await stop(child);
+    await stopOwnedProcesses(children);
     await host.cleanup();
   }
 });

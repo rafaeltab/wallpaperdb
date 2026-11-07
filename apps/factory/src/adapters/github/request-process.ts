@@ -15,6 +15,7 @@ export function requestProcess(project: string, args: readonly string[], signal:
     value: unknown;
     responses: RateResponse[];
     code: number | null;
+    limited: boolean;
     failure?: string;
   }>((resolve) => {
     const responses: RateResponse[] = [],
@@ -23,6 +24,7 @@ export function requestProcess(project: string, args: readonly string[], signal:
       line = '',
       dropping = false,
       headers: RateResponse | undefined,
+      limited = false,
       failure: string | undefined;
     const child = spawn('gh', [...args], {
       cwd: project,
@@ -44,11 +46,18 @@ export function requestProcess(project: string, args: readonly string[], signal:
     const consume = (value: string) => {
       const status = /^< HTTP\/\S+\s+(\d{3})\b/.exec(value);
       if (status) {
+        limited = false;
         if (responses.length >= 256) return kill('response-count');
         headers = { status: Number(status[1]) };
         responses.push(headers);
         return;
       }
+      if (
+        /"type"\s*:\s*"RATE_LIMITED"|^gh: (?:GraphQL: )?(?:You have exceeded|API).*(?:secondary rate limit|abuse detection)/i.test(
+          value
+        )
+      )
+        limited = true;
       if (!headers) return;
       const header = /^< ([a-z-]+):\s*(.*)$/i.exec(value);
       if (!header) {
@@ -96,7 +105,7 @@ export function requestProcess(project: string, args: readonly string[], signal:
           value = text;
         }
       }
-      resolve({ value, responses, code, ...(failure ? { failure } : {}) });
+      resolve({ value, responses, code, limited, ...(failure ? { failure } : {}) });
     });
   });
 }

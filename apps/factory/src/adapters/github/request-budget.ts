@@ -4,7 +4,7 @@ import { githubRequestBudget, stateConnection } from '../../platform/index.js';
 import type { RateResponse } from './request-process.js';
 
 const number = z.number().nonnegative().finite().safe();
-const sample = z.object({ limit: number.positive(), remaining: number, reset: number });
+const sample = z.object({ limit: number, remaining: number, reset: number });
 const resource = z.object({ nextAt: number, samples: z.array(sample).max(8) });
 const stateSchema = z.object({
   version: z.literal(1),
@@ -20,7 +20,31 @@ type Resource = z.infer<typeof resource>;
 const targetFraction = 0.5;
 const period = (name: string) => (['search', 'code_search'].includes(name) ? 60_000 : 3_600_000);
 
-export function requestBudget(directory: string) {
+export interface RequestClock {
+  now(): number;
+  wait(milliseconds: number, signal: AbortSignal): Promise<void>;
+}
+export const requestClock: RequestClock = {
+  now: () => Date.now(),
+  wait: (milliseconds, signal) =>
+    new Promise((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      };
+      const timer = setTimeout(
+        () => {
+          signal.removeEventListener('abort', abort);
+          resolve();
+        },
+        Math.min(milliseconds, 2_147_483_647)
+      );
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+    }),
+};
+
+export function requestBudget(directory: string, clock: RequestClock = requestClock) {
   const value = stateConnection(
     directory,
     (db) => db.select().from(githubRequestBudget).where(eq(githubRequestBudget.id, 1)).get()?.value
@@ -53,10 +77,12 @@ export function requestBudget(directory: string) {
       Math.max(
         0,
         ...samples.map((s) =>
-          Math.max(
-            period(name) / (s.limit * targetFraction),
-            (s.reset - now) / (Math.max(1, s.remaining) * targetFraction)
-          )
+          s.limit === 0
+            ? Math.max(period(name), s.reset - now + 1000)
+            : Math.max(
+                period(name) / (s.limit * targetFraction),
+                (s.reset - now) / (Math.max(1, s.remaining) * targetFraction)
+              )
         )
       )
     );
@@ -73,33 +99,21 @@ export function requestBudget(directory: string) {
     );
   return {
     known(names: readonly string[]) {
-      return names.every((name) => get(name).samples.some((s) => s.reset > Date.now()));
+      return names.every((name) =>
+        get(name).samples.some((s) => s.limit > 0 && s.reset > clock.now())
+      );
     },
     async wait(names: readonly string[], signal: AbortSignal, mutation = false) {
       for (;;) {
         signal.throwIfAborted();
         const delay =
-          Math.max(due(names, Date.now()), mutation ? state.mutationAt : 0) - Date.now();
+          Math.max(due(names, clock.now()), mutation ? state.mutationAt : 0) - clock.now();
         if (delay <= 0) return;
-        await new Promise<void>((resolve, reject) => {
-          const abort = () => {
-            clearTimeout(timer);
-            reject(signal.reason);
-          };
-          const timer = setTimeout(
-            () => {
-              signal.removeEventListener('abort', abort);
-              resolve();
-            },
-            Math.min(delay, 2_147_483_647)
-          );
-          signal.addEventListener('abort', abort, { once: true });
-          if (signal.aborted) abort();
-        });
+        await clock.wait(delay, signal);
       }
     },
     reserve(names: readonly string[], cost: number, mutation = false) {
-      const now = Date.now();
+      const now = clock.now();
       const previous = new Map(names.map((name) => [name, get(name).nextAt]));
       for (const name of names)
         get(name).nextAt =
@@ -115,7 +129,7 @@ export function requestBudget(directory: string) {
       costs: ReadonlyMap<string, number>,
       success: boolean
     ) {
-      const now = Date.now();
+      const now = clock.now();
       const accounted = new Set<string>();
       for (const response of responses) {
         const parsed = sample.safeParse(response);

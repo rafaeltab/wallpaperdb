@@ -8,6 +8,7 @@ import type {
 } from '../../capabilities/observe/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
+type GitHubRead = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 import { blockerNumbers } from './implementation.js';
 const number = z.number().int().positive();
 const page = z.object({ hasNextPage: z.literal(false) });
@@ -191,7 +192,7 @@ function translateIssue(
     pullRequests: pullRequests,
   };
 }
-async function issueIndex(project: string, signal: AbortSignal) {
+async function issueIndex(read: GitHubRead, signal: AbortSignal) {
   const pages = z
     .array(
       z.object({
@@ -206,20 +207,16 @@ async function issueIndex(project: string, signal: AbortSignal) {
       })
     )
     .parse(
-      JSON.parse(
-        await command(
-          'gh',
-          [
-            'api',
-            'graphql',
-            '--paginate',
-            '--slurp',
-            '-f',
-            `query=query($endCursor:String) { repository(owner:"rafaeltab",name:"wallpaperdb") { issues(first:100,states:OPEN,after:$endCursor) { nodes { ${issueFields} } pageInfo { hasNextPage endCursor } } } }`,
-          ],
-          project,
-          signal
-        )
+      await read(
+        [
+          'api',
+          'graphql',
+          '--paginate',
+          '--slurp',
+          '-f',
+          `query=query($endCursor:String) { repository(owner:"rafaeltab",name:"wallpaperdb") { issues(first:100,states:OPEN,after:$endCursor) { nodes { ${issueFields} } pageInfo { hasNextPage endCursor } } } }`,
+        ],
+        signal
       )
     );
   if (!pages.length || pages.at(-1)?.data.repository.issues.pageInfo.hasNextPage)
@@ -327,23 +324,29 @@ export async function observeIssue(
   );
   return { metadata, pullRequests: prs };
 }
+type EvaluateIssue = (
+  number: number
+) => Effect.Effect<
+  { allowed: boolean; blockersReady: boolean; verifiedAt: number; evidence?: string },
+  Unavailable
+>;
 export function githubObservations(
   project: string,
   admitted: () => Effect.Effect<readonly number[], Unavailable>,
-  evaluate?: (
-    number: number
-  ) => Effect.Effect<
-    { allowed: boolean; blockersReady: boolean; verifiedAt: number; evidence?: string },
-    Unavailable
-  >
+  evaluate?: EvaluateIssue | Effect.Effect<EvaluateIssue, Unavailable>,
+  read?: GitHubRead
 ): ObservationSource {
+  const gh =
+    read ??
+    ((args: string[], signal?: AbortSignal) =>
+      command('gh', args, project, signal).then(JSON.parse));
   return {
     read: () =>
       Effect.gen(function* () {
         const retained = yield* admitted();
         const facts: Facts = yield* Effect.tryPromise({
           try: async (signal) => {
-            const index = await issueIndex(project, signal);
+            const index = await issueIndex(gh, signal);
             const candidates = index.filter((i) => i.candidate);
             const pages = z
               .array(
@@ -362,20 +365,16 @@ export function githubObservations(
                 })
               )
               .parse(
-                JSON.parse(
-                  await command(
-                    'gh',
-                    [
-                      'api',
-                      'graphql',
-                      '--paginate',
-                      '--slurp',
-                      '-f',
-                      `query=query($endCursor:String) { repository(owner:"rafaeltab",name:"wallpaperdb") { pullRequests(first:100,states:OPEN,after:$endCursor) { nodes { ${pullFields} } pageInfo { hasNextPage endCursor } } } }`,
-                    ],
-                    project,
-                    signal
-                  )
+                await gh(
+                  [
+                    'api',
+                    'graphql',
+                    '--paginate',
+                    '--slurp',
+                    '-f',
+                    `query=query($endCursor:String) { repository(owner:"rafaeltab",name:"wallpaperdb") { pullRequests(first:100,states:OPEN,after:$endCursor) { nodes { ${pullFields} } pageInfo { hasNextPage endCursor } } } }`,
+                  ],
+                  signal
                 )
               );
             if (
@@ -415,7 +414,8 @@ export function githubObservations(
                     project,
                     n,
                     candidates.some((i) => i.number === n),
-                    signal
+                    signal,
+                    gh
                   )
                 )
               );
@@ -428,7 +428,7 @@ export function githubObservations(
                   const previous =
                     cached && cached.state === pr.state
                       ? cached
-                      : await readPull(project, pr.number, signal);
+                      : await readPull(gh, pr.number, signal);
                   pulls.set(pr.number, {
                     ...previous,
                     linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
@@ -445,18 +445,20 @@ export function githubObservations(
             }
             return {
               issues: issues.sort((a, b) => a.number - b.number),
-              pullRequests: await checkRequirements(project, [...pulls.values()], signal),
-              verifiedPrBases: await verifiedBases(project, [...pulls.values()], signal),
+              pullRequests: await checkRequirements(gh, [...pulls.values()], signal),
+              verifiedPrBases: await verifiedBases(gh, [...pulls.values()], signal),
             };
           },
           catch: (cause) => new Unavailable({ operation: 'github-observations', cause }),
         }).pipe(Effect.tapError(Effect.logError), Effect.withSpan('factory.github.observations'));
-        if (!evaluate) return facts;
+        const inspect =
+          typeof evaluate === 'function' ? evaluate : evaluate ? yield* evaluate : undefined;
+        if (!inspect) return facts;
         const issues = yield* Effect.all(
           facts.issues.map((issue) =>
             !issue.candidate
               ? Effect.succeed(issue)
-              : evaluate(issue.number).pipe(
+              : inspect(issue.number).pipe(
                   Effect.flatMap((value) =>
                     Effect.try({
                       try: () => {
@@ -625,7 +627,7 @@ function reviewState(value: string): NonNullable<PullObservation['reviewers']>[n
 }
 
 async function verifiedBases(
-  project: string,
+  read: GitHubRead,
   pulls: readonly PullObservation[],
   signal: AbortSignal
 ) {
@@ -643,13 +645,9 @@ async function verifiedBases(
     const comparison = z
       .object({ status: z.string(), merge_base_commit: z.object({ sha: z.string() }) })
       .parse(
-        JSON.parse(
-          await command(
-            'gh',
-            ['api', `repos/rafaeltab/wallpaperdb/compare/${base.head}...${tip.head}`],
-            project,
-            signal
-          )
+        await read(
+          ['api', `repos/rafaeltab/wallpaperdb/compare/${base.head}...${tip.head}`],
+          signal
         )
       );
     if (
@@ -662,7 +660,7 @@ async function verifiedBases(
 }
 
 async function checkRequirements(
-  project: string,
+  read: GitHubRead,
   pulls: readonly PullObservation[],
   signal: AbortSignal
 ): Promise<readonly PullObservation[]> {
@@ -680,16 +678,7 @@ async function checkRequirements(
       .join(' ');
     const result = z
       .object({ data: z.record(z.object({ isRequired: z.boolean() }).nullable()) })
-      .parse(
-        JSON.parse(
-          await command(
-            'gh',
-            ['api', 'graphql', '-f', `query=query { ${fields} }`],
-            project,
-            signal
-          )
-        )
-      );
+      .parse(await read(['api', 'graphql', '-f', `query=query { ${fields} }`], signal));
     for (const [index, entry] of batch.entries()) {
       const value = result.data[`c${index}`];
       if (value) requirements.set(`${entry.pr}/${entry.check.id}`, value.isRequired);
@@ -709,25 +698,21 @@ async function checkRequirements(
 }
 
 async function readPull(
-  project: string,
+  read: GitHubRead,
   number: number,
   signal: AbortSignal
 ): Promise<PullObservation> {
   const response = z
     .object({ data: z.object({ repository: z.object({ pullRequest: pull }) }) })
     .parse(
-      JSON.parse(
-        await command(
-          'gh',
-          [
-            'api',
-            'graphql',
-            '-f',
-            `query=query {repository(owner:"rafaeltab",name:"wallpaperdb"){pullRequest(number:${number}){${pullFields}}}}`,
-          ],
-          project,
-          signal
-        )
+      await read(
+        [
+          'api',
+          'graphql',
+          '-f',
+          `query=query {repository(owner:"rafaeltab",name:"wallpaperdb"){pullRequest(number:${number}){${pullFields}}}}`,
+        ],
+        signal
       )
     );
   const value = response.data.repository.pullRequest;

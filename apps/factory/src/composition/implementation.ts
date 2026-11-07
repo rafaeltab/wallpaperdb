@@ -52,6 +52,7 @@ import {
   githubIssues,
   githubPlanning,
   githubObservations,
+  githubRequests,
   type VerifiedPrerequisite,
 } from '../adapters/github/index.js';
 import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
@@ -135,6 +136,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   configuration.FACTORY_STATE = stateDirectory(configuration.FACTORY_STATE);
   await compatibleState(configuration.FACTORY_STATE);
   const project = resolve(configuration.FACTORY_PROJECT);
+  const requests = new AbortController();
+  const github = githubRequests({
+    project,
+    directory: configuration.FACTORY_STATE,
+    signal: requests.signal,
+  });
   await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);
   const help = await command(
     configuration.FACTORY_T3_BINARY,
@@ -153,28 +160,32 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       return result;
     });
   let recoveryAdmission: RecoveryAdmission = () => Effect.succeed(false);
+  const metadataGithub = (args: readonly string[], signal?: AbortSignal) =>
+    github(args, signal, 'background');
+  const githubConfig = (
+    read = github,
+    prerequisites = readyPrerequisites
+  ): Parameters<typeof githubIssues>[0] => ({
+    project,
+    read,
+    prBase: configuration.FACTORY_PR_BASE,
+    base: configuration.FACTORY_BASE,
+    prerequisites: configuration.FACTORY_PREREQUISITES,
+    readyPrerequisites: prerequisites,
+    admitRecovery: (issue) => recoveryAdmission(issue),
+    joins: {
+      directory: resolve(configuration.FACTORY_STATE, 'joins'),
+      binary: configuration.FACTORY_T3_BINARY,
+      projectId: configuration.FACTORY_T3_PROJECT_ID,
+      mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+      mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+    },
+  });
   const jobDeps = (directory: string) =>
     Layer.mergeAll(
       Layer.succeed(Time, systemTime),
       Layer.succeed(JobStore, fileStore(directory)),
-      Layer.succeed(
-        Issues,
-        githubIssues({
-          project,
-          prBase: configuration.FACTORY_PR_BASE,
-          base: configuration.FACTORY_BASE,
-          prerequisites: configuration.FACTORY_PREREQUISITES,
-          readyPrerequisites,
-          admitRecovery: (issue) => recoveryAdmission(issue),
-          joins: {
-            directory: resolve(configuration.FACTORY_STATE, 'joins'),
-            binary: configuration.FACTORY_T3_BINARY,
-            projectId: configuration.FACTORY_T3_PROJECT_ID,
-            mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-            mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-          },
-        })
-      ),
+      Layer.succeed(Issues, githubIssues(githubConfig())),
       Layer.succeed(ContinuationAdmission, {
         authorize: (issue, receipt) => recoveryAdmission(issue, receipt),
       }),
@@ -236,24 +247,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     Layer.effect(
       PlanningSource,
       Effect.map(Job, (job) => {
-        const source = githubPlanning(
-          {
-            project,
-            base: configuration.FACTORY_BASE,
-            prBase: configuration.FACTORY_PR_BASE,
-            prerequisites: configuration.FACTORY_PREREQUISITES,
-            readyPrerequisites,
-            admitRecovery: (issue) => recoveryAdmission(issue),
-            joins: {
-              directory: resolve(configuration.FACTORY_STATE, 'joins'),
-              binary: configuration.FACTORY_T3_BINARY,
-              projectId: configuration.FACTORY_T3_PROJECT_ID,
-              mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-              mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-            },
-          },
-          job
-        );
+        const source = githubPlanning(githubConfig(), job);
         return {
           read: () =>
             Effect.gen(function* () {
@@ -297,17 +291,21 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           githubObservations(
             project,
             () => Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
-            (number) =>
-              Effect.gen(function* () {
-                const issues = yield* Issues;
-                const observed = yield* issues.inspect(number);
-                return {
-                  allowed: eligible(observed),
-                  blockersReady: observed.blockersReady,
-                  verifiedAt: yield* systemTime.now(),
-                  evidence: observed.prerequisite?.evidence,
-                };
-              }).pipe(Effect.provide(deps))
+            Effect.gen(function* () {
+              const prerequisites = yield* Effect.cached(readyPrerequisites());
+              const issues = githubIssues(githubConfig(metadataGithub, () => prerequisites));
+              return (number: number) =>
+                Effect.gen(function* () {
+                  const observed = yield* issues.inspect(number);
+                  return {
+                    allowed: eligible(observed),
+                    blockersReady: observed.blockersReady,
+                    verifiedAt: yield* systemTime.now(),
+                    evidence: observed.prerequisite?.evidence,
+                  };
+                });
+            }),
+            metadataGithub
           )
         )
       )
@@ -358,7 +356,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     resume: (command) => scheduler.resume(command),
     cancel: (id) => scheduler.cancel(id),
   };
-  const requests = new AbortController();
   const observations = await runtime.runPromise(Observations);
   const threadService = await runtime.runPromise(Threads);
   const threads = {

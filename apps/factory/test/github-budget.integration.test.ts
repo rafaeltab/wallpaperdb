@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
+import { readFile, writeFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
-import { githubIssues, githubRequests } from '../src/adapters/github/index.js';
+import { githubIssues, githubObservations, githubRequests } from '../src/adapters/github/index.js';
 import { protocol } from './fixtures/setup.js';
 
 async function withGithub(
@@ -23,29 +24,65 @@ async function withGithub(
   }
 }
 
-it('retains normal issue translation through the shared budgeted GitHub adapter', async () =>
+it.each([false, true])(
+  'retains issue translation with an unrelated unavailable quota=%s',
+  async (unavailableResource) =>
+    withGithub(async (host, stop) => {
+      await host.save({ githubRate: { unavailableResource } });
+      const requests = githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+      });
+      const issues = githubIssues(
+        { project: host.repository, base: host.base, prerequisites: [] },
+        requests
+      );
+      expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({
+        open: true,
+        title: 'Controlled issue',
+        blockers: [],
+        blockersReady: true,
+      });
+      expect(await host.calls()).toContainEqual(
+        expect.objectContaining({
+          binary: 'gh',
+          args: expect.arrayContaining(['issue', 'view', '577']),
+        })
+      );
+    })
+);
+
+it('backs off exponentially for CLI GraphQL throttling reported with HTTP 200', async () =>
   withGithub(async (host, stop) => {
-    const requests = githubRequests({
-      project: host.repository,
-      directory: host.directory + '/state',
-      signal: stop.signal,
-    });
+    const startedAt = Date.now();
+    let now = startedAt;
+    const clock = {
+      now: () => now,
+      wait: async (milliseconds: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        now += milliseconds;
+      },
+    };
     const issues = githubIssues(
       { project: host.repository, base: host.base, prerequisites: [] },
-      requests
-    );
-    expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({
-      open: true,
-      title: 'Controlled issue',
-      blockers: [],
-      blockersReady: true,
-    });
-    expect(await host.calls()).toContainEqual(
-      expect.objectContaining({
-        binary: 'gh',
-        args: expect.arrayContaining(['issue', 'view', '577']),
+      githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
       })
     );
+    await host.save({ githubRate: { limited: true } });
+    await expect(Effect.runPromise(issues.inspect(577))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    await expect(Effect.runPromise(issues.inspect(577))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    await host.save({ githubRate: { limited: false } });
+    expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
+    expect(clock.now() - startedAt).toBe(180_000);
   }));
 
 it.each([429, 503])(
@@ -177,4 +214,212 @@ it('retains provider backoff when the GitHub request owner is reopened', async (
     expect(await Effect.runPromise(reopened.inspect(577))).toMatchObject({ open: true });
     const received = await host.githubRequests();
     expect(received[1].at - received[0].at).toBeGreaterThanOrEqual(2000);
+  }));
+
+it('accounts for explicit GraphQL costs on every page across metadata and issue observations', async () =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.now();
+    let now = startedAt;
+    const clock = {
+      now: () => now,
+      wait: async (delay: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        now += delay;
+      },
+    };
+    await host.save({
+      githubRate: {
+        limit: 7200,
+        remaining: 7199,
+        reset: Math.ceil((startedAt + 3_600_000) / 1000),
+        cost: 3,
+      },
+      planning: {
+        candidates: [],
+        issues: [
+          {
+            number: 577,
+            title: 'Controlled issue',
+            body: '',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
+            author: { login: 'rafaeltab' },
+            labels: [],
+            comments: [],
+          },
+        ],
+        openPullPages: [
+          {
+            data: {
+              repository: {
+                pullRequests: { nodes: [], pageInfo: { hasNextPage: true, endCursor: 'next' } },
+              },
+            },
+          },
+          {
+            data: {
+              repository: {
+                pullRequests: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+      clock,
+    });
+    const source = githubObservations(
+      host.repository,
+      () => Effect.succeed([]),
+      undefined,
+      requests
+    );
+    expect(await Effect.runPromise(source.read())).toMatchObject({
+      issues: [{ number: 577 }],
+      pullRequests: [],
+    });
+    const afterMetadata = clock.now() - startedAt;
+    expect(afterMetadata).toBeGreaterThanOrEqual(3000);
+    const issues = githubIssues(
+      { project: host.repository, base: host.base, prerequisites: [] },
+      requests
+    );
+    expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
+    expect(clock.now() - startedAt - afterMetadata).toBeGreaterThanOrEqual(6000);
+  }));
+
+it('waits through primary exhaustion and obtains usable quota after the reset', async () =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.now(),
+      reset = Math.ceil(startedAt / 1000) + 2;
+    let now = startedAt;
+    const clock = {
+      now: () => now,
+      wait: async (delay: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        now += delay;
+        if (now >= reset * 1000)
+          await host.save({
+            githubRate: {
+              limit: 7200,
+              remaining: 7199,
+              reset: Math.ceil((now + 3_600_000) / 1000),
+            },
+          });
+      },
+    };
+    await host.save({ githubRate: { limit: 7200, remaining: 0, reset } });
+    const issues = githubIssues(
+      { project: host.repository, base: host.base, prerequisites: [] },
+      githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      })
+    );
+    expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
+    expect(clock.now()).toBeGreaterThanOrEqual(reset * 1000 + 1000);
+  }));
+
+it('serves admitted-work observations before already queued background collections', async () =>
+  withGithub(async (host, stop) => {
+    await host.save({
+      hold: 'github-bootstrap',
+      planning: {
+        candidates: [],
+        issues: [
+          {
+            number: 577,
+            title: 'Controlled issue',
+            body: '',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
+            author: { login: 'rafaeltab' },
+            labels: [],
+            comments: [],
+          },
+        ],
+        openPulls: [],
+      },
+    });
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+    });
+    const metadata = (args: string[], signal?: AbortSignal) => requests(args, signal, 'background');
+    const source = githubObservations(
+      host.repository,
+      () => Effect.succeed([]),
+      undefined,
+      metadata
+    );
+    const first = Effect.runPromise(source.read());
+    void first.catch(() => undefined);
+    await vi.waitFor(
+      async () => expect(await readFile(host.directory + '/held', 'utf8')).toBe('github-bootstrap'),
+      { timeout: 5000, interval: 20 }
+    );
+    const second = Effect.runPromise(source.read());
+    void second.catch(() => undefined);
+    const issues = githubIssues(
+      { project: host.repository, base: host.base, prerequisites: [] },
+      requests
+    );
+    const work = Effect.runPromise(issues.inspect(577));
+    void work.catch(() => undefined);
+    await writeFile(host.directory + '/release', 'continue');
+    const [, , result] = await Promise.all([first, second, work]);
+    expect(result).toMatchObject({ open: true });
+    const received = await host.githubRequests();
+    const issueView = received.findIndex(
+      (call) => call.args[0] === 'issue' && call.args[1] === 'view'
+    );
+    const indexes = received.flatMap((call, index) =>
+      call.args[0] === 'api' &&
+      call.args[1] === 'graphql' &&
+      call.args.some((a: string) => a.includes('issues('))
+        ? [index]
+        : []
+    );
+    expect(indexes).toHaveLength(2);
+    expect(issueView).toBeGreaterThan(indexes[0]);
+    expect(issueView).toBeLessThan(indexes[1]);
+  }));
+
+it('creates fresh shared prerequisite evidence once per metadata collection', async () =>
+  withGithub(async (host) => {
+    await host.save({
+      planning: {
+        candidates: [577, 578],
+        issues: [577, 578].map((number) => ({
+          number,
+          title: `Issue ${number}`,
+          body: '',
+          state: 'OPEN',
+          url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+          author: { login: 'rafaeltab' },
+          labels: [{ name: 'ready-for-agent' }],
+          comments: [],
+        })),
+        openPulls: [],
+      },
+    });
+    let proofsRead = 0;
+    const evaluation = Effect.gen(function* () {
+      const proof = yield* Effect.cached(Effect.sync(() => ++proofsRead));
+      return (_number: number) =>
+        Effect.map(proof, (verifiedAt) => ({ allowed: true, blockersReady: true, verifiedAt }));
+    });
+    const source = githubObservations(host.repository, () => Effect.succeed([]), evaluation);
+    const first = await Effect.runPromise(source.read());
+    expect(first.issues.map((issue) => issue.evaluation?.verifiedAt)).toEqual([1, 1]);
+    const second = await Effect.runPromise(source.read());
+    expect(second.issues.map((issue) => issue.evaluation?.verifiedAt)).toEqual([2, 2]);
+    expect(proofsRead).toBe(2);
   }));

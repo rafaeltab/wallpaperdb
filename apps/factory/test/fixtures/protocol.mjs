@@ -47,15 +47,23 @@ if (basename(process.argv[1]) === 'gh' && process.env.GH_DEBUG === 'api') {
     console.log(JSON.stringify({ message: 'Controlled provider throttling' }));
     process.exit(1);
   }
+  if (rate.limited && resource === 'graphql') {
+    process.stderr.write('{"errors":[{"type":"RATE_LIMITED","message":"Secondary rate limit"}]}\n');
+    process.exit(1);
+  }
   if (args[0] === 'api' && args[1] === 'rate_limit') {
+    await hold('github-bootstrap');
     console.log(
       JSON.stringify({
         resources: Object.fromEntries(
-          ['core', 'graphql', 'search'].map((name) => [
+          [
+            ...['core', 'graphql', 'search'],
+            ...(rate.unavailableResource ? ['code_search'] : []),
+          ].map((name) => [
             name,
             {
-              limit: rate.limit ?? 1000000,
-              remaining: rate.remaining ?? 999999,
+              limit: name === 'code_search' ? 0 : (rate.limit ?? 1000000),
+              remaining: name === 'code_search' ? 0 : (rate.remaining ?? 999999),
               reset: rate.reset ?? config.githubQuotaReset,
             },
           ])

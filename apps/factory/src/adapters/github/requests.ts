@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { requestBudget } from './request-budget.js';
+import { requestBudget, type RequestClock } from './request-budget.js';
 import { requestProcess, type RateResponse } from './request-process.js';
 
 const rate = z.object({
@@ -9,7 +9,7 @@ const rate = z.object({
   resetAt: z.string().datetime(),
 });
 const quota = z.object({
-  limit: z.number().int().positive().safe(),
+  limit: z.number().int().nonnegative().safe(),
   remaining: z.number().int().nonnegative().safe(),
   reset: z.number().int().nonnegative().safe(),
 });
@@ -25,11 +25,13 @@ export function githubRequests(config: {
   project: string;
   directory: string;
   signal: AbortSignal;
+  clock?: RequestClock;
 }) {
-  const budget = requestBudget(config.directory);
+  const budget = requestBudget(config.directory, config.clock);
   type Entry = {
     args: readonly string[];
     signal: AbortSignal;
+    priority: 'work' | 'background';
     resolve: (value: unknown) => void;
     reject: (error: unknown) => void;
     abort: () => void;
@@ -148,7 +150,8 @@ export function githubRequests(config: {
         e.type === 'RATE_LIMITED' || /secondary rate limit|abuse detection/i.test(e.message ?? '')
     );
     const responses =
-      secondary && !result.responses.some((r) => r.remaining === 0)
+      (secondary || (result.limited && result.code !== 0)) &&
+      !result.responses.some((r) => r.remaining === 0 || [403, 429].includes(r.status))
         ? [...result.responses, { status: 429 }]
         : result.responses;
     const success = result.code === 0 && !result.failure && !malformed && !graphErrors.length;
@@ -158,7 +161,8 @@ export function githubRequests(config: {
   };
   const pump = () => {
     if (running) return;
-    const entry = queue.shift();
+    const work = queue.findIndex((entry) => entry.priority === 'work');
+    const [entry] = queue.splice(work < 0 ? 0 : work, 1);
     if (!entry) return;
     entry.signal.removeEventListener('abort', entry.abort);
     running = true;
@@ -169,7 +173,11 @@ export function githubRequests(config: {
         pump();
       });
   };
-  return (args: readonly string[], caller?: AbortSignal): Promise<unknown> => {
+  return (
+    args: readonly string[],
+    caller?: AbortSignal,
+    priority: 'work' | 'background' = 'work'
+  ): Promise<unknown> => {
     const signal = caller ? AbortSignal.any([config.signal, caller]) : config.signal;
     if (signal.aborted) return Promise.reject(signal.reason);
     if (queue.length >= 128) return Promise.reject(new Error('GitHub request queue is full'));
@@ -177,6 +185,7 @@ export function githubRequests(config: {
       const entry: Entry = {
         args,
         signal,
+        priority,
         resolve,
         reject,
         abort: () => {
@@ -198,6 +207,7 @@ function failure(result: Awaited<ReturnType<typeof requestProcess>>) {
     cause: {
       code: result.code,
       failure: result.failure,
+      rateLimited: result.limited,
       responses: result.responses.map(({ status, resource, remaining, reset, retryAfter }) => ({
         status,
         resource,

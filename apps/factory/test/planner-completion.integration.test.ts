@@ -41,55 +41,58 @@ it('settles its completed model thread without treating cleanup as another plan'
   }
 });
 
-it('retains a timely model result across failed cleanup, reopen and an expired model deadline', async () => {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
-  const host = await protocol();
-  const previous = process.env.FACTORY_FIXTURE;
-  process.env.FACTORY_FIXTURE = host.configFile;
-  const proposal = { selected: [], deferred: [] };
-  const input = {
-    issues: [],
-    job: { kind: 'empty' as const },
-    capacity: { concurrency: 1, admission: 2 },
-  };
-  const configuration = {
-    ...host.mcp,
-    binary: host.binary,
-    project: host.repository,
-    projectId: 'project-id',
-    stateDirectory: `${host.directory}/planner-state`,
-  };
-  try {
-    await host.save({ planner: { proposal, settleFails: true } });
-    const planner = t3Planner(configuration);
-    await expect(
-      Effect.runPromise(planner.propose(input, { requestId: 'same-attempt' }))
-    ).rejects.toMatchObject({ operation: 'planner-proposal' });
-    const ownership = await Effect.runPromise(planner.ownership(false));
-    expect(ownership).toMatchObject({
-      retired: false,
-      phase: 'succeeded',
-      run: { threadId: 'planner-thread' },
-    });
-    vi.setSystemTime(Date.now() + 11 * 60_000);
-    await host.save({ planner: { proposal } });
-    const reopened = t3Planner(configuration);
-    await expect(
-      Effect.runPromise(reopened.propose(input, { requestId: 'same-attempt' }))
-    ).resolves.toEqual(proposal);
-    expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({
-      retired: true,
-      deadline: ownership?.deadline,
-    });
-    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
-  } finally {
-    vi.useRealTimers();
-    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = previous;
-    await host.cleanup();
+it.each(['settleFails', 'settleUnconfirmed'])(
+  'retains a timely model result across %s, reopen and an expired model deadline',
+  async (failure) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
+    const host = await protocol();
+    const previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const proposal = { selected: [], deferred: [] };
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 2 },
+    };
+    const configuration = {
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    try {
+      await host.save({ planner: { proposal, [failure]: true } });
+      const planner = t3Planner(configuration);
+      await expect(
+        Effect.runPromise(planner.propose(input, { requestId: 'same-attempt' }))
+      ).rejects.toMatchObject({ operation: 'planner-proposal' });
+      const ownership = await Effect.runPromise(planner.ownership(false));
+      expect(ownership).toMatchObject({
+        retired: false,
+        phase: 'succeeded',
+        run: { threadId: 'planner-thread' },
+      });
+      vi.setSystemTime(Date.now() + 11 * 60_000);
+      await host.save({ planner: { proposal } });
+      const reopened = t3Planner(configuration);
+      await expect(
+        Effect.runPromise(reopened.propose(input, { requestId: 'same-attempt' }))
+      ).resolves.toEqual(proposal);
+      expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({
+        retired: true,
+        deadline: ownership?.deadline,
+      });
+      expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
   }
-});
+);
 
 it.each([false, true])(
   'uses exact completion evidence when a model is observed after its deadline, timely=%s',
@@ -236,3 +239,121 @@ it.each([false, true])(
     }
   }
 );
+
+it('enforces the saved automatic model deadline after its observing process is lost', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const input = {
+    issues: [],
+    job: { kind: 'empty' as const },
+    capacity: { concurrency: 1, admission: 2 },
+  };
+  const configuration = {
+    ...host.mcp,
+    binary: host.binary,
+    project: host.repository,
+    projectId: 'project-id',
+    stateDirectory: `${host.directory}/planner-state`,
+  };
+  const controller = new AbortController();
+  let pending: Promise<unknown> | undefined;
+  try {
+    await host.save({ planner: { status: 'running', proposal: { selected: [], deferred: [] } } });
+    const original = t3Planner(configuration);
+    pending = Effect.runPromise(original.propose(input, { automatic: true }), {
+      signal: controller.signal,
+    }).catch(() => undefined);
+    await vi.waitFor(
+      async () => expect((await host.calls()).some((call) => call.args[1] === 'show')).toBe(true),
+      { timeout: 5000, interval: 20 }
+    );
+    controller.abort();
+    await pending;
+    const ownership = await Effect.runPromise(original.ownership(false));
+    if (ownership?.deadline === undefined) throw new Error('Expected a durable deadline');
+    vi.setSystemTime(ownership.deadline + 1);
+    const reopened = t3Planner(configuration);
+    await expect(
+      Effect.runPromise(reopened.propose(input, { automatic: true }))
+    ).rejects.toMatchObject({ operation: 'model-deadline' });
+    const calls = await host.calls();
+    const interrupts = calls.filter((call) => call.args[1] === 't3_thread_interrupt');
+    expect(interrupts).toHaveLength(1);
+    expect(JSON.parse(interrupts[0].args[2])).toMatchObject({
+      threadId: 'planner-thread',
+      runId: 'planner-run',
+    });
+    expect(calls.filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({
+      deadline: ownership.deadline,
+      run: ownership.run,
+    });
+    expect((await Effect.runPromise(reopened.ownership(false)))?.retired).not.toBe(true);
+  } finally {
+    controller.abort();
+    await pending;
+    vi.useRealTimers();
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('requests interruption at the model deadline while thread observation is blocked', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const controller = new AbortController();
+  let pending: Promise<unknown> | undefined;
+  try {
+    await host.save({
+      holds: ['planner-observation'],
+      planner: { status: 'running', proposal: { selected: [], deferred: [] } },
+    });
+    const planner = t3Planner({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+    });
+    pending = Effect.runPromise(
+      planner.propose(
+        { issues: [], job: { kind: 'empty' }, capacity: { concurrency: 1, admission: 2 } },
+        { deadline: Date.now() + 1500 }
+      ),
+      { signal: controller.signal }
+    ).catch(() => undefined);
+    await vi.waitFor(
+      async () =>
+        expect(await readFile(`${host.directory}/held-planner-observation`, 'utf8')).toBe(
+          'planner-observation'
+        ),
+      { timeout: 5000, interval: 20 }
+    );
+    await vi.waitFor(
+      async () => {
+        const interrupts = (await host.calls()).filter(
+          (call) => call.args[1] === 't3_thread_interrupt'
+        );
+        expect(interrupts).toHaveLength(1);
+        expect(JSON.parse(interrupts[0].args[2])).toMatchObject({
+          threadId: 'planner-thread',
+          runId: 'planner-run',
+        });
+      },
+      { timeout: 4000, interval: 20 }
+    );
+    expect((await Effect.runPromise(planner.ownership(false)))?.retired).not.toBe(true);
+  } finally {
+    controller.abort();
+    await writeFile(`${host.directory}/release-planner-observation`, 'cleanup');
+    await pending;
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

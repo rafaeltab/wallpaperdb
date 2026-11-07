@@ -201,6 +201,43 @@ it('serves a stable live board with explicit unavailable provider evidence witho
   }
 });
 
+it.each([false, true])(
+  'reports an in-flight metadata refresh with historical failure=%s',
+  async (historical) => {
+    const board = await liveBoard({
+      scopeId: 'refresh-state',
+      now: () => 300100,
+      initial: {
+        ...initial,
+        observations: {
+          state: 'loading',
+          stale: historical,
+          startedAt: 300000,
+          ...(historical
+            ? { observedAt: 1000, failedAt: 2000, error: 'historical-private-error' }
+            : {}),
+        },
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(snapshot.entities.sources['source:github']).toMatchObject({
+        refresh: 'refreshing',
+        observedAt: historical ? new Date(1000).toISOString() : null,
+        lastAttemptAt: new Date(300000).toISOString(),
+        nextAttemptAt: null,
+      });
+      expect(snapshot.entities.sources['source:github'].failure?.code ?? null).toBe(
+        historical ? 'provider-unavailable' : null
+      );
+      expect(JSON.stringify(snapshot)).not.toContain('historical-private-error');
+    } finally {
+      await app.close();
+    }
+  }
+);
+
 it('publishes real issue and PR facts atomically with stable card identities and explicit head-only evidence', async () => {
   const board = await liveBoard({ scopeId: 'test', initial, now: () => 1000 });
   const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });

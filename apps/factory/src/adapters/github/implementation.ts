@@ -24,6 +24,7 @@ const blockersSchema = z.array(
 export function githubIssues(
   config: {
     project: string;
+    read?: (args: string[], signal?: AbortSignal) => Promise<unknown>;
     base: string;
     joins?: JoinConfiguration;
     prBase?: string;
@@ -37,9 +38,10 @@ export function githubIssues(
     githubPromise({ ...options, defaultRecoveryAdmission: config.admitRecovery });
   const gh =
     read ??
+    config.read ??
     ((args: string[], signal?: AbortSignal) =>
       command('gh', args, config.project, signal).then((text) =>
-        text.trim() ? JSON.parse(text) : null
+        ['edit', 'comment'].includes(args[1]) ? null : text.trim() ? JSON.parse(text) : null
       ));
   const joins = config.joins
     ? prerequisiteJoin(config.project, config.base, config.joins, gh)

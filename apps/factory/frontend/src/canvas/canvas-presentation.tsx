@@ -342,13 +342,25 @@ export function Fields({ id }: { id: number }) {
     <span className="cc-fields">
       <span
         className={item.priority === 'P0' ? 'cc-red' : item.priority === 'P1' ? 'cc-amber' : ''}
-        data-tip={item.priority ? `GitHub Project priority: ${item.priority}` : 'Priority not set'}
+        data-tip={
+          item.priority
+            ? `GitHub Project priority: ${item.priority}`
+            : item.projectKnown
+              ? 'Priority not set'
+              : 'Priority unavailable'
+        }
       >
         {item.priority ?? (item.projectKnown ? 'P—' : '?')}
       </span>
       <span
         className="cc-size"
-        data-tip={item.size ? `GitHub Project size: ${item.size}` : 'Size not set'}
+        data-tip={
+          item.size
+            ? `GitHub Project size: ${item.size}`
+            : item.projectKnown
+              ? 'Size not set'
+              : 'Size unavailable'
+        }
       >
         {item.size ?? (item.projectKnown ? '—' : '?')}
       </span>

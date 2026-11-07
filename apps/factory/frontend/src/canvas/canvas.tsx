@@ -11,7 +11,7 @@ import {
 import type { Action, WorkItem } from '../../../src/http/index.js';
 import type { Board } from './model';
 import { createCanvasProjection } from './view-model';
-import { canvasLayout, relationshipHighlights, stages } from './geometry';
+import { canvasLayout, relationshipHighlights, stages, stageHeadingWidth } from './geometry';
 import type {
   Box,
   CanvasFocus,
@@ -157,7 +157,7 @@ export function Canvas({
             id: -100 - i,
             x: 20,
             y: a.y - 10,
-            width: 310,
+            width: stageHeadingWidth,
             height: 20,
           })),
           ...[...data.groups, ...data.panels].flatMap((g, i) =>

@@ -1385,6 +1385,7 @@ if(argv.includes('usage'))shutdownHold('usage');
 if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  if(fs.existsSync(path.join(control,'info-error'))){console.log(JSON.stringify({code:fs.readFileSync(path.join(control,'info-error'),'utf8')}));process.exit(41);}
  if(fs.existsSync(path.join(control,'stopping'))){
+  if(fs.existsSync(path.join(control,'shutdown-delete-after-stop'))){console.log(JSON.stringify({code:'not_found'}));process.exit(41);}
   if(fs.existsSync(path.join(control,'shutdown-persistent-stopping'))){console.log(JSON.stringify({sandbox:{id:'fake-worker',state:'stopping'}}));process.exit(0);}
   if(fs.existsSync(path.join(control,'stop-observed'))&&fs.existsSync(path.join(control,'shutdown-observe-stopping'))){fs.unlinkSync(path.join(control,'shutdown-observe-stopping'));console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
   if(!fs.existsSync(path.join(control,'stop-observed'))){fs.writeFileSync(path.join(control,'stop-observed'),'yes');console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
@@ -6540,6 +6541,24 @@ async function stopObservationCheckout(t) {
 	f.env.BOAT_EXPECTED_STOP_ID = proof.sandbox.stop.id;
 	return { ...f, proof };
 }
+
+test("disposable stop accounts acknowledged deletion without querying unavailable usage", async (t) => {
+	const f = await shutdownCheckout(t);
+	flag(f, "shutdown-delete-after-stop");
+	flag(f, "fail-usage");
+	const before = f.json(".boat/state.json");
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.equal(result.status, 0, result.output);
+	const after = shutdownLedger(f);
+	assert.equal(after.runningSince, null);
+	assert.ok(after.cost > before.cost);
+	assert.equal(after.shutdownAttempt.submissionAcknowledged, true);
+	assert.equal(after.shutdownAttempt.completion.status, "deleted");
+	assert.equal(after.shutdownAttempt.completion.provider, undefined);
+	const calls = shutdownCalls(f);
+	assert.equal(calls.filter((a) => a.includes("stop")).length, 1);
+	assert.equal(calls.filter((a) => a.includes("usage")).length, 0);
+});
 
 test("stop observation settles exact completed proof once without any stop or wake effect", async (t) => {
 	const f = await stopObservationCheckout(t),

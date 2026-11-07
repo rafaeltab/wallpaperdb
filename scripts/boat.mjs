@@ -1484,14 +1484,19 @@ async function stop(
 						);
 					}
 					if (result.error) errors.push(result.error);
-					try {
-						write(
-							path.join(dir, "usage.json"),
-							await json(["usage", s.id], { shutdown: budget.phase("usage") }),
-						);
-					} catch (error) {
-						errors.push(`Usage after completed stop: ${error.message}`);
-					}
+					if (result.completion.absence)
+						event("usage-unavailable-after-deletion", { id: s.id });
+					else
+						try {
+							write(
+								path.join(dir, "usage.json"),
+								await json(["usage", s.id], {
+									shutdown: budget.phase("usage"),
+								}),
+							);
+						} catch (error) {
+							errors.push(`Usage after completed stop: ${error.message}`);
+						}
 				} catch (error) {
 					errors.push(error.message);
 				} finally {

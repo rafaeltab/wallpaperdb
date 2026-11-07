@@ -47,11 +47,12 @@ export async function runProtocol(
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
     const hold = async (boundary: string) => {
-      if (config.hold !== boundary) return;
-      writeFileSync(join(config.directory, 'held'), boundary);
+      const separate = config.holds?.includes(boundary);
+      if (!separate && config.hold !== boundary) return;
+      writeFileSync(join(config.directory, separate ? `held-${boundary}` : 'held'), boundary);
       const { setTimeout } = await import('node:timers/promises');
       const deadline = Date.now() + 20000;
-      while (!existsSync(join(config.directory, 'release'))) {
+      while (!existsSync(join(config.directory, separate ? `release-${boundary}` : 'release'))) {
         if (Date.now() > deadline) throw new Error('Controlled protocol hold expired');
         await setTimeout(20, undefined, { signal });
       }
@@ -138,6 +139,15 @@ export async function runProtocol(
     }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_list') {
       console.log(JSON.stringify({ structuredContent: { threads: [], nextCursor: null } }));
+      process.exit(0);
+    }
+    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_organize') {
+      const input = JSON.parse(args[2]);
+      if (input.action !== 'settle' || input.threadId !== 'planner-thread')
+        throw new Error('Unexpected planner cleanup');
+      if (config.planner?.settleFails) throw new Error('Controlled settlement failure');
+      writeFileSync(join(config.directory, 'planner-settled'), 'true');
+      console.log(JSON.stringify({ structuredContent: { sequence: 1 } }));
       process.exit(0);
     }
     const earlyFlag = (name: string) => args[args.indexOf(name) + 1];
@@ -590,7 +600,8 @@ export async function runProtocol(
     const flag = (name: string) => args[args.indexOf(name) + 1];
     const reply = (value: unknown) => console.log(JSON.stringify(value));
     if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
-      if (args[1] === 'list')
+      if (args[1] === 'list') {
+        await hold(existsSync(join(config.directory, 'planner.json')) ? 'planning-freshness' : 'planning-discovery');
         reply(
           (
             config.planning.candidates ??
@@ -599,7 +610,7 @@ export async function runProtocol(
             number,
           }))
         );
-      else if (args[0] === 'api' && args[1] === 'graphql') {
+      } else if (args[0] === 'api' && args[1] === 'graphql') {
         if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
           reply(
             config.planning.openPullPages ?? [
@@ -711,9 +722,11 @@ export async function runProtocol(
       }
       const request = JSON.parse(prompt.split('Request: ')[1].split('\n')[0]);
       writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ ...request, prompt }));
+      writeFileSync(join(config.directory, 'planner-settled'), 'false');
       if (config.planner.lostStart) process.exit(1);
       reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
     } else if (config.planner && args[1] === 'show' && args[2] === 'planner-thread') {
+      await hold('planner-observation');
       const { requestId } = JSON.parse(
         readFileSync(join(config.directory, 'planner.json'), 'utf8')
       );
@@ -722,6 +735,7 @@ export async function runProtocol(
           threadId: 'planner-thread',
           latestRunId: config.planner.runId ?? 'planner-run',
           status: config.planner.status ?? 'completed',
+          settled: existsSync(join(config.directory, 'planner-settled')) && readFileSync(join(config.directory, 'planner-settled'), 'utf8') === 'true',
           providerInstanceId: 'codex',
           model: 'gpt-6.1-sol',
         },
@@ -799,6 +813,13 @@ export async function runProtocol(
           labels: [{ name: 'ready-for-agent' }],
         });
     } else if (args[0] === 'acp-mcp-call') {
+      if (args[1] === 't3_thread_read' && JSON.parse(args[2]).threadId === 'planner-thread') {
+        reply({ structuredContent: {
+          thread: { threadId: 'planner-thread', latestRunId: config.planner.runId ?? 'planner-run' },
+          recentRuns: [{ runId: config.planner.runId ?? 'planner-run', completedAt: config.planner.completedAt ?? null }],
+        }});
+        process.exit(0);
+      }
       if (config.mcpReply) {
         reply(config.mcpReply);
         process.exit(0);

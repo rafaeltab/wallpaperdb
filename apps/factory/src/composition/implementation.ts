@@ -278,6 +278,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     Layer.succeed(
       IPlanner,
       t3Planner({
+        mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+        mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
         stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
         project,
         binary: configuration.FACTORY_T3_BINARY,

@@ -9,6 +9,8 @@ import { planningInputIdentity, type IPlanner } from '../../capabilities/plan/in
 import { Unavailable } from '../../capabilities/job/index.js';
 import { plannerState } from './planner-state.js';
 import { command } from '../../platform/index.js';
+import { mcpCall } from './questions.js';
+class ModelDeadline extends Error {}
 const numbers = z.array(z.number().int().positive().safe()).max(1000);
 const reason = z.string().min(1).max(16000);
 const proposalSchema = z
@@ -36,6 +38,8 @@ export function t3Planner(config: {
   project: string;
   projectId: string;
   stateDirectory: string;
+  mcpEndpoint?: string;
+  mcpAuthorizationFile?: string;
 }): IPlanner {
   const call = async (args: string[], signal: AbortSignal, input?: string) =>
     JSON.parse(
@@ -59,6 +63,7 @@ export function t3Planner(config: {
           threadId: z.literal(run.threadId),
           latestRunId: z.literal(run.runId),
           status: z.string(),
+          settled: z.boolean().optional(),
           providerInstanceId: z.literal('codex'),
           model: z.literal('gpt-6.1-sol'),
         }),
@@ -67,6 +72,72 @@ export function t3Planner(config: {
         ),
       })
       .parse(await call(['show', run.threadId, '--messages', '20'], signal));
+  const finish = async (
+    record: Awaited<ReturnType<typeof journal.save>>,
+    detail: Awaited<ReturnType<typeof observe>>,
+    signal: AbortSignal
+  ) => {
+    if (record.retired && record.settled) return record;
+    const successful = ['completed', 'idle'].includes(detail.thread.status);
+    const now = Date.now();
+    let completedAt = record.completedAt;
+    if (successful && completedAt === undefined && record.deadline !== undefined) {
+      if (now < record.deadline) completedAt = now;
+      else {
+        // Observation/cleanup latency is not model execution time. Use exact run evidence.
+        const evidence = z
+          .object({
+            thread: z.object({
+              threadId: z.literal(detail.thread.threadId),
+              latestRunId: z.literal(detail.thread.latestRunId),
+            }),
+            recentRuns: z.array(
+              z.object({ runId: z.string(), completedAt: z.string().datetime().nullable() })
+            ),
+          })
+          .parse(
+            await mcpCall(
+              config,
+              't3_thread_read',
+              { threadId: detail.thread.threadId, runLimit: 1, limit: 1, maxCharsPerItem: 1 },
+              signal
+            )
+          );
+        const finished = evidence.recentRuns.find(
+          (run) => run.runId === detail.thread.latestRunId
+        )?.completedAt;
+        if (finished) {
+          const at = Date.parse(finished);
+          if (at >= record.deadline - 600000 && at <= record.deadline) completedAt = at;
+        }
+      }
+    }
+    const completed = await journal.save({
+      ...record,
+      revision: record.revision + 1,
+      retired: false,
+      phase: successful ? 'succeeded' : 'failed',
+      completedAt,
+    });
+    // Cleanup failure retains this exact completed run, rather than launching a replacement.
+    await mcpCall(
+      config,
+      't3_thread_organize',
+      { action: 'settle', threadId: detail.thread.threadId },
+      signal
+    );
+    const settled = await observe(
+      { threadId: detail.thread.threadId, runId: detail.thread.latestRunId },
+      signal
+    );
+    if (!settled.thread.settled) throw new Error('Planner thread settlement is not confirmed');
+    return journal.save({
+      ...completed,
+      revision: completed.revision + 1,
+      retired: true,
+      settled: true,
+    });
+  };
   const recover = async (
     input: Parameters<IPlanner['propose']>[0],
     signal: AbortSignal,
@@ -81,7 +152,6 @@ export function t3Planner(config: {
         throw new Error(
           'Original planner inputs changed; request a fresh preview after reconciliation'
         );
-      if (Date.now() >= previous.deadline) throw new Error('Original planner deadline expired');
       return await poll(previous, previous.run, signal);
     }
     if (previous && !previous.retired) {
@@ -90,9 +160,11 @@ export function t3Planner(config: {
       const detail = await observe(previous.run, signal);
       if (!terminal(detail.thread.status))
         throw new Error('Previous advisory planner is still outstanding');
-      await journal.save({ ...previous, revision: previous.revision + 1, retired: true });
+      const completed = await finish(previous, detail, signal);
       if (
-        previous.input === JSON.stringify(input) &&
+        (previous.inputIdentity ?? previous.input) ===
+          (previous.inputIdentity ? planningInputIdentity(input) : JSON.stringify(input)) &&
+        completed.completedAt !== undefined &&
         ['completed', 'idle'].includes(detail.thread.status)
       )
         return translateProposal(detail.messages, previous.run.runId, previous.requestId);
@@ -104,23 +176,23 @@ export function t3Planner(config: {
     run: { threadId: string; runId: string },
     signal: AbortSignal
   ) => {
-    while (Date.now() < bound.deadline) {
+    if (bound.deadline === undefined) throw new Error('Missing durable model deadline');
+    for (;;) {
       const detail = await observe(run, signal);
-      if (terminal(detail.thread.status))
-        await journal.save({
-          ...bound,
-          revision: bound.revision + 1,
-          retired: true,
-          phase: ['completed', 'idle'].includes(detail.thread.status) ? 'succeeded' : 'failed',
-        });
-      if (detail.thread.status === 'completed' || detail.thread.status === 'idle') {
-        return translateProposal(detail.messages, run.runId, bound.requestId);
+      if (terminal(detail.thread.status)) {
+        const completed = await finish(bound, detail, signal);
+        if (['completed', 'idle'].includes(detail.thread.status)) {
+          if (completed.completedAt === undefined)
+            throw new ModelDeadline('Model deadline exceeded');
+          return translateProposal(detail.messages, run.runId, bound.requestId);
+        }
+        throw new Error('Planner did not complete');
       }
+      if (Date.now() >= bound.deadline) throw new ModelDeadline('Model deadline exceeded');
       if (!['preparing', 'queued', 'starting', 'running'].includes(detail.thread.status))
         throw new Error('Planner did not complete');
       await setTimeout(1000, undefined, { signal });
     }
-    throw new Error('Planner preview timed out; implementation was not dispatched');
   };
   return {
     ownership: (reconcile = true, requestId) =>
@@ -128,17 +200,10 @@ export function t3Planner(config: {
         try: async (signal) => {
           const previous = await journal.read(requestId);
           if (!previous) return undefined;
-          if (reconcile && !requestId && previous.run && !previous.retired) {
+          if (reconcile && !requestId && previous.run && !previous.settled) {
             const detail = await observe(previous.run, signal);
             if (terminal(detail.thread.status)) {
-              const next = await journal.save({
-                ...previous,
-                revision: previous.revision + 1,
-                retired: true,
-                phase: ['completed', 'idle'].includes(detail.thread.status)
-                  ? 'succeeded'
-                  : 'failed',
-              });
+              const next = await finish(previous, detail, signal);
               const { input: _input, inputIdentity: _identity, ...ownership } = next;
               return ownership;
             }
@@ -175,7 +240,6 @@ export function t3Planner(config: {
                 requestId,
                 input: JSON.stringify(input),
                 inputIdentity: planningInputIdentity(input),
-                deadline: attempt?.deadline ?? Date.now() + 600000,
                 retired: true,
                 phase: 'failed',
                 detail: `Planner message has ${prompt.length} characters; T3 maximum is 120000. No launch claimed.`,
@@ -187,7 +251,7 @@ export function t3Planner(config: {
               requestId,
               input: JSON.stringify(input),
               inputIdentity: planningInputIdentity(input),
-              deadline: attempt?.deadline ?? Date.now() + 600000,
+              deadline: Math.min(attempt?.deadline ?? Infinity, Date.now() + 600000),
               phase: 'launch-intent',
             });
             let launched: { threadId: string; projectId: string; runId: string };
@@ -205,7 +269,7 @@ export function t3Planner(config: {
                       config.projectId,
                       '-',
                       '--title',
-                      `Factory plan preview ${requestId}`,
+                      `Factory ${attempt?.automatic ? 'automatic plan' : 'plan preview'} ${requestId}`,
                       '--provider',
                       'codex',
                       '--model',
@@ -240,7 +304,11 @@ export function t3Planner(config: {
             busy = false;
           }
         },
-        catch: (cause) => new Unavailable({ operation: 'planner-proposal', cause }),
+        catch: (cause) =>
+          new Unavailable({
+            operation: cause instanceof ModelDeadline ? 'model-deadline' : 'planner-proposal',
+            cause,
+          }),
       }).pipe(
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.t3.plan')

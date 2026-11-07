@@ -81,7 +81,7 @@ export interface IPlanner {
   ): Effect.Effect<PlannerOwnership | undefined, Unavailable>;
   propose(
     input: PlanningInput,
-    attempt?: { requestId?: string; deadline: number }
+    attempt?: { requestId?: string; deadline?: number; automatic?: boolean }
   ): Effect.Effect<Proposal, Unavailable>;
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
@@ -94,7 +94,7 @@ export interface Preview {
 export interface Plan {
   preview(attempt?: {
     requestId?: string;
-    deadline: number;
+    automatic?: boolean;
     progress: (phase: 'discovery' | 'handoff' | 'freshness') => Effect.Effect<void, Unavailable>;
   }): Effect.Effect<Preview, Unavailable>;
 }
@@ -174,7 +174,7 @@ export const Scheduler = Context.Service<Scheduler>('wallpaperdb.factory.Schedul
 export interface PlannerOwnership {
   requestId: string;
   revision: number;
-  deadline: number;
+  deadline?: number;
   phase?: 'launch-intent' | 'running' | 'succeeded' | 'failed' | 'uncertain';
   run?: { threadId: string; runId: string };
   retired?: boolean;
@@ -198,6 +198,7 @@ export interface PlanningAttempt {
   id: string;
   revision: number;
   startedAt: number;
+  /** Legacy persisted attempt metadata. Model timing is owned by PlannerOwnership. */
   deadline: number;
   phase: 'discovery' | 'handoff' | 'freshness' | 'succeeded' | 'failed';
   finishedAt?: number;
@@ -217,7 +218,8 @@ export const AttemptStore = Context.Service<AttemptStore>('wallpaperdb.factory.A
 export interface Attempts {
   submit(id: string): Effect.Effect<AttemptSubmission, Unavailable>;
   observe(id: string): Effect.Effect<
-    | (Omit<PlanningAttempt, 'phase'> & {
+    | (Omit<PlanningAttempt, 'phase' | 'deadline'> & {
+        deadline: number | null;
         phase: string;
         elapsedMs: number;
         launch?: PlannerOwnership;

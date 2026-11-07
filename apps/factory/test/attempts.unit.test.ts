@@ -18,78 +18,6 @@ const input: PlanningInput = {
   job: { kind: 'empty' },
   capacity: { concurrency: 1, admission: 1 },
 };
-it.each(['discovery', 'handoff', 'freshness'] as const)(
-  'bounds %s by the persisted overall deadline and cancels underlying work',
-  async (phase) => {
-    const store = controlledAttemptStore();
-    const now = Date.now();
-    await Effect.runPromise(
-      store.create({
-        id: 'attempt',
-        revision: 0,
-        startedAt: now - 100,
-        deadline: now + 60,
-        phase: 'discovery',
-      })
-    );
-    let reads = 0;
-    let cancelled = false;
-    const source = Layer.succeed(PlanningSource, {
-      read: () =>
-        Effect.suspend(() => {
-          reads++;
-          if (phase === 'discovery' || reads === 2)
-            return Effect.never.pipe(
-              Effect.ensuring(
-                Effect.sync(() => {
-                  cancelled = true;
-                })
-              )
-            );
-          return Effect.succeed(input);
-        }),
-    });
-    const planner = Layer.succeed(IPlanner, {
-      ownership: () => Effect.succeed(undefined),
-      propose: () =>
-        phase === 'handoff'
-          ? Effect.never.pipe(
-              Effect.ensuring(
-                Effect.sync(() => {
-                  cancelled = true;
-                })
-              )
-            )
-          : Effect.succeed({ selected: [], deferred: [] }),
-    });
-    const plan = PlanLive.pipe(Layer.provide(Layer.mergeAll(source, planner)));
-    const runtime = ManagedRuntime.make(
-      AttemptsLive.pipe(
-        Layer.provide(
-          Layer.mergeAll(
-            plan,
-            planner,
-            Layer.succeed(AttemptStore, store),
-            Layer.succeed(Time, { now: () => Effect.succeed(now) })
-          )
-        )
-      )
-    );
-    try {
-      const attempts = await runtime.runPromise(Attempts);
-      await runtime.runPromise(attempts.execute('attempt'));
-      expect(cancelled).toBe(true);
-      expect(await Effect.runPromise(store.get('attempt'))).toMatchObject({
-        phase: 'failed',
-        deadline: now + 60,
-        detail: expect.stringContaining('deadline'),
-      });
-    } finally {
-      await runtime.dispose();
-    }
-  }
-);
-
 it('distinguishes busy ownership, allows late bound completion, and never retries an unbound uncertain launch', async () => {
   const store = controlledAttemptStore();
   let ownership: PlannerOwnership | undefined = {
@@ -139,7 +67,7 @@ it('distinguishes busy ownership, allows late bound completion, and never retrie
       id: 'new',
     });
     const fresh = await Effect.runPromise(store.get('new'));
-    expect((fresh?.deadline ?? 0) - (fresh?.startedAt ?? 0)).toBe(600000);
+    expect(fresh?.deadline).toBe(0);
     expect(observed).toBe(3);
     expect(await runtime.runPromise(attempts.submit('other'))).toEqual({ kind: 'busy', id: 'new' });
     expect(observed).toBe(3);
@@ -235,7 +163,7 @@ it.each([
     phase: 'discovery' as const,
     ownership: { requestId: 'legacy', revision: 1, deadline: 0, retired: true },
     detail:
-      'Overall planning deadline exceeded during discovery before planner launch. No planner launch was recorded for this attempt; no launch reconciliation is required.',
+      'Model deadline exceeded. No validated proposal is available; no implementation was dispatched.',
   },
   {
     name: 'a matching outstanding bound advisory run',
@@ -248,14 +176,14 @@ it.each([
       phase: 'running' as const,
     },
     detail:
-      'Overall planning deadline exceeded. This attempt has a bound advisory run whose launch ownership remains outstanding; observe the run before retrying.',
+      'Model deadline exceeded. The bound advisory run remains outstanding; observe it before retrying.',
   },
   {
     name: 'a matching unbound uncertain launch',
     phase: 'discovery' as const,
     ownership: { requestId: 'attempt', revision: 1, deadline: 121000, phase: 'uncertain' as const },
     detail:
-      'Overall planning deadline exceeded after launch intent. This attempt has an uncertain launch outcome; operator reconciliation is required before retrying.',
+      'Model deadline exceeded after launch intent. Operator reconciliation is required before retrying the uncertain launch.',
   },
   {
     name: 'freshness after a retired advisory run',
@@ -269,7 +197,7 @@ it.each([
       run: { threadId: 'thread', runId: 'run' },
     },
     detail:
-      'Overall planning deadline exceeded during freshness validation. The advisory proposal is not validated; no implementation was dispatched.',
+      'Model deadline exceeded. No validated proposal is available; no implementation was dispatched.',
   },
   {
     name: 'restart discovery after a retired advisory run',
@@ -283,7 +211,7 @@ it.each([
       run: { threadId: 'thread', runId: 'run' },
     },
     detail:
-      'Overall planning deadline exceeded after the advisory run. Its launch ownership is retired; no validated preview is available.',
+      'Model deadline exceeded. No validated proposal is available; no implementation was dispatched.',
   },
   {
     name: 'a matching retired non-launch claim',
@@ -296,52 +224,56 @@ it.each([
       phase: 'failed' as const,
     },
     detail:
-      "Overall planning deadline exceeded before a planner run was bound. This attempt's launch ownership is retired; no launch reconciliation is required.",
+      'Model deadline exceeded. No validated proposal is available; no implementation was dispatched.',
   },
-])('reports a truthful deadline outcome for $name', async ({ phase, ownership, detail }) => {
-  const store = controlledAttemptStore();
-  const original = {
-    id: 'attempt',
-    revision: 0,
-    startedAt: 1000,
-    deadline: 121000,
-    phase: 'discovery' as const,
-  };
-  await Effect.runPromise(store.create(original));
-  if (phase === 'freshness')
-    await Effect.runPromise(store.save({ ...original, revision: 1, phase }));
-  const runtime = ManagedRuntime.make(
-    AttemptsLive.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(AttemptStore, store),
-          Layer.succeed(IPlanner, {
-            ownership: () => Effect.succeed(ownership),
-            propose: () => Effect.die('Expired attempt must not launch'),
-          }),
-          Layer.succeed(Plan, {
-            preview: () => Effect.die('Expired attempt must not restart planning'),
-          }),
-          Layer.succeed(Time, { now: () => Effect.succeed(121009) })
+])(
+  'reports a model deadline failure based on ownership for $name',
+  async ({ phase, ownership, detail }) => {
+    const store = controlledAttemptStore();
+    const original = {
+      id: 'attempt',
+      revision: 0,
+      startedAt: 1000,
+      deadline: 121000,
+      phase: 'discovery' as const,
+    };
+    await Effect.runPromise(store.create(original));
+    if (phase === 'freshness')
+      await Effect.runPromise(store.save({ ...original, revision: 1, phase }));
+    const runtime = ManagedRuntime.make(
+      AttemptsLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(AttemptStore, store),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(ownership),
+              propose: () => Effect.die('Expired attempt must not launch'),
+            }),
+            Layer.succeed(Plan, {
+              preview: () =>
+                Effect.fail(new Unavailable({ operation: 'model-deadline', cause: null })),
+            }),
+            Layer.succeed(Time, { now: () => Effect.succeed(121009) })
+          )
         )
       )
-    )
-  );
-  try {
-    const attempts = await runtime.runPromise(Attempts);
-    await runtime.runPromise(attempts.execute('attempt'));
-    expect(await Effect.runPromise(store.get('attempt'))).toMatchObject({
-      id: original.id,
-      startedAt: original.startedAt,
-      deadline: original.deadline,
-      finishedAt: 121009,
-      phase: 'failed',
-      detail,
-    });
-  } finally {
-    await runtime.dispose();
+    );
+    try {
+      const attempts = await runtime.runPromise(Attempts);
+      await runtime.runPromise(attempts.execute('attempt'));
+      expect(await Effect.runPromise(store.get('attempt'))).toMatchObject({
+        id: original.id,
+        startedAt: original.startedAt,
+        deadline: original.deadline,
+        finishedAt: 121009,
+        phase: 'failed',
+        detail,
+      });
+    } finally {
+      await runtime.dispose();
+    }
   }
-});
+);
 
 it.each(['preview', 'stale'] as const)(
   'persists a completed %s through freshness with bounded presentation context and does not replay terminal work',
@@ -389,10 +321,7 @@ it.each(['preview', 'stale'] as const)(
               preview: (attempt) =>
                 Effect.gen(function* () {
                   if (!attempt) return yield* Effect.die('Missing attempt identity');
-                  expect({ requestId: attempt.requestId, deadline: attempt.deadline }).toEqual({
-                    requestId: original.id,
-                    deadline: original.deadline,
-                  });
+                  expect(attempt.requestId).toBe(original.id);
                   calls++;
                   yield* attempt.progress('freshness');
                   return { kind, selected, rejected, input: { ...input, issues: [issue] } };
@@ -426,7 +355,7 @@ it.each(['preview', 'stale'] as const)(
         id: original.id,
         phase: 'succeeded',
         startedAt: 100,
-        deadline: 120100,
+        deadline: null,
         finishedAt: 500,
         elapsedMs: 400,
         result: expected,
@@ -511,7 +440,7 @@ it.each([false, true])(
   }
 );
 
-it('starts the automatic planner deadline before discovery and emits handoff before waiting for the model', async () => {
+it('emits handoff after discovery without assigning the model adapter a discovery deadline', async () => {
   const { vi } = await import('vitest');
   let now = 1000;
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
@@ -531,7 +460,7 @@ it('starts the automatic planner deadline before discovery and emits handoff bef
             ownership: () => Effect.succeed(undefined),
             propose: (_input, attempt) =>
               Effect.sync(() => {
-                expect(attempt?.deadline).toBe(601000);
+                expect(attempt?.deadline).toBeUndefined();
                 expect(phases).toEqual(attempt?.requestId ? ['discovery', 'handoff'] : []);
                 return { selected: [], deferred: [] };
               }),
@@ -545,7 +474,6 @@ it('starts the automatic planner deadline before discovery and emits handoff bef
     await runtime.runPromise(
       plan.preview({
         requestId: 'explicit',
-        deadline: 601000,
         progress: (phase) =>
           Effect.sync(() => {
             phases.push(phase);

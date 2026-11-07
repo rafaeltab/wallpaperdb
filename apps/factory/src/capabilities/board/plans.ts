@@ -55,7 +55,7 @@ export function planDetails(
   const plan: PlanAttempt = entity({
     id: `plan:${attempt.id}`,
     startedAt: new Date(attempt.startedAt).toISOString(),
-    deadline: new Date(attempt.deadline).toISOString(),
+    deadline: timestamp(attempt.launch?.deadline),
     finishedAt: timestamp(attempt.finishedAt),
     phase:
       attempt.launch?.phase === 'uncertain' ||

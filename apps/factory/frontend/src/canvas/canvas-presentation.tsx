@@ -283,8 +283,16 @@ export function CanvasEvidence({ item }: { item: Item }) {
       </fieldset>
       {reviews ? (
         reviews.reviewers.map((review) => {
-          const user = board.entities.users[review.userId],
-            qualifier = comparisonLabel(pr, reviews.comparison);
+          const user = board.entities.users[review.userId];
+          let qualifier = comparisonLabel(pr, reviews.comparison);
+          if (review.state !== 'requested' && review.reviewedHeadOid === null)
+            qualifier = 'Reviewed head unknown';
+          else if (
+            pr.metadata.state === 'known' &&
+            review.reviewedHeadOid !== null &&
+            review.reviewedHeadOid !== pr.metadata.value.comparison.headOid
+          )
+            qualifier = 'Previous comparison';
           const approved = review.state === 'approved' && qualifier === 'Current comparison';
           const detail = `${user?.login ?? 'Unknown reviewer'} · ${review.state} · ${qualifier}${reviews.complete ? '' : ' · Partial reviews'}`;
           return (

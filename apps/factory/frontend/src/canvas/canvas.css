@@ -16,7 +16,7 @@ body:has(.cc-app) { margin:0; padding:0; max-width:none; overflow:hidden; backgr
 .cc-viewport { height:calc(100dvh - 44px); position:relative; overflow:clip; touch-action:none; user-select:none; cursor:grab; background-image:radial-gradient(#343440 .65px,transparent .65px); background-size:18px 18px; }.cc-viewport.dragging { cursor:grabbing; }
 .cc-world { position:absolute; inset:0 auto auto 0; transform-origin:0 0; will-change:transform; }
 .cc-area { position:absolute; border-top:1px solid #383842; pointer-events:none; }
-.cc-area h2 { position:absolute; top:-9px; left:8px; margin:0; padding:0 10px 0 0; height:18px; display:flex; align-items:center; gap:8px; background:#0b0b0e; font-size:12px; font-weight:500; }
+.cc-area h2 { width:max-content; white-space:nowrap; position:absolute; top:-9px; left:8px; margin:0; padding:0 10px 0 0; height:18px; display:flex; align-items:center; gap:8px; background:#0b0b0e; font-size:12px; font-weight:500; }
 .cc-area h2>span { color:#81818e; font-size:9px; font-weight:400; }.cc-stage-dot { width:6px; height:6px; border:1px solid #9696a5; border-radius:50%; }.cc-stage-dot.working { background:#83aff0; border-color:#83aff0; }.cc-stage-dot.review { background:#62c3a2; border-color:#62c3a2; }
 .cc-parent-group { position:absolute; border:1px solid #34343d; border-radius:4px; background:#10101580; z-index:1; }
 .cc-parent-head { display:flex; align-items:center; gap:7px; width:100%; padding:4px 12px; color:#aeb0be; font-size:11px; cursor:pointer; background:#18181e; border-bottom:1px solid #2b2b34; border-radius:3px 3px 0 0; }
@@ -111,7 +111,7 @@ body:has(.cc-app) { margin:0; padding:0; max-width:none; overflow:hidden; backgr
 .cc-pr-top>.cc-identity { width:max-content; flex:0 0 auto; }.cc-identity { gap:8px; }.cc-identity svg { flex-shrink:0; }.cc-id-entry { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; white-space:nowrap; }.cc-identity>.cc-issue-number { font-size:10px; color:#90909e; }.cc-pr-state { color:#9696a5; font-size:8px; font-weight:400; margin-left:2px; }.cc-pr-top>.cc-title { flex:1 1 0; width:0; }
 .cc-status { justify-content:flex-end; text-align:right; }.cc-pr-top>.cc-status { margin-left:auto; }.cc-issue-top>.cc-status { margin-left:auto; }.cc-pr-top>.cc-fields,.cc-issue-top>.cc-fields { margin-left:-4px; }
 .cc-pr-panel.cc-collapsed>.cc-panel-title { height:30px; border-bottom:0; border-radius:3px; }.cc-parent-group.cc-collapsed>.cc-parent-head { border-radius:3px; }
-.cc-area h2>button { pointer-events:auto; align-items:center; gap:4px; font-size:9px; color:#858594; padding:2px 5px; border-radius:3px; }.cc-area h2>button:first-of-type { margin-left:7px; }.cc-area h2>button:hover { color:#dfdfe7; background:#ffffff08; }
+.cc-area h2>button { flex-shrink:0; white-space:nowrap; pointer-events:auto; align-items:center; gap:4px; font-size:9px; color:#858594; padding:2px 5px; border-radius:3px; }.cc-area h2>button:first-of-type { margin-left:7px; }.cc-area h2>button:hover { color:#dfdfe7; background:#ffffff08; }
 .cc-no-parent-heading>.cc-group-count { margin-left:0; }
 /* Text shares a baseline; icons stay centered independently of font size. */
 .cc-parent-head>.cc-heading-text { display:flex; align-items:baseline; gap:7px; flex:1; min-width:0; overflow:visible; line-height:15px; }

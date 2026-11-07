@@ -11,6 +11,7 @@ import type {
   Stage,
 } from './geometry-types';
 import type { Edge, Rect } from './routing';
+export const stageHeadingWidth = 310;
 export const stages: { id: Stage; name: string }[] = [
   { id: 'planned', name: 'Planned' },
   { id: 'working', name: 'Working' },
@@ -119,8 +120,15 @@ function arrangeIssues(
           chunk.forEach((item, column) => {
             nodes.push({ item, column, up, height: heightOf(item) });
           });
+          // Rows are flipped after packing: the next row sits above this one.
+          // Its dependant cards need room below them for incoming bottom ports.
+          const nextRow = row.slice(index + columns, index + columns * 2);
+          const nextNeedsPort = nextRow.some((item) =>
+            connections.some((edge) => edge.target === item.id)
+          );
           up +=
-            height + (index + columns < row.length ? 12 : levelIndex < levels.length - 1 ? 60 : 0);
+            height +
+            (nextRow.length ? (nextNeedsPort ? 60 : 12) : levelIndex < levels.length - 1 ? 60 : 0);
         }
       });
       return {
@@ -403,7 +411,12 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
       ];
       columnY[column] = Math.max(rowY + p.height + 12, ...ports.map((end) => end + 32));
     }
-    areas.push({ ...stage, y, height: maxBottom - y + 12, width: maxRight + 32 });
+    areas.push({
+      ...stage,
+      y,
+      height: maxBottom - y + 12,
+      width: Math.max(stageHeadingWidth + 32, maxRight + 32),
+    });
     y = maxBottom + 48;
   }
   const panels: Panel[] = [];
@@ -472,7 +485,7 @@ export function canvasLayout(fixture: CanvasData, options: LayoutOptions) {
     name: 'In review',
     y,
     height: maxBottom - y + 12,
-    width: maxRight + 32,
+    width: Math.max(stageHeadingWidth + 32, maxRight + 32),
   });
   const width = Math.max(...areas.map((a) => a.width)) + 16,
     height = maxBottom + 48;

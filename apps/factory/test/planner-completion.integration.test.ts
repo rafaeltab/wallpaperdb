@@ -99,6 +99,7 @@ it.each([false, true])(
     const host = await protocol();
     const previous = process.env.FACTORY_FIXTURE;
     process.env.FACTORY_FIXTURE = host.configFile;
+    let pending: Promise<unknown> | undefined;
     try {
       await host.save({
         holds: ['planner-observation'],
@@ -118,9 +119,11 @@ it.each([false, true])(
           capacity: { concurrency: 1, admission: 2 },
         })
       );
-      const result = timely
-        ? expect(work).resolves.toEqual({ selected: [], deferred: [] })
-        : expect(work).rejects.toMatchObject({ operation: 'model-deadline' });
+      const result = work.then(
+        (value) => ({ kind: 'success', value }),
+        (error) => ({ kind: 'failure', error })
+      );
+      pending = result;
       await vi.waitFor(
         async () =>
           expect(await readFile(`${host.directory}/held-planner-observation`, 'utf8')).toBe(
@@ -139,7 +142,11 @@ it.each([false, true])(
         });
       vi.setSystemTime(ownership.deadline + 1);
       await writeFile(`${host.directory}/release-planner-observation`, 'late completion');
-      await result;
+      const outcome = await result;
+      if (timely)
+        expect(outcome).toEqual({ kind: 'success', value: { selected: [], deferred: [] } });
+      else
+        expect(outcome).toMatchObject({ kind: 'failure', error: { operation: 'model-deadline' } });
       expect(await Effect.runPromise(planner.ownership(false))).toMatchObject({
         retired: true,
         deadline: ownership.deadline,
@@ -149,6 +156,7 @@ it.each([false, true])(
       ).toHaveLength(1);
     } finally {
       await writeFile(`${host.directory}/release-planner-observation`, 'cleanup');
+      await pending;
       vi.useRealTimers();
       if (previous === undefined) delete process.env.FACTORY_FIXTURE;
       else process.env.FACTORY_FIXTURE = previous;

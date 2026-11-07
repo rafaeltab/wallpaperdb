@@ -239,7 +239,9 @@ it('continuously admits a validated semantic plan through production adapters wi
   }
 });
 
-it('refreshes GitHub observations without clients and keeps HTTP local', async () => {
+it('refreshes on API demand while keeping idle metadata quiet and HTTP local', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = host.directory + ':' + previous.path;
@@ -257,6 +259,18 @@ it('refreshes GitHub observations without clients and keeps HTTP local', async (
   await host.save({
     planning: { candidates: [577], issues: [issue(577, 'Blocked by: #400'), issue(400, '')] },
   });
+  const { fileScheduleStore } = await import('../src/adapters/store/index.js');
+  const { Effect } = await import('effect');
+  await Effect.runPromise(
+    fileScheduleStore(host.directory + '/state').save({
+      revision: 0,
+      concurrency: 1,
+      allowance: 1,
+      paused: true,
+      admissions: [],
+    })
+  );
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   const running = await startFactory({
     FACTORY_PROJECT: host.repository,
     FACTORY_T3_PROJECT_ID: 'project-id',
@@ -266,30 +280,36 @@ it('refreshes GitHub observations without clients and keeps HTTP local', async (
     FACTORY_PORT: '0',
   });
   try {
-    const { sqliteObservations } = await import('../src/adapters/store/index.js');
-    const { Effect } = await import('effect');
-    // Observe durable storage, not HTTP, until independent background work completes.
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect((await running.app.inject('/health')).statusCode).toBe(200);
+    expect((await running.app.inject('/')).statusCode).toBe(200);
+    expect((await host.calls()).filter((c) => c.binary === 'gh')).toHaveLength(0);
+    expect(
+      (await host.calls()).filter((c) => c.binary === 't3' && !c.args.includes('--help'))
+    ).toHaveLength(0);
+    expect((await running.app.inject('/api/v2/board')).json().meta.dataMode).toBe('live');
     await vi.waitFor(
       async () =>
-        expect(
-          (
-            await Effect.runPromise(sqliteObservations(host.directory + '/state').read())
-          ).facts?.issues.map((i) => i.number)
-        ).toEqual([400, 577]),
+        expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+          relationships: [
+            { issue: 400, blockers: [] },
+            { issue: 577, blockers: [400] },
+          ],
+        }),
       { timeout: 10000, interval: 30 }
     );
     const count = (await host.calls()).filter((c) => c.binary === 'gh').length;
-    expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
-      relationships: [
-        { issue: 400, blockers: [] },
-        { issue: 577, blockers: [400] },
-      ],
-    });
+    expect(count).toBeGreaterThan(0);
+    expect(
+      (await running.app.inject('/api/v2/board')).json().entities.sources['source:github']
+        .nextAttemptAt
+    ).toBeNull();
     for (const url of ['/', '/api/job', '/api/scheduler', '/api/observations'])
       expect((await running.app.inject(url)).statusCode).toBe(200);
     expect((await host.calls()).filter((c) => c.binary === 'gh').length).toBe(count);
   } finally {
     await running.close();
+    vi.useRealTimers();
     process.env.PATH = previous.path;
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;

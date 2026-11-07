@@ -254,13 +254,14 @@ export const SchedulerLive = Layer.effect(
           const snapshot = yield* status();
           if (!available(snapshot)) return snapshot;
           const deadline = Date.now() + 600000;
-          const input = yield* source.read().pipe(
+          const input = yield* (source.poll?.() ?? source.read()).pipe(
             Effect.timeoutOrElse({
               duration: 600000,
               orElse: () =>
                 Effect.fail(new Unavailable({ operation: 'planning-deadline', cause: null })),
             })
           );
+          if (!input) return snapshot;
           const normalized = {
             ...input,
             job: normalize(input.job),

@@ -17,18 +17,17 @@ export function source(
       input.observedAt === undefined || kind === 'factory'
         ? null
         : timestamp(input.observedAt + 240000),
-    refresh: input.error
-      ? ('failed' as const)
-      : input.observedAt === undefined
-        ? ('unavailable' as const)
-        : (input.startedAt ?? 0) > input.observedAt
-          ? ('refreshing' as const)
-          : ('idle' as const),
+    refresh:
+      input.startedAt !== undefined &&
+      input.startedAt > Math.max(input.observedAt ?? -1, input.failedAt ?? -1)
+        ? ('refreshing' as const)
+        : input.error
+          ? ('failed' as const)
+          : input.observedAt === undefined
+            ? ('unavailable' as const)
+            : ('idle' as const),
     lastAttemptAt: timestamp(input.startedAt),
-    nextAttemptAt:
-      input.startedAt === undefined || kind === 'factory'
-        ? null
-        : timestamp(input.startedAt + 120000),
+    nextAttemptAt: null,
     failure: input.error
       ? {
           code: 'provider-unavailable',

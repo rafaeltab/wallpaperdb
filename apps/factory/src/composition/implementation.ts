@@ -53,6 +53,7 @@ import {
   githubIssues,
   githubPlanning,
   githubObservations,
+  githubRequests,
   type VerifiedPrerequisite,
 } from '../adapters/github/index.js';
 import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
@@ -61,6 +62,7 @@ import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
 import { v2Producer } from './v2.js';
 import { planningWorker } from './planning.js';
+import { observationWorker } from './refresh.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
@@ -135,6 +137,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   configuration.FACTORY_STATE = stateDirectory(configuration.FACTORY_STATE);
   await compatibleState(configuration.FACTORY_STATE);
   const project = resolve(configuration.FACTORY_PROJECT);
+  const requests = new AbortController();
+  const github = githubRequests({
+    project,
+    directory: configuration.FACTORY_STATE,
+    signal: requests.signal,
+  });
   await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);
   const help = await command(
     configuration.FACTORY_T3_BINARY,
@@ -153,28 +161,32 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       return result;
     });
   let recoveryAdmission: RecoveryAdmission = () => Effect.succeed(false);
+  const metadataGithub = (args: readonly string[], signal?: AbortSignal) =>
+    github(args, signal, 'background');
+  const githubConfig = (
+    read = github,
+    prerequisites = readyPrerequisites
+  ): Parameters<typeof githubIssues>[0] => ({
+    project,
+    read,
+    prBase: configuration.FACTORY_PR_BASE,
+    base: configuration.FACTORY_BASE,
+    prerequisites: configuration.FACTORY_PREREQUISITES,
+    readyPrerequisites: prerequisites,
+    admitRecovery: (issue) => recoveryAdmission(issue),
+    joins: {
+      directory: resolve(configuration.FACTORY_STATE, 'joins'),
+      binary: configuration.FACTORY_T3_BINARY,
+      projectId: configuration.FACTORY_T3_PROJECT_ID,
+      mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+      mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+    },
+  });
   const jobDeps = (directory: string) =>
     Layer.mergeAll(
       Layer.succeed(Time, systemTime),
       Layer.succeed(JobStore, fileStore(directory)),
-      Layer.succeed(
-        Issues,
-        githubIssues({
-          project,
-          prBase: configuration.FACTORY_PR_BASE,
-          base: configuration.FACTORY_BASE,
-          prerequisites: configuration.FACTORY_PREREQUISITES,
-          readyPrerequisites,
-          admitRecovery: (issue) => recoveryAdmission(issue),
-          joins: {
-            directory: resolve(configuration.FACTORY_STATE, 'joins'),
-            binary: configuration.FACTORY_T3_BINARY,
-            projectId: configuration.FACTORY_T3_PROJECT_ID,
-            mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-            mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-          },
-        })
-      ),
+      Layer.succeed(Issues, githubIssues(githubConfig())),
       Layer.succeed(ContinuationAdmission, {
         authorize: (issue, receipt) => recoveryAdmission(issue, receipt),
       }),
@@ -231,45 +243,35 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     ),
     Layer.succeed(JobPool, pool)
   );
+  let planningDemand = () => {};
   const planningDeps = Layer.mergeAll(
     Layer.effect(
       PlanningSource,
       Effect.map(Job, (job) => {
-        const source = githubPlanning(
-          {
-            project,
-            base: configuration.FACTORY_BASE,
-            prBase: configuration.FACTORY_PR_BASE,
-            prerequisites: configuration.FACTORY_PREREQUISITES,
-            readyPrerequisites,
-            admitRecovery: (issue) => recoveryAdmission(issue),
-            joins: {
-              directory: resolve(configuration.FACTORY_STATE, 'joins'),
-              binary: configuration.FACTORY_T3_BINARY,
-              projectId: configuration.FACTORY_T3_PROJECT_ID,
-              mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-              mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-            },
-          },
-          job
-        );
+        const source = githubPlanning(githubConfig(), job);
+        let automaticAt = 0;
+        const read = () =>
+          Effect.gen(function* () {
+            automaticAt = Date.now() + observationRefreshIntervalMs;
+            yield* Effect.sync(() => planningDemand());
+            const input = yield* source.read();
+            const state = yield* scheduleStore.read();
+            const jobs = [];
+            for (const admission of state.admissions)
+              jobs.push(yield* (yield* pool.job(admission.issue)).status());
+            return {
+              ...input,
+              jobs,
+              scheduleRevision: state.revision,
+              admissions: state.admissions.map((a) => a.issue),
+              paused: state.paused,
+              capacity: { concurrency: state.concurrency, admission: state.allowance },
+            };
+          });
         return {
-          read: () =>
-            Effect.gen(function* () {
-              const input = yield* source.read();
-              const state = yield* scheduleStore.read();
-              const jobs = [];
-              for (const admission of state.admissions)
-                jobs.push(yield* (yield* pool.job(admission.issue)).status());
-              return {
-                ...input,
-                jobs,
-                scheduleRevision: state.revision,
-                admissions: state.admissions.map((a) => a.issue),
-                paused: state.paused,
-                capacity: { concurrency: state.concurrency, admission: state.allowance },
-              };
-            }),
+          read,
+          poll: () =>
+            Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),
         };
       })
     ),
@@ -295,17 +297,21 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           githubObservations(
             project,
             () => Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
-            (number) =>
-              Effect.gen(function* () {
-                const issues = yield* Issues;
-                const observed = yield* issues.inspect(number);
-                return {
-                  allowed: eligible(observed),
-                  blockersReady: observed.blockersReady,
-                  verifiedAt: yield* systemTime.now(),
-                  evidence: observed.prerequisite?.evidence,
-                };
-              }).pipe(Effect.provide(deps))
+            Effect.gen(function* () {
+              const prerequisites = yield* Effect.cached(readyPrerequisites());
+              const issues = githubIssues(githubConfig(metadataGithub, () => prerequisites));
+              return (number: number) =>
+                Effect.gen(function* () {
+                  const observed = yield* issues.inspect(number);
+                  return {
+                    allowed: eligible(observed),
+                    blockersReady: observed.blockersReady,
+                    verifiedAt: yield* systemTime.now(),
+                    evidence: observed.prerequisite?.evidence,
+                  };
+                });
+            }),
+            metadataGithub
           )
         )
       )
@@ -356,11 +362,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     resume: (command) => scheduler.resume(command),
     cancel: (id) => scheduler.cancel(id),
   };
-  const requests = new AbortController();
-  const attempts = await planningWorker({
-    attempts: await runtime.runPromise(Attempts),
-    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
-  });
   const observations = await runtime.runPromise(Observations);
   const threadService = await runtime.runPromise(Threads);
   const threads = {
@@ -371,6 +372,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
       })),
   };
+  const refreshes = observationWorker(() =>
+    runtime.runPromise(
+      Effect.all([observations.refresh(), threads.refresh()], { concurrency: 2 }).pipe(
+        Effect.asVoid,
+        Effect.catch(Effect.logError)
+      ),
+      { signal: requests.signal }
+    )
+  );
+  planningDemand = refreshes.demand;
+  const attempts = await planningWorker({
+    attempts: await runtime.runPromise(Attempts),
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+  });
   const v2 = await v2Producer({
     runSync: (effect) => runtime.runSync(effect),
     planner: await runtime.runPromise(IPlanner),
@@ -392,12 +407,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     requests.abort();
     await Promise.allSettled([
       attempts.close(),
+      refreshes.close(),
       runtime.dispose(),
       ...[...workers.values()].map((worker) => worker.dispose()),
     ]);
     throw cause;
   });
   const app = operationsServer({
+    clientActivity: refreshes.client,
     v2: v2.data,
     threads: threads.snapshot,
     base: configuration.FACTORY_BASE,
@@ -423,6 +440,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       requests.abort();
       await v2.close();
       await attempts.close();
+      await refreshes.close();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }
@@ -456,40 +474,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       });
     void observing.catch(() => undefined);
   }, 1000);
-  let refreshing: Promise<unknown> | undefined;
-  const refresh = () => {
-    if (refreshing) return;
-    refreshing = runtime
-      .runPromise(observations.refresh().pipe(Effect.catch(Effect.logError)), {
-        signal: requests.signal,
-      })
-      .finally(() => {
-        refreshing = undefined;
-      });
-    void refreshing.catch(() => undefined);
-  };
-  refresh();
-  const refreshTimer = setInterval(refresh, observationRefreshIntervalMs);
-  let refreshingThreads: Promise<unknown> | undefined;
-  const refreshThreads = () => {
-    if (refreshingThreads) return;
-    refreshingThreads = runtime
-      .runPromise(threads.refresh().pipe(Effect.catch(Effect.logError)), {
-        signal: requests.signal,
-      })
-      .finally(() => {
-        refreshingThreads = undefined;
-      });
-    void refreshingThreads.catch(() => undefined);
-  };
-  refreshThreads();
-  const threadTimer = setInterval(refreshThreads, observationRefreshIntervalMs);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
       clearInterval(observationTimer);
-      clearInterval(refreshTimer);
-      clearInterval(threadTimer);
       // Reserve the remaining shutdown budget for bounded exporter disposal.
       const deadline = setTimeout(() => {
         requests.abort();
@@ -499,13 +487,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         await app.close();
       } finally {
         try {
-          await Promise.allSettled([
-            v2.close(),
-            attempts.close(),
-            observing,
-            refreshing,
-            refreshingThreads,
-          ]);
+          await Promise.allSettled([v2.close(), attempts.close(), observing, refreshes.close()]);
         } finally {
           clearTimeout(deadline);
           requests.abort();

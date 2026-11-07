@@ -132,10 +132,11 @@ export interface ObservationSource {
 export const ObservationSource = Context.Service<ObservationSource>(
   'wallpaperdb.factory.ObservationSource'
 );
-// Full GitHub refresh: immediate at startup, then every two minutes without overlap.
-// Facts become stale after two missed refresh opportunities; age is exposed even while loading.
-export const observationRefreshIntervalMs = 120_000;
-export const observationStaleAfterMs = 2 * observationRefreshIntervalMs;
+// Coalesced metadata demand waits at least five minutes between collections.
+// Provider budgeting may delay it further. Idle services do not collect metadata.
+export const observationRefreshIntervalMs = 300_000;
+// Freshness is independent of whether demand or provider capacity permits a refresh.
+export const observationStaleAfterMs = 240_000;
 export type ObservationSnapshot = ObservationState & {
   ageMs?: number;
   stale: boolean;

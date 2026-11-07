@@ -22,8 +22,10 @@ export function githubPlanning(
   config: Parameters<typeof githubIssues>[0],
   job: Job
 ): PlanningSource {
-  const gh = async (args: string[], signal?: AbortSignal) =>
-    JSON.parse(await command('gh', args, config.project, signal));
+  const gh =
+    config.read ??
+    (async (args: string[], signal?: AbortSignal) =>
+      JSON.parse(await command('gh', args, config.project, signal)));
   return {
     read: () =>
       Effect.gen(function* () {

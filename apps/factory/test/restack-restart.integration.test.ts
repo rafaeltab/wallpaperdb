@@ -101,7 +101,12 @@ const fs=require('fs'); const args=process.argv.slice(2); const result=require('
           try {
             stat = await readFile(`/proc/${pid}/stat`, 'utf8');
           } catch (error) {
-            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+            if (
+              error instanceof Error &&
+              'code' in error &&
+              (error.code === 'ENOENT' || error.code === 'ESRCH')
+            )
+              return;
             throw error;
           }
           const [state, , group] = stat.slice(stat.lastIndexOf(')') + 2).split(' ');

@@ -149,7 +149,13 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
           accounted.add(name);
         }
         if (response.retryAfter !== undefined || [403, 429].includes(response.status)) {
-          if (response.remaining === 0 && response.reset && response.reset > now) continue;
+          if (
+            response.retryAfter === undefined &&
+            response.remaining === 0 &&
+            response.reset &&
+            response.reset > now
+          )
+            continue;
           state.secondaryFailures = Math.min(32, state.secondaryFailures + 1);
           const after = response.retryAfter;
           const retry =

@@ -51,7 +51,16 @@ it('keeps empty section controls readable within heading clearance across title 
             'matrix(0.9, 0, 0, 0.9, 12, 12)'
           );
           for (const zoom of ['fit', 'in']) {
-            if (zoom === 'in') await page.keyboard.press('=');
+            if (zoom === 'in') {
+              const fittedTransform = await page
+                .locator('.cc-world')
+                .evaluate((el) => getComputedStyle(el).transform);
+              await page.keyboard.press('=');
+              await browserExpect(page.locator('.cc-world')).not.toHaveCSS(
+                'transform',
+                fittedTransform
+              );
+            }
             const headings = await page.locator('.cc-area h2').evaluateAll((elements) =>
               elements.map((heading) => {
                 const bounds = heading.getBoundingClientRect();

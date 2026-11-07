@@ -112,6 +112,52 @@ it.each([429, 503])(
     })
 );
 
+it.each([
+  { resetSeconds: 2, retrySeconds: 120 },
+  { resetSeconds: 120, retrySeconds: 2 },
+])(
+  'retains the later exhausted-quota or retry deadline across reopen: %j',
+  async ({ resetSeconds, retrySeconds }) =>
+    withGithub(async (host, stop) => {
+      const startedAt = Date.UTC(2026, 10, 7, 12);
+      let now = startedAt;
+      const clock = {
+        now: () => now,
+        wait: async (delay: number, signal: AbortSignal) => {
+          signal.throwIfAborted();
+          now += delay;
+        },
+      };
+      const reopen = () =>
+        githubIssues(
+          { project: host.repository, base: host.base, prerequisites: [] },
+          githubRequests({
+            project: host.repository,
+            directory: host.directory + '/state',
+            signal: stop.signal,
+            clock,
+          })
+        );
+      await host.save({
+        githubRate: {
+          status: 429,
+          retryAfter: String(retrySeconds),
+          limit: 7200,
+          remaining: 0,
+          reset: startedAt / 1000 + resetSeconds,
+        },
+      });
+      await expect(Effect.runPromise(reopen().inspect(577))).rejects.toMatchObject({
+        _tag: 'Unavailable',
+      });
+      await host.save({
+        githubRate: { limit: 7200, remaining: 7199, reset: startedAt / 1000 + 3600 },
+      });
+      expect(await Effect.runPromise(reopen().inspect(577))).toMatchObject({ open: true });
+      expect(clock.now() - startedAt).toBeGreaterThanOrEqual(120_000);
+    })
+);
+
 it('cancels a queued GitHub read during provider backoff without dispatching it', async () =>
   withGithub(async (host, stop) => {
     const now = Date.UTC(2026, 10, 7);

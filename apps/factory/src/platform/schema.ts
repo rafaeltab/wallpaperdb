@@ -137,3 +137,12 @@ export const githubRichFacts = sqliteTable('github_rich_facts', {
     .$type<{ observedAt: number; facts: import('../capabilities/observe/index.js').Facts }>()
     .notNull(),
 });
+
+export const githubRequestBudget = sqliteTable(
+  'github_request_budget',
+  {
+    id: integer('id').primaryKey(),
+    value: text('value', { mode: 'json' }).$type<unknown>().notNull(),
+  },
+  (table) => [check('github_request_budget_singleton', sql`${table.id} = 1`)]
+);

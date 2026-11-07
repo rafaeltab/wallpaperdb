@@ -52,9 +52,9 @@ test("Compose image plans and prebuilt startup are explicit opt-ins", () => {
 	assert.match(output("apps-build", "ARGS=--print"), / build --print\s*$/);
 	assert.match(
 		output("apps-start", "ARGS=--no-build"),
-		/ up -d --no-build\s*$/,
+		/ up -d --no-build\s+\|\| \{ status=\$\?;/,
 	);
-	assert.match(output("apps-start"), / up -d --build\s*$/);
+	assert.match(output("apps-start"), / up -d --build\s+\|\| \{ status=\$\?;/);
 	assert.match(output("dev", "ARGS=--no-up"), / watch --no-up\s*$/);
 	assert.match(output("dev"), / watch\s*$/);
 });
@@ -100,15 +100,25 @@ test("Ingestor caches distinguish scheduling modes only for instrumentation task
 			{ encoding: "utf8", env: childEnv },
 		);
 		assert.equal(result.status, 0, result.stderr);
-		return new Map(JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]));
+		return new Map(
+			JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]),
+		);
 	});
 	for (const task of ["test", "test:integration", "test:unit", "build"]) {
 		const id = `@wallpaperdb/ingestor#${task}`;
 		assert.ok(plans[0].has(id) && plans[1].has(id), `${id} must be planned`);
 		if (task === "test" || task === "test:integration") {
-			assert.notEqual(plans[0].get(id), plans[1].get(id), `${id} must hash scheduling mode`);
+			assert.notEqual(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must hash scheduling mode`,
+			);
 		} else {
-			assert.equal(plans[0].get(id), plans[1].get(id), `${id} must retain its cache identity`);
+			assert.equal(
+				plans[0].get(id),
+				plans[1].get(id),
+				`${id} must retain its cache identity`,
+			);
 		}
 	}
 });
@@ -368,6 +378,7 @@ test("one-off scripts require a package and script", () => {
 
 test("force applies to ordinary CI checks and type checks", () => {
 	const ci = output("ci", "FORCE=1");
+	assert.match(ci, /--continue=dependencies-successful/);
 	assert.match(
 		ci,
 		/run build lint check-types test:unit test:integration .*--force/,

@@ -1232,6 +1232,10 @@ async function lockGenerationCheckout(
 		"scripts/package.json",
 	]) {
 		local(name, fs.readFileSync(path.join(repository, name)));
+		fs.chmodSync(
+			path.join(root, name),
+			fs.statSync(path.join(repository, name)).mode & 0o777,
+		);
 	}
 	local("scripts/mise-shell.sh", '#!/bin/sh\nexec sh "$@"\n');
 	fs.chmodSync(path.join(root, "scripts/mise-shell.sh"), 0o755);
@@ -1389,7 +1393,7 @@ if(argv.includes('info')&&!argv.includes('fake-new-worker')){
   if(fs.existsSync(path.join(control,'incomplete-stop'))){console.log(JSON.stringify({state:'ready',stop:{id:'stop-current',status:'failing'}}));process.exit(0);}
   fs.writeFileSync(path.join(control,'sleep'),'yes');fs.unlinkSync(path.join(control,'stopping'));
  }
- console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
+ console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({sandbox:{id:'fake-worker',name:'wallpaperdb-557-smoke-fixture',type:'large',state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}}));process.exit(0);
 }
 if(argv.includes('stop')&&argv.includes('fake-new-worker')){if(fs.existsSync(path.join(control,'candidate-stop-uncertain')))process.exit(46);fs.writeFileSync(path.join(control,'candidate-stopped'),'yes');console.log('{}');process.exit(0);}
 if(argv.includes('stop')){fs.writeFileSync(path.join(control,'shutdown-request-state'),fs.readFileSync('.boat/state.json'));fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
@@ -5631,6 +5635,13 @@ async function developmentCheckout(
 	{ prepare = true, ...fixtureOptions } = {},
 ) {
 	const f = await lockGenerationCheckout(t, fixtureOptions);
+	f.local(
+		"packages/profile-markdown/package.json",
+		JSON.stringify({
+			name: "@wallpaperdb/profile-markdown",
+			scripts: { build: "true" },
+		}),
+	);
 	// Keep the real Make/controller path; control only remote process responses
 	// and Docker so restoration cannot touch a worker or the host's containers.
 	const transport = path.join(f.root, ".mise/boat/boat");
@@ -5796,6 +5807,11 @@ for (const targets of [
 						}
 					: undefined,
 			);
+			if (targets.length === 1)
+				assert.match(
+					fs.readFileSync(path.join(f.control, "validation"), "utf8"),
+					/"build".*"--filter=@wallpaperdb\/profile-markdown"/,
+				);
 			assert.equal(
 				f
 					.transport()
@@ -5874,7 +5890,7 @@ test("awake healthy preview fulfills explicit startup without saved development 
 	});
 });
 
-test("initial preview uses ordinary startup when readiness fails without a recovery obligation", async (t) => {
+test("initial preview reuses prepared images when readiness needs another ordinary startup", async (t) => {
 	const f = await developmentCheckout(t);
 	flag(f, "not-ready");
 	const preview = await f.run("boat-preview").done;
@@ -5884,13 +5900,16 @@ test("initial preview uses ordinary startup when readiness fails without a recov
 		.trim()
 		.split("\n")
 		.map((line) => JSON.parse(line));
-	assert.deepEqual(
-		docker.map((argv) => argv.slice(4)),
-		[
-			["infra/docker-compose.yml", "up", "-d"],
-			["infra/docker-compose.apps.yml", "up", "-d", "--build"],
-		],
-	);
+	const builds = docker.filter((argv) => argv.includes("build"));
+	assert.equal(builds.length, 1);
+	assert.equal(builds[0].at(-1), "web");
+	const starts = docker.filter((argv) => argv.includes("up"));
+	assert.equal(starts.length, 4);
+	for (const argv of starts.filter((argv) =>
+		argv.includes("infra/docker-compose.apps.yml"),
+	))
+		assert.ok(argv.includes("--no-build"));
+	assert.ok(docker.indexOf(builds[0]) < docker.indexOf(starts[0]));
 	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 });
 
@@ -6293,6 +6312,8 @@ for (const evidence of [
 				sandbox: {
 					id: state.id,
 					state: "archived",
+					name: "wallpaperdb-557-smoke-fixture",
+					type: "large",
 					hydrated: true,
 					snapshotAvailable: true,
 					snapshotCompletedAt: "2026-10-31T01:00:01Z",
@@ -7829,15 +7850,21 @@ async function migrationGenerationCheckout(t, fixtureOptions) {
 	);
 	const names = descriptor.before.migrationSet.map((entry) => entry.path);
 	for (const name of [
-		...names,
 		"apps/asset/package.json",
 		"apps/asset/drizzle.config.ts",
-		"apps/asset/src/db/schema.ts",
 	])
 		f.local(name, fs.readFileSync(path.join(repository, name)));
-	// Use checked-in inputs so the regression works in shallow checkouts. A
-	// test-only native append exercises source return without including a Source
-	// capability implementation in the infrastructure change.
+	// The active experiment may have a generated append. Start this private
+	// regression from its pinned product base, independently of working-tree edits.
+	for (const name of [...names, "apps/asset/src/db/schema.ts"])
+		f.local(
+			name,
+			execFileSync(
+				"git",
+				["show", `${descriptor.pins.applicationBase}:${name}`],
+				{ cwd: repository },
+			),
+		);
 	for (const entry of [
 		...descriptor.before.migrationSet,
 		descriptor.before.schema,
@@ -11659,6 +11686,15 @@ async function pendingUpgradePreview(
 		),
 	);
 	f = await lockGenerationCheckout(t);
+	// These lifetime scenarios begin with an already-serving development stack.
+	// Cold application startup is covered by developmentCheckout scenarios.
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+		}),
+	);
 	const initialCacheTunnel = f.json(".boat/cache-tunnel.json");
 	receipts.directory = f.directory;
 	delete f.env.MAKEFILES;
@@ -14197,8 +14233,8 @@ process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-original`)},argv,{stdio:'inh
 		fs
 			.readFileSync(docker, "utf8")
 			.replace(
-				"const apps=argv.includes",
-				"if(argv.includes('up'))fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'restore',argv})+'\\n');\nconst apps=argv.includes",
+				"const apps=argv.some",
+				"if(argv.includes('up'))fs.appendFileSync(path.join(control,'toolchain-log'),JSON.stringify({stage:'restore',argv})+'\\n');\nconst apps=argv.some",
 			),
 	);
 	return {
@@ -16117,6 +16153,7 @@ if(a[0]==='compose'&&a.includes('build')){
  console.log('Application build printed success before completion');fs.writeFileSync(path.join(c,'app-build-entered'),'yes');
  while(fs.existsSync(path.join(c,'hold-app-build'))&&!fs.existsSync(path.join(c,'release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
  if(fs.existsSync(path.join(c,'fail-app-build'))){console.error('native application image build failed');process.exit(23);}
+ fs.writeFileSync(path.join(c,'image-dependencies'),fs.readFileSync(path.join(process.env.FAKE_WORKER,'pnpm-lock.yaml')));
  fs.writeFileSync(path.join(c,'app-images-built'),'yes');record('completed');console.error('native application image build stderr drained');process.exit(0);
 }
 process.exit(cp.spawnSync(${JSON.stringify(`${docker}-ordinary`)},a,{env:process.env,stdio:'inherit'}).status??1);

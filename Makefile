@@ -238,7 +238,7 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@echo "E2E excluded (browser and container). GitHub Actions enforces E2E; opt in locally with make test-e2e."
 	@set -e; \
 	start_time=$$(date +%s); \
-	node scripts/docker-validation.mjs --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
+	node scripts/docker-validation.mjs --label ci -- $(TURBO) run build lint check-types test:unit test:integration --continue=dependencies-successful --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \

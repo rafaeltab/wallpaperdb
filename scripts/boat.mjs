@@ -641,7 +641,7 @@ async function ensure() {
 					worker.type !== config.size
 				)
 					throw new Error("Stopped worker ownership changed; no resume");
-				if (s.snapshotRecovery?.status === "DIRTY") snapshots.startup(info);
+				snapshots.startup(info);
 				if (s.resumeAttempt?.status === "submitted")
 					throw new Error(
 						"Previous resume is unresolved; no repeated submission",
@@ -730,7 +730,7 @@ async function ensure() {
 async function bootstrap(id) {
 	await ssh(
 		id,
-		`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && git -C ${remote} remote add origin https://github.com/rafaeltab/wallpaperdb.git); git -C ${remote} rev-parse --verify HEAD >/dev/null 2>&1 || (cd ${remote} && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
+		`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && git -C ${remote} remote add origin https://github.com/rafaeltab/wallpaperdb.git); (git -C ${remote} rev-parse --verify HEAD >/dev/null 2>&1 || (cd ${remote} && git fetch origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)) && (test "$(git -C ${remote} rev-parse --is-shallow-repository)" != true || git -C ${remote} fetch --unshallow origin ${quote(config.base)})`,
 	);
 }
 function sourceNames() {
@@ -1140,7 +1140,7 @@ async function reconcileDevelopment(
 					)
 					.join(" && ")
 			: `COMPOSE_PROJECT_NAME=${quote(process.env.COMPOSE_PROJECT_NAME)} mise exec -- node scripts/boat.mjs wait-app-images`;
-		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && ${imagePreparation} && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`;
+		const command = `${workerEnvironment}; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop ARGS=--remove-orphans BOAT_EXEC=worker && make build PACKAGE=profile-markdown BOAT_EXEC=worker && ${imagePreparation} && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`;
 		for (let attempt = 1; ; attempt++) {
 			let diagnostic = "";
 			try {
@@ -2602,7 +2602,7 @@ async function preview() {
 	);
 	await ssh(
 		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && ${health.status === 0 || foreground ? "" : `make infra-start BOAT_EXEC=worker && make apps-start ${read(stateFile).developmentWanted ? "ARGS=--no-build" : ""} BOAT_EXEC=worker && `}make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && ${health.status === 0 || foreground ? "" : "make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker && "}make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
 	);
 	event("application-ready", { ms: Date.now() - started });
 	if (!foreground) await watchDevelopment(id);

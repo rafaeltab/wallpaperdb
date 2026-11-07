@@ -15,7 +15,7 @@ const quota = z.object({
 });
 const object = z.record(z.unknown());
 const jsonFields = new Set(
-  'number,state,author,url,body,labels,title,comments,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,isDraft,statusCheckRollup'.split(
+  'number,state,author,url,body,labels,title,comments,headRefOid,headRefName,baseRefName,baseRefOid,mergeable,isDraft,statusCheckRollup,projectItems,closingIssuesReferences'.split(
     ','
   )
 );

@@ -55,6 +55,9 @@ export interface PlanningInput {
 }
 /** Complete bounded discovery, including parent and blocker context. Failure must not yield partial facts. */
 export interface PlanningSource {
+  /** Periodic discovery may coalesce demand without returning cached authority.
+   * Undefined means no new observation; explicit previews and freshness checks use read. */
+  poll?(): Effect.Effect<PlanningInput | undefined, Unavailable>;
   read(): Effect.Effect<PlanningInput, Unavailable>;
 }
 export const PlanningSource = Context.Service<PlanningSource>('wallpaperdb.factory.PlanningSource');

@@ -8,6 +8,7 @@ import {
   ObservationStore,
   ObservationSource,
   LocalSnapshot,
+  observationRefreshIntervalMs,
 } from '../capabilities/observe/index.js';
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -248,24 +249,29 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       PlanningSource,
       Effect.map(Job, (job) => {
         const source = githubPlanning(githubConfig(), job);
+        let automaticAt = 0;
+        const read = () =>
+          Effect.gen(function* () {
+            automaticAt = Date.now() + observationRefreshIntervalMs;
+            yield* Effect.sync(() => planningDemand());
+            const input = yield* source.read();
+            const state = yield* scheduleStore.read();
+            const jobs = [];
+            for (const admission of state.admissions)
+              jobs.push(yield* (yield* pool.job(admission.issue)).status());
+            return {
+              ...input,
+              jobs,
+              scheduleRevision: state.revision,
+              admissions: state.admissions.map((a) => a.issue),
+              paused: state.paused,
+              capacity: { concurrency: state.concurrency, admission: state.allowance },
+            };
+          });
         return {
-          read: () =>
-            Effect.gen(function* () {
-              yield* Effect.sync(() => planningDemand());
-              const input = yield* source.read();
-              const state = yield* scheduleStore.read();
-              const jobs = [];
-              for (const admission of state.admissions)
-                jobs.push(yield* (yield* pool.job(admission.issue)).status());
-              return {
-                ...input,
-                jobs,
-                scheduleRevision: state.revision,
-                admissions: state.admissions.map((a) => a.issue),
-                paused: state.paused,
-                capacity: { concurrency: state.concurrency, admission: state.allowance },
-              };
-            }),
+          read,
+          poll: () =>
+            Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),
         };
       })
     ),

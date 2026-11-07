@@ -311,6 +311,7 @@
             ]
         },
         "@wallpaperdb/infra-local#test:unit": {
+            "dependsOn": ["^build"],
             "inputs": [
                 "$TURBO_DEFAULT$"
             ],

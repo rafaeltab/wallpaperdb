@@ -189,16 +189,22 @@ it('uses PR ancestry for selection while stack ordering supplies its visual conn
 it.each(['separate-stacks', 'independent'])(
   'renders verified PR ancestry between %s cards',
   async (placement) => {
-    const board = await sample(),
-      stack = Object.values(board.entities.stacks)[0];
+    const seed = await sample(),
+      stack = Object.values(seed.entities.stacks)[0];
     if (!stack) throw new Error('Expected sample stack');
-    board.entities.stacks =
-      placement === 'independent'
-        ? {}
-        : {
-            'stack:base': { ...stack, id: 'stack:base', pullRequestIdsBaseToTip: ['pr:2003'] },
-            'stack:tip': { ...stack, id: 'stack:tip', pullRequestIdsBaseToTip: ['pr:2004'] },
-          };
+    const board: FactoryV2Snapshot = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        stacks:
+          placement === 'independent'
+            ? {}
+            : {
+                'stack:base': { ...stack, id: 'stack:base', pullRequestIdsBaseToTip: ['pr:2003'] },
+                'stack:tip': { ...stack, id: 'stack:tip', pullRequestIdsBaseToTip: ['pr:2004'] },
+              },
+      },
+    };
     const graph = layout(board, new Set()),
       base = graph.boxes.find((box) => box.item.item.id === 'item:1003'),
       tip = graph.boxes.find((box) => box.item.item.id === 'item:1004');

@@ -28,7 +28,7 @@ export async function protocol() {
     directory,
     repository,
     lost: true,
-    githubQuotaReset: Math.floor(Date.now() / 3_600_000) * 3600 + 3600,
+    githubQuotaReset: Math.ceil(Date.now() / 1000) + 3600,
   };
   await writeFile(configFile, JSON.stringify(config));
   const commands = join(directory, 'commands');

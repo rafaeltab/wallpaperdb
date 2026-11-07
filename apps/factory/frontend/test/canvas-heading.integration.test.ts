@@ -42,7 +42,14 @@ it('keeps empty section controls readable within heading clearance across title 
           await page.setViewportSize({ width, height: 800 });
           await page.goto(`${origin}?titles=${titles}`);
           await browserExpect(page.locator('[data-area=working] h2')).toContainText('Working0');
+          // A visible DOM node can precede passive keyboard-effect installation.
+          // Focus the actual canvas through a stable browser action before shortcuts.
+          await page.locator('.cc-viewport').click({ position: { x: 3, y: 3 } });
           await page.keyboard.press('f');
+          await browserExpect(page.locator('.cc-world')).not.toHaveCSS(
+            'transform',
+            'matrix(0.9, 0, 0, 0.9, 12, 12)'
+          );
           for (const zoom of ['fit', 'in']) {
             if (zoom === 'in') await page.keyboard.press('=');
             const headings = await page.locator('.cc-area h2').evaluateAll((elements) =>

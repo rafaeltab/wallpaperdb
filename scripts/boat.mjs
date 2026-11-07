@@ -641,6 +641,7 @@ async function ensure() {
 					worker.type !== config.size
 				)
 					throw new Error("Stopped worker ownership changed; no resume");
+				if (s.snapshotRecovery?.status === "DIRTY") snapshots.startup(info);
 				if (s.resumeAttempt?.status === "submitted")
 					throw new Error(
 						"Previous resume is unresolved; no repeated submission",

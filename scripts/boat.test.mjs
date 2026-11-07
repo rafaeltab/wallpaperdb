@@ -2612,8 +2612,20 @@ for (const state of ["ready", "stopped"])
 				snapshotRecovery: { status: "DIRTY", workerId: "fake-worker" },
 			}),
 		);
-		if (state === "stopped")
+		if (state === "stopped") {
 			fs.writeFileSync(path.join(f.control, "sleep"), "yes");
+			fs.writeFileSync(
+				path.join(f.control, "provider-info"),
+				JSON.stringify({
+					sandbox: {
+						id: "fake-worker",
+						name: "wallpaperdb-557-smoke-fixture",
+						type: "large",
+						state: "stopped",
+					},
+				}),
+			);
+		}
 		const result = await f.run("migrate", "PACKAGE=asset").done;
 		assert.notEqual(result.status, 0, result.output);
 		assert.match(result.output, /DIRTY.*snapshot/i);

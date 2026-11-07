@@ -188,6 +188,14 @@ export function createCanvasProjection() {
     const independent = items.filter((i) => i.stage === 'review' && !used.has(i.id));
     if (independent.length)
       stackSpecs.push({ key: 'independent', ids: independent.map((i) => i.id), stacked: false });
+    for (const edge of stackConnections)
+      if (
+        !stackSpecs.some(
+          (stack) =>
+            stack.stacked && stack.ids.includes(edge.source) && stack.ids.includes(edge.target)
+        )
+      )
+        connect(edge.source, edge.target);
     return {
       items,
       metadata,
@@ -195,7 +203,10 @@ export function createCanvasProjection() {
       parentOf,
       stackSpecs,
       connections,
-      selectionConnections: [...connections, ...stackConnections],
+      selectionConnections: [
+        ...connections,
+        ...stackConnections.filter((edge) => !keys.has(`${edge.source}-${edge.target}`)),
+      ],
     };
   };
 }

@@ -154,6 +154,28 @@ it('uses PR ancestry for selection while stack ordering supplies its visual conn
   expect(data.connections).not.toContainEqual({ source: base.id, target: tip.id });
 });
 
+it.each(['separate-stacks', 'independent'])(
+  'renders verified PR ancestry between %s cards',
+  async (placement) => {
+    const board = await sample(),
+      stack = Object.values(board.entities.stacks)[0];
+    if (!stack) throw new Error('Expected sample stack');
+    board.entities.stacks =
+      placement === 'independent'
+        ? {}
+        : {
+            'stack:base': { ...stack, id: 'stack:base', pullRequestIdsBaseToTip: ['pr:2003'] },
+            'stack:tip': { ...stack, id: 'stack:tip', pullRequestIdsBaseToTip: ['pr:2004'] },
+          };
+    const graph = layout(board, new Set()),
+      base = graph.boxes.find((box) => box.item.item.id === 'item:1003'),
+      tip = graph.boxes.find((box) => box.item.item.id === 'item:1004');
+    if (!base || !tip) throw new Error('Expected visible PR cards');
+    expect(graph.connections).toContainEqual({ source: base.id, target: tip.id });
+    expect(graph.routingConnections).toContainEqual({ source: base.id, target: tip.id });
+  }
+);
+
 it('displays a cyclic prerequisite component beside another dependency chain', async () => {
   const seed = await sample(),
     edge = Object.values(seed.entities.relationships).find((r) => r.kind === 'prerequisite');

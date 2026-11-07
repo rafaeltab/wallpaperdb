@@ -11,6 +11,7 @@ const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
   .strict();
 export function operationsServer(config: {
+  clientActivity?: () => () => void;
   v2?: V2Data;
   threads?: () => Effect.Effect<
     import('../capabilities/observe/index.js').ThreadSnapshot,
@@ -38,6 +39,18 @@ export function operationsServer(config: {
   ) => Effect.Effect<readonly WorkRelationship[], Unavailable>;
 }) {
   const app = Fastify({ bodyLimit: 20000 });
+  app.addHook('onRequest', async (request, reply) => {
+    if (!request.url.startsWith('/api/')) return;
+    const release = config.clientActivity?.();
+    if (!release) return;
+    const finish = () => {
+      reply.raw.off('finish', finish);
+      reply.raw.off('close', finish);
+      release();
+    };
+    reply.raw.once('finish', finish);
+    reply.raw.once('close', finish);
+  });
   const problem = (status: number, type: string, title: string) => ({
     status,
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,

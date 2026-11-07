@@ -17,7 +17,7 @@ Before substantive fixes or status updates, follow [issue selection for PR fixes
 
 For GitHub discovery, replies, reactions, and thread resolution, read [references/github-operations.md](references/github-operations.md). Use available GitHub tools or `gh`; retain the original comment IDs and distinguish them from thread IDs.
 
-Read all pages of review threads, their replies, review summaries, and PR conversation comments. By default, handle all unhandled actionable feedback. Explicit comment IDs or URLs narrow the selection, but still read the surrounding conversation. Skip resolved threads unless explicitly selected or later feedback reopens the concern. An outdated line marker does not establish that a concern is fixed.
+Read the complete snapshot returned by the feedback collector. By default, handle all unhandled actionable feedback. Explicit comment IDs or URLs narrow the selection, but still read the surrounding conversation. Skip resolved threads unless explicitly selected or later feedback reopens the concern. An outdated line marker does not establish that a concern is fixed.
 
 Keep a working checklist outside the repository or in session state. For each selected comment, record its URL and ID, thread ID if present, individual claims, verdict and evidence, fix commit, checks, and publication state. A prior reaction alone does not prove the feedback was handled; inspect the replies and current code. Skip acknowledgements and other comments with no requested action.
 

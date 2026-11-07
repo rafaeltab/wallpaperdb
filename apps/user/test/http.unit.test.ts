@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
@@ -41,6 +42,7 @@ describe('User HTTP adapter', () => {
         url: '/profile/me/ensure',
         headers: auth,
       });
+      assertHttpErrorContract(response);
       expect(response.statusCode).toBe(status);
       expect(response.headers['content-type']).toContain('application/problem+json');
       expect(response.json()).toMatchObject({
@@ -90,6 +92,7 @@ describe('User HTTP adapter', () => {
         url,
         payload: { handle: 'new-handle', expectedVersion: 7 },
       });
+      assertHttpErrorContract(unauthenticated);
       expect(unauthenticated.statusCode).toBe(401);
       expect(unauthenticated.json().type).toBe(
         'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unauthorized.md'
@@ -109,6 +112,7 @@ describe('User HTTP adapter', () => {
           headers: auth,
           payload: { handle: 'new-handle', expectedVersion },
         });
+        assertHttpErrorContract(invalid);
         expect(invalid.statusCode).toBe(400);
         expect(invalid.headers['content-type']).toContain('application/problem+json');
         expect(invalid.json()).toMatchObject({
@@ -124,6 +128,7 @@ describe('User HTTP adapter', () => {
             headers: auth,
             payload: { handle, expectedVersion: 7 },
           });
+          assertHttpErrorContract(invalid);
           expect(invalid.statusCode).toBe(400);
           expect(invalid.json().type).toBe(
             'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-handle.md'
@@ -167,6 +172,7 @@ describe('User HTTP adapter', () => {
         url: '/profile/me/ensure',
         headers: auth,
       });
+      assertHttpErrorContract(response);
       expect(response.statusCode).toBe(status);
       expect(response.json()).toMatchObject({
         status,
@@ -192,6 +198,7 @@ describe('User HTTP adapter', () => {
         url: '/profile/me/ensure',
         headers: { authorization },
       });
+      assertHttpErrorContract(response);
       expect(response.statusCode).toBe(401);
     } finally {
       await app.close();
@@ -206,12 +213,14 @@ describe('User HTTP adapter', () => {
       const denied = await app.inject({
         url: '/internal/profile-pictures/pic_missing/availability',
       });
+      assertHttpErrorContract(denied);
       expect(denied.statusCode).toBe(401);
       expect(denied.headers['cache-control']).toBe('no-store');
       const missing = await app.inject({
         url: '/internal/profile-pictures/pic_missing/availability',
         headers: { authorization: 'Bearer test-token' },
       });
+      assertHttpErrorContract(missing);
       expect(missing.statusCode).toBe(404);
       expect(missing.headers['cache-control']).toBe('no-store');
     } finally {
@@ -236,6 +245,7 @@ describe('User HTTP adapter', () => {
         headers: auth,
         payload: payload ?? undefined,
       });
+      assertHttpErrorContract(response);
       expect(response.statusCode).toBe(400);
       expect(response.json().type).toBe(
         `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`
@@ -267,6 +277,7 @@ describe('User HTTP adapter', () => {
         headers: auth,
         payload: { displayName: 'Edited', expectedVersion: 7, profileId: 'victim' },
       });
+      assertHttpErrorContract(result);
       expect(result.statusCode).toBe(409);
       expect(result.headers['content-type']).toContain('application/problem+json');
       expect(result.json()).toMatchObject({

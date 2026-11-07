@@ -49,12 +49,16 @@ export function lint(
 		const config = JSON.parse(
 			readFileSync(join(workspace, "test-correctness.json"), "utf8"),
 		);
-		config.linter = { rules: { preset: "none" } };
+		config.linter = { rules: { preset: "none", correctness: { noUndeclaredDependencies: "error" } } };
 		config.plugins = config.plugins.map((plugin: { path: string }) => ({
 			...plugin,
 			path: join(workspace, plugin.path),
 		}));
 		writeFileSync(join(directory, "biome.json"), JSON.stringify(config));
+		writeFileSync(
+			join(directory, "package.json"),
+			JSON.stringify({ devDependencies: { vitest: "5.0.2" } }),
+		);
 		symlinkSync(
 			join(workspace, "node_modules"),
 			join(directory, "node_modules"),

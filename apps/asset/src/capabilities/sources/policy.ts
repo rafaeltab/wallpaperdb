@@ -1,23 +1,4 @@
-/** Author policy values are admission limits, never measured native processing budgets. */
-export interface SourcePolicy {
-  readonly maxActiveSources: number;
-  readonly maxCandidates: number;
-  readonly aspectRatioTolerance: number;
-  readonly operations: readonly ('add' | 'replace-one' | 'replace-set')[];
-  readonly admission: {
-    readonly maxBytes: number;
-    readonly maxPixels: number;
-    readonly maxAxis: number;
-    readonly squareSize?: number;
-    readonly sourceModels: readonly string[];
-  };
-  readonly retention: { readonly evidenceMs: number; readonly candidateMs: number };
-  readonly temporaryInput: { readonly maxBytes: number; readonly abandonedMs: number };
-}
-export interface SourceOperations {
-  readonly readLifetimeMs: number;
-  readonly reclamationTimeoutMs: number;
-}
+import type { SourceOperations, SourcePolicy } from './contract.js';
 /** One owner for operational normalization, shared by trusted configuration and
  * direct capability/adapter consumers. These ceilings do not qualify capacity. */
 export function resolveSourceOperations(input: Partial<SourceOperations> = {}): SourceOperations {

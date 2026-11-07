@@ -14,7 +14,8 @@ import {
   type SourceFacts,
   type SourcesPort,
 } from './contract.js';
-import { resolveSourceOperations, type SourcePolicy } from './policy.js';
+import { resolveSourceOperations } from './policy.js';
+import type { SourcePolicy } from './contract.js';
 const unavailable = { kind: 'unavailable' } as const;
 const nonterminal = (candidate: Candidate) =>
   !['accepted', 'rejected', 'cancelled'].includes(candidate.status);

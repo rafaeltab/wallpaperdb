@@ -57,7 +57,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
-        worktree-remove ci clean toolchain
+        worktree-remove ci clean toolchain lint-docs
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -234,6 +234,12 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@set -e; \
 	start_time=$$(date +%s); \
 	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
+	node scripts/check-documentation.ts; \
+	node scripts/check-generated.ts routes; \
+	node scripts/check-generated.ts openapi; \
+	node scripts/check-service-wiring.ts; \
+	node scripts/check-migrations.ts; \
+	node scripts/check-generated.ts migrations; \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
@@ -255,3 +261,6 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning generated OpenAPI specs..."
 	@rm -f apps/ingestor/swagger.json apps/asset/swagger.json apps/user/swagger.json
 	@echo "✓ Clean complete"
+
+lint-docs: ## Check maintained documentation and skills (ARGS='--changed <base>' for edited imports)
+	@node scripts/check-documentation.ts $(ARGS)

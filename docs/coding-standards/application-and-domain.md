@@ -7,7 +7,7 @@ Scope: backend capabilities, their application-owned ports, domain policy, and t
 - Effect is the required programming model for effectful application and domain operations, dependency composition, and resource lifecycles. Pure values and calculations remain ordinary TypeScript.
 - Every injected port has an application-owned TypeScript interface and a colocated, namespaced Effect `Context.Service` key; adapters explicitly implement their port interfaces. Separate `Symbol.for(...)` tokens, TSyringe containers, and property injection are not used.
 - Use Effect Layers to construct services and supply their dependencies. Resolve implementation dependencies during layer construction rather than exposing them as requirements of the port's operations. Private implementations may still use ordinary constructors; pure domain values and calculations do not need to become services.
-- Application and domain code declare typed dependencies rather than using global service locators or creating or running their own runtimes. [Composition selects implementations and lifetimes](composition-and-operations.md#configuration-and-lifecycle); [driving adapters execute effects at transport boundaries](adapters.md#driving-adapters).
+- Application and domain code declare typed dependencies rather than using global service locators. Runtime execution is checked by the [capability Biome rule](../../packages/biome-test-rules/src/architecture.ts). [Composition selects implementations and lifetimes](composition-and-operations.md#configuration-and-lifecycle); [driving adapters execute effects at transport boundaries](adapters.md#driving-adapters).
 
 ## Outcomes and failures
 

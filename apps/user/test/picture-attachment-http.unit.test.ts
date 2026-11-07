@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import {
@@ -147,6 +148,7 @@ describe('Initial picture attachment HTTP translation', () => {
         url: '/profile/me/picture-attachments/attachment-A',
         headers: auth,
       });
+      assertHttpErrorContract(failed);
       expect(failed.statusCode).toBe(503);
       expect(failed.json()).toMatchObject({
         status: 503,

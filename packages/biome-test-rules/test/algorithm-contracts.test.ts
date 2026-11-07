@@ -434,3 +434,229 @@ function required<T>(value: T): NonNullable<T> {
 		throw new Error("Expected a required test value");
 	return value;
 }
+import type { AnyJsAstNode, SemanticModel } from "@biomejs/runtime/plugin";
+import {
+	capabilityViolation,
+	invalidEntryStatements,
+	isFixedWait,
+} from "../src/guideline-policy.ts";
+
+// Native-shaped records exercise rule decisions here. The real CLI fixtures
+// continue to own native parsing, binding resolution, and rule registration.
+function policyReference(
+	name: string,
+	property?: string,
+	namespaceProperty?: string,
+	computed = false,
+) {
+	const node: Input = { kind: "JS_REFERENCE_IDENTIFIER", text: name };
+	const expression: Input = {
+		kind: "JS_IDENTIFIER_EXPRESSION",
+		text: name,
+		parent: undefined,
+	};
+	node.parent = expression;
+	if (property) {
+		const access: Input = {
+			kind: computed
+				? "JS_COMPUTED_MEMBER_EXPRESSION"
+				: "JS_STATIC_MEMBER_EXPRESSION",
+			text: name,
+			member: computed
+				? {
+						kind: "JS_STRING_LITERAL_EXPRESSION",
+						valueToken: JSON.stringify(property),
+					}
+				: { text: property },
+		};
+		expression.parent = access;
+		if (namespaceProperty)
+			access.parent = {
+				kind: "JS_STATIC_MEMBER_EXPRESSION",
+				member: { text: namespaceProperty },
+			};
+	}
+	return node as unknown as AnyJsAstNode;
+}
+function policyBinding(
+	source: string,
+	original: string,
+	namespace = false,
+): ReturnType<SemanticModel["binding"]> {
+	const specifier = {
+		kind: namespace
+			? "JS_NAMESPACE_IMPORT_SPECIFIER"
+			: "JS_NAMED_IMPORT_SPECIFIER",
+		name: { text: original },
+	};
+	const declaration = {
+		text: original,
+		parent: specifier,
+		ancestors: () => [
+			{
+				kind: "JS_IMPORT",
+				importClause: { source: { valueToken: JSON.stringify(source) } },
+			},
+		],
+	};
+	return { syntax: () => declaration } as unknown as ReturnType<
+		SemanticModel["binding"]
+	>;
+}
+test("capability decisions distinguish host configuration, imported execution and ordinary values", () => {
+	for (const name of ["process", "global", "globalThis"])
+		expect(
+			capabilityViolation(
+				policyReference(
+					name,
+					name === "process" ? "env" : "process",
+					undefined,
+					true,
+				),
+				undefined,
+			),
+		).toMatch(/^capability-configuration:/);
+	expect(
+		capabilityViolation(policyReference("global", "Math"), undefined),
+	).toBeUndefined();
+	expect(
+		capabilityViolation(
+			policyReference("process"),
+			policyBinding("local", "process"),
+		),
+	).toBeUndefined();
+	expect(
+		capabilityViolation(policyReference("local"), undefined),
+	).toBeUndefined();
+	for (const source of [
+		"effect/Effect",
+		"effect/Runtime",
+		"effect/ManagedRuntime",
+	])
+		for (const name of [
+			"runPromise",
+			"runSyncExitWith",
+			"runForkWith",
+			"runCallbackWith",
+			"make",
+			"makeWith",
+			"makeRunMain",
+			"defaultRuntime",
+		])
+			expect(
+				capabilityViolation(
+					policyReference("alias"),
+					policyBinding(source, name),
+				),
+			).toMatch(/^capability-execution:/);
+	for (const original of ["Effect", "Runtime", "ManagedRuntime"])
+		expect(
+			capabilityViolation(
+				policyReference("alias", "runPromise"),
+				policyBinding("effect", original),
+			),
+		).toMatch(/^capability-execution:/);
+	expect(
+		capabilityViolation(
+			policyReference("E", "Effect", "runSync"),
+			policyBinding("effect", "E", true),
+		),
+	).toMatch(/^capability-execution:/);
+	for (const [source, original, property, namespace] of [
+		["effect", "Effect", "map", false],
+		["effect", "Option", "make", false],
+		["effect", "E", "Option", true],
+		["other", "Effect", "runPromise", false],
+		["", "runPromise", "", false],
+	] as const)
+		expect(
+			capabilityViolation(
+				policyReference("value", property),
+				policyBinding(source, original, namespace),
+			),
+		).toBeUndefined();
+	expect(
+		capabilityViolation(
+			{ kind: "JS_REFERENCE_IDENTIFIER", text: "local" } as AnyJsAstNode,
+			undefined,
+		),
+	).toBeUndefined();
+	expect(
+		capabilityViolation(policyReference("local"), {
+			syntax: () => ({ ancestors: () => [] }),
+		} as unknown as ReturnType<SemanticModel["binding"]>),
+	).toBeUndefined();
+});
+
+test("entry decisions permit contract exports and identify private behavior only at capability entries", () => {
+	const allowed = [
+		{ kind: "JS_IMPORT" },
+		{
+			kind: "JS_EXPORT",
+			exportClause: { kind: "JS_EXPORT_NAMED_FROM_CLAUSE" },
+		},
+		{ kind: "JS_EXPORT", exportClause: { kind: "JS_EXPORT_NAMED_CLAUSE" } },
+	];
+	const rejected = [
+		{ kind: "JS_VARIABLE_STATEMENT" },
+		{ kind: "JS_EXPORT", exportClause: { kind: "JS_EXPORT_FROM_CLAUSE" } },
+		{ kind: "JS_EXPORT" },
+	];
+	const file = "/apps/example/src/capabilities/search/index.ts";
+	const module = {
+		kind: "JS_MODULE",
+		items: [...allowed, ...rejected],
+	} as unknown as AnyJsAstNode;
+	expect(invalidEntryStatements(module, file)).toStrictEqual(rejected);
+	expect(
+		invalidEntryStatements(
+			{ kind: "JS_SCRIPT", statements: allowed } as unknown as AnyJsAstNode,
+			file,
+		),
+	).toStrictEqual([]);
+	expect(
+		invalidEntryStatements(
+			module,
+			file.replace("index.ts", "implementation.ts"),
+		),
+	).toStrictEqual([]);
+	expect(
+		invalidEntryStatements(
+			{ kind: "JS_IDENTIFIER_EXPRESSION", text: "value" } as AnyJsAstNode,
+			file,
+		),
+	).toStrictEqual([]);
+});
+
+test("fixed-wait decisions flag the advisory operation without flagging other waits", () => {
+	const node = (callee?: object) =>
+		({ kind: "JS_CALL_EXPRESSION", callee }) as AnyJsAstNode;
+	expect(
+		isFixedWait(
+			node({
+				kind: "JS_STATIC_MEMBER_EXPRESSION",
+				member: { text: "waitForTimeout" },
+			}),
+		),
+	).toBe(true);
+	expect(
+		isFixedWait(
+			node({
+				kind: "JS_STATIC_MEMBER_EXPRESSION",
+				member: { text: "waitForSelector" },
+			}),
+		),
+	).toBe(false);
+	expect(
+		isFixedWait(
+			node({ kind: "JS_IDENTIFIER_EXPRESSION", text: "waitForTimeout" }),
+		),
+	).toBe(false);
+	expect(isFixedWait(node())).toBe(false);
+	expect(
+		isFixedWait({
+			kind: "JS_IDENTIFIER_EXPRESSION",
+			text: "wait",
+		} as AnyJsAstNode),
+	).toBe(false);
+});

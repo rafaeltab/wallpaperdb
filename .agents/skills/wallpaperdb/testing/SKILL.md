@@ -28,6 +28,10 @@ Apply this guidance to implementation defects, review feedback, and automated re
 4. When a fix narrows accepted inputs, changes classification, or adds a restriction, cover both the reported defect case and a closely related valid case. Check that the valid case works before and after the fix and that the defect case changes as intended. If the proposed fix rejects a supported caller, repair the false positive or incorrect restriction rather than rewriting the valid caller to accommodate it.
 5. Report the evidence, checks and their results, preserved behavior, and remaining limits. State what the checks establish without claiming broader correctness.
 
+## Retain executable evidence
+
+When retaining a reproduction, red/green result, or publication validation, run `make run PACKAGE=scripts SCRIPT=agent ARGS='record-check /absolute/path/check.json'`. The request contains a Make `command` argv array, `expect` set to `success` or `failure`, and an outside-repository `output` path. The recorder binds the observed result and hashed log to its source state and detects source changes during execution. Inspect why a failing command failed; a recorded failure alone does not prove the reported defect or behavioral coverage.
+
 ## Container failures
 
 - Integration tests and container E2E suites start their own containers. Docker must be running. Local `make ci` excludes E2E; GitHub Actions enforces complete E2E coverage. Explicit local `make test-e2e` provisions only selected dependencies and owns browser stack startup and cleanup.

@@ -1,0 +1,51 @@
+{
+  "routes": {
+    "apps/web": {
+      "script": "generate:routes",
+      "committed": false,
+      "outputs": [
+        "src/routeTree.gen.ts"
+      ]
+    }
+  },
+  "openapi": {
+    "apps/asset": {
+      "script": "gen:swagger",
+      "outputs": [
+        "swagger.json"
+      ]
+    }
+  },
+  "migrations": {
+    "apps/asset": {
+      "script": "db:generate",
+      "outputs": [
+        "drizzle"
+      ]
+    },
+    "apps/user": {
+      "script": "db:generate",
+      "outputs": [
+        "drizzle"
+      ]
+    },
+    "apps/ingestor": {
+      "script": "db:generate",
+      "outputs": [
+        "drizzle"
+      ]
+    },
+    "apps/wallpaper": {
+      "script": "db:generate",
+      "outputs": [
+        "drizzle"
+      ]
+    },
+    "apps/tags": {
+      "script": "db:generate",
+      "outputs": [
+        "drizzle"
+      ]
+    }
+  }
+}

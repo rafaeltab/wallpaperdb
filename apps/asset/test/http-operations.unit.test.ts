@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -73,6 +74,7 @@ it('serves health, readiness, OpenAPI, CORS and safe errors', async () => {
     });
     app.connectionsState.isShuttingDown = true;
     const response = await app.inject('/health');
+    assertHttpErrorContract(response);
     expect(response.statusCode).toBe(503);
     expect(response.json()).toMatchObject({ status: 503, healthStatus: 'shutting_down' });
     expect((await app.inject('/ready')).json()).toMatchObject({
@@ -138,6 +140,7 @@ it('hides defects and releases scoped services on close', async () => {
   );
   const app = await createHttpApp({ nodeEnv: 'test', port: 3006 }, Layer.merge(layer, delivery));
   const result = await app.inject('/health');
+  assertHttpErrorContract(result);
   expect(result.statusCode).toBe(500);
   expect(result.body).not.toContain('secret');
   await app.close();

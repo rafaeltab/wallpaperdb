@@ -1,6 +1,25 @@
 import { Context, Data, type Effect } from 'effect';
 import type { OwnedAsset, Owner, CommandContext } from '../lifecycle/index.js';
-import type { SourcePolicy } from './policy.js';
+/** Author policy values are admission limits, never measured native processing budgets. */
+export interface SourcePolicy {
+  readonly maxActiveSources: number;
+  readonly maxCandidates: number;
+  readonly aspectRatioTolerance: number;
+  readonly operations: readonly ('add' | 'replace-one' | 'replace-set')[];
+  readonly admission: {
+    readonly maxBytes: number;
+    readonly maxPixels: number;
+    readonly maxAxis: number;
+    readonly squareSize?: number;
+    readonly sourceModels: readonly string[];
+  };
+  readonly retention: { readonly evidenceMs: number; readonly candidateMs: number };
+  readonly temporaryInput: { readonly maxBytes: number; readonly abandonedMs: number };
+}
+export interface SourceOperations {
+  readonly readLifetimeMs: number;
+  readonly reclamationTimeoutMs: number;
+}
 export class SourceFailure extends Data.TaggedError('SourceFailure')<{
   readonly operation: string;
   readonly cause: unknown;

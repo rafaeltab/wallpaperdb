@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import type { FastifyInstance } from 'fastify';
@@ -575,6 +576,7 @@ describe('GraphQL security driving contract', () => {
       url: '/graphql',
       payload: Array.from({ length: size }, () => ({ query })),
     });
+    assertHttpErrorContract(response, 'graphql');
     expect(response.statusCode).toBe(400);
     expect(response.json().errors[0].extensions.code).toBe(
       size > 10 ? 'BATCH_LIMIT_EXCEEDED' : 'BATCH_NOT_SUPPORTED'
@@ -816,6 +818,7 @@ describe('GraphQL security driving contract', () => {
       headers: { 'content-type': 'application/json' },
       payload: '{',
     });
+    assertHttpErrorContract(response, 'graphql');
     expect(response.statusCode).toBe(400);
     expect(response.json().errors).toBeDefined();
   });

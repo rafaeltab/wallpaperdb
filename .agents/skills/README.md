@@ -8,7 +8,7 @@ Skills live in category folders, following [Matt Pocock's organization](https://
 - [In progress](in-progress/): experimental skills from that collection.
 - [WallpaperDB](wallpaperdb/): workflows maintained for this repository.
 
-These are the actual skill directories. Codex discovers their nested `SKILL.md` files. Keep names unique across categories and update relative links when moving a skill. Matt Pocock skills use the category in their upstream `skillPath` in [`skills-lock.json`](../../skills-lock.json); repository-specific workflows belong in `wallpaperdb/`.
+These are the actual skill directories. Codex discovers their nested `SKILL.md` files. Run `make lint-docs` after installing or moving skills. Matt Pocock skills use the category in their upstream `skillPath` in [`skills-lock.json`](../../skills-lock.json); repository-specific workflows belong in `wallpaperdb/`.
 
 ## Installing and updating
 

@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { readFileSync } from 'node:fs';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
@@ -115,6 +116,7 @@ describe('Picture HTTP translation', () => {
           url: '/profile/me/picture',
           payload: { expectedVersion: 4 },
         });
+        assertHttpErrorContract(reply);
         expect(reply.statusCode).toBe(401);
       }
     } finally {
@@ -175,6 +177,7 @@ describe('Picture HTTP translation', () => {
         url: '/profile/me/picture',
         ...multipart(Buffer.alloc(9)),
       });
+      assertHttpErrorContract(oversized);
       expect(oversized.statusCode).toBe(413);
       expect(oversized.json().type).toContain('picture-too-large');
       const invalid = await app.inject({
@@ -182,6 +185,7 @@ describe('Picture HTTP translation', () => {
         url: '/profile/me/picture',
         ...multipart(Buffer.from('image'), '4x'),
       });
+      assertHttpErrorContract(invalid);
       expect(invalid.statusCode).toBe(400);
       expect(invalid.json().type).toContain('invalid-picture-command');
     } finally {
@@ -253,6 +257,7 @@ describe('Picture HTTP translation', () => {
         headers: auth,
         payload: { expectedVersion: 4 },
       });
+      assertHttpErrorContract(reply);
       expect(reply.statusCode).toBe(409);
       expect(reply.json().type).toContain('profile-version-conflict');
     } finally {

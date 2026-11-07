@@ -11,6 +11,15 @@
 				"!**/{dist,build,coverage,.next,.output}/**",
 				"!**/test/fixtures/crap/**"
 			]
+		},
+		{
+			"path": "./src/architecture.ts",
+			"resolutionKind": "config",
+			"includes": [
+				"**/src/capabilities/**/*.ts",
+				"!**/*.{test,spec}.ts",
+				"!**/{test,tests,specs}/**"
+			]
 		}
 	],
 	"overrides": [

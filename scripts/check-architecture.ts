@@ -18,7 +18,11 @@ const src = path.join(application, "src");
 const capabilitiesRoot = path.join(src, "capabilities");
 const require = createRequire(path.join(application, "package.json"));
 const ts: typeof import("typescript") = require("typescript");
-const config = JSON.parse(
+const config: {
+	capabilities?: unknown;
+	publicModules: string[];
+	allowedCapabilityDependencies?: Record<string, string[]>;
+} = JSON.parse(
 	fs.readFileSync(path.join(application, "quality.config.json"), "utf8"),
 );
 const errors = [];
@@ -70,13 +74,13 @@ function publicModule(filename: string) {
 	const relative = path.relative(src, filename).split(path.sep).join("/");
 	const capabilityName = capability(filename);
 	if (capabilityName) return `capabilities/${capabilityName}`;
-	return config.publicModules.find((module: any) =>
+	return config.publicModules.find((module) =>
 		relative.startsWith(`${module}/`),
 	);
 }
 
 function importPaths(source: import("typescript").SourceFile) {
-	const imports: { specifier: any; node: any }[] = [];
+	const imports: { specifier: string; node: import("typescript").Node }[] = [];
 	function visit(node: import("typescript").Node) {
 		if (
 			(ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
@@ -100,19 +104,67 @@ function importPaths(source: import("typescript").SourceFile) {
 }
 
 const sourceFiles = files(src);
-const graph: Map<string, string[]> = new Map(
-	sourceFiles.map((filename: string) => [filename, []]),
+// Bind only this application's source files. Dependency types and standard
+// libraries are unnecessary for resolving the origin of public declarations.
+const program = ts.createProgram(sourceFiles, {
+	noResolve: true,
+	noLib: true,
+	target: ts.ScriptTarget.Latest,
+	module: ts.ModuleKind.ESNext,
+	moduleResolution: ts.ModuleResolutionKind.Bundler,
+});
+const checker = program.getTypeChecker();
+const sources = new Map<string, import("typescript").SourceFile>();
+function readSource(filename: string): import("typescript").SourceFile {
+	if (!sources.has(filename))
+		sources.set(
+			filename,
+			program.getSourceFile(filename) ??
+				ts.createSourceFile(
+					filename,
+					fs.readFileSync(filename, "utf8"),
+					ts.ScriptTarget.Latest,
+					true,
+				),
+		);
+	return sources.get(filename)!;
+}
+function contractOrigin(entry: import("typescript").ExportSpecifier) {
+	let symbol = checker.getSymbolAtLocation(entry.name);
+	if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+		symbol = checker.getAliasedSymbol(symbol);
+	const declaration = symbol?.declarations?.find(
+		(
+			node,
+		): node is
+			| import("typescript").InterfaceDeclaration
+			| import("typescript").TypeAliasDeclaration
+			| import("typescript").ClassDeclaration
+			| import("typescript").EnumDeclaration
+			| import("typescript").VariableDeclaration =>
+			ts.isInterfaceDeclaration(node) ||
+			ts.isTypeAliasDeclaration(node) ||
+			ts.isClassDeclaration(node) ||
+			ts.isEnumDeclaration(node) ||
+			(ts.isVariableDeclaration(node) &&
+				!!node.initializer &&
+				ts.isClassExpression(node.initializer)),
+	);
+	return (
+		declaration && {
+			filename: declaration.getSourceFile().fileName,
+			name: declaration.name?.getText() ?? entry.name.text,
+		}
+	);
+}
+const graph = new Map<string, string[]>(
+	sourceFiles.map((filename) => [filename, []]),
 );
 for (const filename of [
 	...sourceFiles,
 	...files(path.join(application, "test")),
 ]) {
-	const source = ts.createSourceFile(
-		filename,
-		fs.readFileSync(filename, "utf8"),
-		ts.ScriptTarget.Latest,
-		true,
-	);
+	const source = readSource(filename);
 	const owner = capability(filename);
 	for (const { specifier, node } of importPaths(source)) {
 		const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
@@ -171,6 +223,25 @@ for (const filename of [
 	}
 	if (owner && filename === path.join(capabilitiesRoot, owner, "index.ts")) {
 		for (const statement of source.statements) {
+			if (
+				ts.isExportDeclaration(statement) &&
+				statement.exportClause &&
+				ts.isNamedExports(statement.exportClause)
+			) {
+				for (const entry of statement.exportClause.elements) {
+					const origin = contractOrigin(entry);
+					if (
+						origin &&
+						capability(origin.filename) === owner &&
+						origin.filename !==
+							path.join(capabilitiesRoot, owner, "contract.ts") &&
+						origin.filename !== filename
+					)
+						errors.push(
+							`${path.relative(repo, filename)}: public contract ${origin.name} must be declared in contract.ts`,
+						);
+				}
+			}
 			if (
 				ts.isFunctionDeclaration(statement) ||
 				(ts.isVariableStatement(statement) &&

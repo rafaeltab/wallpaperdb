@@ -5,7 +5,7 @@ Scope: backend configuration, dependency composition, running resources and task
 ## Configuration and lifecycle
 
 - Composition roots select implementations, compose [Effect Layers](application-and-domain.md#effect-and-dependencies), and own shared lifetimes. Executable entry points own process execution.
-- Composition parses external configuration once and passes capability-named typed values inward. Application and domain code do not read global configuration or environment variables. Secrets reach only the adapters that require them, and invalid startup configuration fails before the application accepts work.
+- Composition parses external configuration once and passes capability-named typed values inward. The [capability Biome rules](../../packages/biome-test-rules/src/architecture.ts) enforce the code boundary. Secrets reach only the adapters that require them, and invalid startup configuration fails before the application accepts work.
 - Composition roots coordinate the lifecycle of long-lived resources; adapters implement their own startup and shutdown mechanics, while application and domain code do not own infrastructure lifecycles.
 - Lifecycle ownership includes running tasks as well as connections. Clean up acquired resources when startup fails. During shutdown, stop accepting new work, give in-flight work a bounded opportunity to finish, and attempt remaining cleanup even if one cleanup step fails.
 - Timeouts must bound underlying resource use, not only the caller's wait. Where cancellation is unavailable, bound outstanding work and account for possible late completion before retrying an operation with side effects.

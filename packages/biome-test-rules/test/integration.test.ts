@@ -50,6 +50,7 @@ function isolatedRepository() {
 		".npmrc",
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.ts",
+		"scripts/check-workspaces.ts",
 		"scripts/crap.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
@@ -74,6 +75,14 @@ function isolatedRepository() {
 				join(repository, workspace, "node_modules"),
 				join(target, "node_modules"),
 			);
+	}
+	// The lint-discovery probes below import Vitest, including in workspaces
+	// whose production tests use node:test. Declare that synthetic dependency.
+	for (const workspace of workspaces) {
+		const manifestPath = join(directory, workspace, "package.json");
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+		manifest.devDependencies = { ...manifest.devDependencies, vitest: "5.0.2" };
+		writeFileSync(manifestPath, JSON.stringify(manifest));
 	}
 	const rules = "packages/biome-test-rules";
 	// Keep probe diagnostics visible alongside warnings in the adapted sources.
@@ -496,7 +505,7 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path.endsWith(".mjs") || path.endsWith(".mts") || path.endsWith(".ts")
+					/\.[cm]?[jt]s$/.test(path)
 						? readFileSync(config, "utf8") +
 								(path === "scripts/crap.mts"
 									? "\nthrow new Error('Collector changed after caching');\n"

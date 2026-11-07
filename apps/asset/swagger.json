@@ -19,7 +19,13 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": ["healthy", "unhealthy", "degraded", "error", "shutting_down"],
+            "enum": [
+              "healthy",
+              "unhealthy",
+              "degraded",
+              "error",
+              "shutting_down"
+            ],
             "description": "Overall health status of the service"
           },
           "checks": {
@@ -42,7 +48,11 @@
             "description": "Duration of all checks in milliseconds"
           }
         },
-        "required": ["status", "checks", "timestamp"],
+        "required": [
+          "status",
+          "checks",
+          "timestamp"
+        ],
         "additionalProperties": false
       },
       "ReadyResponse": {
@@ -61,7 +71,10 @@
             "description": "Reason if service is not ready"
           }
         },
-        "required": ["ready", "timestamp"],
+        "required": [
+          "ready",
+          "timestamp"
+        ],
         "additionalProperties": false
       },
       "ProblemDetails": {
@@ -136,7 +149,10 @@
                   "description": "Error code for programmatic handling"
                 }
               },
-              "required": ["field", "message"],
+              "required": [
+                "field",
+                "message"
+              ],
               "additionalProperties": false
             },
             "description": "Array of validation errors"
@@ -151,7 +167,9 @@
     "/health": {
       "get": {
         "summary": "Dependency health",
-        "tags": ["Health"],
+        "tags": [
+          "Health"
+        ],
         "responses": {
           "200": {
             "description": "Default Response",
@@ -185,14 +203,20 @@
                       "properties": {
                         "status": {
                           "type": "integer",
-                          "enum": [503]
+                          "enum": [
+                            503
+                          ]
                         },
                         "timestamp": {
                           "type": "string"
                         },
                         "healthStatus": {
                           "type": "string",
-                          "enum": ["degraded", "unhealthy", "shutting_down"]
+                          "enum": [
+                            "degraded",
+                            "unhealthy",
+                            "shutting_down"
+                          ]
                         },
                         "checks": {
                           "type": "object",
@@ -216,7 +240,9 @@
     "/ready": {
       "get": {
         "summary": "Readiness",
-        "tags": ["Health"],
+        "tags": [
+          "Health"
+        ],
         "responses": {
           "200": {
             "description": "Default Response",
@@ -239,18 +265,29 @@
                     },
                     {
                       "type": "object",
-                      "required": ["type", "title", "status", "timestamp", "ready", "reason"],
+                      "required": [
+                        "type",
+                        "title",
+                        "status",
+                        "timestamp",
+                        "ready",
+                        "reason"
+                      ],
                       "properties": {
                         "status": {
                           "type": "integer",
-                          "enum": [503]
+                          "enum": [
+                            503
+                          ]
                         },
                         "timestamp": {
                           "type": "string"
                         },
                         "ready": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "reason": {
                           "type": "string"
@@ -305,7 +342,9 @@
     },
     "/asset-types/{type}/policy": {
       "get": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "security": [
           {
             "ownerSession": []
@@ -330,7 +369,9 @@
     },
     "/assets/{assetId}/sources": {
       "get": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "parameters": [
           {
             "schema": {
@@ -365,7 +406,9 @@
     },
     "/assets/{assetId}/default-source": {
       "put": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -382,7 +425,10 @@
                     "maxLength": 256
                   }
                 },
-                "required": ["expectedSourceSetRevision", "sourceId"],
+                "required": [
+                  "expectedSourceSetRevision",
+                  "sourceId"
+                ],
                 "additionalProperties": false
               }
             }
@@ -413,7 +459,9 @@
     },
     "/assets/{assetId}/sources/{sourceId}": {
       "delete": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -425,7 +473,9 @@
                     "pattern": "^(0|[1-9][0-9]{0,39})$"
                   }
                 },
-                "required": ["expectedSourceSetRevision"],
+                "required": [
+                  "expectedSourceSetRevision"
+                ],
                 "additionalProperties": false
               }
             }
@@ -464,7 +514,9 @@
     },
     "/assets/{assetId}/source-candidates": {
       "post": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -473,7 +525,11 @@
                 "properties": {
                   "operation": {
                     "type": "string",
-                    "enum": ["add", "replace-one", "replace-set"]
+                    "enum": [
+                      "add",
+                      "replace-one",
+                      "replace-set"
+                    ]
                   },
                   "expectedSourceSetRevision": {
                     "type": "string",
@@ -485,7 +541,10 @@
                     "maxLength": 256
                   }
                 },
-                "required": ["operation", "expectedSourceSetRevision"],
+                "required": [
+                  "operation",
+                  "expectedSourceSetRevision"
+                ],
                 "additionalProperties": false
               }
             }
@@ -516,7 +575,9 @@
     },
     "/assets/{assetId}/source-candidates/{candidateId}": {
       "get": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "security": [
           {
             "ownerSession": []
@@ -547,7 +608,9 @@
         }
       },
       "delete": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "security": [
           {
             "ownerSession": []
@@ -580,7 +643,9 @@
     },
     "/assets/{assetId}/source-candidates/{candidateId}/bytes": {
       "put": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "security": [
           {
             "ownerSession": []
@@ -613,7 +678,9 @@
     },
     "/assets/{assetId}/source-candidates/{candidateId}/accept": {
       "post": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -622,7 +689,11 @@
                 "properties": {
                   "operation": {
                     "type": "string",
-                    "enum": ["add", "replace-one", "replace-set"]
+                    "enum": [
+                      "add",
+                      "replace-one",
+                      "replace-set"
+                    ]
                   },
                   "expectedSourceSetRevision": {
                     "type": "string",
@@ -634,7 +705,10 @@
                     "maxLength": 256
                   }
                 },
-                "required": ["operation", "expectedSourceSetRevision"],
+                "required": [
+                  "operation",
+                  "expectedSourceSetRevision"
+                ],
                 "additionalProperties": false
               }
             }
@@ -673,7 +747,9 @@
     },
     "/assets/{assetId}/sources/{sourceId}/original": {
       "get": {
-        "tags": ["Sources"],
+        "tags": [
+          "Sources"
+        ],
         "security": [
           {
             "ownerSession": []

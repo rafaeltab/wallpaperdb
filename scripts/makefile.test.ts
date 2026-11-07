@@ -542,3 +542,10 @@ test("all public targets are documented, phony, and advertised", () => {
 		expect(help.stdout).toMatch(new RegExp(`^  ${name}\\s`, "m"));
 	}
 });
+
+test("migration replay participates in the standard integration task graph", () => {
+	const task = plannedTask("test-integration", "scripts", "test:integration");
+	expect(task.command).toMatch(
+		/(?:^|&&\s*)node (?:scripts\/)?check-migration-replay\.ts(?:\s*&&|$)/,
+	);
+});

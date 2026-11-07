@@ -1,6 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
-  "extends": ["./packages/biome-test-rules/test-correctness.json"],
+  "extends": [
+    "./packages/biome-test-rules/test-correctness.json"
+  ],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -23,7 +25,8 @@
     "rules": {
       "preset": "recommended",
       "correctness": {
-        "noComponentHookFactories": "off"
+        "noComponentHookFactories": "off",
+        "noUndeclaredDependencies": "error"
       }
     }
   }

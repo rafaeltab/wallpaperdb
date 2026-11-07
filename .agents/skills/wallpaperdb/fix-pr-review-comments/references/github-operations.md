@@ -6,14 +6,7 @@ Use the connected GitHub tools when they expose the required operation, or `gh a
 
 `gh pr view <pr> --json number,url,body,closingIssuesReferences,headRefName,headRefOid,headRepository,headRepositoryOwner,baseRefName,isCrossRepository` identifies the target, its actual head repository, and issue-selection candidates. Select the owning issue through the [shared policy](../../../../../docs/agents/issue-tracker.md#selecting-issues-for-pr-fixes) before lifecycle writes. A fork PR's branch must be fetched and pushed through its head repository.
 
-Use the PR's `reviewThreads` GraphQL connection for thread IDs, `isResolved`, `isOutdated`, `viewerCanResolve`, and each thread's `comments` connection. Retain comment `id`, `url`, `body`, author, and timestamps. Fetch every page of both connections. Advancing the outer thread cursor does not paginate the comments inside each thread. Query review summaries and PR conversation comments as well, using GraphQL connections or these REST lists:
-
-- `GET /repos/{owner}/{repo}/pulls/{number}/reviews` for review summaries.
-- `GET /repos/{owner}/{repo}/issues/{number}/comments` for PR conversation comments.
-
-Use `gh api --paginate` for REST lists. REST `node_id` is the GraphQL node ID; REST numeric `id` belongs to the REST endpoint. Keep each comment's kind with its ID. When resuming, read previous replies and reactions alongside current code to identify already completed operations.
-
-See GitHub's [GraphQL reference](https://docs.github.com/en/graphql/reference), [PR review REST API](https://docs.github.com/en/rest/pulls/reviews), and [issue comment REST API](https://docs.github.com/en/rest/issues/comments) for current fields and endpoints.
+Run `make run PACKAGE=scripts SCRIPT=agent ARGS='feedback <pr>'` and retain its JSON outside the repository. The collector paginates threads, each thread's comments, review summaries, and conversation comments. Preserve comment kinds and IDs when selecting work. On resume, compare existing replies and reactions with current code; their presence alone does not establish that feedback was handled.
 
 ## Reply in the right place
 

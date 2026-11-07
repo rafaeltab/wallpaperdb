@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import Fastify from 'fastify';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
@@ -94,6 +95,7 @@ it('uses verified Creator identity, returns durable progress and hides private w
       url: '/wallpapers/missing',
       headers: { authorization: 'Bearer valid' },
     });
+    assertHttpErrorContract(missing);
     expect(missing.statusCode).toBe(404);
     expect(missing.headers['content-type']).toContain('application/problem+json');
     expect(
@@ -138,6 +140,7 @@ it('reports infrastructure failure safely as retryable unavailability', async ()
       headers: { 'idempotency-key': 'key' },
       payload: {},
     });
+    assertHttpErrorContract(response);
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toMatch(/private-secret|password/);
   } finally {

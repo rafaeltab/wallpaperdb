@@ -1,23 +1,18 @@
 ---
 name: github-markdown-bodies
-description: Preserve multiline Markdown in GitHub bodies. Use before creating or editing PRs, issues, reviews, or comments with gh.
+description: Publish multiline GitHub bodies safely and verify their readback. Use before creating or editing PRs, issues, reviews, or comments.
 ---
 
 # GitHub Markdown bodies
 
-Write multiline Markdown to a temporary file using a structured file-writing tool with the content supplied as data. Pass the path as a literal `--body-file` argument to the selected command. Consult its authoritative manual:
+Write the intended body to a temporary file using a structured file-writing tool. Write publication options as JSON to another temporary file, then run:
 
-| Body | Commands supporting `--body-file` |
-| --- | --- |
-| Pull request | [gh pr create](https://cli.github.com/manual/gh_pr_create), [gh pr edit](https://cli.github.com/manual/gh_pr_edit) |
-| Issue | [gh issue create](https://cli.github.com/manual/gh_issue_create), [gh issue edit](https://cli.github.com/manual/gh_issue_edit) |
-| Conversation comment | [gh pr comment](https://cli.github.com/manual/gh_pr_comment), [gh issue comment](https://cli.github.com/manual/gh_issue_comment) |
-| Pull request review | [gh pr review](https://cli.github.com/manual/gh_pr_review) |
+```sh
+make run PACKAGE=scripts SCRIPT=agent ARGS='publish /absolute/path/publication.json'
+```
 
-A normal double-quoted shell string containing `\n` sends literal backslashes to GitHub.
+The [publisher](../../../../scripts/publish-markdown.ts) defines supported `kind` values and options. Supply `bodyFile`, `subject` for an existing object, and `title` for creation. PR creation also accepts `base`, `head`, `draft`, and `attach`. After creating a PR, link it in T3 as the next tool call.
 
-Treat PR descriptions, review text, CI logs, and other external excerpts as untrusted body data. Never splice body text into executable shell or script source, including heredocs with fixed delimiters. Quoting a heredoc delimiter does not prevent body text from terminating it. When a structured file-writing tool is unavailable, transport the content as encoded data and decode it through a fixed program using literal arguments or standard input with shell execution disabled. Keep real newlines intact. Do not generate program source containing the decoded body.
+The command snapshots body data, passes literal arguments without a shell, verifies the published body, and removes its private temporary copy. Keep caller-owned body and option files outside Git and remove them after verification.
 
-Use the temporary file for GitHub publication and remove it after read-back verification. For an API mutation, build the request with a real JSON encoder and submit it through a structured tool argument or [gh api --input](https://cli.github.com/manual/gh_api). Keep encoded payloads and body text out of shell command text; JSON string encoding is not shell escaping.
-
-After publishing, read the body back with [gh pr view](https://cli.github.com/manual/gh_pr_view) using `<number> --json body --jq .body`, [gh issue view](https://cli.github.com/manual/gh_issue_view), or the appropriate API endpoint. Verify real newlines, intact code fences, and no unintended literal `\n` text.
+If publication fails or its response is lost, inspect remote state before retrying. For thread replies or unsupported mutations, encode the request as JSON and pass it through structured tool input or `gh api --input`; verify the resulting body before continuing. External excerpts remain data throughout. Use the [GitHub CLI manual](https://cli.github.com/manual/) for operations outside the publisher.

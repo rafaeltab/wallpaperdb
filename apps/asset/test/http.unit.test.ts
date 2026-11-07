@@ -1,3 +1,4 @@
+import { assertHttpErrorContract } from '@wallpaperdb/test-utils/http-contracts';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 import { AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
@@ -81,6 +82,7 @@ it.each(['GET', 'HEAD'] as const)(
     try {
       const result = await app.inject({ method, url: '/profile-pictures/pic_1' });
       expect(pictures).toEqual(['pic_1']);
+      assertHttpErrorContract(result);
       expect(result.statusCode).toBe(404);
       expect(result.headers['cache-control']).toBe('no-store');
       expect(result.headers['content-type']).toContain('application/problem+json');
@@ -105,6 +107,7 @@ it.each(['wallpapers/w1', 'profile-pictures/p1'])(
     );
     try {
       const result = await app.inject(`/${path}`);
+      assertHttpErrorContract(result);
       expect(result.statusCode).toBe(503);
       expect(result.headers['cache-control']).toBe('no-store');
       expect(result.json().type).toMatch(
@@ -126,6 +129,7 @@ it.each(['w=0', 'w=2.5', 'h=-1', 'fit=outside', 'w=x', 'w=1&w=2'])(
     );
     try {
       const result = await app.inject(`/wallpapers/w1?${query}`);
+      assertHttpErrorContract(result);
       expect(result.statusCode).toBe(400);
       expect(result.json().type).toContain('/invalid-dimensions.md');
     } finally {
@@ -144,9 +148,11 @@ it('translates capability rejection and hides defects', async () => {
   );
   try {
     const rejected = await app.inject('/wallpapers/w1?w=9000');
+    assertHttpErrorContract(rejected);
     expect(rejected.statusCode).toBe(400);
     expect(rejected.json().detail).toBe('Width exceeds configured limit');
     const defect = await app.inject('/profile-pictures/p1');
+    assertHttpErrorContract(defect);
     expect(defect.statusCode).toBe(500);
     expect(defect.json().type).toContain('/generic-server.md');
     expect(defect.body).not.toContain('private programmer detail');

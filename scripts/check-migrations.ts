@@ -1,0 +1,97 @@
+import type { Generators } from "./lib/agent-types.ts";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+export function checkMigrations(directory: string) {
+	const errors = [];
+	const journal: { entries: { idx: number; tag: string; when: number }[] } =
+		JSON.parse(
+			fs.readFileSync(path.join(directory, "meta/_journal.json"), "utf8"),
+		);
+	const expected = new Set<string>();
+	const ids = new Set<string>();
+	let previous = "00000000-0000-0000-0000-000000000000";
+	let timestamp = -Infinity;
+	for (const [index, entry] of journal.entries.entries()) {
+		if (entry.idx !== index)
+			errors.push(`${directory}: journal index ${entry.idx} must be ${index}`);
+		if (!/^\d{4}_[\w-]+$/.test(entry.tag)) {
+			errors.push(`${directory}: invalid migration tag`);
+			continue;
+		}
+		if (entry.when <= timestamp)
+			errors.push(`${directory}: migration timestamps must increase`);
+		timestamp = entry.when;
+		const sql = `${entry.tag}.sql`;
+		expected.add(sql);
+		if (!fs.existsSync(path.join(directory, sql)))
+			errors.push(`${directory}: missing SQL ${sql}`);
+		const file = path.join(
+			directory,
+			"meta",
+			`${String(entry.idx).padStart(4, "0")}_snapshot.json`,
+		);
+		if (!fs.existsSync(file)) {
+			errors.push(`${directory}: missing snapshot ${entry.idx}`);
+			continue;
+		}
+		const snapshot: { id: string; prevId: string } = JSON.parse(
+			fs.readFileSync(file, "utf8"),
+		);
+		if (!snapshot.id || ids.has(snapshot.id) || snapshot.prevId !== previous)
+			errors.push(`${file}: broken snapshot identity chain`);
+		ids.add(snapshot.id);
+		previous = snapshot.id;
+	}
+	for (const file of fs.readdirSync(directory))
+		if (file.endsWith(".sql") && !expected.has(file))
+			errors.push(`${directory}: SQL ${file} is absent from the journal`);
+	return errors;
+}
+export function checkSchemaDump(expected: string, actual: string) {
+	// PostgreSQL's random psql safety token is the only volatile dump content.
+	const normalize = (dump: string) =>
+		dump.replace(/^\\(?:un)?restrict .*\r?\n/gm, "").trim();
+	const wanted = normalize(expected).split("\n");
+	const found = normalize(actual).split("\n");
+	const line = Array.from(
+		{ length: Math.max(wanted.length, found.length) },
+		(_, index) => index,
+	).find((index) => wanted[index] !== found[index]);
+	return line === undefined
+		? []
+		: [
+				`schema differs from snapshot at dump line ${line + 1}: expected ${wanted[line] ?? "<end>"}; actual ${found[line] ?? "<end>"}`,
+			];
+}
+if (
+	process.argv[1] &&
+	path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+	const root = fileURLToPath(new URL("../", import.meta.url));
+	const errors = [];
+	const definitions: Generators[string] = JSON.parse(
+		fs.readFileSync(path.join(root, "generated.config.json"), "utf8"),
+	).migrations;
+	for (const [workspace, { outputs }] of Object.entries(definitions)) {
+		const config = fs.readFileSync(
+			path.join(root, workspace, "drizzle.config.ts"),
+			"utf8",
+		);
+		const out = config
+			.match(/\bout:\s*['"]([^'"]+)['"]/)?.[1]
+			?.replace(/^\.\//, "");
+		if (!out || outputs.length !== 1 || outputs[0] !== out)
+			errors.push(
+				`${workspace}: migration outputs must match drizzle.config.ts`,
+			);
+		else errors.push(...checkMigrations(path.join(root, workspace, out)));
+	}
+	if (errors.length) {
+		console.error(errors.join("\n"));
+		process.exitCode = 1;
+	} else
+		console.log(
+			"Migration journals, SQL and snapshot identity chains verified.",
+		);
+}

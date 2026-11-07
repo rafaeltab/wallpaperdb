@@ -5,6 +5,88 @@ import path from "node:path";
 import { expect, test, type TestContext } from "vitest";
 import { fileURLToPath } from "node:url";
 
+for (const [label, entry, implementation, barrel] of [
+	[
+		"type wildcard",
+		"export type { Search } from './barrel.js';",
+		"export interface Search { query(): string }",
+		"export type * from './implementation.js';",
+	],
+	[
+		"value wildcard",
+		"export { Search } from './barrel.js';",
+		"export class Search {}",
+		"export * from './implementation.js';",
+	],
+	[
+		"default reexport",
+		"export type { default as Search } from './implementation.js';",
+		"export default interface Search { query(): string }",
+		"",
+	],
+	[
+		"default import",
+		"import type Search from './implementation.js'; export type { Search };",
+		"export default interface Search { query(): string }",
+		"",
+	],
+])
+	test(`public contracts resolve through ${label} without restricting private barrels`, (t) => {
+		const project = fixture(t);
+		project.source("capabilities/search/index.ts", entry);
+		project.source("capabilities/search/implementation.ts", implementation);
+		project.source("capabilities/search/barrel.ts", barrel);
+		const rejected = project.run();
+		expect(rejected.status, rejected.stdout).toBe(1);
+		expect(rejected.stderr).toMatch(
+			/public contract Search must be declared in contract.ts/,
+		);
+		project.source(
+			"capabilities/search/contract.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export { type Search, type Search as default } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
+		);
+		const allowed = project.run();
+		expect(allowed.status, allowed.stderr).toBe(0);
+	});
+
+test("public capability contracts originate in contract.ts through aliases and barrels", (t) => {
+	for (const entry of [
+		"export type { Search } from './implementation.js';",
+		"export { Search as PublicSearch } from './barrel.js';",
+		"import type { Search as PublicSearch } from './implementation.js'; export type { PublicSearch };",
+	]) {
+		const project = fixture(t);
+		project.source("capabilities/search/index.ts", entry);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/barrel.ts",
+			"export type { Search } from './implementation.js';",
+		);
+		const result = project.run();
+		expect(result.status, result.stdout).toBe(1);
+		expect(result.stderr).toMatch(
+			/public contract Search must be declared in contract.ts/,
+		);
+		project.source(
+			"capabilities/search/contract.ts",
+			"export interface Search { query(): string }",
+		);
+		project.source(
+			"capabilities/search/implementation.ts",
+			"export type { Search } from './contract.js'; export function live() { return 1; } export interface PrivateWiring { value: string }",
+		);
+		const allowed = project.run();
+		expect(allowed.status, allowed.stderr).toBe(0);
+	}
+});
+
 const repository = fileURLToPath(new URL("../", import.meta.url));
 
 function fixture(
@@ -144,6 +226,8 @@ test("Turbo invalidates a cached architecture check when another workspace adds 
 		"turbo.json",
 		JSON.stringify({
 			futureFlags: productionConfiguration.futureFlags,
+			experimentalObservability:
+				productionConfiguration.experimentalObservability,
 			tasks: {
 				"//#architecture:workspaces":
 					productionTasks["//#architecture:workspaces"],

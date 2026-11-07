@@ -6,8 +6,8 @@ description: Drizzle migration workflow. Use when changing a relational schema o
 # Database schema
 
 1. Read the service's `drizzle.config.ts` to find its schema and migration directory.
-2. Edit the schema, then generate the migration. Never hand-write migration files.
-3. Review the generated SQL and snapshots before applying them.
+2. Edit the schema, then generate the migration.
+3. Run `make run PACKAGE=scripts SCRIPT=check:migrations` for artifact consistency and `make run PACKAGE=scripts SCRIPT=check:migration-replay` for isolated PostgreSQL replay. Review the generated SQL for intended behavior.
 4. Apply the migration against the intended database. Verify the behavior and relevant persistence constraints.
 
 ```sh

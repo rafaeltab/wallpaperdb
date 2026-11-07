@@ -1,7 +1,9 @@
+import { ast, defineRule, registerDiagnostic } from "@biomejs/runtime/plugin";
 import validExpectRule from "./ported/valid-expect.ts";
 import validExpectInPromiseRule from "./ported/valid-expect-in-promise.ts";
 import requireAwaitedExpectPollRule from "./ported/require-awaited-expect-poll.ts";
 import retryRule from "./retry.ts";
+import { isFixedWait } from "./guideline-policy.ts";
 import { port } from "./port.ts";
 
 export const validExpect = port(validExpectRule, [
@@ -13,3 +15,16 @@ export const validExpect = port(validExpectRule, [
 export const validExpectInPromise = port(validExpectInPromiseRule);
 export const requireAwaitedExpectPoll = port(requireAwaitedExpectPollRule);
 export const noTestRetries = port(retryRule);
+
+export const fixedWait = defineRule({
+	query: ast("JS_CALL_EXPRESSION"),
+	run(node) {
+		if (isFixedWait(node)) {
+			registerDiagnostic(
+				node,
+				"warning",
+				"test-fixed-wait: await an observable condition; retain a fixed wait only when elapsed time is the behavior under test.",
+			);
+		}
+	},
+});

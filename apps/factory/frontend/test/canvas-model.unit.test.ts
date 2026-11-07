@@ -3,6 +3,7 @@ import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
 import { related } from '../src/canvas/model';
 import { createCanvasProjection } from '../src/canvas/view-model';
 import { canvasLayout } from '../src/canvas/geometry';
+import { scenarioBoard } from './fixtures/canvas/board';
 function layout(board: FactoryV2Snapshot, collapsed: Set<string>) {
   return canvasLayout(createCanvasProjection()(board), {
     collapsed,
@@ -181,6 +182,119 @@ it.each(['separate-stacks', 'independent'])(
     expect(graph.routingConnections).toContainEqual({ source: base.id, target: tip.id });
   }
 );
+
+it.each([
+  {
+    name: 'fork',
+    numbers: [10, 11, 12],
+    edges: [
+      [10, 11],
+      [10, 12],
+    ],
+    prefix: [],
+    routes: 2,
+  },
+  {
+    name: 'mixed fork',
+    numbers: [10, 11, 12, 13],
+    edges: [
+      [10, 11],
+      [11, 12],
+      [11, 13],
+    ],
+    prefix: [10, 11],
+    routes: 2,
+  },
+  { name: 'unconnected PRs', numbers: [10, 11, 12], edges: [], prefix: [], routes: 0, gap: 12 },
+  {
+    name: 'linear stack',
+    numbers: [10, 11, 12],
+    edges: [
+      [10, 11],
+      [11, 12],
+    ],
+    prefix: [10, 11, 12],
+    routes: 0,
+    gap: 0,
+  },
+])('routes $name ancestry around the PR cards', async (scenario) => {
+  const seed = await sample();
+  const base = scenarioBoard(seed, {
+    items: scenario.numbers.map((n) => ({
+      id: n,
+      pr: n,
+      stage: 'review',
+      status: 'Needs review',
+      deps: [],
+    })),
+    metadata: Object.fromEntries(
+      scenario.numbers.map((n) => [
+        n,
+        {
+          number: n,
+          title: `PR ${n}`,
+          url: '',
+          labels: [],
+          priority: null,
+          size: null,
+        },
+      ])
+    ),
+    parentIds: [],
+    parentOf: {},
+    synthetic: true,
+    stackSpecs: scenario.prefix.length
+      ? [{ key: 'prefix', ids: scenario.prefix, stacked: true }]
+      : [],
+  });
+  type Relationship =
+    FactoryV2Snapshot['entities']['relationships'][keyof FactoryV2Snapshot['entities']['relationships']];
+  const relationships: Record<Relationship['id'], Relationship> = {};
+  for (const [from, to] of scenario.edges) {
+    const id: Relationship['id'] = `relationship:fork-${from}-${to}`;
+    relationships[id] = {
+      id,
+      version: '1',
+      kind: 'pr-base',
+      basePullRequestId: `pr:visual-${from}`,
+      tipPullRequestId: `pr:visual-${to}`,
+      evidence: {
+        state: 'known',
+        value: 'git-ancestry',
+        sourceId: 'source:github',
+        observedAt: seed.committedAt,
+      },
+    };
+  }
+  const board: FactoryV2Snapshot = { ...base, entities: { ...base.entities, relationships } },
+    graph = layout(board, new Set());
+  const routes = routeCanvas(
+    [
+      ...graph.boxes,
+      ...graph.headerNodes,
+      ...graph.aggregateNodes,
+      ...graph.panels.map((p, i) => ({ id: -500 - i, x: p.x, y: p.y, width: p.width, height: 32 })),
+      ...graph.areas.map((a, i) => ({ id: -100 - i, x: 20, y: a.y - 10, width: 310, height: 20 })),
+      ...[...graph.groups, ...graph.panels].flatMap((g, i) =>
+        [
+          [g.x, g.y],
+          [g.x + g.width, g.y],
+          [g.x, g.y + g.height],
+          [g.x + g.width, g.y + g.height],
+        ].map(([x, y], j) => ({ id: -1000 - i * 4 - j, x, y, width: 0, height: 0 }))
+      ),
+    ],
+    graph.routingConnections,
+    graph.width,
+    graph.height
+  );
+  expect(routes).toHaveLength(scenario.routes);
+  expect(routes.every((route) => !route.failed)).toBe(true);
+  if (scenario.gap !== undefined)
+    for (const panel of graph.panels)
+      for (let i = 1; i < panel.rows.length; i++)
+        expect(panel.rows[i].y - panel.rows[i - 1].y - panel.rows[i - 1].height).toBe(scenario.gap);
+});
 
 it('displays a cyclic prerequisite component beside another dependency chain', async () => {
   const seed = await sample(),

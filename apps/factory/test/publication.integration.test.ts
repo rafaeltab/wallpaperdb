@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import { githubIssues } from '../src/adapters/github/index.js';
+import { githubIssues, githubRequests } from '../src/adapters/github/index.js';
 import type { Intent } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
 it('requires a unique matching PR and mandatory current checks while ignoring advisory failures', async () => {
@@ -106,7 +106,18 @@ async function publicationScenario() {
     createdAt: 1,
     expectedStage: 'implementation',
   };
-  const adapter = githubIssues({ project: host.repository, base: host.base, prerequisites: [] });
+  const stop = new AbortController();
+  const read = githubRequests({
+    project: host.repository,
+    directory: host.directory + '/state',
+    signal: stop.signal,
+  });
+  const adapter = githubIssues({
+    project: host.repository,
+    base: host.base,
+    prerequisites: [],
+    read,
+  });
   const pr = {
     url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
     headRefName: intent.branch,
@@ -126,6 +137,7 @@ async function publicationScenario() {
     adapter,
     pr,
     close: async () => {
+      stop.abort();
       process.env.PATH = previous.path;
       if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
       else process.env.FACTORY_FIXTURE = previous.fixture;

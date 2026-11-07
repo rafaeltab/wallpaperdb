@@ -26,7 +26,7 @@ import {
 import { fileStore } from '../src/adapters/store/index.js';
 import { t3Execution } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
-import { githubIssues } from '../src/adapters/github/index.js';
+import { githubIssues, githubRequests } from '../src/adapters/github/index.js';
 import { joinFixture } from './fixtures/join.js';
 
 const fixture = (options: Parameters<typeof joinFixture>[0] = {}) =>
@@ -114,12 +114,15 @@ async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
     initial,
   };
 }
-it('maintains issue-only descendants after a rebase merge without replaying landed A', async () => {
+it('maintains issue-only descendants through the shared budget after landing without replaying A', async () => {
   const f = await landedFixture();
   const { host, git, merged } = f;
+  const stop = new AbortController();
+  const read = githubRequests({ project: host.repository, directory: host.directory, signal: stop.signal });
+  const issues = githubIssues({ ...f.config, read });
   try {
-    if (!f.issues.reconcile) throw new Error('Missing reconciliation');
-    await Effect.runPromise(f.issues.reconcile());
+    if (!issues.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(issues.reconcile());
     const head = git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
     expect(git('log', '--format=%s', `${merged}..${head}`)).toBe('C\nD\nB');
     expect(git('ls-tree', '--name-only', head)).toBe('A.txt\nB.txt\nC.txt\nD.txt\nunrelated.txt');
@@ -132,7 +135,7 @@ it('maintains issue-only descendants after a rebase merge without replaying land
     expect(live.members).toEqual(
       [102, 103, 104].map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`)
     );
-    const reopened = githubIssues(f.config, f.readGitHub);
+    const reopened = githubIssues({ ...f.config, read });
     if (!reopened.reconcile) throw new Error('Missing reconciliation');
     await Effect.runPromise(reopened.reconcile());
     expect(git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(head);
@@ -148,6 +151,7 @@ it('maintains issue-only descendants after a rebase merge without replaying land
       })
     );
   } finally {
+    stop.abort();
     await f.close();
   }
 });

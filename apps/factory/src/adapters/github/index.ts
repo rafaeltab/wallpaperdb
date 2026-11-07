@@ -4,3 +4,4 @@ export { githubPlanning } from './planning.js';
 
 export type { VerifiedPrerequisite } from './prerequisites.js';
 export { githubObservations } from './observations.js';
+export { githubRequests } from './requests.js';

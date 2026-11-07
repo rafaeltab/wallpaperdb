@@ -24,7 +24,12 @@ export async function protocol() {
     encoding: 'utf8',
   }).trim();
   const configFile = join(directory, 'config.json');
-  const config = { directory, repository, lost: true };
+  const config = {
+    directory,
+    repository,
+    lost: true,
+    githubQuotaReset: Math.floor(Date.now() / 3_600_000) * 3600 + 3600,
+  };
   await writeFile(configFile, JSON.stringify(config));
   const commands = join(directory, 'commands');
   const fixtureCoverage = join(directory, 'fixture-coverage');
@@ -84,6 +89,11 @@ export async function protocol() {
     },
     calls: async () =>
       (await readFile(join(directory, 'calls.jsonl'), 'utf8'))
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    githubRequests: async () =>
+      (await readFile(join(directory, 'github-requests.jsonl'), 'utf8'))
         .split('\n')
         .filter(Boolean)
         .map((line) => JSON.parse(line)),

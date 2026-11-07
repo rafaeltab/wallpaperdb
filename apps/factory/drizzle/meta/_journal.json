@@ -71,6 +71,13 @@
       "when": 1794004118825,
       "tag": "0009_orange_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794017345259,
+      "tag": "0010_flat_wither",
+      "breakpoints": true
     }
   ]
 }

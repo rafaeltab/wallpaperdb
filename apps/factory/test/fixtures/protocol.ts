@@ -37,6 +37,7 @@ export async function runProtocol(
     env: environment,
     argv,
     pid: nodeProcess.pid,
+    stderr: { write: (text: string) => output.error(text) },
     exit: (code: number): never => {
       throw new ProtocolExit(code);
     },
@@ -60,6 +61,52 @@ export async function runProtocol(
       join(config.directory, 'calls.jsonl'),
       `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
     );
+    if (basename(process.argv[1]) === 'gh' && process.env.GH_DEBUG === 'api') {
+      appendFileSync(
+        join(config.directory, 'github-requests.jsonl'),
+        JSON.stringify({ at: Date.now(), args }) + '\n'
+      );
+      const rate = config.githubRate ?? {};
+      const resource = args[0] === 'api' && args[1] !== 'graphql' ? 'core' : 'graphql';
+      const status = rate.status ?? 200;
+      process.stderr.write(
+        `< HTTP/2.0 ${status} Fixture\n` +
+        `< X-Ratelimit-Resource: ${resource}\n` +
+        `< X-Ratelimit-Limit: ${rate.limit ?? 1000000}\n` +
+        `< X-Ratelimit-Remaining: ${rate.remaining ?? 999999}\n` +
+        `< X-Ratelimit-Reset: ${rate.reset ?? config.githubQuotaReset}\n` +
+        (rate.retryAfter ? `< Retry-After: ${rate.retryAfter}\n` : '') + '<\n'
+      );
+      if (status !== 200) {
+        console.log(JSON.stringify({ message: 'Controlled provider throttling' }));
+        process.exit(1);
+      }
+      if (args[0] === 'api' && args[1] === 'rate_limit') {
+        console.log(JSON.stringify({
+          resources: Object.fromEntries(['core', 'graphql', 'search'].map((name) => [name, {
+            limit: rate.limit ?? 1000000,
+            remaining: rate.remaining ?? 999999,
+            reset: rate.reset ?? config.githubQuotaReset,
+          }])),
+        }));
+        process.exit(0);
+      }
+      const log = console.log;
+      console.log = (...values) => {
+        if (args[0] === 'api' && args[1] === 'graphql' && args.some((a) => a.includes('factoryRateLimit:'))) {
+          const value = JSON.parse(values[0]);
+          for (const page of Array.isArray(value) ? value : [value])
+            if (page?.data) page.data.factoryRateLimit = {
+              cost: rate.cost ?? 1,
+              limit: rate.limit ?? 1000000,
+              remaining: rate.remaining ?? 999999,
+              resetAt: new Date((rate.reset ?? config.githubQuotaReset) * 1000).toISOString(),
+            };
+          values[0] = JSON.stringify(value);
+        }
+        log(...values);
+      };
+    }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_environment_read') {
       console.log(
         JSON.stringify({ structuredContent: { environmentId: 'controlled-environment' } })

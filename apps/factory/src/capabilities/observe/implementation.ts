@@ -1,5 +1,5 @@
 import { Effect, Layer, Semaphore } from 'effect';
-import { Time } from '../job/index.js';
+import { Time, attemptIntent } from '../job/index.js';
 import {
   Observations,
   ObservationStore,
@@ -43,7 +43,10 @@ export const ObservationsLive = Layer.effect(
               ...(prior?.kind === 'job'
                 ? prior
                 : { kind: 'job' as const, execution: { kind: 'ambiguous' as const } }),
-              intent,
+              intent: {
+                ...intent,
+                branch: attemptIntent(intent, control.restart?.index ?? 0).branch,
+              },
               elapsedMs: Math.max(0, now - intent.createdAt),
               prerequisite: control.cancelled ? undefined : control.prerequisite,
               delivery:

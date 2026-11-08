@@ -229,6 +229,7 @@ export type Status =
   | { kind: 'empty' }
   | {
       kind: 'job';
+      /** Admission identity and original base remain stable; branch describes the current attempt. */
       intent: Intent;
       prerequisite?: AcceptedPublication;
       execution: Observation;

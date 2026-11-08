@@ -210,6 +210,65 @@ it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
     })
 );
 
+it('keeps Retry disabled for replacement evidence at an already-bound run ordinal', () =>
+  composed(async ({ running, host, save }) => {
+    await start(running);
+    const configure = {
+      ...(await action(running, 'configure')),
+      commandId: '00000000-0000-4000-8000-000000000042',
+      kind: 'configure',
+      payload: {
+        paused: false,
+        concurrency: { kind: 'limited', maximum: 2 },
+        admissionAllowance: { kind: 'limited', maximum: 1 },
+      },
+    };
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: configure }))
+        .statusCode
+    ).toBe(202);
+    await receipt(running, configure.commandId);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    await writeFile(
+      resourcePath,
+      JSON.stringify({ ...prior, status: 'completed', latestRunId: 'replacement-run', runCount: 1 })
+    );
+    await save({
+      messages: [
+        { role: 'assistant', runId: 'replacement-run', text: 'Implementation incomplete.' },
+      ],
+    });
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          execution: { state: 'known', value: { state: 'finished', runId: 'replacement-run' } },
+          occupiesCapacity: true,
+        });
+        expect(board.meta.factory.concurrency).toEqual({
+          limit: { kind: 'limited', maximum: 2 },
+          occupied: 1,
+        });
+        expect(board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          availability: { state: 'disabled' },
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    expect(
+      (await host.calls()).filter(
+        (call) =>
+          call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+    await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+    await save({
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
+  }));
+
 it('manually retries incomplete implementation in a fresh original-base worktree without another admission', () =>
   composed(
     async ({ running, host, save }) => {

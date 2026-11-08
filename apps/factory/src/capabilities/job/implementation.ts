@@ -62,7 +62,7 @@ export const JobLive = Layer.effect(
           intent: { ...intent, branch: activeIntent.branch },
           prerequisite: control.cancelled ? undefined : control.prerequisite,
           resume,
-          retry: yield* restartAction(execution, activeIntent, control, stage, observation),
+          retry: yield* restartAction(store, execution, activeIntent, control, stage, observation),
           execution: observation,
           delivery: delivery
             ? { ...delivery, active: delivery.active ?? !delivery.ready }

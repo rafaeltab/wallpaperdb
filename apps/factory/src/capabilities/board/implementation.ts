@@ -50,7 +50,10 @@ export function makeBoard(config: {
       );
       initial.snapshot = includePlan(initial.snapshot, detail, !!input.observations.facts);
     }
-    let current = { ...initial, snapshot: actions(initial.snapshot, input, initial.details) };
+    let current = {
+      ...initial,
+      snapshot: actions(initial.snapshot, input, initial.details, initial.retryTargets),
+    };
     for (const detail of Object.values(current.details)) {
       const item = current.snapshot.entities.items[detail.itemId];
       if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
@@ -59,7 +62,7 @@ export function makeBoard(config: {
     // Older cached publications lack the private acknowledgement target. Reproject
     // them before exposing actions rather than deriving authority from a wire hash.
     let identity = restored
-      ? restored.planningNoticeTarget === undefined
+      ? restored.planningNoticeTarget === undefined || restored.retryTargets === undefined
         ? ''
         : restored.inputVersion
       : version({ input: stable(input), plan: config.initialPlan });
@@ -68,6 +71,7 @@ export function makeBoard(config: {
         snapshot: restored.snapshot,
         details: restored.details,
         planningNoticeTarget: restored.planningNoticeTarget ?? null,
+        retryTargets: restored.retryTargets ?? {},
       };
     else if (!(yield* store.save({ ...current, history, inputVersion: identity }, null))) {
       const winner = yield* store.read();
@@ -76,6 +80,7 @@ export function makeBoard(config: {
           snapshot: winner.snapshot,
           details: { ...winner.details },
           planningNoticeTarget: winner.planningNoticeTarget ?? null,
+          retryTargets: winner.retryTargets ?? {},
         };
         history = winner.history;
         identity = winner.inputVersion;
@@ -121,7 +126,12 @@ export function makeBoard(config: {
           next.snapshot = includePlan(next.snapshot, detail, !!input.observations.facts);
         }
         revision++;
-        next.snapshot = actions({ ...next.snapshot, cursor: cursor() }, input, next.details);
+        next.snapshot = actions(
+          { ...next.snapshot, cursor: cursor() },
+          input,
+          next.details,
+          next.retryTargets
+        );
         for (const detail of Object.values(next.details)) {
           const item = next.snapshot.entities.items[detail.itemId];
           if (item) next.details[detail.itemId] = { ...detail, itemVersion: item.version };
@@ -147,6 +157,7 @@ export function makeBoard(config: {
               snapshot: winner.snapshot,
               details: { ...winner.details },
               planningNoticeTarget: winner.planningNoticeTarget ?? null,
+              retryTargets: winner.retryTargets ?? {},
             };
             history = winner.history;
             identity = winner.inputVersion;
@@ -184,6 +195,8 @@ export function makeBoard(config: {
         if (rejected) return rejected;
         const record: CommandRecord = {
           request,
+          retryTarget:
+            request.kind === 'retry' ? current.retryTargets[request.actionId] : undefined,
           planningNotice:
             request.kind === 'acknowledge-planning-failures'
               ? current.planningNoticeTarget
@@ -222,8 +235,10 @@ export function makeBoard(config: {
           return winner
             ? replayCommand(request, winner)
             : failure(
-                'ledger-unavailable',
-                'Command responsibility unavailable. Observe before retrying.',
+                request.kind === 'retry' ? 'action-changed' : 'ledger-unavailable',
+                request.kind === 'retry'
+                  ? 'This recovery opportunity was already claimed. Observe its command before retrying.'
+                  : 'Command responsibility unavailable. Observe before retrying.',
                 request.commandId
               );
         }
@@ -318,7 +333,10 @@ export function makeBoard(config: {
             }
             receipts.set(record.request.commandId, running);
             result = yield* commands
-              .execute(record.request, action, input, record.planningNotice)
+              .execute(record.request, action, input, {
+                planningNotice: record.planningNotice,
+                retryTarget: record.retryTarget,
+              })
               .pipe(
                 Effect.catchCause((cause) =>
                   Effect.logError('V2 command outcome is uncertain', cause).pipe(

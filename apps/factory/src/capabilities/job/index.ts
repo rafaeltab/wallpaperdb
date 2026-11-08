@@ -15,6 +15,8 @@ export type {
   StartResult,
   Resume,
   ResumeAction,
+  Retry,
+  RetryAction,
 } from './contract.js';
 export { JobLive } from './implementation.js';
 

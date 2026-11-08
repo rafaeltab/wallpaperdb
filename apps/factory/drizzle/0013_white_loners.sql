@@ -1,0 +1,3 @@
+ALTER TABLE `v2_commands` ADD `retry_target` text;--> statement-breakpoint
+ALTER TABLE `v2_commands` ADD `retry_key` text GENERATED ALWAYS AS (CASE WHEN json_extract(request, '$.kind') = 'retry' THEN json_extract(request, '$.actionId') || ':' || json_extract(request, '$.precondition') ELSE NULL END) VIRTUAL;--> statement-breakpoint
+CREATE UNIQUE INDEX `v2_retry_opportunity` ON `v2_commands` (`scope`,`retry_key`);

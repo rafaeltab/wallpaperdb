@@ -226,6 +226,34 @@ export const SchedulerLive = Layer.effect(
         }
       });
     return {
+      retry: (command, revision) =>
+        Effect.gen(function* () {
+          const snapshot = yield* status();
+          const target = snapshot.jobs.find(
+            (job) => job.kind === 'job' && job.intent.id === command.jobId
+          );
+          if (
+            snapshot.state.revision !== revision ||
+            snapshot.state.paused ||
+            target?.kind !== 'job' ||
+            !target.retry ||
+            target.retry.runId !== command.runId ||
+            target.retry.threadId !== command.threadId
+          )
+            return { kind: 'rejected' as const };
+          const claim = {
+            issue: target.intent.issue,
+            index: command.index,
+            runId: command.runId,
+            retryThreadId: command.threadId,
+            run: observedRun(target),
+          };
+          if (!(yield* claimResume(claim, target, snapshot))) return { kind: 'occupied' as const };
+          const result = yield* (yield* pool.job(target.intent.issue)).retry(command);
+          if (result.kind === 'rejected' || resolvedStart(claim, result))
+            yield* releaseResume(claim);
+          return result;
+        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.retry')),
       authorizeRecovery: admitRecovery,
       status,
       configure: (command) =>
@@ -387,6 +415,8 @@ function recoveredResume(claim: ResumeClaim, jobs: readonly Status[]) {
   const job = jobs.find((job) => job.kind === 'job' && job.intent.issue === claim.issue);
   if (job?.kind !== 'job') return false;
   if (finished(job)) return true;
+  if (claim.retryThreadId && job.execution.kind === 'found')
+    return job.execution.threadId !== claim.retryThreadId && job.execution.run !== undefined;
   const run = observedRun(job);
   return successorRun(claim.run, run);
 }

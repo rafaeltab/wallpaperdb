@@ -1,5 +1,5 @@
 export { BoardCommands, BoardStore } from './contract.js';
-export type { BoardInput, BoardRecord, CommandRecord } from './contract.js';
+export type { BoardInput, BoardRecord, CommandRecord, RetryTarget } from './contract.js';
 export { makeBoard } from './implementation.js';
 export type { Board } from './implementation.js';
 export type {

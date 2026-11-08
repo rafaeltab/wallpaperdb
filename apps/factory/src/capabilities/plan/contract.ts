@@ -108,6 +108,7 @@ export interface Plan {
 export const Plan = Context.Service<Plan>('wallpaperdb.factory.Plan');
 
 export interface ResumeClaim {
+  readonly retryThreadId?: string;
   readonly issue: number;
   readonly index: number;
   readonly questionId?: string;
@@ -160,6 +161,10 @@ export const ScheduleObservations = Context.Service<ScheduleObservations>(
   'wallpaperdb.factory.ScheduleObservations'
 );
 export interface Scheduler {
+  retry(
+    command: import('../job/index.js').Retry,
+    revision: number
+  ): Effect.Effect<import('../job/index.js').StartResult, Unavailable>;
   /** Check recovery capacity without another issue admission. Recovery journals
    * retain their active reservation. A validated completed-stage receipt reserves
    * a durable job slot here before its successor stage can be sent. */

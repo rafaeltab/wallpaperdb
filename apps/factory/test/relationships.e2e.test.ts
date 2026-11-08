@@ -23,6 +23,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
   };
   let starts = 0;
   const job: Job = {
+    retry: () => Effect.die('Unexpected fresh retry in this fixture'),
     status: () => Effect.succeed(current),
     start: () =>
       Effect.sync(() => {
@@ -80,6 +81,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
         { issue: 3, blockers: [2] },
       ]),
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [current] }),
       tick: () => Effect.succeed({ state, jobs: [current] }),

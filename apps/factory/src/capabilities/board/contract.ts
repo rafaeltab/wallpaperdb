@@ -8,6 +8,8 @@ export interface BoardInput {
   plan?: PlanningAttempt;
 }
 export interface BoardRecord {
+  /** Recovery authority committed with the exact displayed failed attempts. */
+  retryTargets?: Readonly<Record<string, RetryTarget>>;
   /** Private target committed atomically with the displayed notice, including CAS winners. */
   planningNoticeTarget?: CommandRecord['planningNotice'];
   snapshot: BoardSnapshot;
@@ -16,13 +18,19 @@ export interface BoardRecord {
   history: readonly BoardDelta[];
 }
 export interface CommandRecord {
+  retryTarget?: RetryTarget | null;
   planningNotice?: { readonly id: string; readonly version: number } | null;
   basis?: import('./model.js').PlanAttempt['basis'] | null;
   request: BoardCommand;
   receipt: CommandReceipt;
 }
+export interface RetryTarget {
+  readonly retry: import('../job/index.js').Retry;
+  readonly scheduleRevision: number;
+}
 /** A save publishes the board, private notice target and bounded replay atomically. Acceptance binds
- * UUID and full request durably before effects. Claims are never retried after restart:
+ * UUID and full request durably before effects. Retry acceptance also atomically claims
+ * its action/precondition; a distinct UUID cannot consume the same opportunity. Claims are never retried after restart:
  * an interrupted worker remains uncertain until operator reconciliation.
  */
 export interface BoardStore {
@@ -48,7 +56,7 @@ export interface BoardCommands {
     command: BoardCommand,
     target: import('./model.js').Action,
     input: ScheduleSnapshot,
-    planningNotice?: CommandRecord['planningNotice']
+    targets?: Pick<CommandRecord, 'planningNotice' | 'retryTarget'>
   ): Effect.Effect<
     {
       state: 'succeeded' | 'rejected' | 'uncertain';

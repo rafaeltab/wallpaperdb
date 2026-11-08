@@ -47,6 +47,7 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
               receipt: v2Commands.receipt,
               basis: v2Commands.basis,
               planningNotice: v2Commands.planningNotice,
+              retryTarget: v2Commands.retryTarget,
             })
             .from(v2Commands)
             .where(and(eq(v2Commands.id, id), eq(v2Commands.scope, scope)))

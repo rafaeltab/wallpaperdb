@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
@@ -170,6 +171,123 @@ it('requires attention and releases capacity when an implementation turn ends wi
       { timeout: 8000, interval: 40 }
     );
   }));
+
+it('manually retries incomplete implementation in a fresh original-base worktree without another admission', () =>
+  composed(
+    async ({ running, host, save }) => {
+      await start(running);
+      const launches = async () =>
+        (await host.calls()).filter(
+          (call) =>
+            call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+        );
+      const original = (await launches())[0];
+      const branch = original.args[original.args.indexOf('--branch') + 1];
+      const resourcePath = `${host.directory}/resource-${branch.replaceAll('/', '-')}.json`;
+      const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+      await writeFile(`${prior.worktreePath}/failed-attempt.txt`, 'Preserve this failed attempt');
+      execFileSync('git', ['add', 'failed-attempt.txt'], { cwd: prior.worktreePath });
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=Test',
+          '-c',
+          'user.email=test@example.invalid',
+          'commit',
+          '-m',
+          'Failed attempt',
+        ],
+        { cwd: prior.worktreePath }
+      );
+      const oldHead = execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: prior.worktreePath,
+        encoding: 'utf8',
+      }).trim();
+      await writeFile(`${prior.worktreePath}/unfinished.txt`, 'Uncommitted evidence');
+      await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+      await save({
+        messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+      });
+      const request = {
+        ...(await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000036',
+        kind: 'retry',
+        payload: {},
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      const result = await receipt(running, request.commandId);
+      expect(result.result).toEqual({ jobId: 'job:rafaeltab/wallpaperdb/577' });
+      const calls = await launches();
+      expect(calls).toHaveLength(2);
+      const retried = calls[1];
+      expect(retried.args[retried.args.indexOf('--worktree') + 1]).toBe(host.base);
+      expect(retried.args[3]).toContain('Only issue 577. Keep the approved boundary.');
+      const nextBranch = retried.args[retried.args.indexOf('--branch') + 1];
+      expect(nextBranch).not.toBe(branch);
+      const next = JSON.parse(
+        await readFile(`${host.directory}/resource-${nextBranch.replaceAll('/', '-')}.json`, 'utf8')
+      );
+      expect(next.threadId).not.toBe(prior.threadId);
+      expect(next.worktreePath).not.toBe(prior.worktreePath);
+      expect(
+        execFileSync('git', ['rev-parse', 'HEAD'], {
+          cwd: next.worktreePath,
+          encoding: 'utf8',
+        }).trim()
+      ).toBe(host.base);
+      await expect(
+        readFile(`${next.worktreePath}/failed-attempt.txt`, 'utf8')
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(readFile(`${next.worktreePath}/unfinished.txt`, 'utf8')).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+      expect(await readFile(`${prior.worktreePath}/failed-attempt.txt`, 'utf8')).toBe(
+        'Preserve this failed attempt'
+      );
+      expect(await readFile(`${prior.worktreePath}/unfinished.txt`, 'utf8')).toBe(
+        'Uncommitted evidence'
+      );
+      expect(
+        execFileSync('git', ['rev-parse', 'HEAD'], {
+          cwd: prior.worktreePath,
+          encoding: 'utf8',
+        }).trim()
+      ).toBe(oldHead);
+      await vi.waitFor(
+        async () => {
+          const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.meta.factory.admission.consumed).toBe(1);
+          expect(board.meta.factory.concurrency.occupied).toBe(1);
+          expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            stage: 'implementation',
+            execution: { state: 'known', value: { state: 'running' } },
+            occupiesCapacity: true,
+          });
+        },
+        { timeout: 8000, interval: 40 }
+      );
+      const replay = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: request,
+      });
+      expect(replay.statusCode).toBe(200);
+      expect(replay.json()).toEqual(result);
+      const stale = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: { ...request, commandId: '00000000-0000-4000-8000-000000000037' },
+      });
+      expect(stale.statusCode).toBe(422);
+      expect(stale.json()).toMatchObject({ code: 'command-rejected' });
+      expect(await launches()).toHaveLength(2);
+    },
+    { parallel: true }
+  ));
 
 it('submits one retained advisory preview through v2 while the composed factory is paused', () =>
   composed(

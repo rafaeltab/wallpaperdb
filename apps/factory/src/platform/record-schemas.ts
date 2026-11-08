@@ -49,6 +49,7 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    restart: z.object({ index: z.number().int().positive() }).strict().optional(),
     revision: z.number().int().nonnegative(),
     cancelled: z.boolean(),
     claimed: z.array(z.number().int().nonnegative()),
@@ -96,6 +97,7 @@ const scheduleSchema = z
             index: z.number().int().nonnegative(),
             questionId: z.string().min(1).optional(),
             runId: z.string().min(1).optional(),
+            retryThreadId: z.string().min(1).optional(),
             run: z
               .object({ id: z.string().min(1), ordinal: z.number().int().positive() })
               .optional(),

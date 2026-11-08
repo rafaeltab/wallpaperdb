@@ -91,6 +91,7 @@ it('retains native merged PRs, open PRs without issues and owner-specific projec
       crossReferencedIssues: [],
     });
     const job = {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       status: () => Effect.succeed({ kind: 'empty' as const }),
       start: () => Effect.succeed({ kind: 'rejected' as const }),
       resume: () => Effect.succeed({ kind: 'rejected' as const }),
@@ -154,6 +155,7 @@ it('preserves last-known facts on partial metadata and refuses a fresh planner r
         facts: { issues: [{ number: 1 }] },
       });
       const job = {
+        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
         status: () => Effect.succeed({ kind: 'empty' as const }),
         start: () => Effect.succeed({ kind: 'rejected' as const }),
         resume: () => Effect.succeed({ kind: 'rejected' as const }),

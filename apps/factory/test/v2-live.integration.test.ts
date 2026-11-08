@@ -20,6 +20,7 @@ const initial: ScheduleSnapshot = {
   observations: { state: 'initial', stale: false },
 };
 const job = {
+  retry: () => Effect.die('Unexpected fresh retry in this fixture'),
   status: () => Effect.succeed({ kind: 'empty' as const }),
   start: () => Effect.succeed({ kind: 'rejected' as const }),
   resume: () => Effect.succeed({ kind: 'rejected' as const }),
@@ -171,8 +172,9 @@ it.each(['after-acceptance', 'failed-publication', 'competing-publication'] as c
       commands: {
         execute: (_command, _action, _input, expected) =>
           Effect.sync(() => {
-            applied.push(expected);
-            return expected?.id === authoritative.id && expected.version === authoritative.version
+            applied.push(expected?.planningNotice);
+            return expected?.planningNotice?.id === authoritative.id &&
+              expected.planningNotice.version === authoritative.version
               ? { state: 'succeeded' as const, result: null, reasons: [] }
               : {
                   state: 'rejected' as const,
@@ -356,8 +358,9 @@ it('rebuilds a cached notice without its private target before accepting acknowl
     commands: {
       execute: (_command, _action, _input, target) =>
         Effect.sync(() => {
-          received.push(target);
-          return target?.id === 'legacy-notice' && target.version === 1
+          received.push(target?.planningNotice);
+          return target?.planningNotice?.id === 'legacy-notice' &&
+            target.planningNotice.version === 1
             ? { state: 'succeeded' as const, result: null, reasons: [] }
             : {
                 state: 'rejected' as const,

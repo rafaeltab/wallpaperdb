@@ -50,6 +50,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
         let job = jobs.get(number);
         if (!job) {
           job = {
+            retry: () => Effect.die('Unexpected fresh retry in this fixture'),
             status: () => Effect.sync(() => statuses.get(number) ?? { kind: 'empty' }),
             start: (command) =>
               Effect.sync(() => {
@@ -837,6 +838,7 @@ it.each([-1, 1, 2])(
     let maximumDepth = 0;
     const decisions: boolean[] = [];
     const job: Job = {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       status: () =>
         Effect.gen(function* () {
           depth++;

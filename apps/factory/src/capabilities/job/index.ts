@@ -19,6 +19,7 @@ export type {
   RetryAction,
 } from './contract.js';
 export { JobLive } from './implementation.js';
+export { attemptIntent } from './restart.js';
 
 export type {
   RecoveryStatus,

@@ -347,6 +347,8 @@ it('manually retries incomplete implementation in a fresh original-base worktree
           .statusCode
       ).toBe(202);
       await receipt(running, again.commandId);
+      const finalLaunch = (await launches())[2];
+      const finalBranch = finalLaunch.args[finalLaunch.args.indexOf('--branch') + 1];
       await save({ complete: true, overrides: { status: 'completed' } });
       await vi.waitFor(
         async () => {
@@ -356,7 +358,11 @@ it('manually retries incomplete implementation in a fresh original-base worktree
               (job: { kind: string; intent?: { issue: number } }) => job.intent?.issue === 577
             )
           ).toMatchObject({
-            intent: { id: prior.title.match(/\[factory:(.*)\]$/)[1] },
+            intent: {
+              id: prior.title.match(/\[factory:(.*)\]$/)[1],
+              branch: finalBranch,
+              base: host.base,
+            },
             delivery: { stage: 'ci', ready: true, landed: false },
           });
         },

@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -297,6 +298,7 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
   });
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
+      Layer.provide(controlledPlanningSafetyLayer),
       Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
       Layer.provide(
         Layer.mergeAll(
@@ -2619,6 +2621,7 @@ process.exit(result.status ?? 1);
     );
     schedulerRuntime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(

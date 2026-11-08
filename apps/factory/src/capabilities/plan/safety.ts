@@ -7,6 +7,36 @@ export const PlanningSafetyLive = Layer.effect(
   Effect.gen(function* () {
     const store = yield* PlanningSafetyStore;
     return {
+      configure: (command) =>
+        Effect.gen(function* () {
+          const snapshot = yield* store.read();
+          if (snapshot.schedule.revision !== command.revision) return 'conflict' as const;
+          if (
+            !command.paused &&
+            snapshot.state.consecutiveModelDeadlineFailures === 3 &&
+            (snapshot.currentNotice?.acknowledgedAt ?? null) === null
+          )
+            return 'acknowledgement-required' as const;
+          const resumed = snapshot.schedule.paused && !command.paused;
+          const result = yield* store.commit({
+            expectedVersion: snapshot.state.version,
+            expectedScheduleRevision: snapshot.schedule.revision,
+            state: {
+              ...snapshot.state,
+              version: snapshot.state.version + 1,
+              consecutiveModelDeadlineFailures: resumed
+                ? 0
+                : snapshot.state.consecutiveModelDeadlineFailures,
+              currentNoticeId: resumed ? null : snapshot.state.currentNoticeId,
+            },
+            schedule: {
+              ...snapshot.schedule,
+              ...command,
+              revision: snapshot.schedule.revision + 1,
+            },
+          });
+          return result === 'saved' ? ('saved' as const) : ('conflict' as const);
+        }).pipe(Effect.withSpan('factory.planning.configure')),
       status: () =>
         Effect.map(store.read(), (snapshot) => ({
           schedule: snapshot.schedule,

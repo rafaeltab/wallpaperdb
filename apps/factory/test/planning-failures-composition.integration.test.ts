@@ -123,6 +123,18 @@ it('pauses after three distinct automatic model deadlines and retains their dura
     expect(reopened.meta.factory.paused).toBe(true);
     expect(reopened.meta.factory.planning.notice).toEqual(notice);
     expect(await starts()).toHaveLength(3);
+    const state = (await running.app.inject('/api/scheduler')).json().state;
+    const prematureResume = await running.app.inject({
+      method: 'POST',
+      url: '/api/scheduler',
+      payload: { revision: state.revision, paused: false, concurrency: 2, allowance: 3 },
+    });
+    expect(prematureResume.statusCode).toBe(422);
+    expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
+      paused: true,
+      concurrency: 1,
+      allowance: 2,
+    });
   } finally {
     await writeFile(`${host.directory}/release-planning-read`, 'cleanup');
     await running?.close();

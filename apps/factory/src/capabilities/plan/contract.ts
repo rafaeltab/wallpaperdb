@@ -172,7 +172,7 @@ export interface Scheduler {
     concurrency: number;
     allowance: number;
     paused: boolean;
-  }): Effect.Effect<'saved' | 'conflict' | 'rejected', Unavailable>;
+  }): Effect.Effect<'saved' | 'conflict' | 'rejected' | 'acknowledgement-required', Unavailable>;
   tick(base: string): Effect.Effect<ScheduleStatus, Unavailable>;
   start(
     command: import('../job/index.js').Start

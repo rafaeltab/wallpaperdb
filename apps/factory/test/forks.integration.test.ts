@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -122,6 +123,7 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
     );
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
         Layer.provide(deps)

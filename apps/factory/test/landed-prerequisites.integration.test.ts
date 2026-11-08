@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -110,6 +111,7 @@ it('launches a new dependent with remotely landed code after the configured base
     const job = await worker.runPromise(Job);
     runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(
@@ -488,6 +490,7 @@ async function reservedRuntime(
   const job = await worker.runPromise(Job);
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
+      Layer.provide(controlledPlanningSafetyLayer),
       Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
       Layer.provide(
         Layer.mergeAll(

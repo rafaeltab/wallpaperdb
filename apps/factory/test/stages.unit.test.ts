@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -1138,6 +1139,7 @@ it.each(['status', 'tick'] as const)(
     let occupied = true;
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(

@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { Time } from '../src/capabilities/job/index.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
@@ -205,6 +206,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
   );
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
+      Layer.provide(controlledPlanningSafetyLayer),
       Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
       Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
       Layer.provide(deps)
@@ -851,6 +853,7 @@ it.each([-1, 1, 2])(
     };
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(

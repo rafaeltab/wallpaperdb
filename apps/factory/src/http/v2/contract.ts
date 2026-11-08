@@ -340,8 +340,10 @@ export interface WorkItem extends Entity<WorkItemId> {
 export type Limit =
   | { readonly kind: 'unlimited' }
   | { readonly kind: 'limited'; readonly maximum: number };
+/** Bounded projection: oldest pending notice, otherwise latest acknowledged notice. */
 export interface FactoryPlanningState {
   readonly maximumAttempts: 3;
+  /** Distinct automatic model deadline failures in this cycle, from zero to three. */
   readonly consecutiveModelDeadlineFailures: number;
   readonly pendingNoticeCount: number;
   readonly notice: PlanningFailureNotice | null;
@@ -349,6 +351,7 @@ export interface FactoryPlanningState {
 export interface PlanningFailureNotice extends Entity<EntityId<'planning-notice'>> {
   readonly createdAt: Timestamp;
   readonly acknowledgedAt: Timestamp | null;
+  /** One to three failures, oldest first. Appending reopens a seen notice revision. */
   readonly failures: readonly AutomaticModelDeadlineFailure[];
 }
 export interface AutomaticModelDeadlineFailure {
@@ -358,7 +361,9 @@ export interface AutomaticModelDeadlineFailure {
   readonly attemptStartedAt: Timestamp;
   readonly modelHandedOffAt: Timestamp;
   readonly deadline: Timestamp;
+  /** Observed classification time; does not assert that the provider stopped then. */
   readonly failedAt: Timestamp;
+  /** Actual elapsed intervals at failedAt, excluding later cleanup. */
   readonly attemptElapsedMs: number;
   readonly modelElapsedMs: number;
   readonly threadId: ThreadId | null;

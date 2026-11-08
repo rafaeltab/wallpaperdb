@@ -26,15 +26,16 @@ export function PlanningNotice({
     .map((id) => board.entities.actions[id])
     .find((a) => a?.kind === 'acknowledge-planning-failures');
   const announced = useRef('');
-  const [announcement, announce] = useState('');
+  const [announcement, announce] = useState({ key: '', text: '' });
   useEffect(() => {
     if (!notice || notice.acknowledgedAt !== null) return;
     const key = `${board.scopeId}/${notice.id}/${notice.version}`;
     if (announced.current === key) return;
     announced.current = key;
-    announce(
-      `Planning needs attention. ${notice.failures.length} model deadline failures. ${state.pendingNoticeCount} pending notices.`
-    );
+    announce({
+      key,
+      text: `Planning needs attention. ${notice.failures.length} model deadline failures. ${state.pendingNoticeCount} pending notices.`,
+    });
   }, [board.scopeId, notice, state.pendingNoticeCount]);
   if (!notice) return null;
   const details = (
@@ -87,8 +88,13 @@ export function PlanningNotice({
       className={`cc-planning-notice ${unseen ? 'cc-planning-unseen' : ''}`}
       aria-labelledby="planning-notice-heading"
     >
-      <div role="status" aria-live="polite" className="cc-sr-only">
-        {announcement}
+      <div
+        role="status"
+        aria-label="Planning failure updates"
+        aria-live="polite"
+        className="cc-sr-only"
+      >
+        <span key={announcement.key}>{announcement.text}</span>
       </div>
       <h2 id="planning-notice-heading">
         {unseen ? 'Planning needs attention' : 'Seen planning failures'}

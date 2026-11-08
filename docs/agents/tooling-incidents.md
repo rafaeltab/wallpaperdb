@@ -10,6 +10,8 @@ Report suspected harm from repository checks, Biome rules, generators and agent 
 
 Reports are labeled `automation-impact` and assigned to `rafaeltab`. This label is the durable impact list for deciding whether to repair or revert the automation. Preserve unrelated labels and assignees. If more than one agent races to create the same report, reconcile duplicates explicitly; GitHub issue creation has no atomic uniqueness guarantee.
 
+Before publication, record `automationIncidents` in the review evidence ledger. Use an explicit empty array if none occurred; otherwise record each report's `url`, `userNotified: true` after the chat notice, and its `outcome`. The [review evidence command](../../scripts/agent-workflow.ts) rejects missing disclosure, incomplete entries, and reports that are not open, labeled and assigned to the user. This declaration covers incidents encountered during the task, including repaired ones; carry earlier records forward when resuming. Existing review ledgers need this current disclosure assessment rather than silently inheriting an empty value.
+
 Example input, with real evidence substituted before publication:
 
 ```json

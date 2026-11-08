@@ -194,9 +194,42 @@ test("review evidence requires all axes and preserves actual reviewed comparison
 	});
 	const evidence = {
 		current,
+		automationIncidents: [],
 		reviews: ["Standards", "Spec", "Defects"].map(review),
 	};
 	expect(reviewEvidenceErrors(evidence, current)).toStrictEqual([]);
+	expect(
+		reviewEvidenceErrors(
+			{ ...evidence, automationIncidents: undefined },
+			current,
+		),
+	).toContain(
+		"Explicit automationIncidents disclosure is required, including an empty array when none occurred",
+	);
+	const incident = {
+		url: "https://github.com/rafaeltab/wallpaperdb/issues/123",
+		userNotified: true,
+		outcome: "Fixed without weakening enforcement",
+	};
+	expect(
+		reviewEvidenceErrors(
+			{ ...evidence, automationIncidents: [incident] },
+			current,
+		),
+	).toStrictEqual([]);
+	for (const change of [
+		{ userNotified: false },
+		{ outcome: "" },
+		{ url: "https://github.com/another/repo/issues/123" },
+	])
+		expect(
+			reviewEvidenceErrors(
+				{ ...evidence, automationIncidents: [{ ...incident, ...change }] },
+				current,
+			),
+		).toContain(
+			"Automation incidents require a repository issue, explicit user notification and outcome",
+		);
 	expect(
 		reviewEvidenceErrors(
 			{ ...evidence, reviews: evidence.reviews.slice(1) },

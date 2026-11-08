@@ -208,6 +208,25 @@ export function reviewEvidenceErrors(
 	current: Comparison,
 ) {
 	const errors: string[] = [];
+	if (!Array.isArray(ledger.automationIncidents))
+		errors.push(
+			"Explicit automationIncidents disclosure is required, including an empty array when none occurred",
+		);
+	else if (
+		ledger.automationIncidents.some(
+			(incident) =>
+				!incident ||
+				!/^https:\/\/github\.com\/rafaeltab\/wallpaperdb\/issues\/\d+$/.test(
+					incident.url,
+				) ||
+				incident.userNotified !== true ||
+				typeof incident.outcome !== "string" ||
+				!incident.outcome.trim(),
+		)
+	)
+		errors.push(
+			"Automation incidents require a repository issue, explicit user notification and outcome",
+		);
 	if (ledger.pendingScopeDecisions?.length)
 		errors.push("Pending scope decisions");
 	for (const key of ["head", "baseSha", "mergeBase"] as const)
@@ -467,6 +486,30 @@ async function main() {
 				} catch {
 					errors.push(`Unavailable artifact ${artifact.path}`);
 				}
+			}
+		if (!errors.length)
+			for (const incident of ledger.automationIncidents ?? []) {
+				const issue = github<{
+					state: string;
+					assignees: { login: string }[];
+					labels: { name: string }[];
+				}>([
+					"issue",
+					"view",
+					incident.url,
+					"--repo",
+					"rafaeltab/wallpaperdb",
+					"--json",
+					"state,assignees,labels",
+				]);
+				if (
+					issue.state !== "OPEN" ||
+					!issue.assignees.some(({ login }) => login === "rafaeltab") ||
+					!issue.labels.some(({ name }) => name === "automation-impact")
+				)
+					errors.push(
+						`Automation incident is not an open, labeled report assigned to the user: ${incident.url}`,
+					);
 			}
 		console.log(
 			JSON.stringify({ head, baseRef, baseSha, mergeBase, errors }, null, 2),

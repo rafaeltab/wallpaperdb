@@ -27,6 +27,11 @@ export interface Review extends Partial<Comparison> {
 	applicability?: Applicability;
 }
 export interface ReviewLedger {
+	automationIncidents?: {
+		url: string;
+		userNotified: boolean;
+		outcome: string;
+	}[];
 	current?: Comparison;
 	reviews?: Review[];
 	pendingScopeDecisions?: unknown[];

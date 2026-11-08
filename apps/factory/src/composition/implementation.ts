@@ -242,7 +242,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     deps,
     PlanningSafetyLive.pipe(
       Layer.provide(
-        Layer.succeed(PlanningSafetyStore, sqlitePlanningSafety(configuration.FACTORY_STATE))
+        Layer.mergeAll(
+          Layer.succeed(PlanningSafetyStore, sqlitePlanningSafety(configuration.FACTORY_STATE)),
+          Layer.succeed(Time, systemTime)
+        )
       )
     ),
     Layer.succeed(ScheduleStore, scheduleStore),
@@ -409,6 +412,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,
     base: configuration.FACTORY_BASE,
     scheduler,
+    planningSafety,
     read: () =>
       Effect.all({
         schedule: observations.schedule(),

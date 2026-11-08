@@ -14,6 +14,7 @@ export interface BoardRecord {
   history: readonly BoardDelta[];
 }
 export interface CommandRecord {
+  planningNotice?: { readonly id: string; readonly version: number } | null;
   basis?: import('./model.js').PlanAttempt['basis'] | null;
   request: BoardCommand;
   receipt: CommandReceipt;
@@ -44,7 +45,8 @@ export interface BoardCommands {
   execute(
     command: BoardCommand,
     target: import('./model.js').Action,
-    input: ScheduleSnapshot
+    input: ScheduleSnapshot,
+    planningNotice?: CommandRecord['planningNotice']
   ): Effect.Effect<
     {
       state: 'succeeded' | 'rejected' | 'uncertain';

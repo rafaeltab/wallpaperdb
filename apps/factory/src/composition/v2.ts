@@ -12,6 +12,7 @@ import { Time, Unavailable } from '../capabilities/job/index.js';
 import {
   AttemptStore,
   IPlanner,
+  type PlanningSafety,
   type Scheduler,
   type AttemptSubmission,
 } from '../capabilities/plan/index.js';
@@ -25,6 +26,7 @@ export async function v2Producer(config: {
   scopeId: string;
   base: string;
   scheduler: Scheduler;
+  planningSafety: PlanningSafety;
   planner: IPlanner;
   read: () => Effect.Effect<ScheduleSnapshot, Unavailable>;
   submitPlan: (parent?: Tracer.Span) => Promise<AttemptSubmission>;
@@ -130,6 +132,7 @@ export async function v2Producer(config: {
 function commandAdapter(config: {
   base: string;
   scheduler: Scheduler;
+  planningSafety: PlanningSafety;
   submitPlan: (parent?: Tracer.Span) => Promise<AttemptSubmission>;
 }): Commands {
   const rejected = (code: string, message: string) => ({
@@ -138,8 +141,19 @@ function commandAdapter(config: {
     reasons: [{ code, message }],
   });
   return {
-    execute: (command: BoardCommand, action: Action, input: ScheduleSnapshot) =>
+    execute: (command: BoardCommand, action: Action, input: ScheduleSnapshot, planningNotice) =>
       Effect.gen(function* () {
+        if (command.kind === 'acknowledge-planning-failures') {
+          const result = planningNotice
+            ? yield* config.planningSafety.acknowledge(planningNotice)
+            : 'stale';
+          return result === 'saved'
+            ? { state: 'succeeded' as const, result: null, reasons: [] }
+            : rejected(
+                'stale-action',
+                'The planning failure notice changed. Refresh before acknowledging it.'
+              );
+        }
         if (command.kind === 'configure') {
           const result = yield* config.scheduler.configure({
             revision: input.state.revision,

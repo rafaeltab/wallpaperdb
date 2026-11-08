@@ -1,9 +1,11 @@
 import { Effect } from 'effect';
+import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { fileScheduleStore } from '../src/adapters/store/index.js';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
+import type { BoardSnapshot } from '../src/capabilities/board/index.js';
 
 it('pauses after three distinct automatic model deadlines and retains their durations after restart', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -119,7 +121,7 @@ it('pauses after three distinct automatic model deadlines and retains their dura
     running = undefined;
     vi.setSystemTime(Date.now() + 5 * 60_000);
     running = await startFactory(configuration);
-    const reopened = (await running.app.inject('/api/v2/board')).json();
+    const reopened = (await running.app.inject('/api/v2/board')).json<BoardSnapshot>();
     expect(reopened.meta.factory.paused).toBe(true);
     expect(reopened.meta.factory.planning.notice).toEqual(notice);
     expect(await starts()).toHaveLength(3);
@@ -135,6 +137,75 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       concurrency: 1,
       allowance: 2,
     });
+    const action = Object.values(reopened.entities.actions).find(
+      (value) => value.kind === 'acknowledge-planning-failures'
+    );
+    expect(action?.availability.state).toBe('available');
+    if (!action || action.availability.state !== 'available')
+      throw new Error('Missing acknowledgement');
+    const request = {
+      commandId: randomUUID(),
+      actionId: action.id,
+      precondition: action.availability.precondition,
+      kind: 'acknowledge-planning-failures',
+      payload: {},
+    };
+    const send = (payload: object) =>
+      running!.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload,
+      });
+    expect((await send(request)).statusCode).toBe(202);
+    await vi.waitFor(
+      async () => {
+        const receipt = (await running!.app.inject(`/api/v2/commands/${request.commandId}`)).json();
+        expect(receipt).toMatchObject({ state: 'succeeded', result: null });
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    await vi.waitFor(
+      async () => {
+        const seen = (await running!.app.inject('/api/v2/board')).json();
+        expect(seen.meta.factory.planning.pendingNoticeCount).toBe(0);
+        expect(seen.meta.factory.planning.notice.acknowledgedAt).not.toBeNull();
+        expect(seen.meta.factory).toMatchObject({
+          paused: true,
+          planning: { consecutiveModelDeadlineFailures: 3 },
+        });
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    const receipt = (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json();
+    const resumed = await running.app.inject({
+      method: 'POST',
+      url: '/api/scheduler',
+      payload: {
+        revision: state.revision,
+        paused: false,
+        concurrency: 1,
+        allowance: 2,
+      },
+    });
+    expect(resumed.statusCode).toBe(200);
+    await vi.waitFor(async () => expect(await starts()).toHaveLength(4), {
+      timeout: 6000,
+      interval: 20,
+    });
+    vi.setSystemTime(Date.now() + 11 * 60_000);
+    await vi.waitFor(
+      async () => {
+        const next = (await running!.app.inject('/api/v2/board')).json();
+        expect(next.meta.factory.planning.consecutiveModelDeadlineFailures).toBe(1);
+        expect(next.meta.factory.planning.notice.id).not.toBe(notice.id);
+      },
+      { timeout: 6000, interval: 20 }
+    );
+    expect((await send(request)).json()).toEqual(receipt);
+    expect((await send({ ...request, commandId: randomUUID() })).statusCode).toBe(412);
+    expect(
+      (await running.app.inject('/api/v2/board')).json().meta.factory.planning.notice.acknowledgedAt
+    ).toBeNull();
   } finally {
     await writeFile(`${host.directory}/release-planning-read`, 'cleanup');
     await running?.close();

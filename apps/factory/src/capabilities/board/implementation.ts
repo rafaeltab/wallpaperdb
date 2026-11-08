@@ -166,6 +166,10 @@ export function makeBoard(config: {
         if (rejected) return rejected;
         const record: CommandRecord = {
           request,
+          planningNotice:
+            request.kind === 'acknowledge-planning-failures' && input.planningSafety?.notice
+              ? { id: input.planningSafety.notice.id, version: input.planningSafety.notice.version }
+              : undefined,
           basis:
             request.kind === 'preview-plan'
               ? {
@@ -295,23 +299,25 @@ export function makeBoard(config: {
               continue;
             }
             receipts.set(record.request.commandId, running);
-            result = yield* commands.execute(record.request, action, input).pipe(
-              Effect.catchCause((cause) =>
-                Effect.logError('V2 command outcome is uncertain', cause).pipe(
-                  Effect.as({
-                    state: 'uncertain' as const,
-                    result: null,
-                    reasons: [
-                      {
-                        code: 'execution-unavailable',
-                        message:
-                          'Observe the owning operation and reconcile its outcome before retrying.',
-                      },
-                    ],
-                  })
+            result = yield* commands
+              .execute(record.request, action, input, record.planningNotice)
+              .pipe(
+                Effect.catchCause((cause) =>
+                  Effect.logError('V2 command outcome is uncertain', cause).pipe(
+                    Effect.as({
+                      state: 'uncertain' as const,
+                      result: null,
+                      reasons: [
+                        {
+                          code: 'execution-unavailable',
+                          message:
+                            'Observe the owning operation and reconcile its outcome before retrying.',
+                        },
+                      ],
+                    })
+                  )
                 )
-              )
-            );
+              );
           }
           const completed = {
             ...record,

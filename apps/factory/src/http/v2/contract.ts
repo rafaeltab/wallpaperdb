@@ -371,7 +371,13 @@ export interface FactoryControl extends Entity<EntityId<'factory'>> {
   readonly admission: { readonly limit: Limit; readonly consumed: number };
   readonly actionIds: readonly ActionId[];
 }
-export type ActionKind = 'configure' | 'start' | 'resume' | 'cancel' | 'preview-plan';
+export type ActionKind =
+  | 'configure'
+  | 'start'
+  | 'resume'
+  | 'cancel'
+  | 'preview-plan'
+  | 'acknowledge-planning-failures';
 export interface Action extends Entity<ActionId> {
   readonly kind: ActionKind;
   readonly targetId: IssueId | JobId | EntityId<'factory'>;
@@ -508,7 +514,10 @@ export type FactoryV2Command = {
       };
     }
   | { readonly kind: 'start'; readonly payload: { readonly context: string } }
-  | { readonly kind: 'resume' | 'cancel' | 'preview-plan'; readonly payload: Record<string, never> }
+  | {
+      readonly kind: 'resume' | 'cancel' | 'preview-plan' | 'acknowledge-planning-failures';
+      readonly payload: Record<string, never>;
+    }
 );
 export interface FactoryV2CommandReceipt {
   readonly commandId: string;

@@ -1,12 +1,36 @@
 import { Effect, Layer } from 'effect';
 import { Unavailable } from '../job/index.js';
+import { Time } from '../job/index.js';
 import { PlanningSafety, PlanningSafetyStore } from './safety-contract.js';
 
 export const PlanningSafetyLive = Layer.effect(
   PlanningSafety,
   Effect.gen(function* () {
     const store = yield* PlanningSafetyStore;
+    const time = yield* Time;
     return {
+      acknowledge: (expected) =>
+        Effect.gen(function* () {
+          for (;;) {
+            const snapshot = yield* store.read();
+            const notice = snapshot.displayedNotice;
+            if (
+              !notice ||
+              notice.id !== expected.id ||
+              notice.version !== expected.version ||
+              notice.acknowledgedAt !== null
+            )
+              return 'stale' as const;
+            const result = yield* store.commit({
+              expectedVersion: snapshot.state.version,
+              expectedScheduleRevision: snapshot.schedule.revision,
+              state: { ...snapshot.state, version: snapshot.state.version + 1 },
+              notice: { ...notice, version: notice.version + 1, acknowledgedAt: yield* time.now() },
+              expectedNoticeVersion: notice.version,
+            });
+            if (result === 'saved') return 'saved' as const;
+          }
+        }).pipe(Effect.withSpan('factory.planning.acknowledge')),
       configure: (command) =>
         Effect.gen(function* () {
           const snapshot = yield* store.read();

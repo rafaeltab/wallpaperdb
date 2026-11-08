@@ -78,6 +78,13 @@
       "when": 1794017345259,
       "tag": "0010_flat_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794098694846,
+      "tag": "0011_curved_lilandra",
+      "breakpoints": true
     }
   ]
 }

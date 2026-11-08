@@ -122,6 +122,7 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
     );
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
         Layer.provide(deps)
       )

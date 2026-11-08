@@ -83,6 +83,7 @@ export const AttemptsLive = Layer.effect(
           const operation = Effect.gen(function* () {
             const result = yield* plan.preview({
               requestId: id,
+              attemptStartedAt: attempt.startedAt,
               progress: (phase) =>
                 Effect.gen(function* () {
                   const current = yield* store.get(id);
@@ -92,6 +93,16 @@ export const AttemptsLive = Layer.effect(
             });
             const current = yield* store.get(id);
             if (!current) return yield* conflict();
+            if (result.kind === 'paused') {
+              yield* save({
+                ...current,
+                revision: current.revision + 1,
+                phase: 'failed',
+                finishedAt: yield* time.now(),
+                detail: 'Planning is paused. No model was launched.',
+              });
+              return;
+            }
             yield* save({
               ...current,
               revision: current.revision + 1,

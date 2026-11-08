@@ -35,6 +35,7 @@ import {
   sqliteObservations,
   sqliteLocalSnapshot,
   sqliteScheduleObservations,
+  sqlitePlanningSafety,
 } from '../adapters/store/index.js';
 import {
   Attempts,
@@ -48,6 +49,9 @@ import {
   JobPool,
   ScheduleStore,
   ScheduleObservations,
+  PlanningSafety,
+  PlanningSafetyLive,
+  PlanningSafetyStore,
 } from '../capabilities/plan/index.js';
 import {
   githubIssues,
@@ -236,6 +240,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
 
   const schedulerDeps = Layer.mergeAll(
     deps,
+    PlanningSafetyLive.pipe(
+      Layer.provide(
+        Layer.succeed(PlanningSafetyStore, sqlitePlanningSafety(configuration.FACTORY_STATE))
+      )
+    ),
     Layer.succeed(ScheduleStore, scheduleStore),
     Layer.succeed(
       ScheduleObservations,
@@ -245,6 +254,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   );
   let planningDemand = () => {};
   const planner = t3Planner({
+    automaticPolicy: {
+      mayLaunch: () =>
+        runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.mayLaunch())),
+      failed: (failure) =>
+        runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.failed(failure))),
+    },
     mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
     mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
     stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
@@ -354,6 +369,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     )
   );
   const scheduler = await runtime.runPromise(Scheduler);
+  const planningSafety = await runtime.runPromise(PlanningSafety);
   recoveryAdmission = scheduler.authorizeRecovery;
   const job: Job = {
     status: () =>
@@ -394,9 +410,15 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     base: configuration.FACTORY_BASE,
     scheduler,
     read: () =>
-      Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
-        Effect.map(({ schedule, threads }) => ({
+      Effect.all({
+        schedule: observations.schedule(),
+        threads: threads.snapshot(),
+        safety: planningSafety.status(),
+      }).pipe(
+        Effect.map(({ schedule, threads, safety }) => ({
           ...schedule,
+          state: safety.schedule,
+          planningSafety: safety.planning,
           threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
         }))
       ),

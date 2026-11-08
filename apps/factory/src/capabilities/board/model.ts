@@ -335,7 +335,32 @@ export interface WorkItem extends Entity<WorkItemId> {
 export type Limit =
   | { readonly kind: 'unlimited' }
   | { readonly kind: 'limited'; readonly maximum: number };
+export interface FactoryPlanningState {
+  readonly maximumAttempts: 3;
+  readonly consecutiveModelDeadlineFailures: number;
+  readonly pendingNoticeCount: number;
+  readonly notice: PlanningFailureNotice | null;
+}
+export interface PlanningFailureNotice extends Entity<EntityId<'planning-notice'>> {
+  readonly createdAt: Timestamp;
+  readonly acknowledgedAt: Timestamp | null;
+  readonly failures: readonly AutomaticModelDeadlineFailure[];
+}
+export interface AutomaticModelDeadlineFailure {
+  readonly attemptId: string;
+  readonly code: 'model-deadline';
+  readonly message: string;
+  readonly attemptStartedAt: Timestamp;
+  readonly modelHandedOffAt: Timestamp;
+  readonly deadline: Timestamp;
+  readonly failedAt: Timestamp;
+  readonly attemptElapsedMs: number;
+  readonly modelElapsedMs: number;
+  readonly threadId: ThreadId | null;
+  readonly runId: string | null;
+}
 export interface FactoryControl extends Entity<EntityId<'factory'>> {
+  readonly planning: FactoryPlanningState;
   readonly paused: boolean;
   readonly concurrency: { readonly limit: Limit; readonly occupied: number };
   readonly admission: { readonly limit: Limit; readonly consumed: number };

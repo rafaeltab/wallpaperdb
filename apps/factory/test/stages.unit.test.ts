@@ -1138,6 +1138,7 @@ it.each(['status', 'tick'] as const)(
     let occupied = true;
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(ScheduleStore, schedule),

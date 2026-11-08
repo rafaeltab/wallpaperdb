@@ -1,3 +1,4 @@
+import { Time } from '../src/capabilities/job/index.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -203,7 +204,11 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
     })
   );
   const runtime = ManagedRuntime.make(
-    SchedulerLive.pipe(Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))), Layer.provide(deps))
+    SchedulerLive.pipe(
+      Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
+      Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
+      Layer.provide(deps)
+    )
   );
   return {
     runtime,
@@ -846,6 +851,7 @@ it.each([-1, 1, 2])(
     };
     const runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(ScheduleStore, store),

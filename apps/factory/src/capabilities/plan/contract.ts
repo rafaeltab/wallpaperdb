@@ -81,12 +81,17 @@ export interface IPlanner {
   ): Effect.Effect<PlannerOwnership | undefined, Unavailable>;
   propose(
     input: PlanningInput,
-    attempt?: { requestId?: string; deadline?: number; automatic?: boolean }
-  ): Effect.Effect<Proposal, Unavailable>;
+    attempt?: {
+      requestId?: string;
+      deadline?: number;
+      automatic?: boolean;
+      attemptStartedAt?: number;
+    }
+  ): Effect.Effect<Proposal | { readonly kind: 'paused' }, Unavailable>;
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
 export interface Preview {
-  readonly kind: 'preview' | 'stale';
+  readonly kind: 'preview' | 'stale' | 'paused';
   readonly selected: Proposal['selected'];
   readonly rejected: readonly { issue: number; reason: string }[];
   readonly input: PlanningInput;
@@ -95,6 +100,7 @@ export interface Plan {
   preview(attempt?: {
     requestId?: string;
     automatic?: boolean;
+    attemptStartedAt?: number;
     progress: (phase: 'discovery' | 'handoff' | 'freshness') => Effect.Effect<void, Unavailable>;
   }): Effect.Effect<Preview, Unavailable>;
 }
@@ -124,6 +130,13 @@ export interface ScheduleStore {
   read(): Effect.Effect<ScheduleState, Unavailable>;
   save(state: ScheduleState): Effect.Effect<boolean, Unavailable>;
 }
+export const initialScheduleState: ScheduleState = {
+  revision: -1,
+  concurrency: 1,
+  allowance: 1,
+  paused: false,
+  admissions: [],
+};
 export const ScheduleStore = Context.Service<ScheduleStore>('wallpaperdb.factory.ScheduleStore');
 /** Stable isolated lifecycle per issue, including after reopening the runtime. */
 export interface JobPool {
@@ -179,9 +192,12 @@ export interface PlannerOwnership {
   run?: { threadId: string; runId: string };
   retired?: boolean;
   detail?: string;
+  automatic?: boolean;
+  attemptStartedAt?: number;
+  modelHandedOffAt?: number;
 }
 export interface AttemptResult {
-  kind: Preview['kind'];
+  kind: Exclude<Preview['kind'], 'paused'>;
   selected: Preview['selected'];
   rejected: Preview['rejected'];
   input: {

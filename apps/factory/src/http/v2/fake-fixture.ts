@@ -411,6 +411,12 @@ export function fakeFixture(cursor: string, at: string): FactoryV2Snapshot {
       ],
       factory: {
         id: 'factory:demo',
+        planning: {
+          maximumAttempts: 3,
+          consecutiveModelDeadlineFailures: 0,
+          pendingNoticeCount: 0,
+          notice: null,
+        },
         version: '1',
         paused: false,
         concurrency: { limit: { kind: 'limited', maximum: 4 }, occupied: 2 },

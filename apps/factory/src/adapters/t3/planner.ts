@@ -5,7 +5,11 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import { Effect } from 'effect';
 import { z } from 'zod';
-import { planningInputIdentity, type IPlanner } from '../../capabilities/plan/index.js';
+import {
+  planningInputIdentity,
+  type IPlanner,
+  type AutomaticDeadlineFailure,
+} from '../../capabilities/plan/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { plannerState } from './planner-state.js';
 import { command } from '../../platform/index.js';
@@ -40,6 +44,10 @@ export function t3Planner(config: {
   stateDirectory: string;
   mcpEndpoint?: string;
   mcpAuthorizationFile?: string;
+  automaticPolicy?: {
+    mayLaunch(): Promise<boolean>;
+    failed(failure: AutomaticDeadlineFailure): Promise<void>;
+  };
 }): IPlanner & { reconcile(): Effect.Effect<void, Unavailable> } {
   const call = async (args: string[], signal: AbortSignal, input?: string) =>
     JSON.parse(
@@ -103,6 +111,30 @@ export function t3Planner(config: {
       })
       .parse(await call(['show', run.threadId, '--messages', '20'], signal));
   type Record = Awaited<ReturnType<typeof journal.save>>;
+  const reportDeadline = async (record: Record) => {
+    if (
+      !record.automatic ||
+      !config.automaticPolicy ||
+      record.attemptStartedAt === undefined ||
+      record.modelHandedOffAt === undefined ||
+      record.deadline === undefined
+    )
+      return;
+    const failedAt = Date.now();
+    await config.automaticPolicy.failed({
+      attemptId: record.requestId,
+      code: 'model-deadline',
+      message: 'Automatic planning did not complete within its model deadline.',
+      attemptStartedAt: record.attemptStartedAt,
+      modelHandedOffAt: record.modelHandedOffAt,
+      deadline: record.deadline,
+      failedAt,
+      attemptElapsedMs: failedAt - record.attemptStartedAt,
+      modelElapsedMs: failedAt - record.modelHandedOffAt,
+      threadId: record.run?.threadId ?? null,
+      runId: record.run?.runId ?? null,
+    });
+  };
   const ownershipOf = (record: Record) => {
     const { input: _input, inputIdentity: _identity, ...ownership } = record;
     return ownership;
@@ -139,6 +171,8 @@ export function t3Planner(config: {
       interruptionFailure = cause;
     }
     const detail = await observe(run, signal);
+    if (['completed', 'idle'].includes(detail.thread.status)) return detail;
+    await reportDeadline(record);
     if (terminal(detail.thread.status)) return detail;
     throw new ModelDeadline(
       interruptionFailure
@@ -188,6 +222,7 @@ export function t3Planner(config: {
         }
       }
     }
+    if (successful && completedAt === undefined) await reportDeadline(record);
     const phase = successful ? 'succeeded' : 'failed';
     const completed =
       record.phase === phase && record.completedAt === completedAt && record.retired === false
@@ -354,6 +389,12 @@ export function t3Planner(config: {
             await waitForReconciliation(signal);
             const recovered = await recover(input, signal, attempt?.requestId);
             if (recovered) return recovered;
+            if (
+              attempt?.automatic &&
+              config.automaticPolicy &&
+              !(await config.automaticPolicy.mayLaunch())
+            )
+              return { kind: 'paused' as const };
             const requestId = attempt?.requestId ?? randomUUID();
             const current = await journal.read();
             if (current && !current.retired) throw new Error('Planner state changed concurrently');
@@ -376,12 +417,16 @@ export function t3Planner(config: {
               });
               throw new Error('Planner message exceeds T3 maximum 120000 characters');
             }
+            const handedOffAt = Date.now();
             const intent = await journal.save({
               revision: (current?.revision ?? -1) + 1,
               requestId,
               input: JSON.stringify(input),
               inputIdentity: planningInputIdentity(input),
-              deadline: Math.min(attempt?.deadline ?? Infinity, Date.now() + 600000),
+              automatic: attempt?.automatic,
+              attemptStartedAt: attempt?.attemptStartedAt ?? handedOffAt,
+              modelHandedOffAt: handedOffAt,
+              deadline: Math.min(attempt?.deadline ?? Infinity, handedOffAt + 600000),
               phase: 'launch-intent',
             });
             needsRecovery = true;

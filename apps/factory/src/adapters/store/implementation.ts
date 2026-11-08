@@ -9,6 +9,7 @@ import {
   scheduleSchema,
 } from '../../platform/index.js';
 import { type Intent, type JobStore, Unavailable } from '../../capabilities/job/index.js';
+import { initialScheduleState } from '../../capabilities/plan/index.js';
 
 const code = (cause: unknown, expected: string) =>
   cause instanceof Error && 'code' in cause && cause.code === expected;
@@ -133,13 +134,7 @@ export function fileScheduleStore(
       Effect.withSpan('factory.store.schedule')
     );
   const read = async () => {
-    let latest: import('../../capabilities/plan/index.js').ScheduleState = {
-      revision: -1,
-      concurrency: 1,
-      allowance: 1,
-      paused: false,
-      admissions: [],
-    };
+    let latest = initialScheduleState;
     for (let revision = 0; ; revision++) {
       try {
         latest = scheduleSchema.parse(await requiredRecord(directory, `schedule-${revision}.json`));

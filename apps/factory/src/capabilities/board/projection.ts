@@ -47,7 +47,12 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
     },
     entities: tables,
   };
-  return { snapshot, details };
+  const notice = input.planningSafety?.notice;
+  return {
+    snapshot,
+    details,
+    planningNoticeTarget: notice ? { id: notice.id, version: notice.version } : null,
+  };
 }
 
 function planning(

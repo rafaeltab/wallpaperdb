@@ -56,13 +56,27 @@ export function makeBoard(config: {
       if (item) current.details[detail.itemId] = { ...detail, itemVersion: item.version };
     }
     let history: readonly BoardDelta[] = restored?.history ?? [];
-    let identity =
-      restored?.inputVersion ?? version({ input: stable(input), plan: config.initialPlan });
-    if (restored) current = { snapshot: restored.snapshot, details: restored.details };
+    // Older cached publications lack the private acknowledgement target. Reproject
+    // them before exposing actions rather than deriving authority from a wire hash.
+    let identity = restored
+      ? restored.planningNoticeTarget === undefined
+        ? ''
+        : restored.inputVersion
+      : version({ input: stable(input), plan: config.initialPlan });
+    if (restored)
+      current = {
+        snapshot: restored.snapshot,
+        details: restored.details,
+        planningNoticeTarget: restored.planningNoticeTarget ?? null,
+      };
     else if (!(yield* store.save({ ...current, history, inputVersion: identity }, null))) {
       const winner = yield* store.read();
       if (winner) {
-        current = { snapshot: winner.snapshot, details: { ...winner.details } };
+        current = {
+          snapshot: winner.snapshot,
+          details: { ...winner.details },
+          planningNoticeTarget: winner.planningNoticeTarget ?? null,
+        };
         history = winner.history;
         identity = winner.inputVersion;
       }
@@ -129,7 +143,11 @@ export function makeBoard(config: {
         ) {
           const winner = yield* store.read();
           if (winner) {
-            current = { snapshot: winner.snapshot, details: { ...winner.details } };
+            current = {
+              snapshot: winner.snapshot,
+              details: { ...winner.details },
+              planningNoticeTarget: winner.planningNoticeTarget ?? null,
+            };
             history = winner.history;
             identity = winner.inputVersion;
             for (const listener of listeners) listener();
@@ -167,8 +185,8 @@ export function makeBoard(config: {
         const record: CommandRecord = {
           request,
           planningNotice:
-            request.kind === 'acknowledge-planning-failures' && input.planningSafety?.notice
-              ? { id: input.planningSafety.notice.id, version: input.planningSafety.notice.version }
+            request.kind === 'acknowledge-planning-failures'
+              ? current.planningNoticeTarget
               : undefined,
           basis:
             request.kind === 'preview-plan'

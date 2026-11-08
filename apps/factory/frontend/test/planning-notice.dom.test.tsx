@@ -147,6 +147,20 @@ it('requires an explicit seen acknowledgement for the displayed failures and kee
         },
       },
     },
+    entities: {
+      ...board.entities,
+      actions: {
+        ...board.entities.actions,
+        [actionId]: {
+          ...board.entities.actions[actionId],
+          availability: {
+            state: 'available',
+            precondition: 'exact-first-rows-v2',
+            validUntil: null,
+          },
+        },
+      },
+    },
   };
   await act(async () => {
     window.dispatchEvent(new Event('pagehide'));
@@ -171,12 +185,14 @@ it('requires an explicit seen acknowledgement for the displayed failures and kee
   await waitFor(() => expect(screen.queryByText(/2 pending planning failure notices/)).toBeNull());
   expect(posted[0]).toMatchObject({
     kind: 'acknowledge-planning-failures',
-    precondition: 'exact-first-rows',
+    precondition: 'exact-first-rows-v2',
     payload: {},
   });
   expect(document.activeElement).toBe(acknowledge);
   await user.click(screen.getByRole('button', { name: 'Acknowledge seen' }));
   await screen.findByRole('heading', { name: 'Seen planning failures' });
+  expect(screen.getByText(/Failures have been acknowledged. Use Resume/)).toBeTruthy();
+  await waitFor(() => expect(live.textContent).toBe(''));
   expect(screen.getByText('Inspect seen failure details')).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>('button', { name: /Resume/ }).disabled).toBe(false);
   expect(posted).toHaveLength(2);

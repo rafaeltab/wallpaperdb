@@ -55,4 +55,22 @@ export function populateThreads(context: ProjectionContext) {
             },
     });
   }
+  for (const failure of input.planningSafety?.notice?.failures ?? []) {
+    if (!failure.threadId) continue;
+    const id = threadId(threadFacts.environmentId, failure.threadId);
+    tables.threads[id] ??= entity({
+      id,
+      metadata: unknown(t3),
+      association: {
+        state: 'unknown' as const,
+        reasons: [
+          {
+            code: 'planning-context',
+            message:
+              'Retained planning failure references this thread; issue associations are unavailable.',
+          },
+        ],
+      },
+    });
+  }
 }

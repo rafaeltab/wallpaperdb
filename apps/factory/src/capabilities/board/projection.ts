@@ -6,11 +6,11 @@ import { coverageFor } from './coverage.js';
 import { populateIssues } from './issues.js';
 import { populateJobs } from './jobs.js';
 import { populateMaintenance } from './maintenance.js';
-import type { BoardSnapshot, FactoryPlanningState, Tables } from './model.js';
+import type { BoardSnapshot, FactoryPlanningState } from './model.js';
 import { populatePulls } from './pulls.js';
 import { stacks } from './stacks.js';
 import { populateThreads } from './threads.js';
-import { entity, version } from './values.js';
+import { entity, version, threadId } from './values.js';
 export function project(input: ScheduleSnapshot, at: string, scopeId: string, cursor: string) {
   const context = projectionContext(input, at);
   populateIssues(context);
@@ -24,7 +24,10 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
   const factory = entity({
     id: 'factory:local' as const,
     paused: input.state.paused,
-    planning: planning(input.planningSafety ?? emptyPlanningSafety, tables),
+    planning: planning(
+      input.planningSafety ?? emptyPlanningSafety,
+      input.threads?.facts?.environmentId
+    ),
     concurrency: { limit: limit(input.state.concurrency), occupied: capacityOccupied(input) },
     admission: { limit: limit(input.state.allowance), consumed: input.state.admissions.length },
     actionIds: [],
@@ -47,7 +50,10 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
   return { snapshot, details };
 }
 
-function planning(state: PlanningSafetyView, tables: Tables): FactoryPlanningState {
+function planning(
+  state: PlanningSafetyView,
+  environment: string | undefined
+): FactoryPlanningState {
   const notice = state.notice;
   const value = notice
     ? {
@@ -62,11 +68,7 @@ function planning(state: PlanningSafetyView, tables: Tables): FactoryPlanningSta
           deadline: new Date(failure.deadline).toISOString(),
           failedAt: new Date(failure.failedAt).toISOString(),
           threadId:
-            Object.values(tables.threads).find(
-              (thread) =>
-                thread.metadata.state === 'known' &&
-                thread.metadata.value.threadId === failure.threadId
-            )?.id ?? null,
+            failure.threadId && environment ? threadId(environment, failure.threadId) : null,
         })),
       }
     : null;

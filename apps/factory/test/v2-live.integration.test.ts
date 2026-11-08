@@ -25,6 +25,83 @@ const job = {
   resume: () => Effect.succeed({ kind: 'rejected' as const }),
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
+it.each(['unknown-environment', 'missing-metadata', 'known-metadata'] as const)(
+  'preserves the exact planning thread association with %s',
+  async (scenario) => {
+    const environment = scenario !== 'unknown-environment';
+    const board = await liveBoard({
+      scopeId: 'planning-context',
+      initial: {
+        ...initial,
+        threads: {
+          state: 'current',
+          stale: false,
+          observedAt: 2,
+          facts: environment
+            ? {
+                environmentId: 'exact-env',
+                projectId: 'project',
+                threads:
+                  scenario === 'known-metadata'
+                    ? [
+                        {
+                          threadId: 'planner-thread',
+                          title: 'Known planner',
+                          createdAt: null,
+                          updatedAt: null,
+                          status: 'interrupted',
+                          branch: null,
+                          worktree: null,
+                          pullRequests: [],
+                        },
+                      ]
+                    : [],
+              }
+            : undefined,
+        },
+        planningSafety: {
+          maximumAttempts: 3,
+          consecutiveModelDeadlineFailures: 1,
+          pendingNoticeCount: 1,
+          notice: {
+            id: 'notice',
+            version: 1,
+            createdAt: 840000,
+            acknowledgedAt: null,
+            failures: [
+              {
+                attemptId: 'owned-model',
+                code: 'model-deadline',
+                message: 'Model deadline exceeded',
+                attemptStartedAt: 0,
+                modelHandedOffAt: 180000,
+                deadline: 780000,
+                failedAt: 840000,
+                attemptElapsedMs: 840000,
+                modelElapsedMs: 660000,
+                threadId: 'planner-thread',
+                runId: 'owned-run',
+              },
+            ],
+          },
+        },
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const failure = snapshot.meta.factory.planning.notice!.failures[0];
+      expect(failure.threadId).toBe(environment ? 'thread:exact-env/planner-thread' : null);
+      expect(failure.runId).toBe('owned-run');
+      if (failure.threadId)
+        expect(snapshot.entities.threads[failure.threadId].metadata.state).toBe(
+          scenario === 'known-metadata' ? 'known' : 'unknown'
+        );
+    } finally {
+      await app.close();
+    }
+  }
+);
 it('binds acknowledgement to its accepted notice and rejects changed evidence before applying it', async () => {
   const failure = {
     attemptId: 'owned-attempt',

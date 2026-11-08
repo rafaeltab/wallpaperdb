@@ -121,11 +121,15 @@ export function stageExecution(
             const commit = (
               await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
             ).trim();
-            if (
-              result.commit !== commit ||
-              (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim()
-            )
-              return null;
+            const dirty = (
+              await command('git', ['status', '--porcelain'], binding.worktree, signal)
+            ).trim();
+            if (result.commit !== commit || dirty) {
+              if (request.stage !== 'implementation') return null;
+              // Rejecting success must not erase the exact owning run's evidence.
+              const pending = pendingRun(raw, request, intent);
+              return pending ? { ...pending, commit, worktreeClean: !dirty } : null;
+            }
             return {
               runId: thread.latestRunId,
               ordinal: thread.runCount,

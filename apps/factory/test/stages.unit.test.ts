@@ -261,6 +261,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       Effect.flatMap(Job, operation).pipe(Effect.provide(JobLive.pipe(Layer.provide(deps))))
     );
   return {
+    retry: () => Effect.die('Unexpected fresh retry in this fixture'),
     repairs: () => repairs,
     publicationRetries: () => publicationRetries,
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
@@ -1149,6 +1150,7 @@ it.each(['status', 'tick'] as const)(
                 Effect.succeed(
                   issue === 577
                     ? {
+                        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
                         status: () =>
                           Effect.promise(async () => {
                             const value = await job.status();
@@ -1161,6 +1163,7 @@ it.each(['status', 'tick'] as const)(
                         cancel: () => Effect.succeed({ kind: 'rejected' as const }),
                       }
                     : {
+                        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
                         status: () =>
                           Effect.succeed({
                             ...own,

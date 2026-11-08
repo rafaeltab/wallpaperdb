@@ -11,6 +11,7 @@ import { populatePulls } from './pulls.js';
 import { stacks } from './stacks.js';
 import { populateThreads } from './threads.js';
 import { entity, version, threadId } from './values.js';
+import type { RetryTarget } from './contract.js';
 export function project(input: ScheduleSnapshot, at: string, scopeId: string, cursor: string) {
   const context = projectionContext(input, at);
   populateIssues(context);
@@ -48,10 +49,18 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
     entities: tables,
   };
   const notice = input.planningSafety?.notice;
+  const retryTargets: Record<string, RetryTarget> = {};
+  for (const job of input.jobs)
+    if (job.kind === 'job' && job.retry)
+      retryTargets[`action:retry/job:rafaeltab/wallpaperdb/${job.intent.issue}`] = {
+        retry: { jobId: job.intent.id, ...job.retry },
+        scheduleRevision: input.state.revision,
+      };
   return {
     snapshot,
     details,
     planningNoticeTarget: notice ? { id: notice.id, version: notice.version } : null,
+    retryTargets,
   };
 }
 

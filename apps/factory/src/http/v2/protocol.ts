@@ -36,7 +36,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
   z
     .object({
       ...common,
-      kind: z.enum(['resume', 'cancel', 'preview-plan', 'acknowledge-planning-failures']),
+      kind: z.enum(['resume', 'retry', 'cancel', 'preview-plan', 'acknowledge-planning-failures']),
       payload: z.object({}).strict(),
     })
     .strict(),

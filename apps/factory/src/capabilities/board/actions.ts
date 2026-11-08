@@ -1,10 +1,12 @@
 import type { ScheduleSnapshot } from '../observe/index.js';
 import type { Action, ActionKind, BoardSnapshot, ItemDetails } from './model.js';
 import { entity, jobId, version } from './values.js';
+import type { RetryTarget } from './contract.js';
 export function actions(
   snapshot: BoardSnapshot,
   input: ScheduleSnapshot,
-  details: Readonly<Record<string, ItemDetails>>
+  details: Readonly<Record<string, ItemDetails>>,
+  retryTargets: Readonly<Record<string, RetryTarget>>
 ): BoardSnapshot {
   const result: Record<Action['id'], Action> = {};
   const make = (
@@ -70,6 +72,21 @@ export function actions(
     const work = input.localWork.find((w) => w.intent?.issue === admission.issue);
     const id = jobId(admission.issue);
     const cancelled = work?.control.cancelled;
+    const retryTarget = retryTargets[`action:retry/${id}`];
+    const retryCapacity =
+      !factory.paused &&
+      (factory.concurrency.limit.kind === 'unlimited' ||
+        factory.concurrency.occupied < factory.concurrency.limit.maximum) &&
+      !(input.state.resuming ?? []).some((claim) => claim.issue === admission.issue);
+    make(
+      'retry',
+      id,
+      !!retryTarget && !cancelled && retryCapacity,
+      retryTarget
+        ? 'Pause, capacity or retained launch responsibility prevents retry.'
+        : 'No confirmed unsuccessful implementation attempt is available to retry.',
+      retryTarget
+    );
     make(
       'cancel',
       id,

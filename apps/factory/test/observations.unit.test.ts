@@ -47,8 +47,15 @@ it('serves all snapshots locally while GitHub and workflow reconciliation are un
     base: 'a'.repeat(40),
     snapshot: observer.schedule,
     run: (e) => runtime.runPromise(e),
-    job: { status: unavailable, start: unavailable, resume: unavailable, cancel: unavailable },
+    job: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
+      status: unavailable,
+      start: unavailable,
+      resume: unavailable,
+      cancel: unavailable,
+    },
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       status: unavailable,
       configure: () =>
         Effect.sync(() => {

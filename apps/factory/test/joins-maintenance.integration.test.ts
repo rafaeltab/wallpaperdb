@@ -252,6 +252,7 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
   const pool: JobPool = {
     job: () =>
       Effect.succeed({
+        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
         status: () => Effect.succeed(unrelated),
         start: (command) =>
           Effect.sync(() => {
@@ -2603,6 +2604,7 @@ process.exit(result.status ?? 1);
       elapsedMs: 0,
     };
     const unrelatedJob: import('../src/capabilities/job/index.js').Job = {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       status: () => Effect.succeed(unrelated),
       start: () => Effect.die('Retained unrelated work must not launch again'),
       resume: () => Effect.succeed({ kind: 'rejected' as const }),

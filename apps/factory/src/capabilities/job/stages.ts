@@ -22,12 +22,15 @@ export function reconcileStages(
   intent: Intent,
   observation: Observation,
   time: Time,
-  continuation?: ContinuationAdmission
+  continuation?: ContinuationAdmission,
+  initialIndex = 0
 ) {
   return Effect.gen(function* () {
     if (observation.kind !== 'found') return undefined;
+    if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
     yield* store.saveStage({
-      index: 0,
+      index: initialIndex,
+      ...(initialIndex > 0 ? { ordinal: 1 } : {}),
       stage: 'implementation',
       threadId: observation.threadId,
       commit: intent.base,
@@ -56,7 +59,7 @@ function accepted(
 }
 function deliver(store: JobStore, execution: Execution, intent: Intent, request: StageRequest) {
   return Effect.gen(function* () {
-    if (request.index === 0 || request.observedRunId) return;
+    if (request.previousRunId === null || request.observedRunId) return;
     if (yield* store.claimStage(request.index)) yield* execution.sendStage(intent, request);
   });
 }

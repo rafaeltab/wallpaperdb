@@ -6,7 +6,13 @@ it('serves the app and compiled same-origin assets without reading any external 
   const app = operationsServer({
     base: 'a'.repeat(40),
     run: Effect.runPromise,
-    job: { status: unavailable, start: unavailable, resume: unavailable, cancel: unavailable },
+    job: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
+      status: unavailable,
+      start: unavailable,
+      resume: unavailable,
+      cancel: unavailable,
+    },
   });
   try {
     const shell = await app.inject('/');

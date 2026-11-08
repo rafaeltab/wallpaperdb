@@ -116,6 +116,12 @@ export const v2Board = sqliteTable('v2_board', {
 export const v2Commands = sqliteTable(
   'v2_commands',
   {
+    retryTarget: text('retry_target', { mode: 'json' }).$type<
+      import('../capabilities/board/index.js').RetryTarget
+    >(),
+    retryKey: text('retry_key').generatedAlwaysAs(
+      sql`CASE WHEN json_extract(request, '$.kind') = 'retry' THEN json_extract(request, '$.actionId') || ':' || json_extract(request, '$.precondition') ELSE NULL END`
+    ),
     planningNotice: text('planning_notice', { mode: 'json' }).$type<{
       readonly id: string;
       readonly version: number;
@@ -133,7 +139,10 @@ export const v2Commands = sqliteTable(
       .$type<import('../capabilities/board/index.js').CommandReceipt>()
       .notNull(),
   },
-  (table) => [index('v2_commands_plan').on(table.scope, table.planId)]
+  (table) => [
+    index('v2_commands_plan').on(table.scope, table.planId),
+    uniqueIndex('v2_retry_opportunity').on(table.scope, table.retryKey),
+  ]
 );
 export const githubRichFacts = sqliteTable('github_rich_facts', {
   id: integer('id').primaryKey(),

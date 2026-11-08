@@ -9,6 +9,7 @@ import {
   type StartResult,
 } from '../src/capabilities/job/index.js';
 const idle: Job = {
+  retry: () => Effect.die('Unexpected fresh retry in this fixture'),
   resume: () => Effect.succeed({ kind: 'rejected' }),
   cancel: () => Effect.succeed({ kind: 'rejected' }),
   start: () => Effect.succeed({ kind: 'empty' }),
@@ -256,6 +257,7 @@ it('translates scheduler controls including unlimited limits and stale revisions
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       configure: (command) =>
@@ -320,6 +322,7 @@ it('translates a valid scheduler command rejected by the capability into 422 Pro
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       configure: () => Effect.succeed('rejected'),
@@ -400,6 +403,7 @@ it('renders current dependency direction from the admitted issue read model and 
           ]);
     },
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [] }),
       tick: () => Effect.succeed({ state, jobs: [] }),

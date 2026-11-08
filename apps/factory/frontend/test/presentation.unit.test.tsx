@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import { operationsServer } from '../../src/http/index.js';
 import type { Job, Intent, Status } from '../../src/capabilities/job/index.js';
 const idle: Job = {
+  retry: () => Effect.die('Unexpected fresh retry in this fixture'),
   resume: () => Effect.succeed({ kind: 'rejected' }),
   cancel: () => Effect.succeed({ kind: 'rejected' }),
   start: () => Effect.succeed({ kind: 'empty' }),
@@ -198,6 +199,7 @@ it('renders server-owned scheduler settings and all reserved jobs', async () => 
     job: idle,
     run: Effect.runPromise,
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       authorizeRecovery: () => Effect.succeed(false),
       status: () => Effect.succeed({ state, jobs: [{ kind: 'empty' }, { kind: 'empty' }, job] }),
       configure: () => Effect.succeed('saved'),
@@ -229,6 +231,7 @@ it.each([false, true])(
       job: idle,
       run: Effect.runPromise,
       scheduler: {
+        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
         authorizeRecovery: () => Effect.succeed(false),
         status: () =>
           Effect.succeed({

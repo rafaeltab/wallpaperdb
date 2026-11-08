@@ -881,10 +881,11 @@ export async function runProtocol(
         reply({
           structuredContent: {
             thread: {
-              latestRunId: existsSync(join(config.directory, 'resource.json'))
-                ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
-                    .latestRunId
-                : null,
+              latestRunId: (() => {
+                const input = JSON.parse(args[2]);
+                const path = join(config.directory, config.parallel ? `resource-${input.threadId.replaceAll('/', '-')}.json` : 'resource.json');
+                return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).latestRunId : null;
+              })(),
             },
             items: config.activity ?? [],
             hasMore: false,
@@ -936,7 +937,7 @@ export async function runProtocol(
       if (config.lost) process.exit(1);
       reply({ threadId: 'thread-live', projectId: 'project-id', runId: 'run-1' });
     } else if (args[1] === 'send') {
-      const path = join(config.directory, 'resource.json');
+      const path = join(config.directory, config.parallel ? `resource-${args[2].replaceAll('/', '-')}.json` : 'resource.json');
       const resource = JSON.parse(readFileSync(path, 'utf8'));
       const index = Number(args[3].match(/Stage (\d) of factory/)![1]);
       resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);

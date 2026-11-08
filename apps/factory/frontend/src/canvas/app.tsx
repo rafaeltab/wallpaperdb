@@ -42,7 +42,8 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
       setPanel('cancel');
       return;
     }
-    if (action.kind === 'resume') void factory.submit(action, { kind: 'resume', payload: {} });
+    if (action.kind === 'resume' || action.kind === 'retry')
+      void factory.submit(action, { kind: action.kind, payload: {} });
   };
   const configure = board?.meta.factory.actionIds
     .map((id) => board.entities.actions[id])

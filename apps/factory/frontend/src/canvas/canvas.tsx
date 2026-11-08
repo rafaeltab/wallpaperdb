@@ -35,7 +35,7 @@ import {
   CanvasThread,
   CanvasEvidence,
 } from './canvas-presentation';
-import { actionLabel } from './presentation';
+import { actionLabel, retryExplanation } from './presentation';
 import './canvas.css';
 export function Canvas({
   board,
@@ -946,10 +946,13 @@ export function Canvas({
                           type="button"
                           className={`cc-action-${action.kind}`}
                           aria-label={label}
+                          title={action.kind === 'retry' ? retryExplanation : undefined}
                           disabled={busy || action.availability.state !== 'available'}
                           data-tip={
                             action.availability.state === 'available'
-                              ? label
+                              ? action.kind === 'retry'
+                                ? retryExplanation
+                                : label
                               : action.availability.reasons.map((r) => r.message).join(' ')
                           }
                           onClick={() =>
@@ -958,7 +961,11 @@ export function Canvas({
                               : onCommand(activeRecord.item, action)
                           }
                         >
-                          <Icon kind={action.kind === 'cancel' ? 'stop' : 'play'} />
+                          {action.kind === 'retry' ? (
+                            label
+                          ) : (
+                            <Icon kind={action.kind === 'cancel' ? 'stop' : 'play'} />
+                          )}
                         </button>
                       );
                     })}

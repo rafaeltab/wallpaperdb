@@ -20,8 +20,15 @@ it('serves the real React app over Vite HMR, proxies same-origin browser POSTs a
     base: 'a'.repeat(40),
     run: Effect.runPromise,
     snapshot: () => Effect.succeed(snapshot),
-    job: { status: unavailable, start: unavailable, resume: unavailable, cancel: unavailable },
+    job: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
+      status: unavailable,
+      start: unavailable,
+      resume: unavailable,
+      cancel: unavailable,
+    },
     scheduler: {
+      retry: () => Effect.die('Unexpected fresh retry in this fixture'),
       status: unavailable,
       tick: unavailable,
       authorizeRecovery: unavailable,

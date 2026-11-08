@@ -845,6 +845,105 @@ async function multiJobBoard(kind: 'resume' | 'cancel'): Promise<FactoryV2Snapsh
     },
   };
 }
+it('offers visible manual Retry with the displayed failed-attempt token and blocks repeated clicks', async () => {
+  const initial = await sample();
+  const item = initial.entities.items['item:1002'];
+  const board: FactoryV2Snapshot = {
+    ...initial,
+    entities: {
+      ...initial.entities,
+      jobs: {
+        ...initial.entities.jobs,
+        'job:1002': {
+          ...initial.entities.jobs['job:1002'],
+          version: 'failed-job-v1',
+          activity: 'manual-recovery',
+          occupiesCapacity: false,
+          progress: 'Implementation finished without a validated success receipt.',
+          execution: {
+            state: 'known',
+            value: { state: 'finished', runId: 'failed-run-1' },
+            sourceId: 'source:factory',
+            observedAt: initial.committedAt,
+          },
+        },
+      },
+      items: {
+        ...initial.entities.items,
+        [item.id]: {
+          ...item,
+          status: { code: 'manual-recovery', label: 'manual recovery', active: false, since: null },
+          attention: {
+            state: 'required',
+            sourceIds: ['source:factory'],
+            reasons: [
+              {
+                code: 'manual-recovery',
+                message: 'Implementation finished without a validated success receipt.',
+                actionIds: ['action:retry-failed'],
+              },
+            ],
+          },
+          actionIds: ['action:retry-failed'],
+        },
+      },
+      actions: {
+        ...initial.entities.actions,
+        'action:retry-failed': {
+          id: 'action:retry-failed',
+          version: 'failed-action-v1',
+          kind: 'retry',
+          targetId: 'job:1002',
+          availability: {
+            state: 'available',
+            precondition: 'displayed-failed-attempt-v1',
+            validUntil: null,
+          },
+        },
+      },
+    },
+  };
+  const posts: string[] = [];
+  let finish: () => void = () => {
+    throw new Error('Retry was not submitted');
+  };
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method !== 'POST') return json(board);
+    posts.push(String(init.body));
+    return new Promise<Response>((resolve) => {
+      finish = () =>
+        resolve(
+          json({
+            commandId: 'manual-retry',
+            state: 'rejected',
+            reasons: [{ code: 'occupied', message: 'No worker capacity remains.' }],
+          })
+        );
+    });
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await user.click(
+    await screen.findByRole('group', { name: 'Select Implement the command centre' })
+  );
+  const retry = screen.getByRole<HTMLButtonElement>('button', { name: 'Retry' });
+  expect(retry.textContent).toContain('Retry');
+  expect(retry.title).toMatch(/fresh context and a clean checkout at the original base/i);
+  await user.click(retry);
+  expect(retry.disabled).toBe(true);
+  fireEvent.click(retry);
+  expect(posts).toHaveLength(1);
+  expect(JSON.parse(posts[0])).toMatchObject({
+    kind: 'retry',
+    payload: {},
+    actionId: 'action:retry-failed',
+    precondition: 'displayed-failed-attempt-v1',
+  });
+  await act(async () => finish());
+  await screen.findByText('No worker capacity remains.');
+  expect(retry.disabled).toBe(false);
+});
+
 it('submits the exact clicked resume action on a multi-job PR', async () => {
   const board = await multiJobBoard('resume'),
     posts: string[] = [];

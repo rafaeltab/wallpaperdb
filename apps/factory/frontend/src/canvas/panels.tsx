@@ -18,6 +18,7 @@ import {
   Threads,
   comparisonLabel,
   actionLabel,
+  retryExplanation,
   ThreadLink,
 } from './presentation';
 export function Panel({
@@ -533,13 +534,16 @@ export function Details({
           )}
         </>
       )}
+      {item.actionIds.some((id) => board.entities.actions[id]?.kind === 'retry') && (
+        <p>{retryExplanation}</p>
+      )}
       <div className="fc-panel-actions">
         <Threads board={board} item={item} native={native} />
         {item.actionIds.map((id) => {
           const a = board.entities.actions[id];
           return (
             a &&
-            (a.kind === 'resume' || a.kind === 'cancel') && (
+            (a.kind === 'resume' || a.kind === 'retry' || a.kind === 'cancel') && (
               <ActionButton
                 key={id}
                 action={a}
@@ -547,7 +551,7 @@ export function Details({
                 label={actionLabel(board, item, a)}
                 onClick={() =>
                   void factory.submit(a, {
-                    kind: a.kind === 'resume' ? 'resume' : 'cancel',
+                    kind: a.kind === 'resume' ? 'resume' : a.kind === 'retry' ? 'retry' : 'cancel',
                     payload: {},
                   })
                 }

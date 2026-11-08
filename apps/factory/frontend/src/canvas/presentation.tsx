@@ -269,11 +269,14 @@ export function CardContent({
   );
 }
 
+export const retryExplanation =
+  'Retry starts with fresh context and a clean checkout at the original base. The previous attempt is retained.';
 export function actionLabel(board: Board, item: WorkItem, action: Action) {
   const names = {
     configure: 'Configure factory',
     start: 'Start issue',
     resume: 'Resume job',
+    retry: 'Retry',
     cancel: 'Cancel job',
     'preview-plan': 'Generate plan preview',
     'acknowledge-planning-failures': 'Acknowledge seen',

@@ -380,6 +380,7 @@ export type ActionKind =
   | 'configure'
   | 'start'
   | 'resume'
+  | 'retry'
   | 'cancel'
   | 'preview-plan'
   | 'acknowledge-planning-failures';
@@ -520,7 +521,12 @@ export type FactoryV2Command = {
     }
   | { readonly kind: 'start'; readonly payload: { readonly context: string } }
   | {
-      readonly kind: 'resume' | 'cancel' | 'preview-plan' | 'acknowledge-planning-failures';
+      readonly kind:
+        | 'resume'
+        | 'retry'
+        | 'cancel'
+        | 'preview-plan'
+        | 'acknowledge-planning-failures';
       readonly payload: Record<string, never>;
     }
 );

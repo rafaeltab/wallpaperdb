@@ -141,8 +141,9 @@ function commandAdapter(config: {
     reasons: [{ code, message }],
   });
   return {
-    execute: (command: BoardCommand, action: Action, input: ScheduleSnapshot, planningNotice) =>
+    execute: (command: BoardCommand, action: Action, input: ScheduleSnapshot, targets = {}) =>
       Effect.gen(function* () {
+        const { planningNotice, retryTarget } = targets;
         if (command.kind === 'acknowledge-planning-failures') {
           const result = planningNotice
             ? yield* config.planningSafety.acknowledge(planningNotice)
@@ -213,6 +214,14 @@ function commandAdapter(config: {
         );
         if (job?.kind !== 'job')
           return rejected('missing-job', 'Owning job is no longer observed.');
+        if (command.kind === 'retry') {
+          if (!retryTarget || retryTarget.retry.jobId !== job.intent.id)
+            return rejected('stale-retry', 'The displayed failed attempt changed.');
+          return commandResult(
+            yield* config.scheduler.retry(retryTarget.retry, retryTarget.scheduleRevision),
+            job.intent.issue
+          );
+        }
         if (command.kind === 'resume' && !job.resume)
           return rejected('stale-resume', 'The stage, run or question changed.');
         const result =

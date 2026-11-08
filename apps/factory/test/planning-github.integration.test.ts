@@ -51,6 +51,7 @@ it('collects full trusted scope, fallback blockers, parent context and job state
     const source = githubPlanning(
       { project: host.repository, base: host.base, prerequisites: [] },
       {
+        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
         status: () => Effect.succeed({ kind: 'empty' }),
         start: () => Effect.succeed({ kind: 'rejected' }),
         resume: () => Effect.succeed({ kind: 'rejected' }),
@@ -127,6 +128,7 @@ it.each([undefined, false, true])(
         admitRecovery: () => Effect.succeed(false),
       });
       const job: import('../src/capabilities/job/index.js').Job = {
+        retry: () => Effect.die('Unexpected fresh retry in this fixture'),
         status: () => required(scheduled.reconcile)().pipe(Effect.as({ kind: 'empty' as const })),
         start: () => Effect.die('Planning must not admit work'),
         resume: () => Effect.die('Planning must not resume a job'),
@@ -245,6 +247,7 @@ it('deduplicates converging parents, blockers and cycles and retains PRs without
       githubPlanning(
         { project: host.repository, base: host.base, prerequisites: [] },
         {
+          retry: () => Effect.die('Unexpected fresh retry in this fixture'),
           status: () => Effect.succeed({ kind: 'empty' }),
           start: () => Effect.succeed({ kind: 'rejected' }),
           resume: () => Effect.succeed({ kind: 'rejected' }),

@@ -83,6 +83,8 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** Current fresh implementation attempt. Prior immutable stages and worktrees remain retained. */
+  readonly restart?: { readonly index: number };
   /** Last verified ready or landed association survives external retargeting and restart.
    * Revalidation still gates all prerequisite use and external maintenance. */
   readonly prerequisite?: AcceptedPublication;
@@ -214,6 +216,15 @@ export type ResumeAction =
   | { index: number; questionId: string }
   | { index: number; runId: string; revision: number };
 export type Resume = ResumeAction & { jobId: string };
+export interface RetryAction {
+  readonly index: number;
+  readonly attempt: number;
+  readonly runId: string;
+  readonly threadId: string;
+  readonly revision: number;
+  readonly base: string;
+}
+export type Retry = RetryAction & { readonly jobId: string };
 export type Status =
   | { kind: 'empty' }
   | {
@@ -223,10 +234,12 @@ export type Status =
       execution: Observation;
       elapsedMs: number;
       resume?: ResumeAction;
+      retry?: RetryAction;
       delivery?: Delivery;
     };
 export type StartResult = Status | { kind: 'occupied' } | { kind: 'rejected' };
 export interface Job {
+  retry(command: Retry): Effect.Effect<StartResult, Unavailable>;
   start(command: Start): Effect.Effect<StartResult, Unavailable>;
   status(): Effect.Effect<Status, Unavailable>;
   resume(command: Resume): Effect.Effect<StartResult, Unavailable>;

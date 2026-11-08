@@ -375,6 +375,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const planningSafety = await runtime.runPromise(PlanningSafety);
   recoveryAdmission = scheduler.authorizeRecovery;
   const job: Job = {
+    retry: (command) =>
+      Effect.flatMap(scheduler.status(), (snapshot) =>
+        scheduler.retry(command, snapshot.state.revision)
+      ),
     status: () =>
       Effect.map(scheduler.status(), (value) => value.jobs[0] ?? { kind: 'empty' as const }),
     start: (command) => scheduler.start(command),

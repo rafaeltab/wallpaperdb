@@ -1,4 +1,5 @@
 import { retryAction, retryStage } from './retry.js';
+import { attemptIntent, matchesRestart, restartAction } from './restart.js';
 import { Effect, Layer, Random, Option } from 'effect';
 import { reconcileStages, currentStage, hasAnsweredQuestion } from './stages.js';
 import {
@@ -22,20 +23,23 @@ export const JobLive = Layer.effect(
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
+        const before = yield* store.readControl();
+        const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
         const observation = yield* execution.observe(
-          intent,
+          activeIntent,
           (yield* currentStage(store)) ?? undefined
         );
         if ((yield* store.readControl()).cancelled && observation.kind === 'found')
-          yield* execution.interrupt(intent, observation.threadId);
+          yield* execution.interrupt(activeIntent, observation.threadId);
         const delivery: Delivery | undefined = yield* reconcileStages(
           store,
           execution,
           issues,
-          intent,
+          activeIntent,
           observation,
           time,
-          continuation
+          continuation,
+          before.restart?.index ?? 0
         );
         yield* retainPrerequisite(store, delivery);
         const control = yield* store.readControl();
@@ -46,7 +50,7 @@ export const JobLive = Layer.effect(
             store,
             execution,
             issues,
-            intent,
+            activeIntent,
             control,
             stage,
             observation,
@@ -58,6 +62,7 @@ export const JobLive = Layer.effect(
           intent,
           prerequisite: control.cancelled ? undefined : control.prerequisite,
           resume,
+          retry: yield* restartAction(execution, activeIntent, control, stage, observation),
           execution: observation,
           delivery: delivery
             ? { ...delivery, active: delivery.active ?? !delivery.ready }
@@ -72,12 +77,13 @@ export const JobLive = Layer.effect(
       Effect.gen(function* () {
         const waiting = yield* currentStage(store);
         const control = yield* store.readControl();
+        const activeIntent = attemptIntent(intent, control.restart?.index ?? 0);
         if (!waiting) return { kind: 'rejected' as const };
         if (!matchesResume(intent, waiting, control, command)) return { kind: 'rejected' as const };
-        const observed = yield* execution.observe(intent, waiting);
+        const observed = yield* execution.observe(activeIntent, waiting);
         if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
         if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
-        const evidence = yield* resumeEvidence(execution, intent, waiting, observed);
+        const evidence = yield* resumeEvidence(execution, activeIntent, waiting, observed);
         if (!evidence) return { kind: 'rejected' as const };
         const request = {
           ...waiting,
@@ -93,6 +99,48 @@ export const JobLive = Layer.effect(
         return yield* observe(intent);
       });
     return {
+      retry: (command) =>
+        Effect.gen(function* () {
+          const intent = yield* store.read();
+          if (!intent || intent.id !== command.jobId) return { kind: 'rejected' as const };
+          const latest = yield* observe(intent);
+          if (!matchesRestart(latest.retry, command)) return { kind: 'rejected' as const };
+          const issue = yield* issues.inspect(intent.issue, {
+            base: intent.base,
+            prBase: intent.prBase,
+          });
+          if (
+            !eligible(issue) ||
+            (issue.prerequisite &&
+              (issue.prerequisite.base !== intent.base ||
+                issue.prerequisite.prBase !== intent.prBase))
+          )
+            return { kind: 'rejected' as const };
+          const activeIntent = attemptIntent(intent, command.attempt);
+          if ((yield* issues.pullRequest(activeIntent)).kind !== 'absent')
+            return { kind: 'rejected' as const };
+          const current = yield* observe(intent);
+          if (!matchesRestart(current.retry, command)) return { kind: 'rejected' as const };
+          const control = yield* store.readControl();
+          const stage = yield* currentStage(store);
+          if (control.revision !== command.revision || stage?.index !== command.index)
+            return { kind: 'rejected' as const };
+          const index = stage.index + 1;
+          if (
+            !(yield* store.saveControl({
+              ...control,
+              revision: control.revision + 1,
+              restart: { index },
+              parked: undefined,
+            }))
+          )
+            return { kind: 'rejected' as const };
+          if (yield* store.claimStage(index)) {
+            if (!(yield* store.readControl()).cancelled)
+              yield* execution.launch(attemptIntent(intent, index));
+          }
+          return yield* observe(intent);
+        }).pipe(Effect.withSpan('factory.job.retry-fresh')),
       status: () =>
         Effect.gen(function* () {
           const intent = yield* store.read();

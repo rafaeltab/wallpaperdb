@@ -126,3 +126,54 @@ export function parkedSnapshot(pull: PullObservation, bound: boolean): ScheduleS
     },
   };
 }
+
+export function stoppedImplementationSnapshot(attempt = 0): ScheduleSnapshot {
+  const source = parkedSnapshot(pullObservation(2), false);
+  const job = source.jobs[0];
+  if (job.kind !== 'job' || job.execution.kind !== 'found') throw new Error('Missing fixture job');
+  const retry = {
+    index: attempt,
+    attempt,
+    revision: attempt,
+    threadId: `stopped-${attempt}`,
+    runId: `failed-${attempt}`,
+    base: job.intent.base,
+  };
+  return {
+    ...source,
+    state: { ...source.state, paused: false },
+    jobs: [
+      {
+        ...job,
+        resume: undefined,
+        retry,
+        execution: {
+          ...job.execution,
+          threadId: retry.threadId,
+          status: 'completed',
+          run: { id: retry.runId, ordinal: 1 },
+        },
+        delivery: {
+          stage: 'implementation',
+          commit: job.intent.base,
+          ready: false,
+          landed: false,
+          active: false,
+          activity: 'manual-recovery',
+          progress: 'Implementation finished without a validated success receipt.',
+        },
+      },
+    ],
+    localWork: [
+      {
+        intent: job.intent,
+        control: {
+          revision: attempt,
+          cancelled: false,
+          claimed: [],
+          ...(attempt > 0 ? { restart: { index: attempt } } : {}),
+        },
+      },
+    ],
+  };
+}

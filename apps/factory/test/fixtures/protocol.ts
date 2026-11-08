@@ -895,6 +895,7 @@ export async function runProtocol(
     } else if (args.includes('--help'))
       console.log(`--worktree --model${config.idempotency ? ' --client-request-id' : ''}`);
     else if (args[1] === 'start') {
+      if (config.unavailableStart) throw new Error('Controlled unavailable launch response');
       if (
         flag('--model') !== 'gpt-6.1-sol' ||
         flag('--provider') !== 'codex' ||
@@ -939,7 +940,7 @@ export async function runProtocol(
     } else if (args[1] === 'send') {
       const path = join(config.directory, config.parallel ? `resource-${args[2].replaceAll('/', '-')}.json` : 'resource.json');
       const resource = JSON.parse(readFileSync(path, 'utf8'));
-      const index = Number(args[3].match(/Stage (\d) of factory/)![1]);
+      const index = Number(args[3].match(/Stage (\d+) of factory/)![1]);
       resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
       resource.stageIndex = index;
       resource.stage = args[3].includes('$babysit-pr')
@@ -950,7 +951,7 @@ export async function runProtocol(
             ? 'implementation'
             : 'publication';
       resource.latestRunId = `run-${resource.runCount}`;
-      if (index === 2 && resource.stage === 'publication') {
+      if (resource.stage === 'publication') {
         const pr = {
           url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
           headRefName: resource.branch,

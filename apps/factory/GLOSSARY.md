@@ -46,6 +46,9 @@ _Avoid_: Completed job, failed issue
 Further execution of an existing job or recovery operation without another distinct admission. Active capacity can still be required before it proceeds.
 _Avoid_: New job, new admission
 
+**Implementation retry**:
+A manually requested new attempt of a conclusively stopped, unsuccessful implementation. It uses fresh agent context and a new isolated worktree at the retained original base, preserving the previous attempt and consuming no additional admission. It is distinct from continuing an existing worker or resending an uncertain command.
+
 **Ready for merge**:
 The current PR comparison has satisfied its applicable acceptance, review and CI requirements. This is a delivery handoff, not proof that the issue has landed.
 _Avoid_: Landed, merged, Done

@@ -18,6 +18,7 @@ async function composed(
     running: Running;
     host: Awaited<ReturnType<typeof protocol>>;
     save: (patch: object) => Promise<void>;
+    reopen: () => Promise<Running>;
   }) => Promise<void>,
   options: object = {},
   initialControl?: { paused: boolean }
@@ -67,17 +68,28 @@ async function composed(
         )
       ).toBe(true);
     }
-    running = await startFactory({
-      FACTORY_PROJECT: host.repository,
-      FACTORY_T3_PROJECT_ID: 'project-id',
-      FACTORY_BASE: host.base,
-      FACTORY_T3_BINARY: host.binary,
-      FACTORY_STATE: `${host.directory}/state`,
-      FACTORY_PORT: '0',
-      FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
-      FACTORY_T3_MCP_AUTHORIZATION_FILE: `${host.directory}/authorization`,
+    const open = () =>
+      startFactory({
+        FACTORY_PROJECT: host.repository,
+        FACTORY_T3_PROJECT_ID: 'project-id',
+        FACTORY_BASE: host.base,
+        FACTORY_T3_BINARY: host.binary,
+        FACTORY_STATE: `${host.directory}/state`,
+        FACTORY_PORT: '0',
+        FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',
+        FACTORY_T3_MCP_AUTHORIZATION_FILE: `${host.directory}/authorization`,
+      });
+    running = await open();
+    await check({
+      running,
+      host,
+      save,
+      reopen: async () => {
+        await running?.close();
+        running = await open();
+        return running;
+      },
     });
-    await check({ running, host, save });
   } finally {
     await running?.close();
     process.env.PATH = previous.path;
@@ -285,9 +297,182 @@ it('manually retries incomplete implementation in a fresh original-base worktree
       expect(stale.statusCode).toBe(422);
       expect(stale.json()).toMatchObject({ code: 'command-rejected' });
       expect(await launches()).toHaveLength(2);
+      await writeFile(
+        `${host.directory}/resource-${nextBranch.replaceAll('/', '-')}.json`,
+        JSON.stringify({ ...next, status: 'completed' })
+      );
+      await save({
+        messages: [
+          {
+            role: 'assistant',
+            runId: 'run-1',
+            text: JSON.stringify({
+              jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
+              stage: 'implementation',
+              base: host.base,
+              commit: oldHead,
+              outcome: '<TASK>COMPLETE</TASK>',
+              tests: true,
+              coverage: true,
+              crap: true,
+              reviews: false,
+            }),
+          },
+        ],
+      });
+      const nextAction = await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
+      expect(nextAction.precondition).not.toBe(request.precondition);
+      expect(await stageMessages(host)).toHaveLength(0);
+      const oldReceipt = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: request,
+      });
+      expect(oldReceipt.json()).toEqual(result);
+      const oldToken = await running.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: { ...request, commandId: '00000000-0000-4000-8000-000000000038' },
+      });
+      expect(oldToken.statusCode).toBe(412);
+      expect(oldToken.json()).toMatchObject({ code: 'stale-action' });
+      expect(await launches()).toHaveLength(2);
+      const again = {
+        ...request,
+        ...nextAction,
+        commandId: '00000000-0000-4000-8000-000000000040',
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: again }))
+          .statusCode
+      ).toBe(202);
+      await receipt(running, again.commandId);
+      await save({ complete: true, overrides: { status: 'completed' } });
+      await vi.waitFor(
+        async () => {
+          const status = (await running.app.inject('/api/scheduler')).json();
+          expect(
+            status.jobs.find(
+              (job: { kind: string; intent?: { issue: number } }) => job.intent?.issue === 577
+            )
+          ).toMatchObject({
+            intent: { id: prior.title.match(/\[factory:(.*)\]$/)[1] },
+            delivery: { stage: 'ci', ready: true, landed: false },
+          });
+        },
+        { timeout: 10000, interval: 40 }
+      );
+      expect(await launches()).toHaveLength(3);
+      expect(
+        (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.factory.admission
+          .consumed
+      ).toBe(1);
     },
     { parallel: true }
   ));
+
+it('retains an uncertain fresh retry and its admission across startup without launching again', () =>
+  composed(
+    async ({ running, host, save, reopen }) => {
+      await start(running);
+      const first = (await host.calls()).find(
+        (c) => c.args[1] === 'start' && c.args.includes('--worktree')
+      );
+      const branch = first.args[first.args.indexOf('--branch') + 1];
+      const path = `${host.directory}/resource-${branch.replaceAll('/', '-')}.json`;
+      const old = JSON.parse(await readFile(path, 'utf8'));
+      await writeFile(path, JSON.stringify({ ...old, status: 'completed' }));
+      await save({
+        unavailableStart: true,
+        messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+      });
+      const request = {
+        ...(await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000039',
+        kind: 'retry',
+        payload: {},
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      const uncertain = await vi.waitFor(
+        async () => {
+          const value = (
+            await running.app.inject(`/api/v2/commands/${request.commandId}`)
+          ).json<FactoryV2CommandReceipt>();
+          expect(value.state).toBe('uncertain');
+          return value;
+        },
+        { timeout: 10000, interval: 40 }
+      );
+      await save({});
+      const restored = await reopen();
+      const replay = await restored.app.inject({
+        method: 'POST',
+        url: '/api/v2/commands',
+        payload: request,
+      });
+      expect(replay.statusCode).toBe(200);
+      expect(replay.json()).toEqual(uncertain);
+      const board = (await restored.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(board.meta.factory.admission.consumed).toBe(1);
+      expect(board.meta.factory.concurrency.occupied).toBe(1);
+      expect(
+        board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577'].availability.state
+      ).toBe('disabled');
+      expect(
+        (await host.calls()).filter((c) => c.args[1] === 'start' && c.args.includes('--worktree'))
+      ).toHaveLength(2);
+      expect(await readFile(path, 'utf8')).toBe(JSON.stringify({ ...old, status: 'completed' }));
+    },
+    { parallel: true }
+  ));
+
+it('rejects fresh retry when the original issue is no longer eligible', () =>
+  composed(async ({ running, host, save }) => {
+    await start(running);
+    await save({
+      overrides: { status: 'completed' },
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    const request = {
+      ...(await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577')),
+      commandId: '00000000-0000-4000-8000-000000000041',
+      kind: 'retry',
+      payload: {},
+    };
+    const configuration = JSON.parse(await readFile(host.configFile, 'utf8'));
+    await save({
+      planning: {
+        ...configuration.planning,
+        issues: configuration.planning.issues.map((issue: { number: number }) => ({
+          ...issue,
+          state: 'CLOSED',
+        })),
+      },
+      overrides: { status: 'completed' },
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+        .statusCode
+    ).toBe(202);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json()
+        ).toMatchObject({ state: 'rejected' }),
+      { timeout: 10000, interval: 40 }
+    );
+    expect(
+      (await host.calls()).filter((c) => c.args[1] === 'start' && c.args.includes('--worktree'))
+    ).toHaveLength(1);
+    expect(
+      (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.factory.admission
+        .consumed
+    ).toBe(1);
+  }));
 
 it('submits one retained advisory preview through v2 while the composed factory is paused', () =>
   composed(

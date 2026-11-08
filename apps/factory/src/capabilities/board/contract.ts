@@ -8,6 +8,8 @@ export interface BoardInput {
   plan?: PlanningAttempt;
 }
 export interface BoardRecord {
+  /** Private target committed atomically with the displayed notice, including CAS winners. */
+  planningNoticeTarget?: CommandRecord['planningNotice'];
   snapshot: BoardSnapshot;
   inputVersion: string;
   details: Readonly<Record<string, import('./model.js').ItemDetails>>;
@@ -19,7 +21,7 @@ export interface CommandRecord {
   request: BoardCommand;
   receipt: CommandReceipt;
 }
-/** A save publishes one coherent board plus bounded replay atomically. Acceptance binds
+/** A save publishes the board, private notice target and bounded replay atomically. Acceptance binds
  * UUID and full request durably before effects. Claims are never retried after restart:
  * an interrupted worker remains uncertain until operator reconciliation.
  */

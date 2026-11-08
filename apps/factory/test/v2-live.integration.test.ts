@@ -102,52 +102,267 @@ it.each(['unknown-environment', 'missing-metadata', 'known-metadata'] as const)(
     }
   }
 );
-it('binds acknowledgement to its accepted notice and rejects changed evidence before applying it', async () => {
-  const failure = {
-    attemptId: 'owned-attempt',
-    code: 'model-deadline' as const,
-    message: 'Model deadline exceeded',
-    attemptStartedAt: 0,
-    modelHandedOffAt: 180000,
-    deadline: 780000,
-    failedAt: 840000,
-    attemptElapsedMs: 840000,
-    modelElapsedMs: 660000,
-    threadId: null,
-    runId: null,
-  };
-  const notice = {
-    id: 'notice-one',
-    version: 1,
-    createdAt: 840000,
-    acknowledgedAt: null,
-    failures: [failure],
-  };
+it.each(['after-acceptance', 'failed-publication', 'competing-publication'] as const)(
+  'binds acknowledgement to the displayed notice through %s',
+  async (scenario) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const directory = await mkdtemp(join(tmpdir(), 'factory-ack-publication-'));
+    const durable = sqliteBoard(directory, 'acknowledgement');
+    const failure = {
+      attemptId: 'owned-attempt',
+      code: 'model-deadline' as const,
+      message: 'Model deadline exceeded',
+      attemptStartedAt: 0,
+      modelHandedOffAt: 180000,
+      deadline: 780000,
+      failedAt: 840000,
+      attemptElapsedMs: 840000,
+      modelElapsedMs: 660000,
+      threadId: null,
+      runId: null,
+    };
+    const notice = {
+      id: 'notice-one',
+      version: 1,
+      createdAt: 840000,
+      acknowledgedAt: null,
+      failures: [failure],
+    };
+    const input: ScheduleSnapshot = {
+      ...initial,
+      planningSafety: {
+        maximumAttempts: 3,
+        consecutiveModelDeadlineFailures: 1,
+        pendingNoticeCount: 1,
+        notice,
+      },
+    };
+    let authoritative = notice;
+    let publicationFault = false;
+    let competing: Awaited<ReturnType<typeof liveBoard>> | undefined;
+    const store: BoardStore = {
+      ...durable,
+      save: (record, cursor) =>
+        Effect.suspend(() => {
+          if (!publicationFault) return durable.save(record, cursor);
+          if (scenario === 'failed-publication')
+            return Effect.fail(
+              new Unavailable({ operation: 'controlled-publication-failure', cause: null })
+            );
+          const other = competing;
+          if (!other) return Effect.die('Missing competing publisher');
+          return Effect.tryPromise({
+            try: () =>
+              other.publish({ ...input, observations: { ...input.observations, startedAt: 2000 } }),
+            catch: (cause) =>
+              new Unavailable({ operation: 'controlled-competing-publication', cause }),
+          }).pipe(Effect.andThen(durable.save(record, cursor)));
+        }),
+    };
+    const applied: CommandRecord['planningNotice'][] = [];
+    const board = await liveBoard({
+      scopeId: 'acknowledgement',
+      initial: input,
+      autoExecute: false,
+      store,
+      commands: {
+        execute: (_command, _action, _input, expected) =>
+          Effect.sync(() => {
+            applied.push(expected);
+            return expected?.id === authoritative.id && expected.version === authoritative.version
+              ? { state: 'succeeded' as const, result: null, reasons: [] }
+              : {
+                  state: 'rejected' as const,
+                  result: null,
+                  reasons: [{ code: 'stale-action', message: 'Notice changed' }],
+                };
+          }),
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      if (scenario === 'competing-publication')
+        competing = await liveBoard({
+          scopeId: 'acknowledgement',
+          initial: input,
+          store: durable,
+          autoExecute: false,
+        });
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const action = Object.values(snapshot.entities.actions).find(
+        (a) => a.kind === 'acknowledge-planning-failures'
+      );
+      if (action?.availability.state !== 'available') throw new Error('Missing notice action');
+      const request = {
+        commandId: '00000000-0000-4000-8000-000000000091',
+        actionId: action.id,
+        precondition: action.availability.precondition,
+        kind: 'acknowledge-planning-failures',
+        payload: {},
+      };
+      if (scenario === 'after-acceptance')
+        expect(
+          (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+            .statusCode
+        ).toBe(202);
+      authoritative = {
+        ...notice,
+        version: 2,
+        failures: [failure, { ...failure, attemptId: 'second-attempt' }],
+      };
+      const nextInput: ScheduleSnapshot = {
+        ...input,
+        planningSafety: {
+          ...input.planningSafety!,
+          notice: authoritative,
+          consecutiveModelDeadlineFailures: 2,
+        },
+      };
+      if (scenario !== 'after-acceptance') {
+        publicationFault = true;
+        if (scenario === 'failed-publication')
+          await expect(board.publish(nextInput)).rejects.toThrow();
+        else await board.publish(nextInput);
+        publicationFault = false;
+        expect(
+          (await app.inject('/api/v2/board')).json().meta.factory.planning.notice.failures
+        ).toHaveLength(1);
+        expect(
+          (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+            .statusCode
+        ).toBe(202);
+      }
+      await board.execute();
+      expect(applied).toEqual([{ id: 'notice-one', version: 1 }]);
+      expect((await app.inject(`/api/v2/commands/${request.commandId}`)).json()).toMatchObject({
+        state: 'rejected',
+        reasons: [{ code: 'stale-action' }],
+      });
+      const originalReceipt = (await app.inject(`/api/v2/commands/${request.commandId}`)).json();
+      await board.publish(nextInput);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            payload: { ...request, commandId: '00000000-0000-4000-8000-000000000092' },
+          })
+        ).statusCode
+      ).toBe(412);
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
+      ).toBe(200);
+      expect(applied).toHaveLength(1);
+      const updated = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const fresh = Object.values(updated.entities.actions).find(
+        (a) => a.kind === 'acknowledge-planning-failures'
+      );
+      if (fresh?.availability.state !== 'available')
+        throw new Error('Missing refreshed notice action');
+      const freshRequest = {
+        ...request,
+        commandId: '00000000-0000-4000-8000-000000000093',
+        actionId: fresh.id,
+        precondition: fresh.availability.precondition,
+      };
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: freshRequest }))
+          .statusCode
+      ).toBe(202);
+      await board.execute();
+      expect((await app.inject(`/api/v2/commands/${freshRequest.commandId}`)).json().state).toBe(
+        'succeeded'
+      );
+      expect(applied).toEqual([
+        { id: 'notice-one', version: 1 },
+        { id: 'notice-one', version: 2 },
+      ]);
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).json()
+      ).toEqual(originalReceipt);
+      expect(applied).toHaveLength(2);
+    } finally {
+      await app.close();
+      await competing?.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+it('rebuilds a cached notice without its private target before accepting acknowledgement', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { sqliteBoard } = await import('../src/adapters/store/index.js');
+  const directory = await mkdtemp(join(tmpdir(), 'factory-ack-cache-'));
+  const store = sqliteBoard(directory, 'ack-cache');
   const input: ScheduleSnapshot = {
     ...initial,
     planningSafety: {
       maximumAttempts: 3,
       consecutiveModelDeadlineFailures: 1,
       pendingNoticeCount: 1,
-      notice,
+      notice: {
+        id: 'legacy-notice',
+        version: 1,
+        createdAt: 660000,
+        acknowledgedAt: null,
+        failures: [
+          {
+            attemptId: 'owned-model',
+            code: 'model-deadline',
+            message: 'Model deadline exceeded',
+            attemptStartedAt: 0,
+            modelHandedOffAt: 0,
+            deadline: 600000,
+            failedAt: 660000,
+            attemptElapsedMs: 660000,
+            modelElapsedMs: 660000,
+            threadId: null,
+            runId: null,
+          },
+        ],
+      },
     },
   };
-  let authoritative = notice;
-  const applied: CommandRecord['planningNotice'][] = [];
-  const board = await liveBoard({
-    scopeId: 'acknowledgement',
+  const old = await liveBoard({
+    scopeId: 'ack-cache',
     initial: input,
+    now: () => 900000,
+    store: {
+      ...store,
+      save: (record, cursor) =>
+        store.save(
+          {
+            snapshot: record.snapshot,
+            details: record.details,
+            history: record.history,
+            inputVersion: record.inputVersion,
+          },
+          cursor
+        ),
+    },
+  });
+  old.close();
+  const received: CommandRecord['planningNotice'][] = [];
+  const board = await liveBoard({
+    scopeId: 'ack-cache',
+    initial: input,
+    now: () => 900000,
+    store,
     autoExecute: false,
     commands: {
-      execute: (_command, _action, _input, expected) =>
+      execute: (_command, _action, _input, target) =>
         Effect.sync(() => {
-          applied.push(expected);
-          return expected?.id === authoritative.id && expected.version === authoritative.version
+          received.push(target);
+          return target?.id === 'legacy-notice' && target.version === 1
             ? { state: 'succeeded' as const, result: null, reasons: [] }
             : {
                 state: 'rejected' as const,
                 result: null,
-                reasons: [{ code: 'stale-action', message: 'Notice changed' }],
+                reasons: [{ code: 'stale-action', message: 'Missing published target' }],
               };
         }),
     },
@@ -158,53 +373,30 @@ it('binds acknowledgement to its accepted notice and rejects changed evidence be
     const action = Object.values(snapshot.entities.actions).find(
       (a) => a.kind === 'acknowledge-planning-failures'
     );
-    if (action?.availability.state !== 'available') throw new Error('Missing notice action');
-    const request = {
-      commandId: '00000000-0000-4000-8000-000000000091',
-      actionId: action.id,
-      precondition: action.availability.precondition,
-      kind: 'acknowledge-planning-failures',
-      payload: {},
-    };
-    expect(
-      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
-    ).toBe(202);
-    // A newer durable failure can precede board publication. The adapter must receive
-    // the accepted target rather than selecting the newer notice when the worker runs.
-    authoritative = {
-      ...notice,
-      version: 2,
-      failures: [failure, { ...failure, attemptId: 'second-attempt' }],
-    };
-    await board.execute();
-    expect(applied).toEqual([{ id: 'notice-one', version: 1 }]);
-    expect((await app.inject(`/api/v2/commands/${request.commandId}`)).json()).toMatchObject({
-      state: 'rejected',
-      reasons: [{ code: 'stale-action' }],
-    });
-    await board.publish({
-      ...input,
-      planningSafety: {
-        ...input.planningSafety!,
-        notice: authoritative,
-        consecutiveModelDeadlineFailures: 2,
-      },
-    });
+    if (action?.availability.state !== 'available')
+      throw new Error('Missing retained notice action');
+    const commandId = '00000000-0000-4000-8000-000000000094';
     expect(
       (
         await app.inject({
           method: 'POST',
           url: '/api/v2/commands',
-          payload: { ...request, commandId: '00000000-0000-4000-8000-000000000092' },
+          payload: {
+            commandId,
+            actionId: action.id,
+            precondition: action.availability.precondition,
+            kind: 'acknowledge-planning-failures',
+            payload: {},
+          },
         })
       ).statusCode
-    ).toBe(412);
-    expect(
-      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
-    ).toBe(200);
-    expect(applied).toHaveLength(1);
+    ).toBe(202);
+    await board.execute();
+    expect((await app.inject(`/api/v2/commands/${commandId}`)).json().state).toBe('succeeded');
+    expect(received).toEqual([{ id: 'legacy-notice', version: 1 }]);
   } finally {
     await app.close();
+    await rm(directory, { recursive: true, force: true });
   }
 });
 it.each([

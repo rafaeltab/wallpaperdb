@@ -9,7 +9,7 @@ import type {
   FactoryV2Snapshot,
 } from '../src/http/index.js';
 import { protocol } from './fixtures/setup.js';
-import { fileScheduleStore } from '../src/adapters/store/index.js';
+import { fileScheduleStore, fileStore } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 
 type Running = Awaited<ReturnType<typeof startFactory>>;
@@ -268,6 +268,83 @@ it('keeps Retry disabled for replacement evidence at an already-bound run ordina
     });
     await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
   }));
+
+it.each(['adopted-run pin', 'predecessor-run identity'])(
+  'preserves retained %s before a separate run binding exists',
+  (association) =>
+    composed(async ({ running, host, save, reopen }) => {
+      await start(running);
+      const resourcePath = `${host.directory}/resource.json`;
+      const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+      await running.close();
+      const directory = `${host.directory}/state`;
+      const schedule = fileScheduleStore(directory);
+      const state = await Effect.runPromise(schedule.read());
+      expect(
+        await Effect.runPromise(
+          schedule.save({ ...state, revision: state.revision + 1, concurrency: 2 })
+        )
+      ).toBe(true);
+      const store = fileStore(directory);
+      expect(
+        await Effect.runPromise(
+          store.saveStage({
+            index: 1,
+            stage: 'implementation',
+            threadId: prior.threadId,
+            commit: host.base,
+            ordinal: 2,
+            previousRunId: 'run-1',
+            ...(association === 'adopted-run pin'
+              ? { observedRunId: 'answer-run', deliveryIndex: 0, resume: false }
+              : { resume: true }),
+          })
+        )
+      ).toBe(true);
+      if (association === 'predecessor-run identity')
+        expect(await Effect.runPromise(store.claimStage(1))).toBe(true);
+      const candidate = association === 'adopted-run pin' ? 'replacement-run' : 'run-1';
+      await save({
+        messages: [{ role: 'assistant', runId: candidate, text: 'Implementation incomplete.' }],
+      });
+      await writeFile(
+        resourcePath,
+        JSON.stringify({ ...prior, status: 'completed', latestRunId: candidate, runCount: 2 })
+      );
+      const current = await reopen();
+      await vi.waitFor(
+        async () => {
+          const board = (await current.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            execution: { state: 'known', value: { state: 'finished', runId: candidate } },
+            occupiesCapacity: true,
+          });
+          expect(board.meta.factory.concurrency).toEqual({
+            limit: { kind: 'limited', maximum: 2 },
+            occupied: 1,
+          });
+          expect(
+            board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']
+          ).toMatchObject({ availability: { state: 'disabled' } });
+        },
+        { timeout: 8000, interval: 40 }
+      );
+      expect(
+        (await host.calls()).filter(
+          (call) =>
+            call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+        )
+      ).toHaveLength(1);
+      await save({
+        messages: [{ role: 'assistant', runId: 'answer-run', text: 'Implementation incomplete.' }],
+      });
+      await writeFile(
+        resourcePath,
+        JSON.stringify({ ...prior, status: 'completed', latestRunId: 'answer-run', runCount: 2 })
+      );
+      await action(current, 'retry', 'job:rafaeltab/wallpaperdb/577');
+    })
+);
 
 it('manually retries incomplete implementation in a fresh original-base worktree without another admission', () =>
   composed(

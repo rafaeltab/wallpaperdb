@@ -123,6 +123,11 @@ export const PlanLive = Layer.effect(
             });
             if ('kind' in proposal)
               return { kind: 'paused' as const, selected: [], rejected: [], input };
+            const ownership = attempt?.automatic ? yield* planner.ownership(false) : undefined;
+            const modelAttemptId =
+              ownership?.automatic && ownership.phase === 'succeeded' && ownership.run
+                ? ownership.requestId
+                : undefined;
             if (attempt) yield* attempt.progress('freshness');
             const current = yield* source.read();
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
@@ -134,7 +139,12 @@ export const PlanLive = Layer.effect(
                 ],
                 input: current,
               };
-            return { kind: 'preview' as const, ...validate(proposal, input), input };
+            return {
+              kind: 'preview' as const,
+              ...validate(proposal, input),
+              input,
+              modelAttemptId,
+            };
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {

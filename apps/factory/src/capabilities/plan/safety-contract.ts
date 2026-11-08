@@ -46,6 +46,7 @@ export interface PlanningSafetySnapshot {
   readonly displayedNotice: PlanningNotice | null;
   readonly pendingNoticeCount: number;
   readonly failureRecorded: boolean;
+  readonly successRecorded: boolean;
 }
 /** One transaction compares both local revisions and commits the failure/notice,
  * counter and any automatic pause together. An already recorded attempt is a no-op.
@@ -60,6 +61,7 @@ export interface PlanningSafetyStore {
     readonly notice?: PlanningNotice;
     readonly expectedNoticeVersion?: number;
     readonly failure?: AutomaticDeadlineFailure;
+    readonly acceptedAttemptId?: string;
     readonly schedule?: ScheduleState;
   }): Effect.Effect<'saved' | 'conflict' | 'duplicate', Unavailable>;
 }
@@ -67,6 +69,7 @@ export const PlanningSafetyStore = Context.Service<PlanningSafetyStore>(
   'wallpaperdb.factory.PlanningSafetyStore'
 );
 export interface PlanningSafety {
+  accepted(attemptId: string): Effect.Effect<void, Unavailable>;
   acknowledge(expected: {
     readonly id: string;
     readonly version: number;

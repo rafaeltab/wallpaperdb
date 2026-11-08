@@ -206,6 +206,66 @@ it('pauses after three distinct automatic model deadlines and retains their dura
     expect(
       (await running.app.inject('/api/v2/board')).json().meta.factory.planning.notice.acknowledgedAt
     ).toBeNull();
+    const unseen = (await running.app.inject('/api/v2/board')).json().meta.factory.planning.notice;
+    await running.close();
+    running = undefined;
+    const saved = JSON.parse(await readFile(host.configFile, 'utf8'));
+    await host.save({ ...saved, planner: { ...saved.planner, status: 'completed' } });
+    running = await startFactory(configuration);
+    await vi.waitFor(
+      async () => {
+        const planned = (await running!.app.inject('/api/v2/board')).json();
+        expect(planned.meta.factory.planning.consecutiveModelDeadlineFailures).toBe(0);
+        expect(planned.meta.factory.planning.notice).toEqual(unseen);
+      },
+      { timeout: 6000, interval: 20 }
+    );
+    await running.close();
+    running = undefined;
+    await host.save({ ...saved, githubQuotaReset: Math.ceil(Date.now() / 1000) + 3600 });
+    const beforeNew = (await starts()).length;
+    running = await startFactory(configuration);
+    await vi.waitFor(async () => expect(await starts()).toHaveLength(beforeNew + 1), {
+      timeout: 6000,
+      interval: 20,
+    });
+    vi.setSystemTime(Date.now() + 11 * 60_000);
+    await vi.waitFor(
+      async () => {
+        const next = (await running!.app.inject('/api/v2/board')).json();
+        expect(next.meta.factory.planning).toMatchObject({
+          consecutiveModelDeadlineFailures: 1,
+          pendingNoticeCount: 2,
+          notice: { id: unseen.id },
+        });
+      },
+      { timeout: 6000, interval: 20 }
+    );
+    const pending = (await running.app.inject('/api/v2/board')).json<BoardSnapshot>();
+    const nextAck = Object.values(pending.entities.actions).find(
+      (a) => a.kind === 'acknowledge-planning-failures'
+    );
+    if (nextAck?.availability.state !== 'available')
+      throw new Error('Missing retained notice action');
+    expect(
+      (
+        await send({
+          ...request,
+          commandId: randomUUID(),
+          actionId: nextAck.id,
+          precondition: nextAck.availability.precondition,
+        })
+      ).statusCode
+    ).toBe(202);
+    await vi.waitFor(
+      async () => {
+        const next = (await running!.app.inject('/api/v2/board')).json();
+        expect(next.meta.factory.planning.pendingNoticeCount).toBe(1);
+        expect(next.meta.factory.planning.notice.id).not.toBe(unseen.id);
+        expect(next.meta.factory.planning.notice.acknowledgedAt).toBeNull();
+      },
+      { timeout: 5000, interval: 20 }
+    );
   } finally {
     await writeFile(`${host.directory}/release-planning-read`, 'cleanup');
     await running?.close();

@@ -9,6 +9,26 @@ export const PlanningSafetyLive = Layer.effect(
     const store = yield* PlanningSafetyStore;
     const time = yield* Time;
     return {
+      accepted: (attemptId) =>
+        Effect.gen(function* () {
+          for (;;) {
+            const snapshot = yield* store.read(attemptId);
+            if (snapshot.failureRecorded || snapshot.successRecorded) return;
+            const exhausted = snapshot.state.consecutiveModelDeadlineFailures === 3;
+            const result = yield* store.commit({
+              expectedVersion: snapshot.state.version,
+              expectedScheduleRevision: snapshot.schedule.revision,
+              state: {
+                ...snapshot.state,
+                version: snapshot.state.version + 1,
+                consecutiveModelDeadlineFailures: exhausted ? 3 : 0,
+                currentNoticeId: exhausted ? snapshot.state.currentNoticeId : null,
+              },
+              acceptedAttemptId: attemptId,
+            });
+            if (result !== 'conflict') return;
+          }
+        }).pipe(Effect.withSpan('factory.planning.accepted')),
       acknowledge: (expected) =>
         Effect.gen(function* () {
           for (;;) {
@@ -81,7 +101,7 @@ export const PlanningSafetyLive = Layer.effect(
         Effect.gen(function* () {
           for (;;) {
             const snapshot = yield* store.read(failure.attemptId);
-            if (snapshot.failureRecorded) return;
+            if (snapshot.failureRecorded || snapshot.successRecorded) return;
             const count = snapshot.state.consecutiveModelDeadlineFailures + 1;
             if (count > 3)
               return yield* Effect.fail(

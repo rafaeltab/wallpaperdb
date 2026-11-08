@@ -1,3 +1,4 @@
+import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -159,6 +160,7 @@ function setup(lostSend = true, immediate = false) {
   const create = () =>
     ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(controlledPlanningSafetyLayer),
         Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
         Layer.provide(deps)

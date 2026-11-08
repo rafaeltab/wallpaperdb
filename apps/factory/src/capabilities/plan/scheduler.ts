@@ -15,6 +15,7 @@ import {
   type ResumeClaim,
 } from './contract.js';
 import { validate, locallyBlocked } from './implementation.js';
+import { PlanningSafety } from './safety-contract.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
 const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
 export function holdsSlot(job: Status, resuming: boolean): boolean {
@@ -49,6 +50,7 @@ export const SchedulerLive = Layer.effect(
     const issues = yield* Issues;
     const source = yield* PlanningSource;
     const time = yield* Time;
+    const planningSafety = yield* PlanningSafety;
     const writers = yield* Semaphore.make(1);
     const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
@@ -228,11 +230,7 @@ export const SchedulerLive = Layer.effect(
       configure: (command) =>
         Effect.gen(function* () {
           if (!limit(command.concurrency) || !limit(command.allowance)) return 'rejected' as const;
-          const state = yield* store.read();
-          if (state.revision !== command.revision) return 'conflict' as const;
-          return (yield* store.save({ ...state, ...command, revision: state.revision + 1 }))
-            ? ('saved' as const)
-            : ('conflict' as const);
+          return yield* planningSafety.configure(command);
         }).pipe(Effect.withSpan('factory.scheduler.configure')),
       start: (command) =>
         Effect.gen(function* () {

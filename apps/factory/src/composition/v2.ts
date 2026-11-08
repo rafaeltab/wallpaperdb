@@ -155,7 +155,12 @@ function commandAdapter(config: {
           });
           return result === 'saved'
             ? { state: 'succeeded' as const, result: null, reasons: [] }
-            : rejected(result, 'Controls changed or limits were rejected. Refresh the board.');
+            : rejected(
+                result,
+                result === 'acknowledgement-required'
+                  ? 'Acknowledge the planning failures before resuming the factory.'
+                  : 'Controls changed or limits were rejected. Refresh the board.'
+              );
         }
         if (command.kind === 'preview-plan') {
           const parent = yield* Effect.currentSpan.pipe(

@@ -67,6 +67,9 @@ export const PlanningSafetyStore = Context.Service<PlanningSafetyStore>(
   'wallpaperdb.factory.PlanningSafetyStore'
 );
 export interface PlanningSafety {
+  configure(
+    command: Parameters<import('./contract.js').Scheduler['configure']>[0]
+  ): Effect.Effect<'saved' | 'conflict' | 'rejected' | 'acknowledgement-required', Unavailable>;
   status(): Effect.Effect<{ schedule: ScheduleState; planning: PlanningSafetyView }, Unavailable>;
   mayLaunch(): Effect.Effect<boolean, Unavailable>;
   failed(failure: AutomaticDeadlineFailure): Effect.Effect<void, Unavailable>;

@@ -257,7 +257,9 @@ export function operationsServer(config: {
             problem(
               result === 'conflict' ? 409 : 422,
               'factory-command',
-              'Controls changed or limits invalid. Refresh observation.'
+              result === 'acknowledgement-required'
+                ? 'Acknowledge the planning failures before resuming the factory.'
+                : 'Controls changed or limits invalid. Refresh observation.'
             )
           );
       return schedulerStatus(request);

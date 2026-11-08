@@ -122,7 +122,8 @@ export function t3Planner(config: {
   const finish = async (
     record: Awaited<ReturnType<typeof journal.save>>,
     detail: Awaited<ReturnType<typeof observe>>,
-    signal: AbortSignal
+    signal: AbortSignal,
+    consume = true
   ) => {
     if (record.retired && record.settled) return record;
     const successful = ['completed', 'idle'].includes(detail.thread.status);
@@ -184,12 +185,18 @@ export function t3Planner(config: {
       );
       if (!settled.thread.settled) throw new Error('Planner thread settlement is not confirmed');
     }
-    const result = await journal.save({
-      ...completed,
-      revision: completed.revision + 1,
-      retired: true,
-      settled: true,
-    });
+    // Background cleanup does not consume an undelivered timely proposal. The next
+    // matching foreground request must still recover it for fresh validation.
+    const retired = record.retired === true || consume || !successful || completedAt === undefined;
+    const result =
+      completed.retired === retired && completed.settled
+        ? completed
+        : await journal.save({
+            ...completed,
+            revision: completed.revision + 1,
+            retired,
+            settled: true,
+          });
     needsRecovery = false;
     return result;
   };
@@ -258,12 +265,12 @@ export function t3Planner(config: {
           reconciling = true;
           try {
             const previous = await journal.read();
-            if (!previous || (previous.retired && previous.settled) || !previous.run) {
+            if (!previous || previous.settled || !previous.run) {
               needsRecovery = false;
               return;
             }
             const detail = await observeOwned(previous, signal);
-            if (terminal(detail.thread.status)) await finish(previous, detail, signal);
+            if (terminal(detail.thread.status)) await finish(previous, detail, signal, false);
           } finally {
             reconciling = false;
           }
@@ -283,7 +290,7 @@ export function t3Planner(config: {
             reconcile &&
             !requestId &&
             previous.run &&
-            !previous.settled &&
+            (!previous.settled || !previous.retired) &&
             !busy &&
             !reconciling
           ) {

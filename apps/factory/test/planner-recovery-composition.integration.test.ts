@@ -122,7 +122,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
       await vi.waitFor(
         async () =>
           expect(await Effect.runPromise(planner.ownership(false))).toMatchObject({
-            retired: true,
+            retired: scenario !== 'slow-settlement',
             settled: true,
             deadline: ownership.deadline,
           }),
@@ -230,3 +230,147 @@ it('allows supported terminal cleanup latency when submitting a preview after pr
     await host.cleanup();
   }
 });
+
+it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
+  'preserves automatic result consumption after process loss, %s',
+  async (ordering) => {
+    const host = await protocol();
+    const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+    process.env.PATH = `${host.directory}:${previous.path}`;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const controller = new AbortController();
+    let pending: Promise<unknown> | undefined;
+    let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+    const configuration = {
+      ...host.mcpEnvironment,
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: `${host.directory}/state`,
+      FACTORY_PORT: '0',
+    };
+    const issue = {
+      number: 581,
+      url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+      title: 'Repair planning',
+      body: 'Preserve the completed automatic result',
+      author: 'rafaeltab',
+      open: true,
+      labels: ['ready-for-agent'],
+      comments: [],
+      blockers: [],
+      parents: [],
+      blockersReady: true,
+      prerequisiteEvidence: '',
+    };
+    const metadata = {
+      ...issue,
+      candidate: true,
+      assignees: [],
+      projectStatus: 'Planned',
+      projectPriority: null,
+      projectSize: null,
+      commentCount: 0,
+      pullRequests: [],
+    };
+    const input = {
+      issues: [{ ...issue, metadata }],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 2 },
+    };
+    const originalProposal = {
+      selected: [
+        { issue: 581, reason: 'Original ready issue proposal', dependsOn: [], conflicts: [] },
+      ],
+      deferred: [],
+    };
+    const plannerConfiguration = {
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${configuration.FACTORY_STATE}/planner`,
+    };
+    try {
+      await Effect.runPromise(
+        fileScheduleStore(configuration.FACTORY_STATE).save({
+          revision: 0,
+          concurrency: 1,
+          allowance: 2,
+          paused: true,
+          admissions: [],
+        })
+      );
+      running = await startFactory(configuration);
+      await running.close();
+      running = undefined;
+      await host.save({ planner: { status: 'running', proposal: originalProposal } });
+      const original = t3Planner(plannerConfiguration);
+      pending = Effect.runPromise(original.propose(input, { automatic: true }), {
+        signal: controller.signal,
+      }).catch(() => undefined);
+      await vi.waitFor(
+        async () => expect((await host.calls()).some((call) => call.args[1] === 'show')).toBe(true),
+        { timeout: 5000, interval: 20 }
+      );
+      controller.abort();
+      await pending;
+      const bound = await Effect.runPromise(original.ownership(false));
+      if (!bound?.deadline) throw new Error('Expected durable model ownership');
+      await host.save({ planner: { proposal: originalProposal } });
+      if (ordering !== 'foreground-first') {
+        // Exercise actual service-owned recovery, without calling a private lifecycle helper.
+        running = await startFactory(configuration);
+        await vi.waitFor(
+          async () =>
+            expect(await readFile(`${host.directory}/planner-settled`, 'utf8')).toBe('true'),
+          { timeout: 5000, interval: 20 }
+        );
+        await running.close();
+        running = undefined;
+      }
+      const changed = ordering === 'changed-input';
+      const proposal = changed
+        ? {
+            selected: [
+              {
+                issue: 581,
+                reason: 'Fresh proposal for changed capacity',
+                dependsOn: [],
+                conflicts: [],
+              },
+            ],
+            deferred: [],
+          }
+        : originalProposal;
+      if (changed) await host.save({ planner: { proposal } });
+      const reopened = t3Planner(plannerConfiguration);
+      const nextInput = changed ? { ...input, capacity: { concurrency: 1, admission: 3 } } : input;
+      expect(await Effect.runPromise(reopened.propose(nextInput, { automatic: true }))).toEqual(
+        proposal
+      );
+      const latest = await Effect.runPromise(reopened.ownership(false));
+      if (changed) expect(latest?.requestId).not.toBe(bound.requestId);
+      else
+        expect(latest).toMatchObject({
+          requestId: bound.requestId,
+          deadline: bound.deadline,
+          retired: true,
+        });
+      expect(
+        (await host.calls()).filter(
+          (call) => call.args[1] === 'start' && !call.args.includes('--help')
+        )
+      ).toHaveLength(changed ? 2 : 1);
+    } finally {
+      controller.abort();
+      await pending;
+      await running?.close();
+      process.env.PATH = previous.path;
+      if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous.fixture;
+      await host.cleanup();
+    }
+  }
+);

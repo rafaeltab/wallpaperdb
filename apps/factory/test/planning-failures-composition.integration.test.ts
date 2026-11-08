@@ -176,6 +176,68 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       concurrency: 1,
       allowance: 2,
     });
+    const configure = Object.values(reopened.entities.actions).find((a) => a.kind === 'configure');
+    if (configure?.availability.state !== 'available')
+      throw new Error('Configuration must remain available');
+    const mixed = {
+      commandId: randomUUID(),
+      actionId: configure.id,
+      precondition: configure.availability.precondition,
+      kind: 'configure',
+      payload: {
+        paused: false,
+        concurrency: { kind: 'limited', maximum: 2 },
+        admissionAllowance: { kind: 'limited', maximum: 3 },
+      },
+    };
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: mixed }))
+        .statusCode
+    ).toBe(202);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running!.app.inject(`/api/v2/commands/${mixed.commandId}`)).json()
+        ).toMatchObject({ state: 'rejected', reasons: [{ code: 'acknowledgement-required' }] }),
+      { timeout: 5000, interval: 20 }
+    );
+    expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
+      paused: true,
+      concurrency: 1,
+      allowance: 2,
+    });
+    const pausedEdit = {
+      ...mixed,
+      commandId: randomUUID(),
+      payload: { ...mixed.payload, paused: true },
+    };
+    expect(
+      (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: pausedEdit }))
+        .statusCode
+    ).toBe(202);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running!.app.inject(`/api/v2/commands/${pausedEdit.commandId}`)).json().state
+        ).toBe('succeeded'),
+      { timeout: 5000, interval: 20 }
+    );
+    expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
+      paused: true,
+      concurrency: 2,
+      allowance: 3,
+    });
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running!.app.inject('/api/v2/board')).json().meta.factory.planning
+        ).toMatchObject({
+          consecutiveModelDeadlineFailures: 3,
+          pendingNoticeCount: 1,
+          notice: { acknowledgedAt: null },
+        }),
+      { timeout: 5000, interval: 20 }
+    );
     const action = Object.values(reopened.entities.actions).find(
       (value) => value.kind === 'acknowledge-planning-failures'
     );
@@ -216,14 +278,15 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       { timeout: 5000, interval: 20 }
     );
     const receipt = (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json();
+    const resumeState = (await running.app.inject('/api/scheduler')).json().state;
     const resumed = await running.app.inject({
       method: 'POST',
       url: '/api/scheduler',
       payload: {
-        revision: state.revision,
+        revision: resumeState.revision,
         paused: false,
-        concurrency: 1,
-        allowance: 2,
+        concurrency: resumeState.concurrency,
+        allowance: resumeState.allowance,
       },
     });
     expect(resumed.statusCode).toBe(200);

@@ -26,6 +26,187 @@ const job = {
   resume: () => Effect.succeed({ kind: 'rejected' as const }),
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
+
+it.each(['controlled', 'sqlite'] as const)(
+  'atomically accepts one Retry opportunity across independent %s HTTP producers and retains replay on reopen',
+  async (backend) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const directory = await mkdtemp(`${tmpdir()}/factory-retry-claim-`);
+    const input = stoppedImplementationSnapshot();
+    const shared =
+      backend === 'sqlite' ? sqliteBoard(directory, 'retry-claim') : controlledBoardStore();
+    const create = async () => {
+      const board = await liveBoard({
+        scopeId: 'retry-claim',
+        initial: input,
+        store: shared,
+        autoExecute: false,
+      });
+      return {
+        board,
+        app: operationsServer({ base: 'b'.repeat(40), run: Effect.runPromise, job, v2: board }),
+      };
+    };
+    const first = await create(),
+      second = await create();
+    try {
+      const snapshot = (await first.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const action = snapshot.entities.actions['action:retry/job:rafaeltab/wallpaperdb/1'];
+      if (action.availability.state !== 'available') throw new Error('Missing Retry action');
+      const make = (id: string) => ({
+        commandId: id,
+        actionId: action.id,
+        precondition:
+          action.availability.state === 'available' ? action.availability.precondition : '',
+        kind: 'retry',
+        payload: {},
+      });
+      const commands = [
+        make('00000000-0000-4000-8000-000000000081'),
+        make('00000000-0000-4000-8000-000000000082'),
+      ];
+      const responses = await Promise.all([
+        first.app.inject({ method: 'POST', url: '/api/v2/commands', payload: commands[0] }),
+        second.app.inject({ method: 'POST', url: '/api/v2/commands', payload: commands[1] }),
+      ]);
+      expect(responses.map((r) => r.statusCode).sort()).toEqual([202, 412]);
+      const winner = responses.findIndex((r) => r.statusCode === 202);
+      expect(responses[1 - winner].json()).toMatchObject({ code: 'stale-action' });
+      await first.app.close();
+      await second.app.close();
+      const restored = await create();
+      try {
+        const prior = (
+          await restored.app.inject(`/api/v2/commands/${commands[winner].commandId}`)
+        ).json();
+        expect(prior.state).toBe('uncertain');
+        const replay = await restored.app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: commands[winner],
+        });
+        expect(replay.statusCode).toBe(200);
+        expect(replay.json()).toEqual(prior);
+        expect(
+          (
+            await restored.app.inject({
+              method: 'POST',
+              url: '/api/v2/commands',
+              payload: make('00000000-0000-4000-8000-000000000083'),
+            })
+          ).statusCode
+        ).toBe(412);
+      } finally {
+        await restored.app.close();
+      }
+    } finally {
+      await first.app.close();
+      await second.app.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
+it.each(['failed-publication', 'competing-publication'] as const)(
+  'binds Retry to the displayed failed attempt through %s',
+  async (scenario) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const directory = await mkdtemp(`${tmpdir()}/factory-retry-publication-`);
+    const original = stoppedImplementationSnapshot(),
+      next = stoppedImplementationSnapshot(1);
+    const durable = sqliteBoard(directory, 'retry-publication');
+    const other = await liveBoard({
+      scopeId: 'retry-publication',
+      initial: original,
+      store: durable,
+      autoExecute: false,
+    });
+    let fault = false;
+    const store: BoardStore = {
+      ...durable,
+      save: (record, cursor) => {
+        if (!fault) return durable.save(record, cursor);
+        if (scenario === 'failed-publication')
+          return Effect.fail(
+            new Unavailable({ operation: 'controlled-retry-publication', cause: null })
+          );
+        return Effect.tryPromise({
+          try: () =>
+            other.publish({
+              ...original,
+              observations: { ...original.observations, startedAt: 2000 },
+            }),
+          catch: (cause) => new Unavailable({ operation: 'controlled-competing-retry', cause }),
+        }).pipe(Effect.andThen(durable.save(record, cursor)));
+      },
+    };
+    const received: CommandRecord['retryTarget'][] = [];
+    const board = await liveBoard({
+      scopeId: 'retry-publication',
+      initial: original,
+      store,
+      autoExecute: false,
+      commands: {
+        execute: (_command, _action, _input, targets) =>
+          Effect.sync(() => {
+            received.push(targets?.retryTarget);
+            return targets?.retryTarget?.retry.threadId === 'stopped-1'
+              ? { state: 'succeeded' as const, result: null, reasons: [] }
+              : {
+                  state: 'rejected' as const,
+                  result: null,
+                  reasons: [{ code: 'stale-retry', message: 'The displayed attempt changed.' }],
+                };
+          }),
+      },
+    });
+    const app = operationsServer({ base: 'b'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      fault = true;
+      if (scenario === 'failed-publication') await expect(board.publish(next)).rejects.toThrow();
+      else await board.publish(next);
+      fault = false;
+      const displayed = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const action = displayed.entities.actions['action:retry/job:rafaeltab/wallpaperdb/1'];
+      if (action.availability.state !== 'available') throw new Error('Retry unavailable');
+      const request = {
+        commandId: '00000000-0000-4000-8000-000000000084',
+        kind: 'retry',
+        payload: {},
+        actionId: action.id,
+        precondition: action.availability.precondition,
+      };
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
+      ).toBe(202);
+      await board.execute();
+      expect(received).toHaveLength(1);
+      expect(received[0]?.retry).toMatchObject({
+        threadId: 'stopped-0',
+        runId: 'failed-0',
+        attempt: 0,
+        index: 0,
+      });
+      const receipt = (await app.inject(`/api/v2/commands/${request.commandId}`)).json();
+      expect(receipt.state).toBe('rejected');
+      await board.publish(next);
+      expect(
+        (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).json()
+      ).toEqual(receipt);
+      expect(received).toHaveLength(1);
+    } finally {
+      await app.close();
+      other.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
 it.each(['unknown-environment', 'missing-metadata', 'known-metadata'] as const)(
   'preserves the exact planning thread association with %s',
   async (scenario) => {
@@ -721,126 +902,10 @@ it('retains the projection across restart and durably deduplicates commands befo
   }
 });
 
-it('exposes T3 metadata with evidenced issue associations without turning independent threads into jobs', async () => {
-  const board = await liveBoard({
-    scopeId: 'test',
-    initial: {
-      ...initial,
-      threads: {
-        state: 'current',
-        stale: false,
-        observedAt: 1000,
-        browserOrigin: 'https://t3.example.invalid',
-        facts: {
-          environmentId: 'environment-one',
-          projectId: 'project-one',
-          threads: [
-            {
-              threadId: 'owned-thread',
-              title: 'Issue 461 implementation',
-              createdAt: '2026-11-09T12:00:00Z',
-              updatedAt: '2026-11-09T12:05:00Z',
-              status: 'completed',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'evidenced',
-              associations: [{ issue: 461, evidence: 'factory-binding', observedAt: 1000 }],
-            },
-            {
-              threadId: 'independent-thread',
-              title: 'Discuss issue 461',
-              createdAt: null,
-              updatedAt: null,
-              status: 'running',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'absent',
-            },
-            {
-              threadId: 'conflicting-thread',
-              title: 'Conflicting context',
-              createdAt: null,
-              updatedAt: null,
-              status: 'completed',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'conflicting',
-              associations: [
-                { issue: 461, evidence: 'factory-binding', observedAt: 1000 },
-                { issue: 250, evidence: 'github-closing-reference', observedAt: 1000 },
-              ],
-            },
-          ],
-        },
-      },
-    },
-  });
-  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
-  try {
-    const response = await app.inject('/api/v2/board');
-    expect(response.statusCode).toBe(200);
-    const snapshot = response.json<FactoryV2Snapshot>();
-    expect(snapshot.entities.threads['thread:environment-one/owned-thread']).toMatchObject({
-      metadata: {
-        state: 'known',
-        value: {
-          title: 'Issue 461 implementation',
-          createdAt: '2026-11-09T12:00:00Z',
-          updatedAt: '2026-11-09T12:05:00Z',
-          status: 'completed',
-          environmentId: 'environment-one',
-          threadId: 'owned-thread',
-          webUrl: 'https://t3.example.invalid/environment-one/owned-thread',
-          nativeUrl: 't3code://threads/environment-one/owned-thread',
-        },
-      },
-      association: {
-        state: 'confirmed',
-        issueIds: ['issue:rafaeltab/wallpaperdb/461'],
-        pullRequestIds: [],
-        evidence: 'factory-binding',
-      },
-    });
-    expect(
-      snapshot.entities.threads['thread:environment-one/independent-thread'].association
-    ).toEqual({
-      state: 'absent',
-      reasons: [],
-    });
-    expect(
-      snapshot.entities.threads['thread:environment-one/conflicting-thread'].association
-    ).toEqual({
-      state: 'ambiguous',
-      reasons: [],
-    });
-    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/461'].metadata.state).toBe(
-      'unknown'
-    );
-    expect(snapshot.entities.jobs).toEqual({});
-    expect(snapshot.meta.factory.admission.consumed).toBe(0);
-  } finally {
-    await app.close();
-  }
-});
-
-async function liveBoard(config: {
-  scopeId: string;
-  initial: ScheduleSnapshot;
-  now?: () => number;
-  store?: BoardStore;
-  commands?: BoardCommands;
-  run?: typeof Effect.runPromise;
-  autoExecute?: boolean;
-  attempts?: AttemptStore;
-  planner?: IPlanner;
-  initialPlan?: import('../src/capabilities/board/index.js').BoardPlan;
-}) {
+function controlledBoardStore(): BoardStore {
   let saved: BoardRecord | undefined;
   const records = new Map<string, CommandRecord>();
-  const store = config.store ?? {
+  return {
     read: () => Effect.succeed(saved),
     save: (record: BoardRecord, expectedCursor: string | null) =>
       Effect.sync(() => {
@@ -852,6 +917,16 @@ async function liveBoard(config: {
     accept: (record: CommandRecord) =>
       Effect.sync(() => {
         if (records.has(record.request.commandId)) return false;
+        if (
+          record.request.kind === 'retry' &&
+          [...records.values()].some(
+            (existing) =>
+              existing.request.kind === 'retry' &&
+              existing.request.actionId === record.request.actionId &&
+              existing.request.precondition === record.request.precondition
+          )
+        )
+          return false;
         records.set(record.request.commandId, record);
         return true;
       }),
@@ -887,6 +962,21 @@ async function liveBoard(config: {
         )?.basis ?? undefined
       ),
   };
+}
+
+async function liveBoard(config: {
+  scopeId: string;
+  initial: ScheduleSnapshot;
+  now?: () => number;
+  store?: BoardStore;
+  commands?: BoardCommands;
+  run?: typeof Effect.runPromise;
+  autoExecute?: boolean;
+  attempts?: AttemptStore;
+  planner?: IPlanner;
+  initialPlan?: import('../src/capabilities/board/index.js').BoardPlan;
+}) {
+  const store = config.store ?? controlledBoardStore();
   const build = makeBoard({ ...config, epoch: 'test' }).pipe(
     Effect.provideService(BoardStore, store),
     Effect.provideService(
@@ -2272,5 +2362,110 @@ it('does not date older rich metadata with a later legacy-only observation after
   } finally {
     await app.close();
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('exposes T3 metadata with evidenced issue associations without turning independent threads into jobs', async () => {
+  const board = await liveBoard({
+    scopeId: 'test',
+    initial: {
+      ...initial,
+      threads: {
+        state: 'current',
+        stale: false,
+        observedAt: 1000,
+        browserOrigin: 'https://t3.example.invalid',
+        facts: {
+          environmentId: 'environment-one',
+          projectId: 'project-one',
+          threads: [
+            {
+              threadId: 'owned-thread',
+              title: 'Issue 461 implementation',
+              createdAt: '2026-11-09T12:00:00Z',
+              updatedAt: '2026-11-09T12:05:00Z',
+              status: 'completed',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'evidenced',
+              associations: [{ issue: 461, evidence: 'factory-binding', observedAt: 1000 }],
+            },
+            {
+              threadId: 'independent-thread',
+              title: 'Discuss issue 461',
+              createdAt: null,
+              updatedAt: null,
+              status: 'running',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'absent',
+            },
+            {
+              threadId: 'conflicting-thread',
+              title: 'Conflicting context',
+              createdAt: null,
+              updatedAt: null,
+              status: 'completed',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'conflicting',
+              associations: [
+                { issue: 461, evidence: 'factory-binding', observedAt: 1000 },
+                { issue: 250, evidence: 'github-closing-reference', observedAt: 1000 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    const snapshot = response.json<FactoryV2Snapshot>();
+    expect(snapshot.entities.threads['thread:environment-one/owned-thread']).toMatchObject({
+      metadata: {
+        state: 'known',
+        value: {
+          title: 'Issue 461 implementation',
+          createdAt: '2026-11-09T12:00:00Z',
+          updatedAt: '2026-11-09T12:05:00Z',
+          status: 'completed',
+          environmentId: 'environment-one',
+          threadId: 'owned-thread',
+          webUrl: 'https://t3.example.invalid/environment-one/owned-thread',
+          nativeUrl: 't3code://threads/environment-one/owned-thread',
+        },
+      },
+      association: {
+        state: 'confirmed',
+        issueIds: ['issue:rafaeltab/wallpaperdb/461'],
+        pullRequestIds: [],
+        evidence: 'factory-binding',
+      },
+    });
+    expect(
+      snapshot.entities.threads['thread:environment-one/independent-thread'].association
+    ).toEqual({
+      state: 'absent',
+      reasons: [],
+    });
+    expect(
+      snapshot.entities.threads['thread:environment-one/conflicting-thread'].association
+    ).toEqual({
+      state: 'ambiguous',
+      reasons: [],
+    });
+    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/461'].metadata.state).toBe(
+      'unknown'
+    );
+    expect(snapshot.entities.jobs).toEqual({});
+    expect(snapshot.meta.factory.admission.consumed).toBe(0);
+  } finally {
+    await app.close();
   }
 });

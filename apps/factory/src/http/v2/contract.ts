@@ -505,6 +505,10 @@ export type FactoryV2Event =
 
 /** Copy actionId and precondition from an available Action. The server must still
  * validate current state. commandId is a client UUID reused for an uncertain retry.
+ * A manual `retry` instead uses a new command UUID and the displayed failed job's
+ * action. It starts fresh implementation context in a clean original-base checkout,
+ * preserving the prior attempt and the same job/admission. Its receipt confirms the
+ * retry operation, never successful implementation. Resume retains continuation semantics.
  */
 export type FactoryV2Command = {
   readonly commandId: string;

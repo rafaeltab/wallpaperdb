@@ -25,106 +25,107 @@ const job = {
   resume: () => Effect.succeed({ kind: 'rejected' as const }),
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
-it('exposes T3 metadata with evidenced issue associations without turning independent threads into jobs', async () => {
+it('binds acknowledgement to its accepted notice and rejects changed evidence before applying it', async () => {
+  const failure = {
+    attemptId: 'owned-attempt',
+    code: 'model-deadline' as const,
+    message: 'Model deadline exceeded',
+    attemptStartedAt: 0,
+    modelHandedOffAt: 180000,
+    deadline: 780000,
+    failedAt: 840000,
+    attemptElapsedMs: 840000,
+    modelElapsedMs: 660000,
+    threadId: null,
+    runId: null,
+  };
+  const notice = {
+    id: 'notice-one',
+    version: 1,
+    createdAt: 840000,
+    acknowledgedAt: null,
+    failures: [failure],
+  };
+  const input: ScheduleSnapshot = {
+    ...initial,
+    planningSafety: {
+      maximumAttempts: 3,
+      consecutiveModelDeadlineFailures: 1,
+      pendingNoticeCount: 1,
+      notice,
+    },
+  };
+  let authoritative = notice;
+  const applied: CommandRecord['planningNotice'][] = [];
   const board = await liveBoard({
-    scopeId: 'test',
-    initial: {
-      ...initial,
-      threads: {
-        state: 'current',
-        stale: false,
-        observedAt: 1000,
-        browserOrigin: 'https://t3.example.invalid',
-        facts: {
-          environmentId: 'environment-one',
-          projectId: 'project-one',
-          threads: [
-            {
-              threadId: 'owned-thread',
-              title: 'Issue 461 implementation',
-              createdAt: '2026-11-09T12:00:00Z',
-              updatedAt: '2026-11-09T12:05:00Z',
-              status: 'completed',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'evidenced',
-              associations: [{ issue: 461, evidence: 'factory-binding', observedAt: 1000 }],
-            },
-            {
-              threadId: 'independent-thread',
-              title: 'Discuss issue 461',
-              createdAt: null,
-              updatedAt: null,
-              status: 'running',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'absent',
-            },
-            {
-              threadId: 'conflicting-thread',
-              title: 'Conflicting context',
-              createdAt: null,
-              updatedAt: null,
-              status: 'completed',
-              branch: null,
-              worktree: null,
-              pullRequests: [],
-              associationState: 'conflicting',
-              associations: [
-                { issue: 461, evidence: 'factory-binding', observedAt: 1000 },
-                { issue: 250, evidence: 'github-closing-reference', observedAt: 1000 },
-              ],
-            },
-          ],
-        },
-      },
+    scopeId: 'acknowledgement',
+    initial: input,
+    autoExecute: false,
+    commands: {
+      execute: (_command, _action, _input, expected) =>
+        Effect.sync(() => {
+          applied.push(expected);
+          return expected?.id === authoritative.id && expected.version === authoritative.version
+            ? { state: 'succeeded' as const, result: null, reasons: [] }
+            : {
+                state: 'rejected' as const,
+                result: null,
+                reasons: [{ code: 'stale-action', message: 'Notice changed' }],
+              };
+        }),
     },
   });
   const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
   try {
-    const response = await app.inject('/api/v2/board');
-    expect(response.statusCode).toBe(200);
-    const snapshot = response.json<FactoryV2Snapshot>();
-    expect(snapshot.entities.threads['thread:environment-one/owned-thread']).toMatchObject({
-      metadata: {
-        state: 'known',
-        value: {
-          title: 'Issue 461 implementation',
-          createdAt: '2026-11-09T12:00:00Z',
-          updatedAt: '2026-11-09T12:05:00Z',
-          status: 'completed',
-          environmentId: 'environment-one',
-          threadId: 'owned-thread',
-          webUrl: 'https://t3.example.invalid/environment-one/owned-thread',
-          nativeUrl: 't3code://threads/environment-one/owned-thread',
-        },
-      },
-      association: {
-        state: 'confirmed',
-        issueIds: ['issue:rafaeltab/wallpaperdb/461'],
-        pullRequestIds: [],
-        evidence: 'factory-binding',
-      },
-    });
-    expect(
-      snapshot.entities.threads['thread:environment-one/independent-thread'].association
-    ).toEqual({
-      state: 'absent',
-      reasons: [],
-    });
-    expect(
-      snapshot.entities.threads['thread:environment-one/conflicting-thread'].association
-    ).toEqual({
-      state: 'ambiguous',
-      reasons: [],
-    });
-    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/461'].metadata.state).toBe(
-      'unknown'
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const action = Object.values(snapshot.entities.actions).find(
+      (a) => a.kind === 'acknowledge-planning-failures'
     );
-    expect(snapshot.entities.jobs).toEqual({});
-    expect(snapshot.meta.factory.admission.consumed).toBe(0);
+    if (action?.availability.state !== 'available') throw new Error('Missing notice action');
+    const request = {
+      commandId: '00000000-0000-4000-8000-000000000091',
+      actionId: action.id,
+      precondition: action.availability.precondition,
+      kind: 'acknowledge-planning-failures',
+      payload: {},
+    };
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
+    ).toBe(202);
+    // A newer durable failure can precede board publication. The adapter must receive
+    // the accepted target rather than selecting the newer notice when the worker runs.
+    authoritative = {
+      ...notice,
+      version: 2,
+      failures: [failure, { ...failure, attemptId: 'second-attempt' }],
+    };
+    await board.execute();
+    expect(applied).toEqual([{ id: 'notice-one', version: 1 }]);
+    expect((await app.inject(`/api/v2/commands/${request.commandId}`)).json()).toMatchObject({
+      state: 'rejected',
+      reasons: [{ code: 'stale-action' }],
+    });
+    await board.publish({
+      ...input,
+      planningSafety: {
+        ...input.planningSafety!,
+        notice: authoritative,
+        consecutiveModelDeadlineFailures: 2,
+      },
+    });
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: { ...request, commandId: '00000000-0000-4000-8000-000000000092' },
+        })
+      ).statusCode
+    ).toBe(412);
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).statusCode
+    ).toBe(200);
+    expect(applied).toHaveLength(1);
   } finally {
     await app.close();
   }
@@ -445,6 +446,111 @@ it('retains the projection across restart and durably deduplicates commands befo
     }
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('exposes T3 metadata with evidenced issue associations without turning independent threads into jobs', async () => {
+  const board = await liveBoard({
+    scopeId: 'test',
+    initial: {
+      ...initial,
+      threads: {
+        state: 'current',
+        stale: false,
+        observedAt: 1000,
+        browserOrigin: 'https://t3.example.invalid',
+        facts: {
+          environmentId: 'environment-one',
+          projectId: 'project-one',
+          threads: [
+            {
+              threadId: 'owned-thread',
+              title: 'Issue 461 implementation',
+              createdAt: '2026-11-09T12:00:00Z',
+              updatedAt: '2026-11-09T12:05:00Z',
+              status: 'completed',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'evidenced',
+              associations: [{ issue: 461, evidence: 'factory-binding', observedAt: 1000 }],
+            },
+            {
+              threadId: 'independent-thread',
+              title: 'Discuss issue 461',
+              createdAt: null,
+              updatedAt: null,
+              status: 'running',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'absent',
+            },
+            {
+              threadId: 'conflicting-thread',
+              title: 'Conflicting context',
+              createdAt: null,
+              updatedAt: null,
+              status: 'completed',
+              branch: null,
+              worktree: null,
+              pullRequests: [],
+              associationState: 'conflicting',
+              associations: [
+                { issue: 461, evidence: 'factory-binding', observedAt: 1000 },
+                { issue: 250, evidence: 'github-closing-reference', observedAt: 1000 },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    const snapshot = response.json<FactoryV2Snapshot>();
+    expect(snapshot.entities.threads['thread:environment-one/owned-thread']).toMatchObject({
+      metadata: {
+        state: 'known',
+        value: {
+          title: 'Issue 461 implementation',
+          createdAt: '2026-11-09T12:00:00Z',
+          updatedAt: '2026-11-09T12:05:00Z',
+          status: 'completed',
+          environmentId: 'environment-one',
+          threadId: 'owned-thread',
+          webUrl: 'https://t3.example.invalid/environment-one/owned-thread',
+          nativeUrl: 't3code://threads/environment-one/owned-thread',
+        },
+      },
+      association: {
+        state: 'confirmed',
+        issueIds: ['issue:rafaeltab/wallpaperdb/461'],
+        pullRequestIds: [],
+        evidence: 'factory-binding',
+      },
+    });
+    expect(
+      snapshot.entities.threads['thread:environment-one/independent-thread'].association
+    ).toEqual({
+      state: 'absent',
+      reasons: [],
+    });
+    expect(
+      snapshot.entities.threads['thread:environment-one/conflicting-thread'].association
+    ).toEqual({
+      state: 'ambiguous',
+      reasons: [],
+    });
+    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/461'].metadata.state).toBe(
+      'unknown'
+    );
+    expect(snapshot.entities.jobs).toEqual({});
+    expect(snapshot.meta.factory.admission.consumed).toBe(0);
+  } finally {
+    await app.close();
   }
 });
 

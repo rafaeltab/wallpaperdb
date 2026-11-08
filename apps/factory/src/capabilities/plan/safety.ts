@@ -61,7 +61,10 @@ export const PlanningSafetyLive = Layer.effect(
             (snapshot.currentNotice?.acknowledgedAt ?? null) === null
           )
             return 'acknowledgement-required' as const;
-          const resumed = snapshot.schedule.paused && !command.paused;
+          const resumed =
+            snapshot.schedule.paused &&
+            !command.paused &&
+            snapshot.state.consecutiveModelDeadlineFailures === 3;
           const result = yield* store.commit({
             expectedVersion: snapshot.state.version,
             expectedScheduleRevision: snapshot.schedule.revision,

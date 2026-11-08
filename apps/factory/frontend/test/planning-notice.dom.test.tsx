@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
@@ -126,6 +126,39 @@ it('requires an explicit seen acknowledgement for the displayed failures and kee
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByRole('heading', { name: 'Planning needs attention' });
+  const live = screen.getByRole('status', { name: 'Planning failure updates' });
+  await waitFor(() =>
+    expect(live.textContent).toContain('Planning needs attention. 1 model deadline failures.')
+  );
+  let announcements = 0;
+  const observer = new MutationObserver(() => {
+    announcements++;
+  });
+  observer.observe(live, { childList: true, subtree: true, characterData: true });
+  board = {
+    ...board,
+    meta: {
+      ...board.meta,
+      factory: {
+        ...board.meta.factory,
+        planning: {
+          ...board.meta.factory.planning,
+          notice: { ...board.meta.factory.planning.notice!, version: 'first-v2' },
+        },
+      },
+    },
+  };
+  await act(async () => {
+    window.dispatchEvent(new Event('pagehide'));
+    window.dispatchEvent(new Event('pageshow'));
+  });
+  await waitFor(() => expect(announcements).toBe(1));
+  await act(async () => {
+    window.dispatchEvent(new Event('pagehide'));
+    window.dispatchEvent(new Event('pageshow'));
+  });
+  expect(announcements).toBe(1);
+  observer.disconnect();
   expect(screen.getByText(/2 pending planning failure notices/)).toBeTruthy();
   expect(screen.getByText(/Model elapsed: 660.0 seconds/)).toBeTruthy();
   expect(screen.getByText(/Attempt elapsed: 840.0 seconds/)).toBeTruthy();

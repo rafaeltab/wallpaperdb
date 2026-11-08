@@ -79,6 +79,45 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       // Each provider run gets a different actual elapsed interval. A fixed ten-minute
       // duration, or discovery time charged to model execution, fails these assertions.
       vi.setSystemTime(Date.now() + elapsed[index]);
+      if (index === 0) {
+        await vi.waitFor(
+          async () =>
+            expect(
+              (await running!.app.inject('/api/v2/board')).json().meta.factory.planning
+                .consecutiveModelDeadlineFailures
+            ).toBe(1),
+          { timeout: 5000, interval: 20 }
+        );
+        const first = (await running.app.inject('/api/v2/board')).json<BoardSnapshot>();
+        const acknowledge = Object.values(first.entities.actions).find(
+          (a) => a.kind === 'acknowledge-planning-failures'
+        );
+        if (acknowledge?.availability.state !== 'available')
+          throw new Error('Missing first failure action');
+        expect(
+          (
+            await running.app.inject({
+              method: 'POST',
+              url: '/api/v2/commands',
+              payload: {
+                commandId: randomUUID(),
+                actionId: acknowledge.id,
+                precondition: acknowledge.availability.precondition,
+                kind: 'acknowledge-planning-failures',
+                payload: {},
+              },
+            })
+          ).statusCode
+        ).toBe(202);
+        await vi.waitFor(
+          async () =>
+            expect(
+              (await running!.app.inject('/api/v2/board')).json().meta.factory.planning
+                .pendingNoticeCount
+            ).toBe(0),
+          { timeout: 5000, interval: 20 }
+        );
+      }
     }
     await vi.waitFor(
       async () =>
@@ -268,6 +307,151 @@ it('pauses after three distinct automatic model deadlines and retains their dura
     );
   } finally {
     await writeFile(`${host.directory}/release-planning-read`, 'cleanup');
+    await running?.close();
+    vi.useRealTimers();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
+it('keeps a nonexhausted streak through manual previews, pause/resume and empty discovery', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 8, 12));
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const configuration = {
+    ...host.mcpEnvironment,
+    FACTORY_PROJECT: host.repository,
+    FACTORY_T3_PROJECT_ID: 'project-id',
+    FACTORY_BASE: host.base,
+    FACTORY_T3_BINARY: host.binary,
+    FACTORY_STATE: `${host.directory}/state`,
+    FACTORY_PORT: '0',
+  };
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  const planning = {
+    issues: [
+      {
+        number: 581,
+        title: 'Repair planning',
+        body: 'Implement bounded planning',
+        state: 'OPEN',
+        url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+        author: { login: 'rafaeltab' },
+        labels: [{ name: 'ready-for-agent' }],
+        comments: [],
+      },
+    ],
+  };
+  const planner = {
+    status: 'running',
+    interruptCompletes: true,
+    proposal: { selected: [], deferred: [] },
+  };
+  try {
+    await host.save({ planning, planner });
+    running = await startFactory(configuration);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await host.calls()).filter((c) => c.args[1] === 'start' && !c.args.includes('--help'))
+        ).toHaveLength(1),
+      { timeout: 6000, interval: 20 }
+    );
+    const controls = (await running.app.inject('/api/scheduler')).json().state;
+    expect(
+      (
+        await running.app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          payload: {
+            revision: controls.revision,
+            concurrency: controls.concurrency,
+            allowance: controls.allowance,
+            paused: true,
+          },
+        })
+      ).statusCode
+    ).toBe(200);
+    vi.setSystemTime(Date.now() + 11 * 60000);
+    await vi.waitFor(
+      async () =>
+        expect(
+          (await running!.app.inject('/api/v2/board')).json().meta.factory.planning
+            .consecutiveModelDeadlineFailures
+        ).toBe(1),
+      { timeout: 6000, interval: 20 }
+    );
+    await host.save({ planning, planner: { ...planner, status: 'completed' } });
+    const snapshot = (await running.app.inject('/api/v2/board')).json<BoardSnapshot>();
+    const action = Object.values(snapshot.entities.actions).find((a) => a.kind === 'preview-plan');
+    if (action?.availability.state !== 'available') throw new Error('Missing manual preview');
+    const commandId = randomUUID();
+    expect(
+      (
+        await running.app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: {
+            commandId,
+            actionId: action.id,
+            precondition: action.availability.precondition,
+            kind: 'preview-plan',
+            payload: {},
+          },
+        })
+      ).statusCode
+    ).toBe(202);
+    let planId = '';
+    await vi.waitFor(
+      async () => {
+        const receipt = (await running!.app.inject(`/api/v2/commands/${commandId}`)).json();
+        expect(receipt.state).toBe('succeeded');
+        planId = receipt.result.planId;
+        expect(
+          (await running!.app.inject(`/api/v2/plans/${encodeURIComponent(planId)}`)).json().attempt
+            .phase
+        ).toBe('succeeded');
+      },
+      { timeout: 6000, interval: 20 }
+    );
+    expect(
+      (await running.app.inject('/api/v2/board')).json().meta.factory.planning
+        .consecutiveModelDeadlineFailures
+    ).toBe(1);
+    await host.save({ planning: { issues: [] }, planner });
+    const paused = (await running.app.inject('/api/scheduler')).json().state;
+    expect(
+      (
+        await running.app.inject({
+          method: 'POST',
+          url: '/api/scheduler',
+          payload: {
+            revision: paused.revision,
+            concurrency: paused.concurrency,
+            allowance: paused.allowance,
+            paused: false,
+          },
+        })
+      ).statusCode
+    ).toBe(200);
+    vi.setSystemTime(Date.now() + 5 * 60000);
+    await vi.waitFor(
+      async () => {
+        const board = (await running!.app.inject('/api/v2/board')).json();
+        expect(board.meta.factory.paused).toBe(false);
+        expect(board.meta.factory.planning.consecutiveModelDeadlineFailures).toBe(1);
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    expect(
+      (await running.app.inject('/api/v2/board')).json().meta.factory.planning.notice?.id
+    ).toBe(snapshot.meta.factory.planning.notice?.id);
+  } finally {
     await running?.close();
     vi.useRealTimers();
     process.env.PATH = previous.path;

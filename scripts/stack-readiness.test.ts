@@ -45,6 +45,7 @@ test("stack readiness verifies the parent commit, passing logs, review axes and 
 	};
 	const ledger = {
 		current,
+		automationIncidents: [],
 		reviews: ["Standards", "Spec", "Defects"].map((axis) => ({
 			...current,
 			axis,

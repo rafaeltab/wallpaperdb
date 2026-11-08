@@ -147,6 +147,7 @@ export interface LocalWork {
   control: import('../job/index.js').Control;
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
+  planningSafety?: import('../plan/index.js').PlanningSafetyView;
   threads?: ThreadSnapshot;
   observations: ObservationSnapshot;
   localWork: readonly LocalWork[];

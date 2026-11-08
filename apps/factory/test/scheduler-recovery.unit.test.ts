@@ -159,6 +159,7 @@ function setup(lostSend = true, immediate = false) {
   const create = () =>
     ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
         Layer.provide(deps)
       )

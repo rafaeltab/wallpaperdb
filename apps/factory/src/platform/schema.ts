@@ -146,3 +146,49 @@ export const githubRequestBudget = sqliteTable(
   },
   (table) => [check('github_request_budget_singleton', sql`${table.id} = 1`)]
 );
+
+export const planningSafety = sqliteTable(
+  'planning_safety',
+  {
+    id: integer('id').primaryKey(),
+    version: integer('version').notNull(),
+    consecutiveModelDeadlineFailures: integer('consecutive_model_deadline_failures').notNull(),
+    currentNoticeId: text('current_notice_id'),
+  },
+  (table) => [
+    check('planning_safety_singleton', sql`${table.id} = 1`),
+    check(
+      'planning_safety_counter',
+      sql`${table.consecutiveModelDeadlineFailures} between 0 and 3`
+    ),
+    check('planning_safety_version', sql`${table.version} >= 0`),
+  ]
+);
+export const planningNotices = sqliteTable(
+  'planning_notices',
+  {
+    sequence: integer('sequence').primaryKey({ autoIncrement: true }),
+    id: text('id').notNull().unique(),
+    version: integer('version').notNull(),
+    createdAt: integer('created_at').notNull(),
+    acknowledgedAt: integer('acknowledged_at'),
+  },
+  (table) => [index('planning_notices_pending').on(table.acknowledgedAt, table.sequence)]
+);
+export const planningDeadlineFailures = sqliteTable(
+  'planning_deadline_failures',
+  {
+    attemptId: text('attempt_id').primaryKey(),
+    noticeId: text('notice_id')
+      .notNull()
+      .references(() => planningNotices.id),
+    position: integer('position').notNull(),
+    value: text('value', { mode: 'json' })
+      .$type<import('../capabilities/plan/index.js').AutomaticDeadlineFailure>()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('planning_deadline_failure_position').on(table.noticeId, table.position),
+    check('planning_deadline_failure_bound', sql`${table.position} between 1 and 3`),
+  ]
+);

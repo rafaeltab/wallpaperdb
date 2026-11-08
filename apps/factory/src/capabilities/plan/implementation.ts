@@ -119,7 +119,10 @@ export const PlanLive = Layer.effect(
             const proposal = yield* planner.propose(input, {
               requestId: attempt?.requestId,
               automatic: attempt?.automatic,
+              attemptStartedAt: attempt?.attemptStartedAt,
             });
+            if ('kind' in proposal)
+              return { kind: 'paused' as const, selected: [], rejected: [], input };
             if (attempt) yield* attempt.progress('freshness');
             const current = yield* source.read();
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))

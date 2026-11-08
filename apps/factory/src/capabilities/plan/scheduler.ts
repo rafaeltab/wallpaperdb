@@ -1,5 +1,5 @@
 import { Effect, Layer, Option, Semaphore } from 'effect';
-import { Issues, type Start, type Status } from '../job/index.js';
+import { Issues, Time, type Start, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
@@ -48,6 +48,7 @@ export const SchedulerLive = Layer.effect(
     const plan = yield* Plan;
     const issues = yield* Issues;
     const source = yield* PlanningSource;
+    const time = yield* Time;
     const writers = yield* Semaphore.make(1);
     const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
@@ -253,6 +254,7 @@ export const SchedulerLive = Layer.effect(
           yield* reconcile();
           const snapshot = yield* status();
           if (!available(snapshot)) return snapshot;
+          const attemptStartedAt = yield* time.now();
           const input = yield* source.poll?.() ?? source.read();
           if (!input) return snapshot;
           const normalized = {
@@ -265,8 +267,12 @@ export const SchedulerLive = Layer.effect(
           if (signature === lastInput) {
             return yield* retry(retryPreview, base, snapshot.state.revision);
           }
-          const preview = yield* plan.preview({ automatic: true, progress: () => Effect.void });
-          if (preview.kind === 'stale') return yield* status();
+          const preview = yield* plan.preview({
+            automatic: true,
+            attemptStartedAt,
+            progress: () => Effect.void,
+          });
+          if (preview.kind !== 'preview') return yield* status();
           lastInput = signature;
           retryPreview = joinPreview(preview);
           // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.

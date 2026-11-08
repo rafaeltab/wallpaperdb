@@ -110,6 +110,7 @@ it('launches a new dependent with remotely landed code after the configured base
     const job = await worker.runPromise(Job);
     runtime = ManagedRuntime.make(
       SchedulerLive.pipe(
+        Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(Issues, issues),
@@ -487,6 +488,7 @@ async function reservedRuntime(
   const job = await worker.runPromise(Job);
   const runtime = ManagedRuntime.make(
     SchedulerLive.pipe(
+      Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(Issues, issues),

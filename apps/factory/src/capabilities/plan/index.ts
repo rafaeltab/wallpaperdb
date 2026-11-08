@@ -2,6 +2,7 @@ export { Plan, PlanningSource, IPlanner } from './contract.js';
 export type { PlanningInput, PlanningIssue, Proposal, Preview } from './contract.js';
 export { PlanLive } from './implementation.js';
 export { Scheduler, ScheduleStore, JobPool } from './contract.js';
+export { initialScheduleState } from './contract.js';
 export type { ScheduleState, ScheduleStatus } from './contract.js';
 export { SchedulerLive } from './scheduler.js';
 
@@ -14,3 +15,12 @@ export { planningInputIdentity } from './implementation.js';
 export { ScheduleObservations } from './contract.js';
 
 export { holdsSlot, capacityOccupied } from './scheduler.js';
+export { PlanningSafety, PlanningSafetyStore, emptyPlanningSafety } from './safety-contract.js';
+export type {
+  AutomaticDeadlineFailure,
+  PlanningNotice,
+  PlanningSafetyState,
+  PlanningSafetyView,
+  PlanningSafetySnapshot,
+} from './safety-contract.js';
+export { PlanningSafetyLive } from './safety.js';

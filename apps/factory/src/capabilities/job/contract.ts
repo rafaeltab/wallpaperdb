@@ -295,6 +295,7 @@ export type PullRequestObservation =
     };
 export interface Delivery {
   readonly stage: Stage | 'ci';
+  readonly progress?: string;
   readonly activity?:
     | 'repairing'
     | 'waiting-for-github'

@@ -13,6 +13,7 @@ import { recordCheck, sourceSnapshot } from "./record-check.ts";
 import { verifyStackReadiness } from "./stack-readiness.ts";
 import { videoReferences, verifyVideo } from "./verify-video.ts";
 import { guardedPush } from "./guarded-push.ts";
+import { reportToolingIncident } from "./report-tooling-incident.ts";
 import { githubFeedback } from "./collect-feedback.ts";
 import { publishMarkdown } from "./publish-markdown.ts";
 export { publishMarkdown };
@@ -552,6 +553,12 @@ async function main() {
 		for (const url of videoReferences(body.body_html ?? "", body.body ?? ""))
 			videos.push(await verifyVideo(url));
 		console.log(JSON.stringify({ pr: pr.url, videos }, null, 2));
+	} else if (action === "report-tooling-incident") {
+		const result = reportToolingIncident(
+			JSON.parse(fs.readFileSync(requiredSubject(subject), "utf8")),
+		);
+		console.log(result.userNotice);
+		console.log(JSON.stringify(result, null, 2));
 	} else if (action === "record-check") {
 		const result = recordCheck(
 			JSON.parse(fs.readFileSync(requiredSubject(subject), "utf8")),

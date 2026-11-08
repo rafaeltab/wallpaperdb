@@ -14,6 +14,10 @@ For skill installation, updates, or moves, follow the [skill layout](.agents/ski
 
 Read [task scope](docs/agents/task-scope.md) when planning, implementing, reviewing, delegating, monitoring, or automatically picking up work, and when resuming any of those workflows.
 
+### Automation incidents
+
+For broken, unexpectedly slow, or falsely rejecting repository checks or agent tools, and before working around or weakening their enforcement, follow [automation incident reporting](docs/agents/tooling-incidents.md). This applies even when you fix the incident during the task.
+
 ### Issue tracker
 
 Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.

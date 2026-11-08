@@ -151,38 +151,64 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
   });
 }
 
-it('requires attention and releases capacity when an implementation turn ends without success', () =>
-  composed(async ({ running, save }) => {
-    await start(running);
-    await save({
-      overrides: { status: 'completed' },
-      messages: [
-        {
-          role: 'assistant',
-          runId: 'run-1',
-          text: 'Implementation incomplete. No repair established.',
-        },
-      ],
-    });
-    await vi.waitFor(
-      async () => {
-        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
-        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
+  'requires attention and releases capacity when implementation ends without success: %s',
+  (cause) =>
+    composed(async ({ running, host, save }) => {
+      await start(running);
+      let text = 'Implementation incomplete. No repair established.';
+      if (cause !== 'missing receipt') {
+        const prior = JSON.parse(await readFile(`${host.directory}/resource.json`, 'utf8'));
+        if (cause === 'dirty checkout')
+          await writeFile(`${prior.worktreePath}/unfinished.txt`, 'Preserve unfinished work');
+        text = JSON.stringify({
+          jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
           stage: 'implementation',
-          activity: 'manual-recovery',
-          execution: { state: 'known', value: { state: 'finished', runId: 'run-1' } },
-          occupiesCapacity: false,
+          base: host.base,
+          commit: cause === 'mismatched receipt commit' ? 'f'.repeat(40) : host.base,
+          outcome: '<TASK>COMPLETE</TASK>',
+          tests: true,
+          coverage: true,
+          crap: true,
+          reviews: false,
         });
-        expect(board.entities.items['item:issue:rafaeltab/wallpaperdb/577']).toMatchObject({
-          status: { code: 'manual-recovery', active: false },
-          attention: { state: 'required' },
-        });
-        expect(board.meta.factory.concurrency.occupied).toBe(0);
-        expect(board.meta.factory.admission.consumed).toBe(1);
-      },
-      { timeout: 8000, interval: 40 }
-    );
-  }));
+      }
+      await save({
+        overrides: { status: 'completed' },
+        messages: [
+          {
+            role: 'assistant',
+            runId: 'run-1',
+            text,
+          },
+        ],
+      });
+      await vi.waitFor(
+        async () => {
+          const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            stage: 'implementation',
+            activity: 'manual-recovery',
+            execution: { state: 'known', value: { state: 'finished', runId: 'run-1' } },
+            occupiesCapacity: false,
+          });
+          expect(board.entities.items['item:issue:rafaeltab/wallpaperdb/577']).toMatchObject({
+            status: { code: 'manual-recovery', active: false },
+            attention: { state: 'required' },
+          });
+          expect(board.meta.factory.concurrency.occupied).toBe(0);
+          expect(board.meta.factory.admission.consumed).toBe(1);
+          expect(
+            board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']
+          ).toMatchObject({
+            availability: { state: 'available' },
+          });
+        },
+        { timeout: 8000, interval: 40 }
+      );
+      expect(await stageMessages(host)).toHaveLength(0);
+    })
+);
 
 it('manually retries incomplete implementation in a fresh original-base worktree without another admission', () =>
   composed(

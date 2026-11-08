@@ -343,6 +343,19 @@ function pendingDelivery(
   evidence: StageEvidence | null,
   delivery: Delivery
 ) {
+  if (
+    waiting.stage === 'implementation' &&
+    ['completed', 'failed', 'interrupted', 'cancelled'].includes(observation.status) &&
+    evidence !== null &&
+    observation.run !== undefined &&
+    evidence.runId === observation.run.id
+  )
+    return Effect.succeed({
+      ...delivery,
+      activity: 'manual-recovery' as const,
+      active: false,
+      progress: 'Implementation finished without a validated success receipt.',
+    });
   if (waiting.stage === 'babysitting')
     return Effect.gen(function* () {
       const reconciled = yield* terminalCI(store, issues, intent, waiting, observation, evidence);

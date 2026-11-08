@@ -65,7 +65,7 @@ export function populateJobs(context: ProjectionContext) {
         : (delivery?.activity ?? delivery?.stage ?? 'unknown'),
       activityStartedAt: null,
       deadline: timestamp(delivery?.deadline),
-      progress: '',
+      progress: delivery?.progress ?? '',
       execution:
         execution?.kind === 'found'
           ? known(

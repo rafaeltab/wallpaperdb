@@ -138,6 +138,39 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
   });
 }
 
+it('requires attention and releases capacity when an implementation turn ends without success', () =>
+  composed(async ({ running, save }) => {
+    await start(running);
+    await save({
+      overrides: { status: 'completed' },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: 'Implementation incomplete. No repair established.',
+        },
+      ],
+    });
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'implementation',
+          activity: 'manual-recovery',
+          execution: { state: 'known', value: { state: 'finished', runId: 'run-1' } },
+          occupiesCapacity: false,
+        });
+        expect(board.entities.items['item:issue:rafaeltab/wallpaperdb/577']).toMatchObject({
+          status: { code: 'manual-recovery', active: false },
+          attention: { state: 'required' },
+        });
+        expect(board.meta.factory.concurrency.occupied).toBe(0);
+        expect(board.meta.factory.admission.consumed).toBe(1);
+      },
+      { timeout: 8000, interval: 40 }
+    );
+  }));
+
 it('submits one retained advisory preview through v2 while the composed factory is paused', () =>
   composed(
     async ({ running, host }) => {

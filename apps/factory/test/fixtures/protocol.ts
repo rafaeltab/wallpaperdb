@@ -50,6 +50,7 @@ export async function runProtocol(
       const separate = config.holds?.includes(boundary);
       if (!separate && config.hold !== boundary) return;
       writeFileSync(join(config.directory, separate ? `held-${boundary}` : 'held'), boundary);
+      writeFileSync(join(config.directory, `held-${boundary}.pid`), String(process.pid));
       const { setTimeout } = await import('node:timers/promises');
       const deadline = Date.now() + 20000;
       while (!existsSync(join(config.directory, separate ? `release-${boundary}` : 'release'))) {

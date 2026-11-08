@@ -9,6 +9,7 @@ import type {
 import type { FactoryClient } from './client';
 import type { Factory } from './use-factory';
 import { CommandFeedback } from './feedback';
+import { planningResumeBlocked } from './planning-notice';
 import { type Board, type Issue, subject, title, metadataIssue, issueIds } from './model';
 import {
   Checks,
@@ -114,6 +115,7 @@ export function Controls({
   );
   const [error, setError] = useState('');
   const stale = baseScope !== board.scopeId || base.version !== board.meta.factory.version;
+  const resumeBlocked = planningResumeBlocked(board) && !paused;
   const action = base.actionIds
     .map((id) => board.entities.actions[id])
     .find((a) => a?.kind === 'configure');
@@ -132,7 +134,7 @@ export function Controls({
             return { kind: 'limited', maximum } as const;
           };
           try {
-            if (action && !stale)
+            if (action && !stale && !resumeBlocked)
               void factory.submit(action, {
                 kind: 'configure',
                 payload: {
@@ -151,6 +153,12 @@ export function Controls({
           Pause new admissions
         </label>
         <p>Existing jobs continue when admissions are paused.</p>
+        {planningResumeBlocked(board) && (
+          <p>
+            Acknowledge the planning failures before resuming. You can still edit limits while
+            paused.
+          </p>
+        )}
         <label>
           Concurrency
           <input
@@ -180,7 +188,12 @@ export function Controls({
         {error && <p role="alert">{error}</p>}
         <button
           type="submit"
-          disabled={action?.availability.state !== 'available' || stale || factory.commandsBlocked}
+          disabled={
+            action?.availability.state !== 'available' ||
+            stale ||
+            factory.commandsBlocked ||
+            resumeBlocked
+          }
         >
           Apply controls
         </button>

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
 import { fileScheduleStore } from '../src/adapters/store/index.js';
@@ -18,6 +18,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
     const controller = new AbortController();
     let pending: Promise<unknown> | undefined;
     let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+    let heldPid: number | undefined;
     const configuration = {
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
@@ -88,7 +89,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
         });
       }
       running = await startFactory(configuration);
-      if (scenario === 'blocked-discovery')
+      if (scenario === 'blocked-discovery') {
         await vi.waitFor(
           async () =>
             expect(await readFile(`${host.directory}/held-planning-read`, 'utf8')).toBe(
@@ -96,6 +97,9 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
             ),
           { timeout: 5000, interval: 20 }
         );
+        heldPid = Number(await readFile(`${host.directory}/held-planning-read.pid`, 'utf8'));
+        expect(heldPid).toBeGreaterThan(0);
+      }
       if (scenario !== 'slow-settlement') {
         await vi.waitFor(
           async () => {
@@ -134,11 +138,16 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
           (call) => call.args[1] === 'start' && !call.args.includes('--help')
         )
       ).toHaveLength(1);
+      await running.close();
+      running = undefined;
+      if (heldPid) {
+        const pid = heldPid;
+        expect(() => process.kill(pid, 0)).toThrow();
+      }
     } finally {
       controller.abort();
       await pending;
       await running?.close();
-      await writeFile(`${host.directory}/release-planning-read`, 'cleanup');
       vi.useRealTimers();
       process.env.PATH = previous.path;
       if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;

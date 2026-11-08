@@ -38,7 +38,7 @@ export function githubRequests(config: {
     abort: () => void;
   };
   const queue: Entry[] = [];
-  let running = false;
+  let running: Promise<void> | undefined;
   const execute = async (entry: Entry) => {
     const { args, signal } = entry;
     const api = args[0] === 'api',
@@ -166,15 +166,14 @@ export function githubRequests(config: {
     const [entry] = queue.splice(work < 0 ? 0 : work, 1);
     if (!entry) return;
     entry.signal.removeEventListener('abort', entry.abort);
-    running = true;
-    void execute(entry)
+    running = execute(entry)
       .then(entry.resolve, entry.reject)
       .finally(() => {
-        running = false;
+        running = undefined;
         pump();
       });
   };
-  return (
+  const request = (
     args: readonly string[],
     caller?: AbortSignal,
     priority: 'work' | 'background' = 'work'
@@ -201,6 +200,13 @@ export function githubRequests(config: {
       pump();
     });
   };
+  return Object.assign(request, {
+    // Composition cancels the owner first, then joins process exit and durable accounting.
+    // An interrupted Effect alone does not wait for the underlying Promise to finish.
+    drain: async () => {
+      while (running) await running;
+    },
+  });
 }
 
 function failure(

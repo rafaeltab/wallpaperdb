@@ -164,7 +164,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const metadataGithub = (args: readonly string[], signal?: AbortSignal) =>
     github(args, signal, 'background');
   const githubConfig = (
-    read = github,
+    read: Parameters<typeof githubIssues>[0]['read'] = github,
     prerequisites = readyPrerequisites
   ): Parameters<typeof githubIssues>[0] => ({
     project,
@@ -408,6 +408,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     await Promise.allSettled([
       attempts.close(),
       refreshes.close(),
+      github.drain(),
       runtime.dispose(),
       ...[...workers.values()].map((worker) => worker.dispose()),
     ]);
@@ -441,6 +442,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       await v2.close();
       await attempts.close();
       await refreshes.close();
+      await github.drain();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
     }
@@ -511,6 +513,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           clearTimeout(deadline);
           requests.abort();
           await Promise.allSettled([
+            github.drain(),
             runtime.dispose(),
             ...[...workers.values()].map((worker) => worker.dispose()),
           ]);

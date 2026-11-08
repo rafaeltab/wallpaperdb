@@ -28,7 +28,10 @@ export function PlanningNotice({
   const announced = useRef('');
   const [announcement, announce] = useState({ key: '', text: '' });
   useEffect(() => {
-    if (!notice || notice.acknowledgedAt !== null) return;
+    if (!notice || notice.acknowledgedAt !== null) {
+      announce((previous) => (previous.text ? { key: '', text: '' } : previous));
+      return;
+    }
     const key = `${board.scopeId}/${notice.id}/${notice.version}`;
     if (announced.current === key) return;
     announced.current = key;
@@ -99,11 +102,17 @@ export function PlanningNotice({
       <h2 id="planning-notice-heading">
         {unseen ? 'Planning needs attention' : 'Seen planning failures'}
       </h2>
+      <p>
+        Consecutive automatic model deadline failures: {state.consecutiveModelDeadlineFailures} of{' '}
+        {state.maximumAttempts}.
+      </p>
       {state.consecutiveModelDeadlineFailures === state.maximumAttempts && (
         <p>
-          The factory paused after three automatic model deadline failures. Acknowledge the
-          failures, then use Resume separately to begin a fresh cycle. Existing ownership and
-          admission checks still apply.
+          The factory paused after three automatic model deadline failures.{' '}
+          {state.pendingNoticeCount > 0
+            ? 'Acknowledge the failures, then use Resume separately to begin a fresh cycle.'
+            : 'Failures have been acknowledged. Use Resume separately to begin a fresh cycle.'}{' '}
+          Existing ownership and admission checks still apply.
         </p>
       )}
       {state.pendingNoticeCount > 1 && (

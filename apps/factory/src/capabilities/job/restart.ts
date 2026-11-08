@@ -3,6 +3,7 @@ import type {
   Control,
   Execution,
   Intent,
+  JobStore,
   Observation,
   Retry,
   RetryAction,
@@ -20,6 +21,7 @@ export function attemptIntent(intent: Intent, index: number): Intent {
 }
 
 export function restartAction(
+  store: JobStore,
   execution: Execution,
   intent: Intent,
   control: Control,
@@ -48,6 +50,7 @@ export function restartAction(
       evidence.ordinal !== (stage.ordinal ?? stage.index + 1)
     )
       return undefined;
+    if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
     return {
       index: stage.index,
       attempt: control.restart?.index ?? 0,

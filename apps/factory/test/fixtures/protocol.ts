@@ -952,7 +952,9 @@ export async function runProtocol(
             : 'publication';
       resource.latestRunId = `run-${resource.runCount}`;
       if (resource.stage === 'publication') {
-        const pr = {
+        const pr = existsSync(join(config.directory, 'pr.json'))
+          ? JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))
+          : {
           url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
           headRefName: resource.branch,
           baseRefName: 'main',
@@ -965,7 +967,8 @@ export async function runProtocol(
             (name: string) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
           ),
         };
-        writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
+        if (!existsSync(join(config.directory, 'pr.json')))
+          writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
         resource.pullRequests = [{ url: pr.url }];
       }
       writeFileSync(path, JSON.stringify(resource));

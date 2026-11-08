@@ -8,6 +8,7 @@ import { subject } from './model';
 import { SourceCoverage } from './sources';
 import { CommandFeedback } from './feedback';
 import { Controls, Details, Panel, Plan, Start } from './panels';
+import { PlanningNotice, planningResumeBlocked } from './planning-notice';
 import './style.css';
 export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
   const [client] = useState(() => provided ?? new FactoryClient());
@@ -177,13 +178,14 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
       titleMode={titleMode}
       reach={reach}
       busy={busy}
+      notice={<PlanningNotice board={board} factory={factory} native={native} />}
       onSettings={() => setPanel(panel === 'settings' ? undefined : 'settings')}
       onPlan={() => setPanel(panel === 'plan' ? undefined : 'plan')}
       onStartIssue={() => {
         setSelected(undefined);
         setPanel(panel === 'start' ? undefined : 'start');
       }}
-      canConfigure={configure?.availability.state === 'available'}
+      canConfigure={configure?.availability.state === 'available' && !planningResumeBlocked(board)}
       onPause={() => {
         if (configure)
           void factory.submit(configure, {

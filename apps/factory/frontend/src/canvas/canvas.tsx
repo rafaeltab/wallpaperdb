@@ -52,6 +52,7 @@ export function Canvas({
   onPause,
   canConfigure,
   children,
+  notice,
 }: {
   board: Board;
   native: boolean;
@@ -67,6 +68,7 @@ export function Canvas({
   onPause: () => void;
   canConfigure: boolean;
   children?: ReactNode;
+  notice?: ReactNode;
 }) {
   const [projection] = useState(createCanvasProjection);
   const fixture = useMemo(() => projection(board), [projection, board]);
@@ -611,6 +613,7 @@ export function Canvas({
             <Icon kind="gear" size={18} />
           </button>
         </header>
+        {notice}
         <div
           className={`cc-viewport ${dragging ? 'dragging' : ''}`}
           ref={viewport}

@@ -91,6 +91,7 @@ export interface IPlanner {
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
 export interface Preview {
+  readonly modelAttemptId?: string;
   readonly kind: 'preview' | 'stale' | 'paused';
   readonly selected: Proposal['selected'];
   readonly rejected: readonly { issue: number; reason: string }[];

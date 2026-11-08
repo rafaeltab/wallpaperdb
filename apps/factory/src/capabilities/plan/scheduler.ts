@@ -275,6 +275,7 @@ export const SchedulerLive = Layer.effect(
           retryPreview = joinPreview(preview);
           // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.
           if (preview.input.scheduleRevision !== snapshot.state.revision) return yield* status();
+          if (preview.modelAttemptId) yield* planningSafety.accepted(preview.modelAttemptId);
           yield* dispatch(preview, base, snapshot.state.revision);
           return yield* status();
         }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.tick')),

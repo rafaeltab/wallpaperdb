@@ -39,6 +39,13 @@ const safetySchema = z.object({
   currentNoticeId: z.string().nullable(),
 });
 type Reader = Pick<BetterSQLite3Database, 'select'>;
+const acceptedName = (id: string) => `planning-accepted-${encodeURIComponent(id)}.json`;
+const isAccepted = (db: Reader, namespace: string, id: string) =>
+  !!db
+    .select({ name: records.name })
+    .from(records)
+    .where(and(eq(records.namespace, namespace), eq(records.name, acceptedName(id))))
+    .get();
 const readState = (db: Reader) => {
   const row = db.select().from(safety).where(eq(safety.id, 1)).get();
   return safetySchema.parse(
@@ -118,6 +125,7 @@ export function sqlitePlanningSafety(directory: string): PlanningSafetyStore {
                   .from(notices)
                   .where(isNull(notices.acknowledgedAt))
                   .get()?.value ?? 0,
+              successRecorded: !!attemptId && isAccepted(tx, namespace, attemptId),
               failureRecorded:
                 !!attemptId &&
                 !!tx
@@ -134,13 +142,15 @@ export function sqlitePlanningSafety(directory: string): PlanningSafetyStore {
         stateConnection(directory, (db, namespace) =>
           db.transaction(
             (tx) => {
+              const attemptId = change.failure?.attemptId ?? change.acceptedAttemptId;
               if (
-                change.failure &&
-                tx
-                  .select({ id: failures.attemptId })
-                  .from(failures)
-                  .where(eq(failures.attemptId, change.failure.attemptId))
-                  .get()
+                attemptId &&
+                (isAccepted(tx, namespace, attemptId) ||
+                  tx
+                    .select({ id: failures.attemptId })
+                    .from(failures)
+                    .where(eq(failures.attemptId, attemptId))
+                    .get())
               )
                 return 'duplicate' as const;
               if (
@@ -183,6 +193,14 @@ export function sqlitePlanningSafety(directory: string): PlanningSafetyStore {
                 .values({ id: 1, ...state })
                 .onConflictDoUpdate({ target: safety.id, set: state })
                 .run();
+              if (change.acceptedAttemptId)
+                tx.insert(records)
+                  .values({
+                    namespace,
+                    name: acceptedName(change.acceptedAttemptId),
+                    value: { attemptId: change.acceptedAttemptId },
+                  })
+                  .run();
               if (change.schedule) {
                 const next = scheduleSchema.parse(change.schedule);
                 if (next.revision !== change.expectedScheduleRevision + 1)

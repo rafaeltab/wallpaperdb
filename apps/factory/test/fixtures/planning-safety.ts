@@ -14,6 +14,7 @@ export const controlledPlanningSafetyLayer = Layer.effect(
       status: unexpected,
       mayLaunch: unexpected,
       failed: unexpected,
+      accepted: unexpected,
       acknowledge: unexpected,
       configure: (command) =>
         Effect.gen(function* () {

@@ -30,7 +30,17 @@ export function actions(
     return id;
   };
   const factory = snapshot.meta.factory;
-  const configure = make('configure', factory.id, true, '', input.state.revision);
+  const configure = make('configure', factory.id, true, '', {
+    revision: input.state.revision,
+    planning: factory.planning,
+  });
+  const acknowledge = make(
+    'acknowledge-planning-failures',
+    factory.id,
+    !!factory.planning.notice && factory.planning.notice.acknowledgedAt === null,
+    'There are no unseen planning failures.',
+    factory.planning.notice
+  );
   const currentPlan = snapshot.meta.currentPlanId
     ? snapshot.entities.plans[snapshot.meta.currentPlanId]
     : undefined;
@@ -113,7 +123,10 @@ export function actions(
   );
   return {
     ...snapshot,
-    meta: { ...snapshot.meta, factory: entity({ ...factory, actionIds: [configure, preview] }) },
+    meta: {
+      ...snapshot.meta,
+      factory: entity({ ...factory, actionIds: [configure, preview, acknowledge] }),
+    },
     entities: { ...snapshot.entities, actions: result, items },
   };
 }

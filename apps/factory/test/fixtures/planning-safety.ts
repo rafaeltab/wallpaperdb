@@ -14,6 +14,7 @@ export const controlledPlanningSafetyLayer = Layer.effect(
       status: unexpected,
       mayLaunch: unexpected,
       failed: unexpected,
+      acknowledge: unexpected,
       configure: (command) =>
         Effect.gen(function* () {
           const current = yield* schedule.read();

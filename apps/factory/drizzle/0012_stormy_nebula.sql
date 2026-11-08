@@ -1,0 +1,1 @@
+ALTER TABLE `v2_commands` ADD `planning_notice` text;

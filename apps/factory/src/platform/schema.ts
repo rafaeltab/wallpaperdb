@@ -116,6 +116,10 @@ export const v2Board = sqliteTable('v2_board', {
 export const v2Commands = sqliteTable(
   'v2_commands',
   {
+    planningNotice: text('planning_notice', { mode: 'json' }).$type<{
+      readonly id: string;
+      readonly version: number;
+    }>(),
     planId: text('plan_id').generatedAlwaysAs(sql`json_extract(receipt, '$.result.planId')`),
     basis: text('basis', { mode: 'json' }).$type<
       import('../capabilities/board/index.js').PlanAttempt['basis']

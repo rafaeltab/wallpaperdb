@@ -67,6 +67,10 @@ export const PlanningSafetyStore = Context.Service<PlanningSafetyStore>(
   'wallpaperdb.factory.PlanningSafetyStore'
 );
 export interface PlanningSafety {
+  acknowledge(expected: {
+    readonly id: string;
+    readonly version: number;
+  }): Effect.Effect<'saved' | 'stale', Unavailable>;
   configure(
     command: Parameters<import('./contract.js').Scheduler['configure']>[0]
   ): Effect.Effect<'saved' | 'conflict' | 'rejected' | 'acknowledgement-required', Unavailable>;

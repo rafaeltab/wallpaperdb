@@ -276,6 +276,7 @@ export function actionLabel(board: Board, item: WorkItem, action: Action) {
     resume: 'Resume job',
     cancel: 'Cancel job',
     'preview-plan': 'Generate plan preview',
+    'acknowledge-planning-failures': 'Acknowledge seen',
   };
   const name = names[action.kind];
   if (item.actionIds.filter((id) => board.entities.actions[id]?.kind === action.kind).length < 2)

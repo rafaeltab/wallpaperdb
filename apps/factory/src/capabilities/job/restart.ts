@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { associateStage } from './stages.js';
 import type {
   Control,
   Execution,
@@ -50,7 +51,7 @@ export function restartAction(
       evidence.ordinal !== (stage.ordinal ?? stage.index + 1)
     )
       return undefined;
-    if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
+    if (!(yield* associateStage(store, evidence, stage))) return undefined;
     return {
       index: stage.index,
       attempt: control.restart?.index ?? 0,

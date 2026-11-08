@@ -160,7 +160,11 @@ function readiness(
   });
 }
 
-function associateStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
+export function associateStage(
+  store: JobStore,
+  evidence: StageEvidence | null,
+  request: StageRequest
+) {
   return Effect.gen(function* () {
     if (!associatedRun(evidence, request)) return null;
     if (!adoptedRunMatches(evidence, request)) return null;

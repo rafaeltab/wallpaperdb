@@ -370,7 +370,7 @@ it('serves the live v2 producer and executes durable control commands on the exi
   }
 });
 
-it.each(['claim', 'claim-committed', 'finish'] as const)(
+it.each(['accept', 'accept-committed', 'claim', 'claim-committed', 'finish'] as const)(
   'recovers durable control responsibility after a SQLite %s failure without repeating effects',
   async (boundary) => {
     const host = await protocol();
@@ -403,10 +403,11 @@ it.each(['claim', 'claim-committed', 'finish'] as const)(
       if (!availability || typeof availability !== 'object' || !('precondition' in availability))
         throw new Error('Configure unavailable');
       database = new DatabaseSync(`${host.directory}/state/factory.sqlite`);
+      const accepting = boundary === 'accept' || boundary === 'accept-committed';
       database.exec(`
         CREATE TABLE injected_command_faults (attempt INTEGER);
-        CREATE TRIGGER injected_command_failure ${boundary === 'claim-committed' ? 'AFTER' : 'BEFORE'} UPDATE OF receipt ON v2_commands
-        WHEN json_extract(NEW.receipt, '$.state') = '${boundary === 'finish' ? 'succeeded' : 'running'}'
+        CREATE TRIGGER injected_command_failure ${boundary.endsWith('-committed') ? 'AFTER' : 'BEFORE'} ${accepting ? 'INSERT' : 'UPDATE OF receipt'} ON v2_commands
+        WHEN json_extract(NEW.receipt, '$.state') = '${accepting ? 'accepted' : boundary === 'finish' ? 'succeeded' : 'running'}'
         BEGIN
           INSERT INTO injected_command_faults VALUES (1);
           SELECT RAISE(FAIL, 'Controlled command storage failure');
@@ -426,7 +427,7 @@ it.each(['claim', 'claim-committed', 'finish'] as const)(
       expect(
         (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
           .statusCode
-      ).toBe(202);
+      ).toBe(accepting ? 503 : 202);
       // The real SQLite trigger proves the failure happened before recovery is allowed.
       await vi.waitFor(
         () =>
@@ -435,12 +436,18 @@ it.each(['claim', 'claim-committed', 'finish'] as const)(
           ).toBeGreaterThan(0),
         { timeout: 5000, interval: 20 }
       );
-      expect(
-        (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json()
-      ).toMatchObject({
-        state: boundary === 'claim' ? 'accepted' : 'running',
-      });
+      const receipt = await running.app.inject(`/api/v2/commands/${request.commandId}`);
+      if (boundary === 'accept') expect(receipt.statusCode).toBe(404);
+      else if (!accepting)
+        expect(receipt.json()).toMatchObject({
+          state: boundary === 'claim' ? 'accepted' : 'running',
+        });
       database.exec('DROP TRIGGER injected_command_failure');
+      if (boundary === 'accept')
+        expect(
+          (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+            .statusCode
+        ).toBe(202);
       await vi.waitFor(
         async () =>
           expect(

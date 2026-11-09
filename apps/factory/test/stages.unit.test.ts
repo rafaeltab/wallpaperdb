@@ -1299,7 +1299,7 @@ it.each(['interrupted', 'failed'])(
     job.change({ status, accepted: false });
     const before = await job.start();
     if (before.kind !== 'job') throw new Error('Expected job');
-    expect(before.resume).toMatchObject({ index: 0, runId: 'run-1', revision: -1 });
+    expect(before.resume).toMatchObject({ index: 0, runId: 'run-1', revision: 0 });
     if (!before.resume) throw new Error('Expected retry command');
     const command = { jobId: before.intent.id, ...before.resume };
     await job.resume(command);

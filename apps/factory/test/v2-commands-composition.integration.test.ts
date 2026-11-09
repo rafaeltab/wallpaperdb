@@ -219,13 +219,14 @@ it('continues an implementation repaired by an ordinary message in its existing 
     await save({
       messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
     });
-    await vi.waitFor(
+    const stopped = await vi.waitFor(
       async () => {
         const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
         expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
           activity: 'manual-recovery',
           occupiesCapacity: false,
         });
+        return board;
       },
       { timeout: 8000, interval: 40 }
     );
@@ -274,12 +275,125 @@ it('continues an implementation repaired by an ordinary message in its existing 
       resourcePath,
       JSON.stringify({ ...prior, status: 'completed', latestRunId: 'manual-repair-2', runCount: 2 })
     );
-    await vi.waitFor(
+    const continued = await vi.waitFor(
       async () => {
         const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
         expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
           stage: 'review',
           occupiesCapacity: true,
+        });
+        expect(board.meta.factory.admission.consumed).toBe(1);
+        return board;
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    expect(
+      (await host.calls()).filter(
+        (call) =>
+          call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+    if (process.env.FACTORY_MANUAL_REPAIR_DEMO === '1')
+      console.info(
+        JSON.stringify(
+          {
+            scenario: 'Same-thread manual implementation repair, isolated protocols',
+            before: stopped.entities.jobs['job:rafaeltab/wallpaperdb/577'],
+            after: continued.entities.jobs['job:rafaeltab/wallpaperdb/577'],
+            admission: continued.meta.factory.admission,
+            workerStarts: (await host.calls()).filter(
+              (call) =>
+                call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+            ).length,
+          },
+          null,
+          2
+        )
+      );
+    const sends = await stageMessages(host);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toContain('Use $review-loop');
+    expect(sends[0]).toContain('expected run ordinal 3');
+    expect(await readFile(`${prior.worktreePath}/repaired.txt`, 'utf8')).toBe(
+      'Manually repaired in the existing session'
+    );
+  }));
+
+it('retains manual repair across restart and rejects invalid and stale follow-up receipts', () =>
+  composed(async ({ running, host, save, reopen }) => {
+    await start(running);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    const jobId = prior.title.match(/\[factory:(.*)\]$/)[1];
+    let active = running;
+    const result = (commit = host.base) =>
+      JSON.stringify({
+        jobId,
+        stage: 'implementation',
+        base: host.base,
+        commit,
+        outcome: '<TASK>COMPLETE</TASK>',
+        tests: true,
+        coverage: true,
+        crap: true,
+        reviews: false,
+      });
+    const turn = async (
+      id: string,
+      ordinal: number,
+      status: string,
+      text: string,
+      messageRun = id
+    ) => {
+      await save({ messages: [{ role: 'assistant', runId: messageRun, text }] });
+      await writeFile(
+        resourcePath,
+        JSON.stringify({ ...prior, status, latestRunId: id, runCount: ordinal })
+      );
+    };
+    const recovery = (runId: string) =>
+      vi.waitFor(
+        async () => {
+          const board = (await active.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            activity: 'manual-recovery',
+            occupiesCapacity: false,
+            execution: { state: 'known', value: { runId } },
+          });
+          expect(board.meta.factory.admission.consumed).toBe(1);
+        },
+        { timeout: 8000, interval: 40 }
+      );
+    await turn('run-1', 1, 'completed', 'Implementation incomplete.');
+    await recovery('run-1');
+    active = await reopen();
+    await turn('repair-2', 2, 'running', 'Working on the manual repair.');
+    await vi.waitFor(
+      async () => {
+        const board = (await active.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          occupiesCapacity: true,
+          execution: { state: 'known', value: { runId: 'repair-2', state: 'running' } },
+        });
+        expect(board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          availability: { state: 'disabled' },
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    expect(await stageMessages(host)).toHaveLength(0);
+    await turn('repair-2', 2, 'completed', result('f'.repeat(40)));
+    await recovery('repair-2');
+    active = await reopen();
+    await turn('repair-3', 3, 'completed', result(), 'repair-2');
+    await recovery('repair-3');
+    expect(await stageMessages(host)).toHaveLength(0);
+    await turn('repair-4', 4, 'completed', result());
+    await vi.waitFor(
+      async () => {
+        const board = (await active.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'review',
         });
         expect(board.meta.factory.admission.consumed).toBe(1);
       },
@@ -293,11 +407,241 @@ it('continues an implementation repaired by an ordinary message in its existing 
     ).toHaveLength(1);
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
-    expect(sends[0]).toContain('Use $review-loop');
-    expect(sends[0]).toContain('expected run ordinal 3');
-    expect(await readFile(`${prior.worktreePath}/repaired.txt`, 'utf8')).toBe(
-      'Manually repaired in the existing session'
+    expect(sends[0]).toContain('expected run ordinal 5');
+    await save({ complete: true, overrides: { status: 'completed' } });
+    await vi.waitFor(
+      async () => {
+        const state = (await active.app.inject('/api/scheduler')).json();
+        expect(
+          state.jobs.find((job: { intent?: { issue: number } }) => job.intent?.issue === 577)
+        ).toMatchObject({ delivery: { stage: 'ci', ready: true } });
+      },
+      { timeout: 10000, interval: 40 }
     );
+    expect(await stageMessages(host)).toHaveLength(2);
+  }));
+
+it('retains a question first observed on a manual repair run across restart', () =>
+  composed(async ({ running, host, save, reopen }) => {
+    await start(running);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    await save({
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+    await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
+    const question = {
+      itemId: 'repair-question',
+      runId: 'repair-2',
+      sourceThreadId: prior.threadId,
+      visibility: 'local',
+      type: 'user_input_request',
+      text: 'Which repair behavior?',
+    };
+    await save({ activity: [{ ...question, status: 'waiting' }] });
+    await writeFile(
+      resourcePath,
+      JSON.stringify({
+        ...prior,
+        status: 'completed',
+        latestRunId: 'repair-2',
+        runCount: 2,
+        pendingRequestCount: 1,
+      })
+    );
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          activity: 'awaiting-answer',
+          occupiesCapacity: false,
+          question: { id: 'repair-question' },
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    const current = await reopen();
+    await save({
+      activity: [{ ...question, status: 'completed' }],
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'answer-3',
+          text: JSON.stringify({
+            jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
+            stage: 'implementation',
+            base: host.base,
+            commit: host.base,
+            outcome: '<TASK>COMPLETE</TASK>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: false,
+          }),
+        },
+      ],
+    });
+    await writeFile(
+      resourcePath,
+      JSON.stringify({ ...prior, status: 'completed', latestRunId: 'answer-3', runCount: 3 })
+    );
+    await vi.waitFor(
+      async () => {
+        const board = (await current.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'review',
+        });
+        expect(board.meta.factory.admission.consumed).toBe(1);
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    const sends = await stageMessages(host);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toContain('expected run ordinal 4');
+  }));
+
+it.each(['unobserved failure', 'cancelled job'])('does not adopt a follow-up after %s', (reason) =>
+  composed(async ({ running, host, save }) => {
+    await start(running);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    if (reason === 'cancelled job') {
+      await save({
+        messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+      });
+      await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+      await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
+      const command = {
+        ...(await action(running, 'cancel', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000043',
+        kind: 'cancel',
+        payload: {},
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: command }))
+          .statusCode
+      ).toBe(202);
+      await receipt(running, command.commandId);
+    }
+    await save({
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'unadopted-2',
+          text: JSON.stringify({
+            jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
+            stage: 'implementation',
+            base: host.base,
+            commit: host.base,
+            outcome: '<TASK>COMPLETE</TASK>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: false,
+          }),
+        },
+      ],
+    });
+    await writeFile(
+      resourcePath,
+      JSON.stringify({ ...prior, status: 'completed', latestRunId: 'unadopted-2', runCount: 2 })
+    );
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'implementation',
+          cancelled: reason === 'cancelled job',
+          execution: { state: 'known', value: { runId: 'unadopted-2' } },
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    expect(await stageMessages(host)).toHaveLength(0);
+    expect(
+      (await host.calls()).filter(
+        (call) =>
+          call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+  })
+);
+
+it('recovers a durable manual adoption before observing a later follow-up', () =>
+  composed(async ({ running, host, save, reopen }) => {
+    await start(running);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    await save({
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+    await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
+    await running.close();
+    const store = fileStore(`${host.directory}/state`);
+    const control = await Effect.runPromise(store.readControl());
+    if (!control.manualRepair) throw new Error('Missing recovery eligibility');
+    expect(
+      await Effect.runPromise(
+        store.saveControl({
+          ...control,
+          revision: control.revision + 1,
+          manualRepair: {
+            ...control.manualRepair,
+            adoption: {
+              index: 1,
+              stage: 'implementation',
+              threadId: prior.threadId,
+              commit: host.base,
+              ordinal: 2,
+              previousRunId: 'run-1',
+              observedRunId: 'repair-2',
+              repairOrigin: 0,
+              resume: false,
+              deliveryIndex: 0,
+            },
+          },
+        })
+      )
+    ).toBe(true);
+    await save({
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'repair-3',
+          text: JSON.stringify({
+            jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
+            stage: 'implementation',
+            base: host.base,
+            commit: host.base,
+            outcome: '<TASK>COMPLETE</TASK>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: false,
+          }),
+        },
+      ],
+    });
+    await writeFile(
+      resourcePath,
+      JSON.stringify({ ...prior, status: 'completed', latestRunId: 'repair-3', runCount: 3 })
+    );
+    const current = await reopen();
+    await vi.waitFor(
+      async () => {
+        const board = (await current.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'review',
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    const sends = await stageMessages(host);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toContain('Stage 3 of factory job');
+    expect(sends[0]).toContain('expected run ordinal 4');
   }));
 
 it('keeps Retry disabled for replacement evidence at an already-bound run ordinal', () =>

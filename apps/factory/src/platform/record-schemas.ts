@@ -55,6 +55,7 @@ const controlSchema = z
         index: z.number().int().nonnegative(),
         threadId: z.string().min(1),
         run: z.object({ id: z.string().min(1), ordinal: z.number().int().positive() }).strict(),
+        adoption: stageSchema.optional(),
       })
       .strict()
       .optional(),

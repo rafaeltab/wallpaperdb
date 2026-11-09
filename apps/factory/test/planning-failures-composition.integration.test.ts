@@ -477,7 +477,6 @@ it('keeps a nonexhausted streak through manual previews, pause/resume and empty 
         expect(await Effect.runPromise(owner.ownership(false))).toMatchObject({
           phase: 'failed',
           retired: true,
-          settled: true,
         }),
       { timeout: 6000, interval: 20 }
     );

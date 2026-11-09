@@ -323,6 +323,7 @@ it('previews automatically discovered work without starting an implementation wo
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
+      ...host.mcpEnvironment,
       FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
     });

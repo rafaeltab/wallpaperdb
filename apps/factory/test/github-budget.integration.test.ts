@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { readFile, writeFile } from 'node:fs/promises';
+import { inspect } from 'node:util';
 import { expect, it, vi } from 'vitest';
 import { githubIssues, githubObservations, githubRequests } from '../src/adapters/github/index.js';
 import { protocol } from './fixtures/setup.js';
@@ -23,6 +24,93 @@ async function withGithub(
     await host.cleanup();
   }
 }
+
+it.each([
+  { stderr: 'gh: authentication failed', diagnostic: 'authentication', bootstrap: true },
+  {
+    stderr: 'gh: To get started with GitHub CLI, please run: gh auth login',
+    diagnostic: 'authentication',
+  },
+  {
+    stderr: 'error connecting to api.github.com: lookup api.github.com: no such host',
+    diagnostic: 'dns',
+  },
+  {
+    stderr:
+      'Post "https://api.github.com/graphql": tls: failed to verify certificate: x509: certificate signed by unknown authority',
+    diagnostic: 'tls',
+  },
+  { stderr: 'gh: connection refused', diagnostic: 'connection' },
+  {
+    stderr: '',
+    errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by integration' }],
+    diagnostic: 'permissions',
+  },
+  {
+    stderr: '',
+    errors: [{ message: "Field 'unavailable' doesn't exist on type 'Repository'" }],
+    diagnostic: 'graphql-schema',
+  },
+  { stderr: 'gh: unrecognized controlled failure', diagnostic: 'unclassified-provider-error' },
+])('preserves a safe $diagnostic cause through the budgeted GitHub adapter', async (failure) =>
+  withGithub(async (host, stop) => {
+    const secret = 'controlled-credential-that-must-not-be-recorded';
+    await host.nodeCommand(
+      'gh',
+      `
+      const args = process.argv.slice(2);
+      if (args[1] === 'rate_limit' && !${JSON.stringify(failure.bootstrap ?? false)}) {
+        console.log(JSON.stringify({ resources: { graphql: { limit: 5000, remaining: 5000, reset: Math.ceil(Date.now()/1000)+3600 } } }));
+      } else {
+        console.error('> Authorization: Bearer ${secret}');
+        console.error(JSON.stringify({ debugBody: ${JSON.stringify(secret)} }));
+        console.error(${JSON.stringify(failure.stderr + ' ' + secret)});
+        console.log(JSON.stringify(${JSON.stringify({ errors: failure.errors?.map((error) => ({ ...error, message: `${error.message} ${secret}` })) })}));
+        process.exitCode = ${failure.errors ? 0 : 1};
+      }
+    `
+    );
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+    });
+    const error = await requests([
+      'api',
+      'graphql',
+      '-f',
+      'query=query { viewer { login } }',
+    ]).catch((cause) => cause);
+    expect(error).toMatchObject({
+      message: 'GitHub request failed',
+      cause: { diagnostics: [failure.diagnostic] },
+    });
+    expect(inspect(error, { depth: null })).not.toContain(secret);
+  })
+);
+
+it('retains successful GitHub output when stderr contains diagnostic-looking text', async () =>
+  withGithub(async (host, stop) => {
+    await host.nodeCommand(
+      'gh',
+      `
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: { graphql: { limit: 5000, remaining: 5000, reset: Math.ceil(Date.now()/1000)+3600 } } }));
+      } else {
+        console.error('gh: authentication failed in an unrelated diagnostic example');
+        console.log(JSON.stringify({ data: { viewer: { login: 'controlled' } } }));
+      }
+    `
+    );
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+    });
+    expect(await requests(['api', 'graphql', '-f', 'query=query { viewer { login } }'])).toEqual({
+      data: { viewer: { login: 'controlled' } },
+    });
+  }));
 
 it.each([false, true])(
   'retains issue translation with an unrelated unavailable quota=%s',

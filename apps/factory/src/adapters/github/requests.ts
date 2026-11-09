@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requestBudget, type RequestClock } from './request-budget.js';
 import { requestProcess, type RateResponse } from './request-process.js';
+import { graphqlDiagnostic } from './request-diagnostics.js';
 
 const rate = z.object({
   cost: z.number().int().nonnegative().safe(),
@@ -156,7 +157,7 @@ export function githubRequests(config: {
         : result.responses;
     const success = result.code === 0 && !result.failure && !malformed && !graphErrors.length;
     budget.complete(reservation, responses, costs, success);
-    if (!success) throw failure(result);
+    if (!success) throw failure(result, graphErrors);
     return value;
   };
   const pump = () => {
@@ -202,12 +203,19 @@ export function githubRequests(config: {
   };
 }
 
-function failure(result: Awaited<ReturnType<typeof requestProcess>>) {
+function failure(
+  result: Awaited<ReturnType<typeof requestProcess>>,
+  errors: readonly { type?: string; message?: string }[] = []
+) {
+  const diagnostics = [
+    ...new Set([...result.diagnostics, ...errors.slice(0, 16).map(graphqlDiagnostic)]),
+  ];
   return new Error('GitHub request failed', {
     cause: {
       code: result.code,
       failure: result.failure,
       rateLimited: result.limited,
+      diagnostics: diagnostics.length ? diagnostics : ['unclassified-provider-error'],
       responses: result.responses.map(({ status, resource, remaining, reset, retryAfter }) => ({
         status,
         resource,

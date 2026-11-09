@@ -1,6 +1,22 @@
 import { Effect } from 'effect';
 import type { Control, JobStore, Observation, StageRequest } from './contract.js';
 
+export function recoverManualRepair(store: JobStore) {
+  return Effect.gen(function* () {
+    const control = yield* store.readControl();
+    const origin = control.manualRepair;
+    const request = origin?.adoption;
+    if (
+      request &&
+      origin &&
+      (control.restart?.index ?? 0) <= origin.index &&
+      request.repairOrigin === origin.index &&
+      request.threadId === origin.threadId
+    )
+      yield* store.saveStage(request);
+  });
+}
+
 export function retainManualRepair(
   store: JobStore,
   stage: StageRequest,
@@ -75,6 +91,16 @@ export function adoptManualRepair(
       resume: false,
       repairOrigin: origin.index,
     };
+    // Linearize against cancellation and fresh Retry before writing the stage.
+    // The intent survives a crash between these independently replay-safe steps.
+    if (
+      !(yield* store.saveControl({
+        ...control,
+        revision: control.revision + 1,
+        manualRepair: { ...origin, adoption: request },
+      }))
+    )
+      return undefined;
     yield* store.saveStage(request);
     const saved = yield* store.readStage(request.index);
     return saved?.stage === request.stage &&

@@ -89,6 +89,8 @@ export interface Control {
     readonly index: number;
     readonly threadId: string;
     readonly run: { readonly id: string; readonly ordinal: number };
+    /** Durable continuation intent; recover the immutable stage before accepting a result. */
+    readonly adoption?: StageRequest;
   };
   /** Current fresh implementation attempt. Prior immutable stages and worktrees remain retained. */
   readonly restart?: { readonly index: number };

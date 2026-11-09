@@ -14,7 +14,7 @@ import {
   type ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
-import { adoptManualRepair, retainManualRepair } from './manual-repair.js';
+import { adoptManualRepair, recoverManualRepair, retainManualRepair } from './manual-repair.js';
 
 export function reconcileStages(
   store: JobStore,
@@ -37,6 +37,7 @@ export function reconcileStages(
       commit: intent.base,
       previousRunId: null,
     });
+    yield* recoverManualRepair(store);
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
     return yield* reconcileStage(

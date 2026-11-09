@@ -119,6 +119,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
       )}
       {board && panel === 'start' && (
         <Start
+          key={selected ?? 'search'}
           initialQuery={item ? String(subject(board, item)?.number ?? '') : ''}
           client={client}
           factory={factory}

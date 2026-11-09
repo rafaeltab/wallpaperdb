@@ -22,6 +22,8 @@ The [canvas app](../apps/factory/frontend/src/canvas/app.tsx) owns navigation an
 
 The [layout](../apps/factory/frontend/src/canvas/geometry.ts) sorts the approximate work order by priority, size and issue number. For each rank it places unavailable ordering before known ranks, with known unmarked fields last. Both unavailable project data and a named option with an unknown rank retain that distinction. Ties use issue-number order. This order is packed upward from the bottom of each issue section.
 
+The [Start panel](../apps/factory/frontend/src/canvas/panels.tsx) keeps the execution-context draft while revalidating current actions. Changed authorization requires reselection; a page reset keeps a selection confirmed by the current board.
+
 ## Select a backend
 
 Set `FACTORY_BACKEND_URL` to the backend's private HTTP origin. No machine identity or credentials belong in frontend source. The [Vite configuration](../apps/factory/frontend/vite.config.ts) proxies `/api` to that origin. It translates requests from its own development page to the backend origin; other Origins remain unchanged. Production uses the backend's origin checks without a development proxy.

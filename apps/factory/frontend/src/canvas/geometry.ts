@@ -40,6 +40,18 @@ function linesFor(text: string, width: number, size: number) {
   }
   return lines;
 }
+function compareRank(
+  a: CanvasData['metadata'][number],
+  b: CanvasData['metadata'][number],
+  field: 'priority' | 'size'
+) {
+  const rank = field === 'priority' ? 'priorityRank' : 'sizeRank';
+  const leftKnown = a.projectKnown && (a[field] === null || a[rank] !== undefined);
+  const rightKnown = b.projectKnown && (b[field] === null || b[rank] !== undefined);
+  return (
+    Number(leftKnown) - Number(rightKnown) || (a[rank] ?? Infinity) - (b[rank] ?? Infinity) || 0
+  );
+}
 function arrangeIssues(
   members: Item[],
   connections: Edge[],
@@ -49,12 +61,10 @@ function arrangeIssues(
   const localIds = new Set(members.map((i) => i.id));
   const localEdges = connections.filter((e) => localIds.has(e.source) && localIds.has(e.target));
   const connected = new Set(connections.flatMap((e) => [e.source, e.target]));
-  // Unavailable project data precedes known ranks, including known unmarked fields.
+  // Unavailable ordering stays distinct from known unmarked fields for each rank.
   const compare = (a: Item, b: Item) =>
-    Number(issueMetadata[a.id].projectKnown) - Number(issueMetadata[b.id].projectKnown) ||
-    (issueMetadata[a.id].priorityRank ?? Infinity) -
-      (issueMetadata[b.id].priorityRank ?? Infinity) ||
-    (issueMetadata[a.id].sizeRank ?? Infinity) - (issueMetadata[b.id].sizeRank ?? Infinity) ||
+    compareRank(issueMetadata[a.id], issueMetadata[b.id], 'priority') ||
+    compareRank(issueMetadata[a.id], issueMetadata[b.id], 'size') ||
     (issueMetadata[a.id].number ?? Infinity) - (issueMetadata[b.id].number ?? Infinity) ||
     a.id - b.id;
   const unseen = new Set(localIds),

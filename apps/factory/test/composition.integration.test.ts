@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
@@ -367,3 +369,105 @@ it('serves the live v2 producer and executes durable control commands on the exi
     await host.cleanup();
   }
 });
+
+it.each(['claim', 'finish'] as const)(
+  'recovers durable control responsibility after a SQLite %s failure without repeating effects',
+  async (boundary) => {
+    const host = await protocol();
+    const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+    process.env.PATH = `${host.directory}:${previous.path}`;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+    let database: DatabaseSync | undefined;
+    try {
+      running = await startFactory({
+        FACTORY_PROJECT: host.repository,
+        FACTORY_T3_PROJECT_ID: 'project-id',
+        FACTORY_BASE: host.base,
+        FACTORY_T3_BINARY: host.binary,
+        FACTORY_STATE: `${host.directory}/state`,
+        FACTORY_PORT: '0',
+      });
+      const before = (await running.app.inject('/api/scheduler')).json().state.revision;
+      const board = (await running.app.inject('/api/v2/board')).json();
+      const action = Object.values(board.entities.actions).find(
+        (value: unknown) =>
+          typeof value === 'object' &&
+          value !== null &&
+          'kind' in value &&
+          value.kind === 'configure'
+      );
+      if (!action || typeof action !== 'object' || !('id' in action) || !('availability' in action))
+        throw new Error('Missing configure action');
+      const availability = action.availability;
+      if (!availability || typeof availability !== 'object' || !('precondition' in availability))
+        throw new Error('Configure unavailable');
+      database = new DatabaseSync(`${host.directory}/state/factory.sqlite`);
+      database.exec(`
+        CREATE TABLE injected_command_faults (attempt INTEGER);
+        CREATE TRIGGER injected_command_failure BEFORE UPDATE OF receipt ON v2_commands
+        WHEN json_extract(NEW.receipt, '$.state') = '${boundary === 'claim' ? 'running' : 'succeeded'}'
+        BEGIN
+          INSERT INTO injected_command_faults VALUES (1);
+          SELECT RAISE(FAIL, 'Controlled command storage failure');
+        END;
+      `);
+      const request = {
+        commandId: randomUUID(),
+        actionId: action.id,
+        precondition: availability.precondition,
+        kind: 'configure',
+        payload: {
+          paused: true,
+          concurrency: { kind: 'limited', maximum: 2 },
+          admissionAllowance: { kind: 'limited', maximum: 4 },
+        },
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      // The real SQLite trigger proves the failure happened before recovery is allowed.
+      await vi.waitFor(
+        () =>
+          expect(
+            database!.prepare('SELECT * FROM injected_command_faults').all().length
+          ).toBeGreaterThan(0),
+        { timeout: 5000, interval: 20 }
+      );
+      expect(
+        (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json()
+      ).toMatchObject({
+        state: boundary === 'claim' ? 'accepted' : 'running',
+      });
+      database.exec('DROP TRIGGER injected_command_failure');
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await running!.app.inject(`/api/v2/commands/${request.commandId}`)).json()
+          ).toMatchObject({
+            state: 'succeeded',
+          }),
+        { timeout: 10000, interval: 30 }
+      );
+      expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
+        revision: before + 1,
+        paused: true,
+        concurrency: 2,
+        allowance: 4,
+      });
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(200);
+      expect((await running.app.inject('/api/scheduler')).json().state.revision).toBe(before + 1);
+    } finally {
+      database?.close();
+      await running?.close();
+      process.env.PATH = previous.path;
+      if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous.fixture;
+      await host.cleanup();
+    }
+  }
+);

@@ -14,6 +14,7 @@ import {
   type ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
+import { adoptManualRepair, retainManualRepair } from './manual-repair.js';
 
 export function reconcileStages(
   store: JobStore,
@@ -283,6 +284,8 @@ function suspension(
       };
     if (answerContinuation(control, waiting, observation))
       return yield* adoptAnswer(store, waiting, observation, control);
+    const repaired = yield* adoptManualRepair(store, waiting, observation, control);
+    if (repaired) return adoptedDelivery(repaired, observation);
     if (observation.question) {
       if (changedPark(control, waiting, observation.question))
         yield* store.saveControl({
@@ -350,18 +353,22 @@ function pendingDelivery(
   evidence: StageEvidence | null,
   delivery: Delivery
 ) {
+  const run = observation.run;
   if (
     waiting.stage === 'implementation' &&
     ['completed', 'failed', 'interrupted', 'cancelled'].includes(observation.status) &&
     evidence !== null &&
-    observation.run !== undefined &&
-    evidence.runId === observation.run.id
+    run !== undefined &&
+    evidence.runId === run.id
   )
-    return Effect.succeed({
-      ...delivery,
-      activity: 'manual-recovery' as const,
-      active: false,
-      progress: 'Implementation finished without a validated success receipt.',
+    return Effect.gen(function* () {
+      yield* retainManualRepair(store, waiting, run);
+      return {
+        ...delivery,
+        activity: 'manual-recovery' as const,
+        active: false,
+        progress: 'Implementation finished without a validated success receipt.',
+      };
     });
   if (waiting.stage === 'babysitting')
     return Effect.gen(function* () {

@@ -131,6 +131,7 @@ export const JobLive = Layer.effect(
               ...control,
               revision: control.revision + 1,
               restart: { index },
+              manualRepair: undefined,
               parked: undefined,
             }))
           )

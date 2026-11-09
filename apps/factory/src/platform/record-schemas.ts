@@ -16,6 +16,7 @@ export const intentSchema = z
   .strict();
 const stageSchema = z
   .object({
+    repairOrigin: z.number().int().nonnegative().optional(),
     ordinal: z.number().int().positive().optional(),
     comparison: z
       .object({
@@ -49,6 +50,14 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    manualRepair: z
+      .object({
+        index: z.number().int().nonnegative(),
+        threadId: z.string().min(1),
+        run: z.object({ id: z.string().min(1), ordinal: z.number().int().positive() }).strict(),
+      })
+      .strict()
+      .optional(),
     restart: z.object({ index: z.number().int().positive() }).strict().optional(),
     revision: z.number().int().nonnegative(),
     cancelled: z.boolean(),

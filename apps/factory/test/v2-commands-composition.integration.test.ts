@@ -210,6 +210,96 @@ it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
     })
 );
 
+it('continues an implementation repaired by an ordinary message in its existing thread', () =>
+  composed(async ({ running, host, save }) => {
+    await start(running);
+    const resourcePath = `${host.directory}/resource.json`;
+    const prior = JSON.parse(await readFile(resourcePath, 'utf8'));
+    await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
+    await save({
+      messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+    });
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          activity: 'manual-recovery',
+          occupiesCapacity: false,
+        });
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    await writeFile(
+      `${prior.worktreePath}/repaired.txt`,
+      'Manually repaired in the existing session'
+    );
+    execFileSync('git', ['add', 'repaired.txt'], { cwd: prior.worktreePath });
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.invalid',
+        'commit',
+        '-m',
+        'Manual repair',
+      ],
+      { cwd: prior.worktreePath }
+    );
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: prior.worktreePath,
+      encoding: 'utf8',
+    }).trim();
+    await save({
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'manual-repair-2',
+          text: JSON.stringify({
+            jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
+            stage: 'implementation',
+            base: host.base,
+            commit,
+            outcome: '<TASK>COMPLETE</TASK>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: false,
+          }),
+        },
+      ],
+    });
+    await writeFile(
+      resourcePath,
+      JSON.stringify({ ...prior, status: 'completed', latestRunId: 'manual-repair-2', runCount: 2 })
+    );
+    await vi.waitFor(
+      async () => {
+        const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+          stage: 'review',
+          occupiesCapacity: true,
+        });
+        expect(board.meta.factory.admission.consumed).toBe(1);
+      },
+      { timeout: 8000, interval: 40 }
+    );
+    expect(
+      (await host.calls()).filter(
+        (call) =>
+          call.binary === 't3' && call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toHaveLength(1);
+    const sends = await stageMessages(host);
+    expect(sends).toHaveLength(1);
+    expect(sends[0]).toContain('Use $review-loop');
+    expect(sends[0]).toContain('expected run ordinal 3');
+    expect(await readFile(`${prior.worktreePath}/repaired.txt`, 'utf8')).toBe(
+      'Manually repaired in the existing session'
+    );
+  }));
+
 it('keeps Retry disabled for replacement evidence at an already-bound run ordinal', () =>
   composed(async ({ running, host, save }) => {
     await start(running);

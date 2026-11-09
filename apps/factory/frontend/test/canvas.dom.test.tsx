@@ -143,36 +143,82 @@ it('distinguishes complete empty data from unavailable coverage', async () => {
     screen.getByRole('button', { name: 'Highlight 0 items needing human attention' })
   ).toBeTruthy();
 });
-it('keeps uncertain commands recoverable inside the originating dialog without creating a new UUID', async () => {
+it.each(['network', '503', '500'] as const)(
+  'keeps uncertain commands recoverable after %s without creating a new UUID',
+  async (failure) => {
+    const board = await sample(),
+      bodies: string[] = [];
+    const client = new FactoryClient(async (path, init) => {
+      if (init?.method === 'POST') {
+        bodies.push(String(init.body));
+        if (bodies.length === 1) {
+          if (failure === 'network') throw new TypeError('Connection lost');
+          return new Response(
+            JSON.stringify({
+              detail: 'Storage unavailable',
+              retry: failure === '500' ? 'never' : 'later',
+            }),
+            {
+              status: Number(failure),
+            }
+          );
+        }
+        return json({
+          commandId: JSON.parse(bodies[0]).commandId,
+          state: 'succeeded',
+          reasons: [],
+        });
+      }
+      if (String(path).includes('/commands/'))
+        return new Response(JSON.stringify({ detail: 'Receipt not found' }), { status: 404 });
+      return json(board);
+    });
+    const user = userEvent.setup();
+    render(<FactoryApp client={client} />);
+    await screen.findByText('Implement the command centre');
+    await user.click(screen.getByRole('button', { name: 'Factory settings' }));
+    await user.click(screen.getByRole('button', { name: 'Apply controls' }));
+    const dialog = screen.getByRole('dialog', { name: 'Factory controls' });
+    expect(dialog.textContent).toContain('Command uncertain');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Apply controls' }).disabled).toBe(
+      true
+    );
+    await user.click(screen.getByRole('button', { name: 'Observe command receipt' }));
+    await screen.findByText('Receipt not found');
+    expect(bodies).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Retry same command' }));
+    await screen.findByText('Command succeeded');
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toBe(bodies[0]);
+  }
+);
+
+it('allows a fresh command after a definitive stale-action rejection', async () => {
   const board = await sample(),
     bodies: string[] = [];
-  const client = new FactoryClient(async (path, init) => {
-    if (init?.method === 'POST') {
-      bodies.push(String(init.body));
-      if (bodies.length === 1) throw new TypeError('Connection lost');
-      return json({ commandId: JSON.parse(bodies[0]).commandId, state: 'succeeded', reasons: [] });
-    }
-    if (String(path).includes('/commands/'))
-      return new Response(JSON.stringify({ detail: 'Receipt not found' }), { status: 404 });
-    return json(board);
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method !== 'POST') return json(board);
+    bodies.push(String(init.body));
+    if (bodies.length === 1)
+      return new Response(JSON.stringify({ detail: 'Action changed', retry: 'refresh' }), {
+        status: 412,
+      });
+    return json({ commandId: JSON.parse(bodies[1]).commandId, state: 'succeeded', reasons: [] });
   });
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
   await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   await user.click(screen.getByRole('button', { name: 'Apply controls' }));
-  const dialog = screen.getByRole('dialog', { name: 'Factory controls' });
-  expect(dialog.textContent).toContain('Command uncertain');
+  await screen.findByText('Action changed');
+  expect(screen.queryByRole('button', { name: 'Retry same command' })).toBeNull();
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Apply controls' }).disabled).toBe(
-    true
+    false
   );
-  await user.click(screen.getByRole('button', { name: 'Observe command receipt' }));
-  await screen.findByText('Receipt not found');
-  expect(bodies).toHaveLength(1);
-  await user.click(screen.getByRole('button', { name: 'Retry same command' }));
+  await user.click(screen.getByRole('button', { name: 'Apply controls' }));
   await screen.findByText('Command succeeded');
   expect(bodies).toHaveLength(2);
-  expect(bodies[1]).toBe(bodies[0]);
+  expect(JSON.parse(bodies[1]).commandId).not.toBe(JSON.parse(bodies[0]).commandId);
 });
 
 it('keeps failed checks and detail check names visible without URLs', async () => {

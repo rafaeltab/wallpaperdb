@@ -118,7 +118,11 @@ it('maintains issue-only descendants through the shared budget after landing wit
   const f = await landedFixture();
   const { host, git, merged } = f;
   const stop = new AbortController();
-  const read = githubRequests({ project: host.repository, directory: host.directory, signal: stop.signal });
+  const read = githubRequests({
+    project: host.repository,
+    directory: host.directory,
+    signal: stop.signal,
+  });
   const issues = githubIssues({ ...f.config, read });
   try {
     if (!issues.reconcile) throw new Error('Missing reconciliation');

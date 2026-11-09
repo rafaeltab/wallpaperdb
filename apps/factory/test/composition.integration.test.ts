@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
+import { sqliteObservations } from '../src/adapters/store/index.js';
 it('validates host configuration before serving and composes the real driving and storage adapters', async () => {
   const host = await protocol();
   const configuration = {

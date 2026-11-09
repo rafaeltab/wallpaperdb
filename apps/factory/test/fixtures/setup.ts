@@ -87,6 +87,7 @@ export async function protocol() {
         .split('\n')
         .filter(Boolean)
         .map((line) => JSON.parse(line)),
-    cleanup: () => rm(directory, { recursive: true, force: true }),
+    // Covered fixture processes can finish writing while recursive removal is in progress.
+    cleanup: () => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
   };
 }

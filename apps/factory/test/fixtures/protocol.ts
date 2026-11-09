@@ -883,7 +883,12 @@ export async function runProtocol(
             thread: {
               latestRunId: (() => {
                 const input = JSON.parse(args[2]);
-                const path = join(config.directory, config.parallel ? `resource-${input.threadId.replaceAll('/', '-')}.json` : 'resource.json');
+                const path = join(
+                  config.directory,
+                  config.parallel
+                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
+                    : 'resource.json'
+                );
                 return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).latestRunId : null;
               })(),
             },
@@ -938,7 +943,10 @@ export async function runProtocol(
       if (config.lost) process.exit(1);
       reply({ threadId: 'thread-live', projectId: 'project-id', runId: 'run-1' });
     } else if (args[1] === 'send') {
-      const path = join(config.directory, config.parallel ? `resource-${args[2].replaceAll('/', '-')}.json` : 'resource.json');
+      const path = join(
+        config.directory,
+        config.parallel ? `resource-${args[2].replaceAll('/', '-')}.json` : 'resource.json'
+      );
       const resource = JSON.parse(readFileSync(path, 'utf8'));
       const index = Number(args[3].match(/Stage (\d+) of factory/)![1]);
       resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
@@ -955,18 +963,18 @@ export async function runProtocol(
         const pr = existsSync(join(config.directory, 'pr.json'))
           ? JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))
           : {
-          url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
-          headRefName: resource.branch,
-          baseRefName: 'main',
-          headRefOid: config.base,
-          baseRefOid: config.base,
-          state: 'OPEN',
-          isDraft: false,
-          mergeable: 'MERGEABLE',
-          statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
-            (name: string) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
-          ),
-        };
+              url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+              headRefName: resource.branch,
+              baseRefName: 'main',
+              headRefOid: config.base,
+              baseRefOid: config.base,
+              state: 'OPEN',
+              isDraft: false,
+              mergeable: 'MERGEABLE',
+              statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
+                (name: string) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+              ),
+            };
         if (!existsSync(join(config.directory, 'pr.json')))
           writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
         resource.pullRequests = [{ url: pr.url }];

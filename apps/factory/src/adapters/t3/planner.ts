@@ -146,7 +146,7 @@ export function t3Planner(config: {
       { threadId: run.threadId, runId: run.runId, reason: 'Factory model deadline exceeded' },
       signal
     );
-  const timelyTerminalAt = async (
+  const terminalAt = async (
     record: Record,
     detail: Awaited<ReturnType<typeof observe>>,
     signal: AbortSignal
@@ -175,9 +175,7 @@ export function t3Planner(config: {
     )?.completedAt;
     if (!finished) return undefined;
     const at = Date.parse(finished);
-    return at >= (record.modelHandedOffAt ?? record.deadline - 600000) && at <= record.deadline
-      ? at
-      : undefined;
+    return at >= (record.modelHandedOffAt ?? record.deadline - 600000) ? at : undefined;
   };
   const observeOwned = async (record: Record, signal: AbortSignal) => {
     if (!record.run || record.deadline === undefined)
@@ -205,11 +203,12 @@ export function t3Planner(config: {
     }
     const detail = await observe(run, signal);
     if (['completed', 'idle'].includes(detail.thread.status)) return detail;
-    if (
-      terminal(detail.thread.status) &&
-      (await timelyTerminalAt(record, detail, signal)) !== undefined
-    )
-      return detail;
+    if (terminal(detail.thread.status)) {
+      const at = await terminalAt(record, detail, signal);
+      // A late observation is not proof of a late run. Unknown terminal timing
+      // remains a provider failure and cannot advance the model timeout counter.
+      if (at === undefined || at <= record.deadline) return detail;
+    }
     await reportDeadline(record);
     if (terminal(detail.thread.status)) return detail;
     throw new ModelDeadline(
@@ -233,10 +232,11 @@ export function t3Planner(config: {
       if (now < record.deadline) completedAt = now;
       else {
         // Observation/cleanup latency is not model execution time. Use exact run evidence.
-        completedAt = await timelyTerminalAt(record, detail, signal);
+        const at = await terminalAt(record, detail, signal);
+        if (at !== undefined && at <= record.deadline) completedAt = at;
+        else if (at !== undefined) await reportDeadline(record);
       }
     }
-    if (successful && completedAt === undefined) await reportDeadline(record);
     const phase = successful ? 'succeeded' : 'failed';
     const completed =
       record.phase === phase && record.completedAt === completedAt && record.retired === false

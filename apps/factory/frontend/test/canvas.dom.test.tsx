@@ -377,6 +377,68 @@ it('refreshes Start authorization after controls change while preserving the con
   }
 });
 
+it('retains a Start selection when issue metadata changes without changing its action', async () => {
+  let board = await sample();
+  const initialIssue = board.entities.issues['issue:1001'];
+  if (initialIssue.metadata.state !== 'known') throw new Error('Expected known sample issue');
+  const startAction = board.entities.actions['action:start-1001'];
+  let posts = 0;
+  const client = new FactoryClient(async (path, init) => {
+    if (init?.method === 'POST') posts++;
+    const url = new URL(String(path), 'http://controlled.invalid');
+    if (url.pathname.endsWith('/issues/search'))
+      return json({
+        apiVersion: 2,
+        query: url.searchParams.get('q') ?? '',
+        coverage: board.meta.coverage,
+        sources: board.entities.sources,
+        users: board.entities.users,
+        labels: board.entities.labels,
+        repositories: board.entities.repositories,
+        nextPageToken: null,
+        hits: [{ issue: board.entities.issues[initialIssue.id], startAction }],
+      } satisfies import('../../src/http/index.js').FactoryV2IssueSearch);
+    return json(board);
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await user.click(
+    await screen.findByRole('group', { name: 'Select Add a searchable issue list' })
+  );
+  await user.click(screen.getByRole('button', { name: 'Start issue' }));
+  await user.click(
+    await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
+  );
+  await user.type(screen.getByLabelText('Execution context'), 'Retain the selected scope');
+  act(() => window.dispatchEvent(new Event('pagehide')));
+  vi.useFakeTimers();
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      issues: {
+        ...board.entities.issues,
+        [initialIssue.id]: {
+          ...initialIssue,
+          version: 'changed-title',
+          metadata: {
+            ...initialIssue.metadata,
+            value: { ...initialIssue.metadata.value, title: 'Updated searchable issue' },
+          },
+        },
+      },
+    },
+  };
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(screen.getByRole('group', { name: 'Select Updated searchable issue' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Start selected issue' })).toBeTruthy();
+  expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe(
+    'Retain the selected scope'
+  );
+  expect(posts).toBe(0);
+});
+
 it('keeps failed checks and detail check names visible without URLs', async () => {
   let board = await sample();
   const pr = board.entities.pullRequests['pr:2003'];

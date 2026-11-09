@@ -370,7 +370,7 @@ it('serves the live v2 producer and executes durable control commands on the exi
   }
 });
 
-it.each(['claim', 'finish'] as const)(
+it.each(['claim', 'claim-committed', 'finish'] as const)(
   'recovers durable control responsibility after a SQLite %s failure without repeating effects',
   async (boundary) => {
     const host = await protocol();
@@ -405,8 +405,8 @@ it.each(['claim', 'finish'] as const)(
       database = new DatabaseSync(`${host.directory}/state/factory.sqlite`);
       database.exec(`
         CREATE TABLE injected_command_faults (attempt INTEGER);
-        CREATE TRIGGER injected_command_failure BEFORE UPDATE OF receipt ON v2_commands
-        WHEN json_extract(NEW.receipt, '$.state') = '${boundary === 'claim' ? 'running' : 'succeeded'}'
+        CREATE TRIGGER injected_command_failure ${boundary === 'claim-committed' ? 'AFTER' : 'BEFORE'} UPDATE OF receipt ON v2_commands
+        WHEN json_extract(NEW.receipt, '$.state') = '${boundary === 'finish' ? 'succeeded' : 'running'}'
         BEGIN
           INSERT INTO injected_command_faults VALUES (1);
           SELECT RAISE(FAIL, 'Controlled command storage failure');
@@ -446,21 +446,21 @@ it.each(['claim', 'finish'] as const)(
           expect(
             (await running!.app.inject(`/api/v2/commands/${request.commandId}`)).json()
           ).toMatchObject({
-            state: 'succeeded',
+            state: boundary === 'claim-committed' ? 'uncertain' : 'succeeded',
           }),
         { timeout: 10000, interval: 30 }
       );
       expect((await running.app.inject('/api/scheduler')).json().state).toMatchObject({
-        revision: before + 1,
-        paused: true,
-        concurrency: 2,
-        allowance: 4,
+        revision: before + (boundary === 'claim-committed' ? 0 : 1),
+        ...(boundary === 'claim-committed' ? {} : { paused: true, concurrency: 2, allowance: 4 }),
       });
       expect(
         (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
           .statusCode
       ).toBe(200);
-      expect((await running.app.inject('/api/scheduler')).json().state.revision).toBe(before + 1);
+      expect((await running.app.inject('/api/scheduler')).json().state.revision).toBe(
+        before + (boundary === 'claim-committed' ? 0 : 1)
+      );
     } finally {
       database?.close();
       await running?.close();

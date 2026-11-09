@@ -163,7 +163,8 @@ export async function runProtocol(
     ) {
       if (config.planner?.interruptFails)
         throw new Error('Controlled planner interruption failure');
-      if (config.planner?.interruptCompletes) writeFileSync(join(config.directory, 'planner-interrupted'), 'true');
+      if (config.planner?.interruptCompletes)
+        writeFileSync(join(config.directory, 'planner-interrupted'), 'true');
       console.log(
         JSON.stringify({
           structuredContent: { status: 'interrupt_requested', threadId: 'planner-thread' },
@@ -761,7 +762,11 @@ export async function runProtocol(
         thread: {
           threadId: 'planner-thread',
           latestRunId: config.planner.runId ?? 'planner-run',
-          status: config.planner.interruptCompletes && readFileSync(join(config.directory, 'planner-interrupted'), 'utf8') === 'true' ? 'interrupted' : (config.planner.status ?? 'completed'),
+          status:
+            config.planner.interruptCompletes &&
+            readFileSync(join(config.directory, 'planner-interrupted'), 'utf8') === 'true'
+              ? 'interrupted'
+              : (config.planner.status ?? 'completed'),
           settled:
             existsSync(join(config.directory, 'planner-settled')) &&
             readFileSync(join(config.directory, 'planner-settled'), 'utf8') === 'true',

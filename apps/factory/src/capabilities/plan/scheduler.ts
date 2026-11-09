@@ -263,7 +263,7 @@ export const SchedulerLive = Layer.effect(
           if (pendingSuccess && planningInputIdentity(pendingSuccess.input) !== signature)
             pendingSuccess = undefined;
           if (!hasFrontier(input, snapshot.state)) return snapshot;
-          if (signature === lastInput) {
+          if (!pendingSuccess && signature === lastInput) {
             return yield* retry(retryPreview, base, snapshot.state.revision);
           }
           const preview =

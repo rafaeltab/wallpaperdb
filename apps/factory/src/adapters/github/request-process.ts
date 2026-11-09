@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { cliDiagnostic, type RequestDiagnostic } from './request-diagnostics.js';
 
 export interface RateResponse {
   status: number;
@@ -16,10 +17,12 @@ export function requestProcess(project: string, args: readonly string[], signal:
     responses: RateResponse[];
     code: number | null;
     limited: boolean;
+    diagnostics: readonly RequestDiagnostic[];
     failure?: string;
   }>((resolve) => {
     const responses: RateResponse[] = [],
-      output: Buffer[] = [];
+      output: Buffer[] = [],
+      diagnostics = new Set<RequestDiagnostic>();
     let bytes = 0,
       line = '',
       dropping = false,
@@ -44,6 +47,8 @@ export function requestProcess(project: string, args: readonly string[], signal:
       output.push(chunk);
     });
     const consume = (value: string) => {
+      const diagnostic = cliDiagnostic(value);
+      if (diagnostic) diagnostics.add(diagnostic);
       const status = /^< HTTP\/\S+\s+(\d{3})\b/.exec(value);
       if (status) {
         limited = false;
@@ -105,7 +110,14 @@ export function requestProcess(project: string, args: readonly string[], signal:
           value = text;
         }
       }
-      resolve({ value, responses, code, limited, ...(failure ? { failure } : {}) });
+      resolve({
+        value,
+        responses,
+        code,
+        limited,
+        diagnostics: [...diagnostics],
+        ...(failure ? { failure } : {}),
+      });
     });
   });
 }

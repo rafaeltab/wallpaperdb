@@ -515,6 +515,70 @@ it.each([
   }
 );
 
+it('refreshes an open plan when the same attempt completes and its applicability changes', async () => {
+  let board = await sample();
+  let attempt: import('../../src/http/index.js').FactoryV2PlanDetails['attempt'] = {
+    id: 'plan:progress',
+    version: '1',
+    startedAt: board.committedAt,
+    deadline: board.committedAt,
+    finishedAt: null,
+    phase: 'discovery',
+    progress: 'Gathering current issues',
+    threadId: null,
+    basis: {
+      boardCursor: board.cursor,
+      inputVersion: '1',
+      controlVersion: board.meta.factory.version,
+    },
+    applicability: 'unknown',
+    result: null,
+  };
+  const publish = () => {
+    board = {
+      ...board,
+      meta: { ...board.meta, currentPlanId: attempt.id },
+      entities: { ...board.entities, plans: { [attempt.id]: attempt } },
+    };
+  };
+  publish();
+  let reads = 0;
+  const client = new FactoryClient(async (path) => {
+    if (!String(path).includes('/plans/')) return json(board);
+    reads++;
+    return json({ apiVersion: 2, attempt, entities: board.entities });
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await screen.findByText('Implement the command centre');
+  await user.click(screen.getByRole('button', { name: '◇ Preview plan' }));
+  await screen.findByText('Gathering current issues');
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  expect(reads).toBe(1);
+
+  attempt = {
+    ...attempt,
+    version: '2',
+    phase: 'succeeded',
+    progress: 'Planning completed',
+    finishedAt: board.committedAt,
+    applicability: 'current',
+    result: { selected: [], rejected: [], deferred: [] },
+  };
+  publish();
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await screen.findByText('Planning completed');
+  expect(screen.getByText('Proposed work')).toBeTruthy();
+  expect(screen.getByText('Applicability: current')).toBeTruthy();
+  expect(reads).toBe(2);
+
+  attempt = { ...attempt, version: '3', applicability: 'stale' };
+  publish();
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await screen.findByText('Applicability: stale');
+  expect(reads).toBe(3);
+});
+
 it('dismisses an open labels tooltip when its work item disappears from a fresh snapshot', async () => {
   let board = await sample();
   const issue = board.entities.issues['issue:1002'];

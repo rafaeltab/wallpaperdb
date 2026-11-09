@@ -741,12 +741,17 @@ it('refreshes an open plan when the same attempt completes and its applicability
     reads++;
     return json({ apiVersion: 2, attempt, entities: board.entities });
   });
+  const restorePage = () =>
+    act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      window.dispatchEvent(new Event('pageshow'));
+    });
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
   await user.click(screen.getByRole('button', { name: '◇ Preview plan' }));
   await screen.findByText('Gathering current issues');
-  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await restorePage();
   expect(reads).toBe(1);
 
   attempt = {
@@ -759,7 +764,7 @@ it('refreshes an open plan when the same attempt completes and its applicability
     result: { selected: [], rejected: [], deferred: [] },
   };
   publish();
-  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await restorePage();
   await screen.findByText('Planning completed');
   expect(screen.getByText('Proposed work')).toBeTruthy();
   expect(screen.getByText('Applicability: current')).toBeTruthy();
@@ -767,7 +772,7 @@ it('refreshes an open plan when the same attempt completes and its applicability
 
   attempt = { ...attempt, version: '3', applicability: 'stale' };
   publish();
-  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await restorePage();
   await screen.findByText('Applicability: stale');
   expect(reads).toBe(3);
 });

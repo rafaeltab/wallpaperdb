@@ -75,21 +75,40 @@ export async function v2Producer(config: {
     void publishing.catch(() => undefined);
   };
   const queue: { id: string; parent?: Tracer.Span }[] = [];
+  let retryAt = 0,
+    retryDelay = 1000;
   const pump = () => {
-    if (working || closed) return;
-    const entry = queue.shift();
-    if (!entry) return;
-    const operation = board.processPending(entry.id).pipe(Effect.catch(Effect.logError));
+    if (working || closed || Date.now() < retryAt) return;
+    const entry = queue[0];
+    if (!entry && !board.hasPending()) return;
+    const operation = board.processPending(entry?.id).pipe(
+      Effect.tap(() =>
+        Effect.sync(() => {
+          if (entry) queue.shift();
+          retryAt = 0;
+          retryDelay = 1000;
+        })
+      ),
+      Effect.catch((cause) =>
+        Effect.sync(() => {
+          retryAt = Date.now() + retryDelay;
+          retryDelay = Math.min(retryDelay * 2, 30000);
+        }).pipe(Effect.andThen(Effect.logError(cause)))
+      )
+    );
     working = run(
-      entry.parent ? operation.pipe(Effect.withParentSpan(entry.parent)) : operation
+      entry?.parent ? operation.pipe(Effect.withParentSpan(entry.parent)) : operation
     ).finally(() => {
       working = undefined;
       refresh();
-      pump();
+      if (queue.length && retryAt === 0) pump();
     });
     void working.catch(() => undefined);
   };
-  const timer = setInterval(refresh, 1000);
+  const timer = setInterval(() => {
+    refresh();
+    pump();
+  }, 1000);
   return {
     data: liveV2Data(
       board,

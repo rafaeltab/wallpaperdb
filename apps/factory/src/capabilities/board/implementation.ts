@@ -190,8 +190,14 @@ export function makeBoard(config: {
     const processPending = (commandId?: string) =>
       Effect.gen(function* () {
         for (const record of [...receipts.values()].filter(
-          (r) => r.receipt.state === 'accepted' && (!commandId || r.request.commandId === commandId)
+          (r) => r.receipt.state !== 'running' && (!commandId || r.request.commandId === commandId)
         )) {
+          // A computed outcome may still need persistence. Never execute it again.
+          if (record.receipt.state !== 'accepted') {
+            yield* store.finish(record);
+            receipts.delete(record.request.commandId);
+            continue;
+          }
           const action = current.snapshot.entities.actions[record.request.actionId];
           const stale = validate(record.request, action);
           let result: Effect.Success<ReturnType<BoardCommands['execute']>>;
@@ -210,10 +216,7 @@ export function makeBoard(config: {
             };
             if (!(yield* store.claim(running))) {
               const winner = yield* store.command(record.request.commandId);
-              if (
-                winner &&
-                (winner.receipt.state === 'accepted' || winner.receipt.state === 'running')
-              )
+              if (winner && winner.receipt.state === 'accepted')
                 receipts.set(record.request.commandId, winner);
               else receipts.delete(record.request.commandId);
               continue;
@@ -247,6 +250,7 @@ export function makeBoard(config: {
                 result.state === 'uncertain' ? null : new Date(yield* time.now()).toISOString(),
             },
           };
+          receipts.set(record.request.commandId, completed);
           yield* store.finish(completed);
           receipts.delete(record.request.commandId);
         }
@@ -293,7 +297,7 @@ export function makeBoard(config: {
         };
       },
       receipt: (id: string) => Effect.map(store.command(id), (record) => record?.receipt),
-      hasPending: () => [...receipts.values()].some((r) => r.receipt.state === 'accepted'),
+      hasPending: () => [...receipts.values()].some((r) => r.receipt.state !== 'running'),
       search: issueSearch(() => current.snapshot),
       details: (id: string) => current.details[id],
       plan: (id: string) =>

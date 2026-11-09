@@ -318,6 +318,65 @@ it('starts a fresh session when another issue is opened in the floating Start pa
   });
 });
 
+it('refreshes Start authorization after controls change while preserving the context draft', async () => {
+  const server = fakeV2Server({ epoch: 'start-authorization' });
+  const commands: import('../../src/http/index.js').FactoryV2Command[] = [];
+  const startStatuses: number[] = [];
+  const client = new FactoryClient(async (path, init) => {
+    const url = new URL(String(path), 'http://controlled.invalid');
+    if (init?.method === 'POST') commands.push(JSON.parse(String(init.body)));
+    const response = await server.inject({
+      method: init?.method === 'POST' ? 'POST' : 'GET',
+      url: url.pathname + url.search,
+      headers: Object.fromEntries(new Headers(init?.headers)),
+      payload: init?.body ? String(init.body) : undefined,
+    });
+    if (init?.method === 'POST' && JSON.parse(String(init.body)).kind === 'start')
+      startStatuses.push(response.statusCode);
+    return new Response(response.body || null, {
+      status: response.statusCode,
+      headers: {
+        'content-type': 'application/json',
+        ...(response.headers.etag ? { etag: String(response.headers.etag) } : {}),
+      },
+    });
+  });
+  const user = userEvent.setup();
+  try {
+    render(<FactoryApp client={client} />);
+    await user.click(
+      await screen.findByRole('group', { name: 'Select Add a searchable issue list' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Start issue' }));
+    await user.click(
+      await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
+    );
+    await user.type(screen.getByLabelText('Execution context'), 'Keep this reviewed scope');
+    await user.click(screen.getByRole('button', { name: 'Ⅱ Pause' }));
+    const resume = await screen.findByRole<HTMLButtonElement>('button', { name: '▶ Resume' });
+    await vi.waitFor(() => expect(resume.disabled).toBe(false), { timeout: 5000, interval: 20 });
+    await user.click(resume);
+    const pause = await screen.findByRole<HTMLButtonElement>('button', { name: 'Ⅱ Pause' });
+    await vi.waitFor(() => expect(pause.disabled).toBe(false), { timeout: 5000, interval: 20 });
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe(
+      'Keep this reviewed scope'
+    );
+    expect(screen.queryByRole('button', { name: 'Start selected issue' })).toBeNull();
+    await user.click(
+      await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Start selected issue' }));
+    await screen.findByText('Command succeeded', {}, { timeout: 5000 });
+    expect(startStatuses).toEqual([202]);
+    expect(commands.filter((command) => command.kind === 'start')).toEqual([
+      expect.objectContaining({ payload: { context: 'Keep this reviewed scope' } }),
+    ]);
+  } finally {
+    cleanup();
+    await server.close();
+  }
+});
+
 it('keeps failed checks and detail check names visible without URLs', async () => {
   let board = await sample();
   const pr = board.entities.pullRequests['pr:2003'];

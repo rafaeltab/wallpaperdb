@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   Action,
   FactoryV2IssueSearch,
@@ -204,8 +204,21 @@ export function Start({
   const [result, setResult] = useState<FactoryV2IssueSearch>(),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true);
-  const [picked, setPicked] = useState<{ issue: Issue; action: Action }>(),
+  const indexRevision = useMemo(
+    () =>
+      JSON.stringify([
+        Object.values(factory.board?.entities.issues ?? {}).map(({ id, version }) => [id, version]),
+        Object.values(factory.board?.entities.actions ?? {}).map(({ id, version }) => [
+          id,
+          version,
+        ]),
+      ]),
+    [factory.board?.entities.issues, factory.board?.entities.actions]
+  );
+  const [resultRevision, setResultRevision] = useState<string>();
+  const [picked, setPicked] = useState<{ issue: Issue; action: Action; revision: string }>(),
     [context, setContext] = useState('');
+  useEffect(() => setPage(undefined), [indexRevision]);
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
@@ -217,6 +230,16 @@ export function Start({
         .then((data) => {
           if (current) {
             setResult(data);
+            setResultRevision(indexRevision);
+            setPicked((selection) => {
+              if (!selection || selection.revision === indexRevision) return selection;
+              const hit = data.hits.find((candidate) => candidate.issue.id === selection.issue.id);
+              return hit &&
+                hit.startAction.id === selection.action.id &&
+                hit.startAction.version === selection.action.version
+                ? { ...selection, issue: hit.issue, revision: indexRevision }
+                : undefined;
+            });
             setLoading(false);
           }
         })
@@ -232,7 +255,7 @@ export function Start({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [client, query, page]);
+  }, [client, query, page, indexRevision]);
   return (
     <Panel name="Start an issue" close={close} feedback={<CommandFeedback factory={factory} />}>
       <label>
@@ -264,7 +287,13 @@ export function Start({
                 <button
                   type="button"
                   aria-pressed={picked?.issue.id === hit.issue.id}
-                  onClick={() => setPicked({ issue: hit.issue, action: hit.startAction })}
+                  onClick={() =>
+                    setPicked({
+                      issue: hit.issue,
+                      action: hit.startAction,
+                      revision: resultRevision ?? indexRevision,
+                    })
+                  }
                 >
                   #{hit.issue.number} {title(hit.issue)}
                 </button>
@@ -304,7 +333,7 @@ export function Start({
           </p>
           <ActionButton
             action={picked.action}
-            busy={factory.commandsBlocked}
+            busy={factory.commandsBlocked || loading || !!error || resultRevision !== indexRevision}
             label="Start selected issue"
             onClick={() =>
               void factory.submit(picked.action, { kind: 'start', payload: { context } })

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
+import { fakeV2Server, type FactoryV2Snapshot, type WorkItem } from '../../src/http/index.js';
 import { related } from '../src/canvas/model';
 import { createCanvasProjection } from '../src/canvas/view-model';
 import { canvasLayout } from '../src/canvas/geometry';
@@ -51,6 +51,96 @@ async function sample() {
     await app.close();
   }
 }
+it('keeps unavailable project ranks ahead of known ranks and orders known unmarked fields last', async () => {
+  const seed = await sample();
+  const template = seed.entities.issues['issue:1001'];
+  if (template.metadata.state !== 'known' || template.project.state !== 'known')
+    throw new Error('Expected known sample issue');
+  const candidates = [
+    { number: 9000, known: false, priority: null, size: null },
+    { number: 1, known: true, priority: 0, size: null },
+    { number: 20, known: true, priority: 4, size: null },
+    { number: 30, known: true, priority: 2, size: 0 },
+    { number: 4, known: true, priority: 2, size: 4 },
+    { number: 5, known: true, priority: 2, size: null },
+    { number: 3, known: true, priority: null, size: 0 },
+    { number: 50, known: false, priority: null, size: null },
+  ];
+  for (const order of [candidates, [...candidates].reverse()]) {
+    const issues: Record<keyof FactoryV2Snapshot['entities']['issues'], typeof template> = {};
+    const items: Record<WorkItem['id'], WorkItem> = {};
+    for (const candidate of order) {
+      const id: keyof typeof issues = `issue:rank-${candidate.number}`;
+      issues[id] = {
+        ...template,
+        id,
+        number: candidate.number,
+        metadata: {
+          ...template.metadata,
+          value: { ...template.metadata.value, title: `Issue ${candidate.number}`, labelIds: [] },
+        },
+        project: candidate.known
+          ? {
+              ...template.project,
+              value: {
+                ...template.project.value,
+                priority:
+                  candidate.priority === null
+                    ? null
+                    : {
+                        id: `P${candidate.priority}`,
+                        name: `P${candidate.priority}`,
+                        rank: candidate.priority,
+                      },
+                size:
+                  candidate.size === null
+                    ? null
+                    : {
+                        id: candidate.size === 0 ? 'XS' : 'XL',
+                        name: candidate.size === 0 ? 'XS' : 'XL',
+                        rank: candidate.size,
+                      },
+              },
+            }
+          : {
+              state: 'unknown',
+              sourceId: template.project.sourceId,
+              reason: 'Project unavailable',
+            },
+      };
+      const itemId: WorkItem['id'] = `item:rank-${candidate.number}`;
+      items[itemId] = {
+        ...seed.entities.items['item:1001'],
+        id: itemId,
+        subject: { kind: 'issue', issueId: id },
+        jobIds: [],
+        threadIds: [],
+        actionIds: [],
+      };
+    }
+    const board: FactoryV2Snapshot = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        issues,
+        items,
+        relationships: {},
+        stacks: {},
+        jobs: {},
+        maintenance: {},
+        threads: {},
+        actions: {},
+      },
+    };
+    // Planned work flows from its bottom row toward the section header.
+    expect(
+      [...layout(board, new Set()).boxes]
+        .sort((a, b) => b.y - a.y || a.x - b.x)
+        .map((box) => box.item.issueNumbers[0].number)
+    ).toEqual([50, 9000, 1, 30, 4, 5, 20, 3]);
+  }
+});
+
 it('places each authoritative work item once and stacks tip above base', async () => {
   const board = await sample(),
     graph = layout(board, new Set());

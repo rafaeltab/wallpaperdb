@@ -20,6 +20,8 @@ Open the local URL Vite prints. The board identifies fake data. Configure, start
 
 The [canvas app](../apps/factory/frontend/src/canvas/app.tsx) owns navigation and presentation. Layout, collapse and relationship selection stay client-side. The [polling integration](../apps/factory/frontend/src/canvas/use-factory.ts) fetches conditional snapshots at the server's suggested interval, bounded to 1–30 seconds. Snapshots replace the board atomically; this client does not require SSE or delta support. Failed refreshes retain the prior board and block new commands until observations recover. A lost command response retains its UUID for receipt observation or an explicit retry of the same request.
 
+The [layout](../apps/factory/frontend/src/canvas/geometry.ts) puts issues with unavailable project data first in its approximate work order, using issue-number order within that group. For known project data it sorts by priority, size and issue number; known unmarked fields follow ranked values. This order is packed upward from the bottom of each issue section.
+
 ## Select a backend
 
 Set `FACTORY_BACKEND_URL` to the backend's private HTTP origin. No machine identity or credentials belong in frontend source. The [Vite configuration](../apps/factory/frontend/vite.config.ts) proxies `/api` to that origin. It translates requests from its own development page to the backend origin; other Origins remain unchanged. Production uses the backend's origin checks without a development proxy.

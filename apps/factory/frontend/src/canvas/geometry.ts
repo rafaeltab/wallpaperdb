@@ -49,7 +49,9 @@ function arrangeIssues(
   const localIds = new Set(members.map((i) => i.id));
   const localEdges = connections.filter((e) => localIds.has(e.source) && localIds.has(e.target));
   const connected = new Set(connections.flatMap((e) => [e.source, e.target]));
+  // Unavailable project data precedes known ranks, including known unmarked fields.
   const compare = (a: Item, b: Item) =>
+    Number(issueMetadata[a.id].projectKnown) - Number(issueMetadata[b.id].projectKnown) ||
     (issueMetadata[a.id].priorityRank ?? Infinity) -
       (issueMetadata[b.id].priorityRank ?? Infinity) ||
     (issueMetadata[a.id].sizeRank ?? Infinity) - (issueMetadata[b.id].sizeRank ?? Infinity) ||

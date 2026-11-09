@@ -51,12 +51,17 @@ async function sample() {
     await app.close();
   }
 }
-it('keeps unavailable project ranks ahead of known ranks and orders known unmarked fields last', async () => {
+it('distinguishes unavailable priority and size ranks from known unmarked fields', async () => {
   const seed = await sample();
   const template = seed.entities.issues['issue:1001'];
   if (template.metadata.state !== 'known' || template.project.state !== 'known')
     throw new Error('Expected known sample issue');
-  const candidates = [
+  const candidates: readonly {
+    number: number;
+    known: boolean;
+    priority: number | 'unknown' | null;
+    size: number | 'unknown' | null;
+  }[] = [
     { number: 9000, known: false, priority: null, size: null },
     { number: 1, known: true, priority: 0, size: null },
     { number: 20, known: true, priority: 4, size: null },
@@ -65,6 +70,10 @@ it('keeps unavailable project ranks ahead of known ranks and orders known unmark
     { number: 5, known: true, priority: 2, size: null },
     { number: 3, known: true, priority: null, size: 0 },
     { number: 50, known: false, priority: null, size: null },
+    { number: 60, known: true, priority: 'unknown', size: null },
+    { number: 7, known: true, priority: 0, size: 'unknown' },
+    { number: 8, known: true, priority: 0, size: 0 },
+    { number: 6, known: true, priority: 2, size: 'unknown' },
   ];
   for (const order of [candidates, [...candidates].reverse()]) {
     const issues: Record<keyof FactoryV2Snapshot['entities']['issues'], typeof template> = {};
@@ -87,19 +96,23 @@ it('keeps unavailable project ranks ahead of known ranks and orders known unmark
                 priority:
                   candidate.priority === null
                     ? null
-                    : {
-                        id: `P${candidate.priority}`,
-                        name: `P${candidate.priority}`,
-                        rank: candidate.priority,
-                      },
+                    : candidate.priority === 'unknown'
+                      ? { id: 'custom-priority', name: 'Custom priority', rank: null }
+                      : {
+                          id: `P${candidate.priority}`,
+                          name: `P${candidate.priority}`,
+                          rank: candidate.priority,
+                        },
                 size:
                   candidate.size === null
                     ? null
-                    : {
-                        id: candidate.size === 0 ? 'XS' : 'XL',
-                        name: candidate.size === 0 ? 'XS' : 'XL',
-                        rank: candidate.size,
-                      },
+                    : candidate.size === 'unknown'
+                      ? { id: 'custom-size', name: 'Custom size', rank: null }
+                      : {
+                          id: candidate.size === 0 ? 'XS' : 'XL',
+                          name: candidate.size === 0 ? 'XS' : 'XL',
+                          rank: candidate.size,
+                        },
               },
             }
           : {
@@ -137,7 +150,7 @@ it('keeps unavailable project ranks ahead of known ranks and orders known unmark
       [...layout(board, new Set()).boxes]
         .sort((a, b) => b.y - a.y || a.x - b.x)
         .map((box) => box.item.issueNumbers[0].number)
-    ).toEqual([50, 9000, 1, 30, 4, 5, 20, 3]);
+    ).toEqual([50, 9000, 60, 7, 8, 1, 6, 30, 4, 5, 20, 3]);
   }
 });
 

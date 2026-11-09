@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { fileScheduleStore } from '../src/adapters/store/index.js';
 import { startFactory } from '../src/composition/index.js';
+import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
 import type { BoardSnapshot } from '../src/capabilities/board/index.js';
 
@@ -425,6 +426,7 @@ it('keeps a nonexhausted streak through manual previews, pause/resume and empty 
   const planner = {
     status: 'running',
     interruptCompletes: true,
+    settleDelayMs: 3000,
     proposal: { selected: [], deferred: [] },
   };
   try {
@@ -461,7 +463,25 @@ it('keeps a nonexhausted streak through manual previews, pause/resume and empty 
         ).toBe(1),
       { timeout: 6000, interval: 20 }
     );
-    await host.save({ planning, planner: { ...planner, status: 'completed' } });
+    // The failure notice is recorded before cleanup finishes. Observe the
+    // existing planner port read-only before requesting a separate manual run.
+    const owner = t3Planner({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${configuration.FACTORY_STATE}/planner`,
+    });
+    await vi.waitFor(
+      async () =>
+        expect(await Effect.runPromise(owner.ownership(false))).toMatchObject({
+          phase: 'failed',
+          retired: true,
+          settled: true,
+        }),
+      { timeout: 6000, interval: 20 }
+    );
+    await host.save({ planning, planner: { ...planner, status: 'completed', settleDelayMs: 0 } });
     const snapshot = (await running.app.inject('/api/v2/board')).json<BoardSnapshot>();
     const action = Object.values(snapshot.entities.actions).find((a) => a.kind === 'preview-plan');
     if (action?.availability.state !== 'available') throw new Error('Missing manual preview');

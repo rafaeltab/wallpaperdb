@@ -26,6 +26,8 @@ export interface BoardStore {
   read(): Effect.Effect<BoardRecord | undefined, Unavailable>;
   save(record: BoardRecord, expectedCursor: string | null): Effect.Effect<boolean, Unavailable>;
   command(id: string): Effect.Effect<CommandRecord | undefined, Unavailable>;
+  /** A technical failure can leave acceptance committed. Read the exact durable
+   * request and receipt before claiming responsibility or dispatching effects. */
   accept(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
   /** Claims only accepted responsibility. A technical failure can leave the claim
    * committed; inspect the durable receipt before retrying any external effect. */

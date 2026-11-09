@@ -69,6 +69,7 @@ export function makeBoard(config: {
     }
     const listeners = new Set<() => void>();
     const receipts = new Map<string, CommandRecord>();
+    const uncertainAccepts = new Set<string>();
     const uncertainClaims = new Set<string>();
     yield* store.interruptPending({
       code: 'interrupted-command',
@@ -140,10 +141,20 @@ export function makeBoard(config: {
         history = nextHistory;
         for (const listener of listeners) listener();
       }).pipe(lock.withPermits(1), Effect.withSpan('factory.board.publish'));
+    const replayCommand = (request: BoardCommand, prior: CommandRecord) => {
+      if (
+        version(request) === version(prior.request) &&
+        prior.receipt.state === 'accepted' &&
+        !receipts.has(request.commandId) &&
+        receipts.size < maxOutstandingCommands
+      )
+        receipts.set(request.commandId, prior);
+      return replay(request, prior);
+    };
     const submit = (request: BoardCommand) =>
       Effect.gen(function* () {
         const prior = yield* store.command(request.commandId);
-        if (prior) return replay(request, prior);
+        if (prior) return replayCommand(request, prior);
         if (receipts.size >= maxOutstandingCommands)
           return failure(
             'command-capacity',
@@ -175,10 +186,19 @@ export function makeBoard(config: {
             resultingCursor: null,
           },
         };
-        if (!(yield* store.accept(record))) {
+        if (
+          !(yield* store.accept(record).pipe(
+            Effect.tapError(() =>
+              Effect.sync(() => {
+                receipts.set(request.commandId, record);
+                uncertainAccepts.add(request.commandId);
+              })
+            )
+          ))
+        ) {
           const winner = yield* store.command(request.commandId);
           return winner
-            ? replay(request, winner)
+            ? replayCommand(request, winner)
             : failure(
                 'ledger-unavailable',
                 'Command responsibility unavailable. Observe before retrying.',
@@ -190,9 +210,24 @@ export function makeBoard(config: {
       }).pipe(lock.withPermits(1), Effect.withSpan('factory.board.submit'));
     const processPending = (commandId?: string) =>
       Effect.gen(function* () {
-        for (const record of [...receipts.values()].filter(
+        for (let record of [...receipts.values()].filter(
           (r) => r.receipt.state !== 'running' && (!commandId || r.request.commandId === commandId)
         )) {
+          if (uncertainAccepts.has(record.request.commandId)) {
+            // An insert can commit and still report failure. Only the exact durable
+            // accepted request grants authority to proceed; memory alone never does.
+            const retained = yield* store.command(record.request.commandId);
+            uncertainAccepts.delete(record.request.commandId);
+            if (
+              retained?.receipt.state !== 'accepted' ||
+              version(retained.request) !== version(record.request)
+            ) {
+              receipts.delete(record.request.commandId);
+              continue;
+            }
+            record = retained;
+            receipts.set(record.request.commandId, retained);
+          }
           // A computed outcome may still need persistence. Never execute it again.
           if (record.receipt.state !== 'accepted') {
             yield* store.finish(record);

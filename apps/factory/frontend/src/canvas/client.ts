@@ -105,7 +105,8 @@ export class FactoryClient {
       });
       const result = await response.json();
       if (!response.ok) {
-        if (!['refresh', 'later', 'never'].includes(result.retry)) this.uncertain = command;
+        if (response.status >= 500 || !['refresh', 'later', 'never'].includes(result.retry))
+          this.uncertain = command;
         else {
           this.activeCommand = null;
           this.uncertain = null;

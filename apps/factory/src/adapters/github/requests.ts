@@ -157,7 +157,7 @@ export function githubRequests(config: {
         : result.responses;
     const success = result.code === 0 && !result.failure && !malformed && !graphErrors.length;
     budget.complete(reservation, responses, costs, success);
-    if (!success) throw failure(result, graphErrors);
+    if (!success) throw failure({ ...result, limited: result.limited || secondary }, graphErrors);
     return value;
   };
   const pump = () => {
@@ -207,15 +207,17 @@ function failure(
   result: Awaited<ReturnType<typeof requestProcess>>,
   errors: readonly { type?: string; message?: string }[] = []
 ) {
-  const diagnostics = [
-    ...new Set([...result.diagnostics, ...errors.slice(0, 16).map(graphqlDiagnostic)]),
-  ];
+  const diagnostics = new Set([
+    ...result.diagnostics,
+    ...errors.slice(0, 16).map(graphqlDiagnostic),
+  ]);
+  if (result.limited) diagnostics.add('rate-limit');
   return new Error('GitHub request failed', {
     cause: {
       code: result.code,
       failure: result.failure,
       rateLimited: result.limited,
-      diagnostics: diagnostics.length ? diagnostics : ['unclassified-provider-error'],
+      diagnostics: diagnostics.size ? [...diagnostics] : ['unclassified-provider-error'],
       responses: result.responses.map(({ status, resource, remaining, reset, retryAfter }) => ({
         status,
         resource,

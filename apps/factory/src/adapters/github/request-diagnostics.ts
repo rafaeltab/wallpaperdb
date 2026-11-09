@@ -1,4 +1,5 @@
 export type RequestDiagnostic =
+  | 'rate-limit'
   | 'authentication'
   | 'dns'
   | 'tls'
@@ -9,6 +10,7 @@ export type RequestDiagnostic =
   | 'graphql';
 
 const patterns: ReadonlyArray<readonly [RequestDiagnostic, RegExp]> = [
+  ['rate-limit', /\bRATE_LIMITED\b|secondary rate limit|abuse detection/i],
   [
     'authentication',
     /gh auth login|not logged in|bad credentials|authentication failed|HTTP 401|requires authentication/i,

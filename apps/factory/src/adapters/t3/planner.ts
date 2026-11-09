@@ -146,6 +146,39 @@ export function t3Planner(config: {
       { threadId: run.threadId, runId: run.runId, reason: 'Factory model deadline exceeded' },
       signal
     );
+  const timelyTerminalAt = async (
+    record: Record,
+    detail: Awaited<ReturnType<typeof observe>>,
+    signal: AbortSignal
+  ) => {
+    if (record.deadline === undefined) return undefined;
+    const evidence = z
+      .object({
+        thread: z.object({
+          threadId: z.literal(detail.thread.threadId),
+          latestRunId: z.literal(detail.thread.latestRunId),
+        }),
+        recentRuns: z.array(
+          z.object({ runId: z.string(), completedAt: z.string().datetime().nullable() })
+        ),
+      })
+      .parse(
+        await mcpCall(
+          config,
+          't3_thread_read',
+          { threadId: detail.thread.threadId, runLimit: 1, limit: 1, maxCharsPerItem: 1 },
+          signal
+        )
+      );
+    const finished = evidence.recentRuns.find(
+      (run) => run.runId === detail.thread.latestRunId
+    )?.completedAt;
+    if (!finished) return undefined;
+    const at = Date.parse(finished);
+    return at >= (record.modelHandedOffAt ?? record.deadline - 600000) && at <= record.deadline
+      ? at
+      : undefined;
+  };
   const observeOwned = async (record: Record, signal: AbortSignal) => {
     if (!record.run || record.deadline === undefined)
       throw new Error('Missing durable model ownership');
@@ -172,6 +205,11 @@ export function t3Planner(config: {
     }
     const detail = await observe(run, signal);
     if (['completed', 'idle'].includes(detail.thread.status)) return detail;
+    if (
+      terminal(detail.thread.status) &&
+      (await timelyTerminalAt(record, detail, signal)) !== undefined
+    )
+      return detail;
     await reportDeadline(record);
     if (terminal(detail.thread.status)) return detail;
     throw new ModelDeadline(
@@ -195,31 +233,7 @@ export function t3Planner(config: {
       if (now < record.deadline) completedAt = now;
       else {
         // Observation/cleanup latency is not model execution time. Use exact run evidence.
-        const evidence = z
-          .object({
-            thread: z.object({
-              threadId: z.literal(detail.thread.threadId),
-              latestRunId: z.literal(detail.thread.latestRunId),
-            }),
-            recentRuns: z.array(
-              z.object({ runId: z.string(), completedAt: z.string().datetime().nullable() })
-            ),
-          })
-          .parse(
-            await mcpCall(
-              config,
-              't3_thread_read',
-              { threadId: detail.thread.threadId, runLimit: 1, limit: 1, maxCharsPerItem: 1 },
-              signal
-            )
-          );
-        const finished = evidence.recentRuns.find(
-          (run) => run.runId === detail.thread.latestRunId
-        )?.completedAt;
-        if (finished) {
-          const at = Date.parse(finished);
-          if (at >= record.deadline - 600000 && at <= record.deadline) completedAt = at;
-        }
+        completedAt = await timelyTerminalAt(record, detail, signal);
       }
     }
     if (successful && completedAt === undefined) await reportDeadline(record);

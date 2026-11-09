@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
+import type { AutomaticDeadlineFailure } from '../src/capabilities/plan/index.js';
 
 it('settles its completed model thread without treating cleanup as another plan', async () => {
   const host = await protocol();
@@ -357,3 +358,87 @@ it('requests interruption at the model deadline while thread observation is bloc
     await host.cleanup();
   }
 });
+
+it.each([
+  { status: 'failed', timely: true },
+  { status: 'cancelled', timely: true },
+  { status: 'failed', timely: false },
+  { status: 'cancelled', timely: false },
+])(
+  'classifies recovered $status using exact terminal timing, timely=$timely',
+  async ({ status, timely }) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.UTC(2026, 10, 9, 12));
+    const host = await protocol();
+    const previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const controller = new AbortController();
+    let pending: Promise<unknown> | undefined;
+    const failures: AutomaticDeadlineFailure[] = [];
+    const configuration = {
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      stateDirectory: `${host.directory}/planner-state`,
+      automaticPolicy: {
+        mayLaunch: async () => true,
+        failed: async (failure: AutomaticDeadlineFailure) => {
+          failures.push(failure);
+        },
+      },
+    };
+    try {
+      await host.save({ planner: { status: 'running', proposal: { selected: [], deferred: [] } } });
+      const original = t3Planner(configuration);
+      pending = Effect.runPromise(
+        original.propose(
+          { issues: [], job: { kind: 'empty' }, capacity: { concurrency: 1, admission: 2 } },
+          { automatic: true }
+        ),
+        { signal: controller.signal }
+      ).catch(() => undefined);
+      await vi.waitFor(
+        async () => expect((await host.calls()).some((call) => call.args[1] === 'show')).toBe(true),
+        { timeout: 5000, interval: 20 }
+      );
+      controller.abort();
+      await pending;
+      const ownership = await Effect.runPromise(original.ownership(false));
+      if (ownership?.deadline === undefined) throw new Error('Missing durable model deadline');
+      await host.save({
+        planner: {
+          status,
+          completedAt: new Date(ownership.deadline + (timely ? -1 : 1)).toISOString(),
+          proposal: { selected: [], deferred: [] },
+        },
+      });
+      vi.setSystemTime(ownership.deadline + 10000);
+      const reopened = t3Planner(configuration);
+      await Effect.runPromise(reopened.reconcile());
+      expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({
+        phase: 'failed',
+        retired: true,
+        deadline: ownership.deadline,
+        run: ownership.run,
+      });
+      expect(failures).toHaveLength(timely ? 0 : 1);
+      if (!timely)
+        expect(failures[0]).toMatchObject({
+          deadline: ownership.deadline,
+          runId: 'planner-run',
+          threadId: 'planner-thread',
+        });
+      await Effect.runPromise(t3Planner(configuration).reconcile());
+      expect(failures).toHaveLength(timely ? 0 : 1);
+      expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    } finally {
+      controller.abort();
+      await pending;
+      vi.useRealTimers();
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
+  }
+);

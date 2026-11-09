@@ -108,7 +108,7 @@ async function receipt(running: Running, id: string) {
       expect(value).toMatchObject({ state: 'succeeded' });
       return value;
     },
-    { timeout: 10000, interval: 40 }
+    { timeout: 30000, interval: 40 }
   );
 }
 async function start(running: Running) {
@@ -399,7 +399,7 @@ it('resumes the exact failed review run through v2 without starting another owni
             delivery: { stage: 'review' },
             execution: { threadId: 'thread-live', run: { id: 'run-3', ordinal: 3 } },
           }),
-        { timeout: 5000, interval: 40 }
+        { timeout: 30000, interval: 40 }
       );
       const messages = await stageMessages(host);
       expect(

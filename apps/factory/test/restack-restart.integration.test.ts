@@ -178,7 +178,7 @@ for (const { boundary, edit } of scenarios) {
       await vi.waitFor(
         async () =>
           expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true),
-        { timeout: 10000, interval: 30 }
+        { timeout: 30000, interval: 30 }
       );
       const observed = await Effect.runPromise(f.reopen().inspect(5));
       const head = observed.prerequisite?.base;

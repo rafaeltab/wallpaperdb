@@ -13,7 +13,7 @@ import { basename, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 class ProtocolExit {
-  code: number;
+  declare code: number;
   constructor(code: number) {
     this.code = code;
   }
@@ -26,7 +26,12 @@ class ProtocolExit {
  * @param {Pick<Console, 'log' | 'error'>} output
  * @param {AbortSignal} [signal]
  */
-export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[], output: Pick<Console, "log" | "error">, signal?: AbortSignal): Promise<number> {
+export async function runProtocol(
+  environment: NodeJS.ProcessEnv,
+  argv: string[],
+  output: Pick<Console, 'log' | 'error'>,
+  signal?: AbortSignal
+): Promise<number> {
   signal?.throwIfAborted();
   const process = {
     env: environment,
@@ -40,7 +45,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
-    const hold = async (boundary) => {
+    const hold = async (boundary: string) => {
       if (config.hold !== boundary) return;
       writeFileSync(join(config.directory, 'held'), boundary);
       const { setTimeout } = await import('node:timers/promises');
@@ -65,7 +70,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       console.log(JSON.stringify({ structuredContent: { threads: [], nextCursor: null } }));
       process.exit(0);
     }
-    const earlyFlag = (name) => args[args.indexOf(name) + 1];
+    const earlyFlag = (name: string) => args[args.indexOf(name) + 1];
     if (
       basename(process.argv[1]) === 'gh' &&
       args[0] === 'api' &&
@@ -73,7 +78,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       earlyFlag('-f')?.includes('closedByPullRequestsReferences') &&
       !earlyFlag('-f')?.includes('includeClosedPrs:true')
     ) {
-      const number = Number(earlyFlag('-f').match(/issue\(number:(\d+)\)/)[1]);
+      const number = Number(earlyFlag('-f').match(/issue\(number:(\d+)\)/)![1]);
       console.log(
         JSON.stringify({
           data: {
@@ -87,7 +92,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
                 number,
                 state: config.issueStates?.[number] ?? 'OPEN',
                 closedByPullRequestsReferences: {
-                  nodes: (config.landedPrerequisites?.[number] ?? []).map((pr) => ({
+                  nodes: (config.landedPrerequisites?.[number] ?? []).map((pr: number) => ({
                     number: pr,
                     url: `https://github.com/rafaeltab/wallpaperdb/pull/${pr}`,
                   })),
@@ -104,16 +109,16 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       basename(process.argv[1]) === 'gh' &&
       args[0] === 'api' &&
       /^repos\/rafaeltab\/wallpaperdb\/pulls\/\d+$/.test(args[1]) &&
-      Object.hasOwn(config.mergedPrerequisites ?? {}, args[1].split('/').at(-1))
+      Object.hasOwn(config.mergedPrerequisites ?? {}, args[1].split('/').at(-1)!)
     ) {
-      console.log(JSON.stringify(config.mergedPrerequisites?.[args[1].split('/').at(-1)] ?? null));
+      console.log(JSON.stringify(config.mergedPrerequisites?.[args[1].split('/').at(-1)!] ?? null));
       process.exit(0);
     }
     if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--help')) {
       const path = join(config.directory, 'restacker.json');
-      const flag = (name) => args[args.indexOf(name) + 1];
+      const flag = (name: string) => args[args.indexOf(name) + 1];
       let state = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
-      const git = (cwd, ...values) =>
+      const git = (cwd: string, ...values: string[]) =>
         execFileSync('git', values, {
           cwd,
           encoding: 'utf8',
@@ -142,8 +147,8 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
         );
       } else if (args[1] === 'start') {
         const prompt = args[3];
-        const operation = prompt.match(/Operation ([a-f0-9]+)\./)[1];
-        const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/).slice(1);
+        const operation = prompt.match(/Operation ([a-f0-9]+)\./)![1];
+        const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/)!.slice(1);
         const worktree = join(config.directory, `recovery-worker-${operation}`);
         git(
           config.repository,
@@ -219,7 +224,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           const snapshots = database
             .prepare('SELECT value FROM records WHERE name = ? AND namespace LIKE ?')
             .all('recovery-progress.json', shared ? 'joins/%' : '%')
-            .map((record) => JSON.parse(record.value));
+            .map((record) => JSON.parse(record.value as string));
           writeFileSync(
             join(config.directory, 'review-capacity-observed.json'),
             JSON.stringify(snapshots)
@@ -279,8 +284,8 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       args[0] === 'api' &&
       args[1].includes('/pulls/') &&
       (!config.landing ||
-        (Number(args[1].split('/').at(-1)) !== config.landing.pr &&
-          !Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1))))
+        (Number(args[1].split('/').at(-1)!) !== config.landing.pr &&
+          !Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1)!)))
     ) {
       console.log(
         JSON.stringify({
@@ -299,10 +304,10 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       (args[1] === 'repos/rafaeltab/wallpaperdb' ||
         args[1].includes('/compare/') ||
         (args[1].includes('/pulls/') &&
-          (Number(args[1].split('/').at(-1)) === config.landing.pr ||
-            Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1)))))
+          (Number(args[1].split('/').at(-1)!) === config.landing.pr ||
+            Object.hasOwn(config.landing.merges ?? {}, args[1].split('/').at(-1)!))))
     ) {
-      const value = config.landing.merges?.[args[1].split('/').at(-1)] ?? config.landing;
+      const value = config.landing.merges?.[args[1].split('/').at(-1)!] ?? config.landing;
       if (args[1].includes('/compare/'))
         console.log(
           JSON.stringify({
@@ -364,12 +369,13 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
         args[0] === 'pr' && args[1] === 'list'
           ? Number(
               Object.entries(state.prs).find(
-                ([, value]) => value.branch === args[args.indexOf('--head') + 1]
+                ([, value]) =>
+                  (value as { branch: string }).branch === args[args.indexOf('--head') + 1]
               )?.[0]
             )
           : Number(args[2]);
-      const flag = (name) => args[args.indexOf(name) + 1];
-      const git = (...values) =>
+      const flag = (name: string) => args[args.indexOf(name) + 1];
+      const git = (...values: string[]) =>
         execFileSync('git', ['-C', config.repository, ...values], { encoding: 'utf8' }).trim();
       let result = {};
       if (args[0] === 'issue' && args[1] === 'view')
@@ -419,7 +425,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           isDraft: false,
           mergeable: 'MERGEABLE',
           statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
-            (name) => ({
+            (name: string) => ({
               name,
               status: 'COMPLETED',
               conclusion:
@@ -448,7 +454,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           ? [
               {
                 number: 900,
-                pull_requests: state.members.map((url) => ({
+                pull_requests: state.members.map((url: string) => ({
                   number: Number(url.split('/').at(-1)),
                 })),
               },
@@ -456,8 +462,12 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           : [];
       } else if (args[0] === 'api' && args.includes('POST')) {
         const path = args.find((value) => value.includes('/unstack'));
-        const number = Number(path.split('/').at(-2));
-        if (state.groups) state.groups = state.groups.filter((group) => group.number !== number);
+        const number = Number(path!.split('/').at(-2));
+        if (state.groups)
+          state.groups = state.groups.filter(
+            (group: { number: number; pull_requests: { number: number }[] }) =>
+              group.number !== number
+          );
         else state.members = [];
       } else if (args[0] === 'api' && args[1].includes('/stacks')) {
         const groups =
@@ -466,15 +476,15 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
             ? [
                 {
                   number: 9,
-                  pull_requests: state.members.map((url) => ({
+                  pull_requests: state.members.map((url: string) => ({
                     number: Number(url.split('/').at(-1)),
                   })),
                 },
               ]
             : []);
         const requested = Number(args[1].match(/pull_request=(\d+)/)?.[1]);
-        result = groups.filter((group) =>
-          group.pull_requests.some((pr) => pr.number === requested)
+        result = groups.filter((group: { number: number; pull_requests: { number: number }[] }) =>
+          group.pull_requests.some((pr: { number: number }) => pr.number === requested)
         );
       }
       const boundary =
@@ -498,7 +508,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       // Queries can overlap each other and metadata edits. They must not publish
       // their old snapshots over a completed edit or expose a truncated JSON file.
       if (boundary || (args[0] === 'api' && args.includes('POST'))) save();
-      await hold(boundary);
+      await hold(boundary!);
       console.log(JSON.stringify(result));
       process.exit(0);
     }
@@ -507,16 +517,17 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       const input = JSON.parse(args[2]);
       args.splice(0, args.length, 'thread', 'send', input.threadId, input.message);
     }
-    const flag = (name) => args[args.indexOf(name) + 1];
-    const reply = (value) => console.log(JSON.stringify(value));
+    const flag = (name: string) => args[args.indexOf(name) + 1];
+    const reply = (value: unknown) => console.log(JSON.stringify(value));
     if (config.planning && basename(process.argv[1]) === 'gh' && args[0] !== 'pr') {
       if (args[1] === 'list')
         reply(
-          (config.planning.candidates ?? config.planning.issues.map((i) => i.number)).map(
-            (number) => ({
-              number,
-            })
-          )
+          (
+            config.planning.candidates ??
+            config.planning.issues.map((i: { number: number }) => i.number)
+          ).map((number: number) => ({
+            number,
+          }))
         );
       else if (args[0] === 'api' && args[1] === 'graphql') {
         if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
@@ -537,8 +548,9 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
         else {
           const n = Number(args.join(' ').match(/issue\(number:(\d+)\)/)?.[1]);
           const issue =
-            config.planning.issues.find((i) => i.number === n) ?? config.planning.context;
-          const conn = (nodes) => ({ nodes, pageInfo: { hasNextPage: false } });
+            config.planning.issues.find((i: { number: number }) => i.number === n) ??
+            config.planning.context;
+          const conn = (nodes: unknown[]) => ({ nodes, pageInfo: { hasNextPage: false } });
           reply({
             data: {
               repository: {
@@ -568,14 +580,14 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
         }
       } else if (args[0] === 'api')
         reply([
-          (config.planning.blockers ?? []).map((b) => ({
+          (config.planning.blockers ?? []).map((b: { number: number }) => ({
             html_url: `https://github.com/rafaeltab/wallpaperdb/issues/${b.number}`,
             ...b,
           })),
         ]);
       else
         reply(
-          config.planning.issues.find((i) => i.number === Number(args[2])) ??
+          config.planning.issues.find((i: { number: number }) => i.number === Number(args[2])) ??
             config.planning.context
         );
     } else if (
@@ -631,7 +643,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
         reply(
           config.respectPRFilters
             ? prs.filter(
-                (pr) =>
+                (pr: { headRefName: string; baseRefName: string }) =>
                   pr.headRefName === args[args.indexOf('--head') + 1] &&
                   (!args.includes('--base') || pr.baseRefName === args[args.indexOf('--base') + 1])
               )
@@ -656,7 +668,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           headRefName: `factory/pr-${args[2]}`,
           mergeable: 'MERGEABLE',
           statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
-            (name) => ({
+            (name: string) => ({
               name,
               status: 'COMPLETED',
               conclusion: config.prerequisiteCI ?? 'SUCCESS',
@@ -753,7 +765,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
     } else if (args[1] === 'send') {
       const path = join(config.directory, 'resource.json');
       const resource = JSON.parse(readFileSync(path, 'utf8'));
-      const index = Number(args[3].match(/Stage (\d) of factory/)[1]);
+      const index = Number(args[3].match(/Stage (\d) of factory/)![1]);
       resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
       resource.stageIndex = index;
       resource.stage = args[3].includes('$babysit-pr')
@@ -775,7 +787,7 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
           isDraft: false,
           mergeable: 'MERGEABLE',
           statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
-            (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+            (name: string) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
           ),
         };
         writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
@@ -792,8 +804,8 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
       }
       const parallelResources = config.parallel
         ? readdirSync(config.directory)
-            .filter((name) => name.startsWith('resource-'))
-            .map((name) => JSON.parse(readFileSync(join(config.directory, name), 'utf8')))
+            .filter((name: string) => name.startsWith('resource-'))
+            .map((name: string) => JSON.parse(readFileSync(join(config.directory, name), 'utf8')))
         : [];
       const resource = config.parallel
         ? parallelResources.find((item) => item.threadId === args[2])
@@ -863,7 +875,13 @@ export async function runProtocol(environment: NodeJS.ProcessEnv, argv: string[]
                             review: '<REVIEW>COMPLETE</REVIEW>',
                             publication: '<PR>CREATED</PR>',
                             babysitting: '<PR>READY</PR>',
-                          }[resource.stage ?? 'implementation'],
+                          }[
+                            (resource.stage ?? 'implementation') as
+                              | 'implementation'
+                              | 'review'
+                              | 'publication'
+                              | 'babysitting'
+                          ],
                           tests: true,
                           coverage: true,
                           crap: true,

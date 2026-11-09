@@ -221,6 +221,103 @@ it('allows a fresh command after a definitive stale-action rejection', async () 
   expect(JSON.parse(bodies[1]).commandId).not.toBe(JSON.parse(bodies[0]).commandId);
 });
 
+it('starts a fresh session when another issue is opened in the floating Start panel', async () => {
+  const seed = await sample();
+  const first = seed.entities.issues['issue:1001'];
+  const firstItem = seed.entities.items['item:1001'];
+  const firstAction = seed.entities.actions['action:start-1001'];
+  if (first.metadata.state !== 'known') throw new Error('Expected known first issue');
+  const second = {
+    ...first,
+    id: 'issue:9999',
+    number: 9999,
+    metadata: {
+      ...first.metadata,
+      value: { ...first.metadata.value, title: 'Another ready issue' },
+    },
+  } satisfies typeof first;
+  const secondAction = {
+    ...firstAction,
+    id: 'action:start-9999',
+    targetId: second.id,
+  } satisfies typeof firstAction;
+  const board = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      issues: { ...seed.entities.issues, [second.id]: second },
+      actions: { ...seed.entities.actions, [secondAction.id]: secondAction },
+      items: {
+        ...seed.entities.items,
+        'item:9999': {
+          ...firstItem,
+          id: 'item:9999',
+          subject: { kind: 'issue', issueId: second.id },
+          actionIds: [secondAction.id],
+        },
+      },
+    },
+  } satisfies FactoryV2Snapshot;
+  const commands: string[] = [];
+  const client = new FactoryClient(async (path, init) => {
+    if (init?.method === 'POST') {
+      commands.push(String(init.body));
+      return json({
+        commandId: JSON.parse(String(init.body)).commandId,
+        state: 'succeeded',
+        reasons: [],
+      });
+    }
+    const url = new URL(String(path), 'http://controlled.invalid');
+    if (url.pathname.endsWith('/issues/search')) {
+      const query = url.searchParams.get('q') ?? '';
+      return json({
+        apiVersion: 2,
+        query,
+        coverage: board.meta.coverage,
+        nextPageToken: null,
+        sources: board.entities.sources,
+        users: board.entities.users,
+        labels: board.entities.labels,
+        repositories: board.entities.repositories,
+        hits:
+          query === '9999'
+            ? [{ issue: second, startAction: secondAction }]
+            : [{ issue: first, startAction: firstAction }],
+      } satisfies import('../../src/http/index.js').FactoryV2IssueSearch);
+    }
+    return json(board);
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await user.click(
+    await screen.findByRole('group', { name: 'Select Add a searchable issue list' })
+  );
+  await user.click(screen.getByRole('button', { name: 'Start issue' }));
+  await user.click(
+    await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
+  );
+  await user.type(screen.getByLabelText('Execution context'), 'Only for the first issue');
+  await user.click(screen.getByRole('button', { name: 'Start issue' }));
+  expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe(
+    'Only for the first issue'
+  );
+  await user.click(screen.getByRole('group', { name: 'Select Another ready issue' }));
+  await user.click(screen.getByRole('button', { name: 'Start issue' }));
+  expect(screen.getByLabelText<HTMLInputElement>('Search issues').value).toBe('9999');
+  expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe('');
+  expect(screen.queryByRole('button', { name: 'Start selected issue' })).toBeNull();
+  await user.click(await screen.findByRole('button', { name: '#9999 Another ready issue' }));
+  await user.type(screen.getByLabelText('Execution context'), 'Only for the second issue');
+  await user.click(screen.getByRole('button', { name: 'Start selected issue' }));
+  await screen.findByText('Command succeeded');
+  expect(commands).toHaveLength(1);
+  expect(JSON.parse(commands[0])).toMatchObject({
+    actionId: 'action:start-9999',
+    payload: { context: 'Only for the second issue' },
+  });
+});
+
 it('keeps failed checks and detail check names visible without URLs', async () => {
   let board = await sample();
   const pr = board.entities.pullRequests['pr:2003'];

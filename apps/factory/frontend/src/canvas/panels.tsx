@@ -218,6 +218,19 @@ export function Start({
   const [resultRevision, setResultRevision] = useState<string>();
   const [picked, setPicked] = useState<{ issue: Issue; action: Action; revision: string }>(),
     [context, setContext] = useState('');
+  const currentAction = picked ? factory.board?.entities.actions[picked.action.id] : undefined;
+  const currentIssue = picked ? factory.board?.entities.issues[picked.issue.id] : undefined;
+  useEffect(() => {
+    if (!picked || picked.revision === indexRevision || !currentAction) return;
+    setPicked((selection) =>
+      selection !== picked
+        ? selection
+        : currentAction.version === picked.action.version
+          ? { ...picked, issue: currentIssue ?? picked.issue, revision: indexRevision }
+          : undefined
+    );
+  }, [picked, indexRevision, currentAction, currentIssue]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: A new index generation expires the current page token.
   useEffect(() => setPage(undefined), [indexRevision]);
   useEffect(() => {
     const controller = new AbortController();

@@ -439,6 +439,104 @@ it('retains a Start selection when issue metadata changes without changing its a
   expect(posts).toBe(0);
 });
 
+it('keeps a valid later-page Start selection when an index change resets pagination', async () => {
+  const seed = await sample();
+  const template = seed.entities.issues['issue:1001'];
+  if (template.metadata.state !== 'known') throw new Error('Expected known sample issue');
+  const issues: Record<keyof FactoryV2Snapshot['entities']['issues'], typeof template> = {};
+  const actions = { ...seed.entities.actions };
+  for (let number = 2000; number < 2025; number++) {
+    const id: keyof typeof issues = `issue:page-${number}`;
+    issues[id] = {
+      ...template,
+      id,
+      number,
+      metadata: {
+        ...template.metadata,
+        value: { ...template.metadata.value, title: `Issue ${number}` },
+      },
+    };
+    const actionId: keyof typeof actions = `action:page-${number}`;
+    actions[actionId] = {
+      ...seed.entities.actions['action:start-1001'],
+      id: actionId,
+      targetId: id,
+    };
+  }
+  let board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      issues,
+      actions,
+      items: {},
+      relationships: {},
+      stacks: {},
+      jobs: {},
+      maintenance: {},
+      threads: {},
+    },
+  };
+  const pages: (string | null)[] = [];
+  const client = new FactoryClient(async (path) => {
+    const url = new URL(String(path), 'http://controlled.invalid');
+    if (url.pathname.endsWith('/issues/search')) {
+      const page = url.searchParams.get('pageToken');
+      pages.push(page);
+      const matches = Object.values(board.entities.issues).sort((a, b) => a.number - b.number);
+      const offset = page ? 20 : 0;
+      return json({
+        apiVersion: 2,
+        query: url.searchParams.get('q') ?? '',
+        coverage: board.meta.coverage,
+        sources: board.entities.sources,
+        users: board.entities.users,
+        labels: board.entities.labels,
+        repositories: board.entities.repositories,
+        nextPageToken: offset ? null : 'page-two',
+        hits: matches.slice(offset, offset + 20).map((issue) => ({
+          issue,
+          startAction: board.entities.actions[`action:page-${issue.number}`],
+        })),
+      } satisfies import('../../src/http/index.js').FactoryV2IssueSearch);
+    }
+    return json(board);
+  });
+  vi.useFakeTimers();
+  await act(async () => {
+    render(<FactoryApp client={client} />);
+  });
+  fireEvent.click(screen.getByRole('button', { name: '+ Start issue' }));
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  fireEvent.click(screen.getByRole('button', { name: 'Next results' }));
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  fireEvent.click(screen.getByRole('button', { name: '#2024 Issue 2024' }));
+  fireEvent.change(screen.getByLabelText('Execution context'), {
+    target: { value: 'Preserve this selected scope' },
+  });
+  act(() => window.dispatchEvent(new Event('pagehide')));
+  board = {
+    ...board,
+    entities: {
+      ...board.entities,
+      issues: {
+        ...board.entities.issues,
+        'issue:page-2000': { ...board.entities.issues['issue:page-2000'], version: 'unrelated' },
+      },
+    },
+  };
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  expect(pages).toContain('page-two');
+  expect(pages.at(-1)).toBeNull();
+  expect(
+    screen.getByRole<HTMLButtonElement>('button', { name: 'Start selected issue' }).disabled
+  ).toBe(false);
+  expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe(
+    'Preserve this selected scope'
+  );
+});
+
 it('keeps failed checks and detail check names visible without URLs', async () => {
   let board = await sample();
   const pr = board.entities.pullRequests['pr:2003'];

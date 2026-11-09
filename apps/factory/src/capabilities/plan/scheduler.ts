@@ -14,7 +14,7 @@ import {
   type Proposal,
   type ResumeClaim,
 } from './contract.js';
-import { validate, locallyBlocked } from './implementation.js';
+import { validate, locallyBlocked, planningInputIdentity } from './implementation.js';
 import { PlanningSafety } from './safety-contract.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
 const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
@@ -55,6 +55,7 @@ export const SchedulerLive = Layer.effect(
     const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
     let retryPreview: Preview | undefined;
+    let pendingSuccess: Preview | undefined;
     const observe = (
       state: ScheduleState
     ): Effect.Effect<ScheduleStatus, import('../job/index.js').Unavailable> =>
@@ -252,30 +253,37 @@ export const SchedulerLive = Layer.effect(
           yield* reconcile();
           const snapshot = yield* status();
           if (!available(snapshot)) return snapshot;
+          // Retry the local success record before spending another provider read.
+          if (pendingSuccess?.modelAttemptId)
+            yield* planningSafety.accepted(pendingSuccess.modelAttemptId);
           const attemptStartedAt = yield* time.now();
-          const input = yield* source.poll?.() ?? source.read();
+          const input = yield* pendingSuccess ? source.read() : (source.poll?.() ?? source.read());
           if (!input) return snapshot;
-          const normalized = {
-            ...input,
-            job: normalize(input.job),
-            jobs: input.jobs?.map(normalize),
-          };
-          const signature = JSON.stringify(normalized);
+          const signature = planningInputIdentity(input);
+          if (pendingSuccess && planningInputIdentity(pendingSuccess.input) !== signature)
+            pendingSuccess = undefined;
           if (!hasFrontier(input, snapshot.state)) return snapshot;
           if (signature === lastInput) {
             return yield* retry(retryPreview, base, snapshot.state.revision);
           }
-          const preview = yield* plan.preview({
-            automatic: true,
-            attemptStartedAt,
-            progress: () => Effect.void,
-          });
+          const preview =
+            pendingSuccess ??
+            (yield* plan.preview({
+              automatic: true,
+              attemptStartedAt,
+              progress: () => Effect.void,
+            }));
           if (preview.kind !== 'preview') return yield* status();
-          lastInput = signature;
-          retryPreview = joinPreview(preview);
           // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.
-          if (preview.input.scheduleRevision !== snapshot.state.revision) return yield* status();
+          if (preview.input.scheduleRevision !== snapshot.state.revision) {
+            pendingSuccess = undefined;
+            return yield* status();
+          }
+          pendingSuccess = preview;
           if (preview.modelAttemptId) yield* planningSafety.accepted(preview.modelAttemptId);
+          lastInput = planningInputIdentity(preview.input);
+          retryPreview = joinPreview(preview);
+          pendingSuccess = undefined;
           yield* dispatch(preview, base, snapshot.state.revision);
           return yield* status();
         }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.tick')),
@@ -307,10 +315,6 @@ export const SchedulerLive = Layer.effect(
     } satisfies Scheduler;
   })
 );
-
-function normalize(job: Status) {
-  return job.kind === 'job' ? { ...job, elapsedMs: 0 } : job;
-}
 
 function validStart(command: Start) {
   return (

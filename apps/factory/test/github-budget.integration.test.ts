@@ -26,6 +26,27 @@ async function withGithub(
 }
 
 it.each([
+  {
+    stderr: '',
+    errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }],
+    diagnostic: 'rate-limit',
+    status: 200,
+    limited: true,
+  },
+  {
+    stderr: '',
+    errors: [
+      ...Array.from({ length: 16 }, () => ({
+        type: 'CONTROLLED_ERROR',
+        message: 'Controlled GraphQL failure',
+      })),
+      { type: 'RATE_LIMITED', message: 'API rate limit exceeded' },
+    ],
+    diagnostic: 'rate-limit outside the diagnostic sample',
+    diagnostics: ['graphql', 'rate-limit'],
+    status: 200,
+    limited: true,
+  },
   { stderr: 'gh: authentication failed', diagnostic: 'authentication', bootstrap: true },
   {
     stderr: 'gh: To get started with GitHub CLI, please run: gh auth login',
@@ -62,6 +83,14 @@ it.each([
       if (args[1] === 'rate_limit' && !${JSON.stringify(failure.bootstrap ?? false)}) {
         console.log(JSON.stringify({ resources: { graphql: { limit: 5000, remaining: 5000, reset: Math.ceil(Date.now()/1000)+3600 } } }));
       } else {
+        if (${JSON.stringify(failure.status ?? null)} !== null) {
+          console.error('< HTTP/2.0 ${failure.status ?? 200}');
+          console.error('< X-Ratelimit-Resource: graphql');
+          console.error('< X-Ratelimit-Limit: 5000');
+          console.error('< X-Ratelimit-Remaining: 4900');
+          console.error('< X-Ratelimit-Reset: ' + (Math.ceil(Date.now()/1000)+3600));
+          console.error('');
+        }
         console.error('> Authorization: Bearer ${secret}');
         console.error(JSON.stringify({ debugBody: ${JSON.stringify(secret)} }));
         console.error(${JSON.stringify(failure.stderr + ' ' + secret)});
@@ -75,17 +104,25 @@ it.each([
       directory: host.directory + '/state',
       signal: stop.signal,
     });
-    const error = await requests([
+    const pending = requests([
       'api',
       'graphql',
       '-f',
       'query=query { viewer { login } }',
-    ]).catch((cause) => cause);
-    expect(error).toMatchObject({
+    ]);
+    await expect(pending).rejects.toMatchObject({
       message: 'GitHub request failed',
-      cause: { diagnostics: [failure.diagnostic] },
+      cause: {
+        diagnostics: failure.diagnostics ?? [failure.diagnostic],
+        rateLimited: failure.limited ?? false,
+      },
     });
+    const error = await pending.catch((cause) => cause);
     expect(inspect(error, { depth: null })).not.toContain(secret);
+    if (failure.status === 200)
+      expect(error).toMatchObject({
+        cause: { responses: [{ status: 200, resource: 'graphql', remaining: 4900 }] },
+      });
   })
 );
 

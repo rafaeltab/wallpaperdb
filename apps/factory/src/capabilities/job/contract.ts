@@ -83,6 +83,13 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** A verified unsuccessful implementation opens same-thread manual repair.
+   * Successor associations are immutable stage records, never another launch. */
+  readonly manualRepair?: {
+    readonly index: number;
+    readonly threadId: string;
+    readonly run: { readonly id: string; readonly ordinal: number };
+  };
   /** Current fresh implementation attempt. Prior immutable stages and worktrees remain retained. */
   readonly restart?: { readonly index: number };
   /** Last verified ready or landed association survives external retargeting and restart.
@@ -252,6 +259,8 @@ export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' 
 /** Immutable stage association, written before any delivery. Ordinal pins single-turn stages. Babysitting watcher turns also require the
  * exact stage delivery identity in their current-run receipt. */
 export interface StageRequest {
+  /** Original verified recovery stage authorizing this manually started continuation. */
+  readonly repairOrigin?: number;
   readonly comparison?: {
     readonly base: string;
     readonly prBase: string;

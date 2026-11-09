@@ -360,13 +360,17 @@ it('requests interruption at the model deadline while thread observation is bloc
 });
 
 it.each([
-  { status: 'failed', timely: true },
-  { status: 'cancelled', timely: true },
-  { status: 'failed', timely: false },
-  { status: 'cancelled', timely: false },
+  { status: 'failed', timing: 'early' },
+  { status: 'cancelled', timing: 'early' },
+  { status: 'failed', timing: 'late' },
+  { status: 'cancelled', timing: 'late' },
+  { status: 'failed', timing: 'unknown' },
+  { status: 'cancelled', timing: 'unknown' },
+  { status: 'completed', timing: 'unknown' },
+  { status: 'completed', timing: 'late' },
 ])(
-  'classifies recovered $status using exact terminal timing, timely=$timely',
-  async ({ status, timely }) => {
+  'classifies recovered $status using exact terminal timing, timing=$timing',
+  async ({ status, timing }) => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.UTC(2026, 10, 9, 12));
     const host = await protocol();
@@ -409,7 +413,13 @@ it.each([
       await host.save({
         planner: {
           status,
-          completedAt: new Date(ownership.deadline + (timely ? -1 : 1)).toISOString(),
+          ...(timing === 'unknown'
+            ? {}
+            : {
+                completedAt: new Date(
+                  ownership.deadline + (timing === 'early' ? -1 : 1)
+                ).toISOString(),
+              }),
           proposal: { selected: [], deferred: [] },
         },
       });
@@ -417,20 +427,20 @@ it.each([
       const reopened = t3Planner(configuration);
       await Effect.runPromise(reopened.reconcile());
       expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({
-        phase: 'failed',
+        phase: status === 'completed' ? 'succeeded' : 'failed',
         retired: true,
         deadline: ownership.deadline,
         run: ownership.run,
       });
-      expect(failures).toHaveLength(timely ? 0 : 1);
-      if (!timely)
+      expect(failures).toHaveLength(timing === 'late' ? 1 : 0);
+      if (timing === 'late')
         expect(failures[0]).toMatchObject({
           deadline: ownership.deadline,
           runId: 'planner-run',
           threadId: 'planner-thread',
         });
       await Effect.runPromise(t3Planner(configuration).reconcile());
-      expect(failures).toHaveLength(timely ? 0 : 1);
+      expect(failures).toHaveLength(timing === 'late' ? 1 : 0);
       expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
     } finally {
       controller.abort();

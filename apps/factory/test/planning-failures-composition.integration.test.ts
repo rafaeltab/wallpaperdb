@@ -7,6 +7,18 @@ import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
 import type { BoardSnapshot } from '../src/capabilities/board/index.js';
 
+async function expireModel(host: Awaited<ReturnType<typeof protocol>>, elapsed: number) {
+  const at = Date.now() + elapsed;
+  const saved = JSON.parse(await readFile(host.configFile, 'utf8'));
+  // The controlled provider confirms this run ended after expiry. Advancing the
+  // observer's clock alone cannot establish when a terminal model actually ended.
+  await host.save({
+    ...saved,
+    planner: { ...saved.planner, completedAt: new Date(at).toISOString() },
+  });
+  vi.setSystemTime(at);
+}
+
 it('pauses after three distinct automatic model deadlines and retains their durations after restart', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 8, 12));
@@ -78,7 +90,7 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       });
       // Each provider run gets a different actual elapsed interval. A fixed ten-minute
       // duration, or discovery time charged to model execution, fails these assertions.
-      vi.setSystemTime(Date.now() + elapsed[index]);
+      await expireModel(host, elapsed[index]);
       if (index === 0) {
         await vi.waitFor(
           async () =>
@@ -294,7 +306,7 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       timeout: 6000,
       interval: 20,
     });
-    vi.setSystemTime(Date.now() + 11 * 60_000);
+    await expireModel(host, 11 * 60_000);
     await vi.waitFor(
       async () => {
         const next = (await running!.app.inject('/api/v2/board')).json();
@@ -331,7 +343,7 @@ it('pauses after three distinct automatic model deadlines and retains their dura
       timeout: 6000,
       interval: 20,
     });
-    vi.setSystemTime(Date.now() + 11 * 60_000);
+    await expireModel(host, 11 * 60_000);
     await vi.waitFor(
       async () => {
         const next = (await running!.app.inject('/api/v2/board')).json();
@@ -440,7 +452,7 @@ it('keeps a nonexhausted streak through manual previews, pause/resume and empty 
         })
       ).statusCode
     ).toBe(200);
-    vi.setSystemTime(Date.now() + 11 * 60000);
+    await expireModel(host, 11 * 60000);
     await vi.waitFor(
       async () =>
         expect(

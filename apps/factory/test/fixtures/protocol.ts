@@ -71,45 +71,60 @@ export async function runProtocol(
       const status = rate.status ?? 200;
       process.stderr.write(
         `< HTTP/2.0 ${status} Fixture\n` +
-        `< X-Ratelimit-Resource: ${resource}\n` +
-        `< X-Ratelimit-Limit: ${rate.limit ?? 1000000}\n` +
-        `< X-Ratelimit-Remaining: ${rate.remaining ?? 999999}\n` +
-        `< X-Ratelimit-Reset: ${rate.reset ?? config.githubQuotaReset}\n` +
-        (rate.retryAfter ? `< Retry-After: ${rate.retryAfter}\n` : '') + '<\n'
+          `< X-Ratelimit-Resource: ${resource}\n` +
+          `< X-Ratelimit-Limit: ${rate.limit ?? 1000000}\n` +
+          `< X-Ratelimit-Remaining: ${rate.remaining ?? 999999}\n` +
+          `< X-Ratelimit-Reset: ${rate.reset ?? config.githubQuotaReset}\n` +
+          (rate.retryAfter ? `< Retry-After: ${rate.retryAfter}\n` : '') +
+          '<\n'
       );
       if (status !== 200) {
         console.log(JSON.stringify({ message: 'Controlled provider throttling' }));
         process.exit(1);
       }
       if (rate.limited && resource === 'graphql') {
-        process.stderr.write('{"errors":[{"type":"RATE_LIMITED","message":"Secondary rate limit"}]}\n');
+        process.stderr.write(
+          '{"errors":[{"type":"RATE_LIMITED","message":"Secondary rate limit"}]}\n'
+        );
         process.exit(1);
       }
       if (args[0] === 'api' && args[1] === 'rate_limit') {
         await hold('github-bootstrap');
-        console.log(JSON.stringify({
-          resources: Object.fromEntries([
-            ...['core', 'graphql', 'search'],
-            ...(rate.unavailableResource ? ['code_search'] : []),
-          ].map((name) => [name, {
-            limit: name === 'code_search' ? 0 : (rate.limit ?? 1000000),
-            remaining: name === 'code_search' ? 0 : (rate.remaining ?? 999999),
-            reset: rate.reset ?? config.githubQuotaReset,
-          }])),
-        }));
+        console.log(
+          JSON.stringify({
+            resources: Object.fromEntries(
+              [
+                ...['core', 'graphql', 'search'],
+                ...(rate.unavailableResource ? ['code_search'] : []),
+              ].map((name) => [
+                name,
+                {
+                  limit: name === 'code_search' ? 0 : (rate.limit ?? 1000000),
+                  remaining: name === 'code_search' ? 0 : (rate.remaining ?? 999999),
+                  reset: rate.reset ?? config.githubQuotaReset,
+                },
+              ])
+            ),
+          })
+        );
         process.exit(0);
       }
       const log = console.log;
       console.log = (...values) => {
-        if (args[0] === 'api' && args[1] === 'graphql' && args.some((a) => a.includes('factoryRateLimit:'))) {
+        if (
+          args[0] === 'api' &&
+          args[1] === 'graphql' &&
+          args.some((a) => a.includes('factoryRateLimit:'))
+        ) {
           const value = JSON.parse(values[0]);
           for (const page of Array.isArray(value) ? value : [value])
-            if (page?.data) page.data.factoryRateLimit = {
-              cost: rate.cost ?? 1,
-              limit: rate.limit ?? 1000000,
-              remaining: rate.remaining ?? 999999,
-              resetAt: new Date((rate.reset ?? config.githubQuotaReset) * 1000).toISOString(),
-            };
+            if (page?.data)
+              page.data.factoryRateLimit = {
+                cost: rate.cost ?? 1,
+                limit: rate.limit ?? 1000000,
+                remaining: rate.remaining ?? 999999,
+                resetAt: new Date((rate.reset ?? config.githubQuotaReset) * 1000).toISOString(),
+              };
           values[0] = JSON.stringify(value);
         }
         log(...values);

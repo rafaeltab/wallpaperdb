@@ -27,7 +27,10 @@ export interface BoardStore {
   save(record: BoardRecord, expectedCursor: string | null): Effect.Effect<boolean, Unavailable>;
   command(id: string): Effect.Effect<CommandRecord | undefined, Unavailable>;
   accept(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
+  /** Claims only accepted responsibility. A technical failure can leave the claim
+   * committed; inspect the durable receipt before retrying any external effect. */
   claim(record: CommandRecord): Effect.Effect<boolean, Unavailable>;
+  /** Replay-safe persistence of an already computed outcome; never executes its command. */
   finish(record: CommandRecord): Effect.Effect<void, Unavailable>;
   interruptPending(reason: import('./model.js').Reason): Effect.Effect<void, Unavailable>;
   planBasis(

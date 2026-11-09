@@ -69,6 +69,7 @@ export function makeBoard(config: {
     }
     const listeners = new Set<() => void>();
     const receipts = new Map<string, CommandRecord>();
+    const uncertainClaims = new Set<string>();
     yield* store.interruptPending({
       code: 'interrupted-command',
       message:
@@ -198,6 +199,35 @@ export function makeBoard(config: {
             receipts.delete(record.request.commandId);
             continue;
           }
+          if (uncertainClaims.has(record.request.commandId)) {
+            const retained = yield* store.command(record.request.commandId);
+            uncertainClaims.delete(record.request.commandId);
+            if (retained?.receipt.state === 'running') {
+              const uncertain: CommandRecord = {
+                ...record,
+                receipt: {
+                  ...record.receipt,
+                  state: 'uncertain',
+                  version: '3',
+                  reasons: [
+                    {
+                      code: 'claim-outcome-uncertain',
+                      message:
+                        'Command ownership could not be confirmed. Reconcile the owning operation before retrying.',
+                    },
+                  ],
+                },
+              };
+              receipts.set(record.request.commandId, uncertain);
+              yield* store.finish(uncertain);
+              receipts.delete(record.request.commandId);
+              continue;
+            }
+            if (retained?.receipt.state !== 'accepted') {
+              receipts.delete(record.request.commandId);
+              continue;
+            }
+          }
           const action = current.snapshot.entities.actions[record.request.actionId];
           const stale = validate(record.request, action);
           let result: Effect.Success<ReturnType<BoardCommands['execute']>>;
@@ -214,7 +244,15 @@ export function makeBoard(config: {
               ...record,
               receipt: { ...record.receipt, state: 'running' as const, version: '2' },
             };
-            if (!(yield* store.claim(running))) {
+            if (
+              !(yield* store
+                .claim(running)
+                .pipe(
+                  Effect.tapError(() =>
+                    Effect.sync(() => uncertainClaims.add(record.request.commandId))
+                  )
+                ))
+            ) {
               const winner = yield* store.command(record.request.commandId);
               if (winner && winner.receipt.state === 'accepted')
                 receipts.set(record.request.commandId, winner);

@@ -55,6 +55,34 @@ export function t3Planner(config: {
   const journal = plannerState(config.stateDirectory);
   let busy = false;
   let reconciling = false;
+  let reconciliation = Promise.resolve();
+  const startReconciliation = () => {
+    reconciling = true;
+    let complete: (() => void) | undefined;
+    reconciliation = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    return () => {
+      reconciling = false;
+      complete?.();
+    };
+  };
+  const waitForReconciliation = async (signal: AbortSignal) => {
+    if (!reconciling) return;
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        signal.removeEventListener('abort', abort);
+        reject(signal.reason);
+      };
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+      void reconciliation.then(() => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      });
+    });
+    signal.throwIfAborted();
+  };
   let needsRecovery = true;
   const terminal = (status: string) =>
     ['idle', 'completed', 'interrupted', 'failed', 'cancelled'].includes(status);
@@ -262,7 +290,7 @@ export function t3Planner(config: {
       Effect.tryPromise({
         try: async (signal) => {
           if (busy || reconciling || !needsRecovery) return;
-          reconciling = true;
+          const finishReconciliation = startReconciliation();
           try {
             const previous = await journal.read();
             if (!previous || previous.settled || !previous.run) {
@@ -272,7 +300,7 @@ export function t3Planner(config: {
             const detail = await observeOwned(previous, signal);
             if (terminal(detail.thread.status)) await finish(previous, detail, signal, false);
           } finally {
-            reconciling = false;
+            finishReconciliation();
           }
         },
         catch: (cause) => new Unavailable({ operation: 'planner-recovery', cause }),
@@ -294,7 +322,7 @@ export function t3Planner(config: {
             !busy &&
             !reconciling
           ) {
-            reconciling = true;
+            const finishReconciliation = startReconciliation();
             try {
               const detail = await observeOwned(previous, signal);
               if (terminal(detail.thread.status)) {
@@ -305,7 +333,7 @@ export function t3Planner(config: {
               if (!(cause instanceof ModelDeadline)) throw cause;
               failure = new Unavailable({ operation: 'model-deadline', cause });
             } finally {
-              reconciling = false;
+              finishReconciliation();
             }
           }
           return { ownership: ownershipOf(previous), failure };
@@ -320,9 +348,10 @@ export function t3Planner(config: {
     propose: (input, attempt) =>
       Effect.tryPromise({
         try: async (signal) => {
-          if (busy || reconciling) throw new Error('Planner request already in progress');
+          if (busy) throw new Error('Planner request already in progress');
           busy = true;
           try {
+            await waitForReconciliation(signal);
             const recovered = await recover(input, signal, attempt?.requestId);
             if (recovered) return recovered;
             const requestId = attempt?.requestId ?? randomUUID();

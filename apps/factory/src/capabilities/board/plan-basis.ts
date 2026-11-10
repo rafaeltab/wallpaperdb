@@ -2,6 +2,7 @@ import type { ScheduleSnapshot } from '../observe/index.js';
 import { version } from './values.js';
 /** Relevant planning facts exclude source freshness, elapsed time and presentation. */
 export function planningIdentity(input: ScheduleSnapshot) {
+  const pulls = new Map(input.observations.facts?.pullRequests.map((pr) => [pr.number, pr]));
   return version({
     state: input.state,
     issues: input.observations.facts?.issues.map((i) => ({
@@ -15,6 +16,10 @@ export function planningIdentity(input: ScheduleSnapshot) {
       updatedAt: i.updatedAt,
       blockers: i.blockers,
       parents: i.parents,
+      pullRequests: i.pullRequests.map((number) => {
+        const pr = pulls.get(number);
+        return { number, url: pr?.url, state: pr?.state };
+      }),
       evaluation: i.evaluation
         ? {
             allowed: i.evaluation.allowed,

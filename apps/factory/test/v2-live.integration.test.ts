@@ -1162,6 +1162,104 @@ it('distinguishes failed CI without an actor from an owned automatic repair', as
 });
 
 it.each([
+  { change: 'linked lifecycle', expected: 'stale' },
+  { change: 'linked association', expected: 'stale' },
+  { change: 'unrelated lifecycle', expected: 'current' },
+] as const)(
+  'qualifies preview applicability after $change changes',
+  async ({ change, expected }) => {
+    const { issueObservation, pullObservation } = await import('./fixtures/v2.js');
+    const observed = issueObservation(1, { pullRequests: [8] }),
+      linked = pullObservation(8, { linkedIssues: [1] }),
+      other = pullObservation(9);
+    const input: ScheduleSnapshot = {
+      ...initial,
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 1000,
+        facts: { issues: [observed], pullRequests: [linked, other] },
+      },
+    };
+    const attempt: PlanningAttempt = {
+      id: '00000000-0000-4000-8000-000000000081',
+      revision: 1,
+      startedAt: 1000,
+      deadline: 5000,
+      finishedAt: 2000,
+      phase: 'succeeded',
+    };
+    const attempts: AttemptStore = {
+      pending: () => Effect.succeed(undefined),
+      get: (id) => Effect.succeed(id === attempt.id ? attempt : undefined),
+      create: () => Effect.succeed(false),
+      save: () => Effect.succeed(false),
+    };
+    const board = await liveBoard({
+      scopeId: 'test',
+      initial: input,
+      attempts,
+      commands: {
+        execute: () =>
+          Effect.succeed({
+            state: 'succeeded',
+            result: { planId: `plan:${attempt.id}` },
+            reasons: [],
+          }),
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const before = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const preview = Object.values(before.entities.actions).find((a) => a.kind === 'preview-plan');
+      if (preview?.availability.state !== 'available') throw new Error('Preview unavailable');
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/v2/commands',
+            payload: {
+              commandId: '00000000-0000-4000-8000-000000000082',
+              actionId: preview.id,
+              precondition: preview.availability.precondition,
+              kind: 'preview-plan',
+              payload: {},
+            },
+          })
+        ).statusCode
+      ).toBe(202);
+      await board.idle();
+      await board.publish(input, attempt);
+      const url = `/api/v2/plans/${encodeURIComponent(`plan:${attempt.id}`)}`;
+      const current = (await app.inject(url)).json();
+      expect(current.attempt.applicability).toBe('current');
+      await board.publish(
+        {
+          ...input,
+          observations: {
+            ...input.observations,
+            observedAt: 2000,
+            facts: {
+              issues: [{ ...observed, pullRequests: change === 'linked association' ? [9] : [8] }],
+              pullRequests: [
+                { ...linked, state: change === 'linked lifecycle' ? 'MERGED' : 'OPEN' },
+                { ...other, state: change === 'unrelated lifecycle' ? 'CLOSED' : 'OPEN' },
+              ],
+            },
+          },
+        },
+        attempt
+      );
+      const after = (await app.inject(url)).json();
+      expect(after.attempt.basis).toEqual(current.attempt.basis);
+      expect(after.attempt.applicability).toBe(expected);
+    } finally {
+      await app.close();
+    }
+  }
+);
+
+it.each([
   { field: 'projectPriority', projectField: 'priority', next: 'P0' },
   { field: 'projectSize', projectField: 'size', next: 'XL' },
   { field: 'projectStatus', projectField: 'status', next: 'In Progress' },

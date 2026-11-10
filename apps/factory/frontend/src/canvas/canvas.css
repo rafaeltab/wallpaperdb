@@ -12,6 +12,7 @@ body:has(.cc-app) { margin:0; padding:0; max-width:none; overflow:hidden; backgr
 .cc-fixture { color:#aaa187; font-size:9px; padding:3px 5px; border:1px solid #454033; border-radius:3px; white-space:nowrap; }.cc-toolbar-space { flex:1; }
 .cc-toolbar>button { color:#b0b0bf; font-size:10px; padding:5px 7px; border-radius:4px; white-space:nowrap; }.cc-toolbar>button:hover { background:#292930; }.cc-toolbar select { font-size:10px; color:#b7b7c6; background:#1c1c23; border:1px solid #373741; border-radius:4px; padding:4px 7px; max-width:155px; }
 .cc-toolbar .cc-settings-button { padding:5px; border-left:1px solid #35353e; border-radius:0; }
+.cc-attention-source-details { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .cc-viewport { height:calc(100dvh - 44px); position:relative; overflow:clip; touch-action:none; user-select:none; cursor:grab; background-image:radial-gradient(#343440 .65px,transparent .65px); background-size:18px 18px; }.cc-viewport.dragging { cursor:grabbing; }
 .cc-world { position:absolute; inset:0 auto auto 0; transform-origin:0 0; will-change:transform; }
 .cc-area { position:absolute; border-top:1px solid #383842; pointer-events:none; }

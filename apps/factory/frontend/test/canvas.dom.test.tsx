@@ -1239,6 +1239,127 @@ it('keeps unknown labels distinct from an observed empty list on a known PR', as
   const card = await screen.findByRole('group', { name: 'Select Expose observation metadata' });
   expect(card.textContent).toContain('Labels unavailable');
 });
+it.each([
+  { kind: 'github', refresh: 'idle', expired: true, observed: true, warning: true },
+  { kind: 't3', refresh: 'failed', expired: false, observed: true, warning: true },
+  { kind: 't3', refresh: 'unavailable', expired: false, observed: false, warning: true },
+  { kind: 'github', refresh: 'idle', expired: false, observed: true, warning: false },
+] as const)(
+  'qualifies attention on the board for $kind $refresh, expired $expired',
+  async ({ kind, refresh, expired, observed, warning }) => {
+    const now = Date.UTC(2026, 10, 10, 12);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    const seed = await sample(),
+      source = Object.values(seed.entities.sources).find((s) => s.kind === kind);
+    if (!source) throw new Error('Expected provider source');
+    const observedAt = new Date(now - 60000).toISOString();
+    const board: FactoryV2Snapshot = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        sources: {
+          ...seed.entities.sources,
+          [source.id]: {
+            ...source,
+            refresh,
+            observedAt: observed ? observedAt : null,
+            staleAt: observed ? new Date(now + (expired ? -1 : 60000)).toISOString() : null,
+            failure: refresh === 'failed' ? { code: 'provider', message: 'Refresh failed' } : null,
+          },
+        },
+      },
+    };
+    render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+    await screen.findByText('Implement the command centre');
+    const toggle = screen.getByRole('button', {
+      name: 'Highlight 2 items needing human attention',
+    });
+    expect(screen.queryByRole('button', { name: 'Refresh observations' })).toBeNull();
+    if (!warning) {
+      expect(screen.queryByText('Attention count may be outdated')).toBeNull();
+      expect(toggle.getAttribute('aria-describedby')).toBeNull();
+      return;
+    }
+    const status = screen.getByRole('status');
+    expect(status.textContent).toContain('Attention count may be outdated');
+    expect(status.textContent).toContain(kind);
+    expect(toggle.textContent).toContain(observed ? 'as of' : 'source unavailable');
+    if (observed) expect(toggle.querySelector('time')?.getAttribute('datetime')).toBe(observedAt);
+    expect(toggle.getAttribute('aria-describedby')).toBe(status.id);
+    if (observed) expect(status.querySelector('time')?.getAttribute('datetime')).toBe(observedAt);
+    else {
+      expect(status.textContent).toContain('unobserved');
+      expect(status.querySelector('time')).toBeNull();
+    }
+    expect(screen.queryByText(/Showing last-known board/)).toBeNull();
+  }
+);
+it('dates attention by the oldest affected observation rather than publication or a healthy source', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 10, 12));
+  const seed = await sample();
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      sources: Object.fromEntries(
+        Object.entries(seed.entities.sources).map(([id, source]) => [
+          id,
+          {
+            ...source,
+            observedAt:
+              source.kind === 'github'
+                ? '2026-11-10T11:58:00.000Z'
+                : source.kind === 't3'
+                  ? '2026-11-10T11:59:00.000Z'
+                  : '2026-11-10T11:00:00.000Z',
+            staleAt: source.kind === 'factory' ? null : '2026-11-10T11:59:59.000Z',
+          },
+        ])
+      ),
+    },
+  };
+  render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+  await screen.findByText('Implement the command centre');
+  const status = screen.getByRole('status');
+  expect(status.textContent).toContain('github');
+  expect(status.querySelector('time')?.getAttribute('datetime')).toBe('2026-11-10T11:58:00.000Z');
+});
+it('dates attention after a source expires while successful board reads remain not-modified', async () => {
+  const now = Date.UTC(2026, 10, 10, 12);
+  vi.useFakeTimers({ now });
+  const seed = await sample(),
+    source = Object.values(seed.entities.sources).find((s) => s.kind === 'github');
+  if (!source) throw new Error('Expected GitHub source');
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      sources: {
+        ...seed.entities.sources,
+        [source.id]: { ...source, staleAt: new Date(now + 5000).toISOString() },
+      },
+    },
+  };
+  let reads = 0;
+  const client = new FactoryClient(async () =>
+    ++reads === 1 ? json(board) : new Response(null, { status: 304 })
+  );
+  await act(async () => {
+    render(<FactoryApp client={client} />);
+  });
+  expect(screen.queryByText('Attention count may be outdated')).toBeNull();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(reads).toBeGreaterThan(1);
+  const status = screen.getByRole('status');
+  expect(status.textContent).toContain('Attention count may be outdated');
+  expect(status.querySelector('time')?.getAttribute('datetime')).toBe(source.observedAt);
+  expect(screen.queryByRole('button', { name: 'Refresh observations' })).toBeNull();
+  expect(screen.queryByText(/Showing last-known board/)).toBeNull();
+});
 it('marks sources stale as time passes even when board requests return not-modified', async () => {
   const seed = await sample(),
     source = Object.values(seed.entities.sources)[0];

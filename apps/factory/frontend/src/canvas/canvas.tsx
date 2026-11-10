@@ -21,6 +21,7 @@ import type {
   RelationshipDirection,
 } from './geometry-types';
 import { routeCanvas } from './routing';
+import { AttentionControl } from './sources';
 import {
   CanvasContext,
   Icon,
@@ -572,22 +573,12 @@ export function Canvas({
             <i />
             {paused ? 'Paused' : 'Running'}
           </span>
-          <button
-            type="button"
-            className="cc-attention-toggle"
-            aria-label={`Highlight ${attentionIds.size} items needing human attention`}
-            aria-pressed={attentionOnly}
-            disabled={attentionIds.size === 0 && !attentionOnly}
-            data-tip="Highlight work the server identifies as needing human attention."
-            onClick={toggleAttention}
-          >
-            <Icon kind="attention" size={13} />
-            <span className="cc-attention-count">
-              {attentionIds.size}
-              {board.meta.coverage.state !== 'complete' ? '+' : ''}
-            </span>{' '}
-            need attention
-          </button>
+          <AttentionControl
+            board={board}
+            count={attentionIds.size}
+            active={attentionOnly}
+            onToggle={toggleAttention}
+          />
           {board.meta.dataMode === 'fake' && (
             <span className="cc-fixture" data-tip="Fake v2 server · commands are simulated">
               Fake data · commands are simulated

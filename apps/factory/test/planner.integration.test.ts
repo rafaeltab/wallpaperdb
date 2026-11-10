@@ -566,6 +566,107 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
   }
 });
 
+it.each([
+  { operation: 'reconcile', cancel: false },
+  { operation: 'ownership', cancel: false },
+  { operation: 'reconcile', cancel: true },
+] as const)(
+  'recovers the same attempt while background $operation is observing its retained run, cancel wait $cancel',
+  async ({ operation, cancel }) => {
+    const host = await protocol(),
+      previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    const abort = new AbortController(),
+      requestAbort = new AbortController(),
+      pending: Promise<unknown>[] = [];
+    try {
+      const { plannerState } = await import('../src/adapters/t3/index.js');
+      const config = {
+        binary: host.binary,
+        project: host.repository,
+        projectId: 'project-id',
+        ...host.mcp,
+        stateDirectory: `${host.directory}/planner-state`,
+      };
+      const input = {
+        issues: [],
+        job: { kind: 'empty' as const },
+        capacity: { concurrency: 1, admission: 1 },
+      };
+      const attempt = { requestId: 'resuming-same-attempt', deadline: Date.now() + 60000 },
+        run = { threadId: 'planner-thread', runId: 'planner-run' },
+        proposal = { selected: [], deferred: [] };
+      await plannerState(config.stateDirectory).save({
+        revision: 0,
+        requestId: attempt.requestId,
+        input: JSON.stringify(input),
+        deadline: attempt.deadline,
+        run,
+        phase: 'running',
+      });
+      await writeFile(`${host.directory}/planner.json`, JSON.stringify({ ...attempt, input }));
+      await host.save({
+        holds: ['planner-observation'],
+        planner: { status: 'completed', proposal },
+      });
+      const adapter = t3Planner(config);
+      const background = Effect.runPromise(adapter[operation](), { signal: abort.signal }).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error })
+      );
+      pending.push(background);
+      await vi.waitFor(
+        async () =>
+          expect(await readFile(`${host.directory}/held-planner-observation`, 'utf8')).toBe(
+            'planner-observation'
+          ),
+        { timeout: 5000, interval: 20 }
+      );
+      let resumed = Effect.runPromise(adapter.propose(input, attempt), {
+        signal: requestAbort.signal,
+      }).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error })
+      );
+      pending.push(resumed);
+      expect(await Effect.runPromise(adapter.ownership(false, attempt.requestId))).toMatchObject({
+        requestId: attempt.requestId,
+        deadline: attempt.deadline,
+        run,
+      });
+      if (cancel) {
+        requestAbort.abort();
+        expect(await resumed).toHaveProperty('error');
+        // Cancellation releases only this caller. Background ownership remains intact.
+        resumed = Effect.runPromise(adapter.propose(input, attempt), { signal: abort.signal }).then(
+          (value) => ({ value }),
+          (error: unknown) => ({ error })
+        );
+        pending.push(resumed);
+      }
+      await writeFile(`${host.directory}/release-planner-observation`, 'continue');
+      expect(await resumed).toEqual({ value: proposal });
+      expect(await background).not.toHaveProperty('error');
+      expect(await plannerState(config.stateDirectory).read()).toMatchObject({
+        requestId: attempt.requestId,
+        deadline: attempt.deadline,
+        run,
+        retired: true,
+        settled: true,
+      });
+      expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(0);
+    } finally {
+      requestAbort.abort();
+      abort.abort();
+      await writeFile(`${host.directory}/release-planner-observation`, 'cleanup');
+      await Promise.allSettled(pending);
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
+  }
+);
+
 it('reattaches an exact bound attempt when only incidental job elapsed time advanced', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

@@ -104,12 +104,7 @@ it.each([
       directory: host.directory + '/state',
       signal: stop.signal,
     });
-    const pending = requests([
-      'api',
-      'graphql',
-      '-f',
-      'query=query { viewer { login } }',
-    ]);
+    const pending = requests(['api', 'graphql', '-f', 'query=query { viewer { login } }']);
     await expect(pending).rejects.toMatchObject({
       message: 'GitHub request failed',
       cause: {
@@ -495,6 +490,141 @@ it('waits through primary exhaustion and obtains usable quota after the reset', 
     );
     expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
     expect(clock.now()).toBeGreaterThanOrEqual(reset * 1000 + 1000);
+  }));
+
+it.each([
+  { name: 'exhausted primary quota', remaining: 0, status: 200, retryAfter: undefined },
+  { name: 'low primary quota', remaining: 1, status: 200, retryAfter: undefined },
+  { name: 'longer secondary backoff', remaining: 0, status: 429, retryAfter: '7200' },
+])('refreshes completed-response pacing after reopening with $name', async (response) =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.UTC(2026, 10, 7, 12),
+      reset = startedAt + 3_600_000;
+    let now = startedAt;
+    const clock = {
+      now: () => now,
+      wait: async (delay: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        now += delay;
+        if (now >= reset)
+          await host.save({
+            githubRate: {
+              limit: 7200,
+              remaining: 7199,
+              reset: Math.ceil((now + 3_600_000) / 1000),
+            },
+          });
+      },
+    };
+    const open = () => {
+      const requests = githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      });
+      return {
+        requests,
+        issues: githubIssues(
+          { project: host.repository, base: host.base, prerequisites: [] },
+          requests
+        ),
+      };
+    };
+    await host.save({
+      githubRate: { limit: 7200, remaining: 7199, reset: reset / 1000 },
+    });
+    const first = open();
+    expect(await Effect.runPromise(first.issues.inspect(577))).toMatchObject({ open: true });
+    await host.save({
+      githubRate: {
+        limit: 7200,
+        remaining: response.remaining,
+        reset: reset / 1000,
+        status: response.status,
+        retryAfter: response.retryAfter,
+      },
+    });
+    const completed = Effect.runPromise(first.issues.inspect(578));
+    if (response.status === 200) expect(await completed).toMatchObject({ open: true });
+    else await expect(completed).rejects.toMatchObject({ _tag: 'Unavailable' });
+    const expectedAt = response.retryAfter ? now + 7_200_000 : reset + 1000;
+    const reopened = open();
+    expect(await Effect.runPromise(reopened.issues.inspect(579))).toMatchObject({ open: true });
+    expect(clock.now()).toBeGreaterThanOrEqual(expectedAt);
+    expect(clock.now()).toBeLessThanOrEqual(expectedAt + 1000);
+    expect(
+      (await host.calls()).filter((call) => call.args[0] === 'api' && call.args[1] === 'rate_limit')
+    ).toHaveLength(2);
+  })
+);
+
+it('retains an interrupted request reservation beyond its quota reset after reopening', async () =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.UTC(2026, 10, 7, 12),
+      reset = startedAt + 3_600_000,
+      originalProtocol = await readFile(host.directory + '/commands/gh.mjs', 'utf8'),
+      firstStop = new AbortController();
+    let now = startedAt;
+    const clock = {
+      now: () => now,
+      wait: async (delay: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        now += delay;
+        await host.save({
+          githubRate: {
+            limit: 7200,
+            remaining: 7199,
+            reset: Math.ceil((now + 3_600_000) / 1000),
+          },
+        });
+      },
+    };
+    await host.nodeCommand(
+      'gh',
+      `
+      const { writeFileSync } = require('node:fs');
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: { graphql: { limit: 7200, remaining: 1, reset: ${reset / 1000} } } }));
+      } else {
+        writeFileSync(${JSON.stringify(host.directory + '/reserved-read-ready')}, 'ready');
+        setInterval(() => {}, 1000);
+      }
+      `
+    );
+    const first = githubIssues(
+      { project: host.repository, base: host.base, prerequisites: [] },
+      githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: AbortSignal.any([firstStop.signal, stop.signal]),
+        clock,
+      })
+    );
+    const interrupted = Effect.runPromise(first.inspect(577));
+    void interrupted.catch(() => undefined);
+    try {
+      await vi.waitFor(
+        async () =>
+          expect(await readFile(host.directory + '/reserved-read-ready', 'utf8')).toBe('ready'),
+        { timeout: 5000, interval: 20 }
+      );
+    } finally {
+      firstStop.abort();
+      await expect(interrupted).rejects.toMatchObject({ _tag: 'Unavailable' });
+    }
+    await host.nodeCommand('gh', originalProtocol, { module: true });
+    const reopened = githubIssues(
+      { project: host.repository, base: host.base, prerequisites: [] },
+      githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      })
+    );
+    expect(await Effect.runPromise(reopened.inspect(578))).toMatchObject({ open: true });
+    expect(clock.now()).toBe(startedAt + 14_400_000);
   }));
 
 it('serves admitted-work observations before already queued background collections', async () =>

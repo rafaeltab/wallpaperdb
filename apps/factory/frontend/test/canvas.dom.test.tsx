@@ -110,7 +110,14 @@ it.each([
   }
 );
 it('retains last-known items when refresh fails and disables command controls', async () => {
-  const board = await sample();
+  const sampled = await sample();
+  const board = {
+    ...sampled,
+    meta: {
+      ...sampled.meta,
+      transport: { ...sampled.meta.transport, suggestedPollMs: 30000 },
+    },
+  };
   let offline = false,
     posts = 0;
   const client = new FactoryClient(async (_path, init) => {
@@ -123,6 +130,7 @@ it('retains last-known items when refresh fails and disables command controls', 
   await screen.findByText('Implement the command centre');
   offline = true;
   await act(async () => {
+    window.dispatchEvent(new Event('pagehide'));
     window.dispatchEvent(new Event('pageshow'));
   });
   await screen.findByText(/Showing last-known board/);

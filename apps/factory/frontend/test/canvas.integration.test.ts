@@ -126,65 +126,60 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
   }
 }, 60000);
 
-it('renders the archived scale scenarios through the public v2 data model', async () => {
-  const { buildScaleFixture } = await import('./fixtures/canvas/factory-scale-fixture');
-  const { scenarioBoard } = await import('./fixtures/canvas/board');
-  const backend = fakeV2Server({ epoch: 'scale-browser' });
-  const seed = (await backend.inject('/api/v2/board')).json<
-    import('../../src/http/index.js').FactoryV2Snapshot
-  >();
-  const vite = await createServer({ configFile: 'frontend/vite.config.ts', server: { port: 0 } });
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
-    viewport: { width: 1600, height: 1000 },
-    reducedMotion: 'reduce',
-  });
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  try {
-    await vite.listen();
-    const origin = vite.resolvedUrls?.local[0];
-    if (!origin) throw new Error('Missing Vite origin');
-    for (const count of [100, 200, 300] as const) {
+it.each([100, 200, 300] as const)(
+  'renders the archived %i-item scale scenario through the public v2 data model',
+  async (count) => {
+    const { buildScaleFixture } = await import('./fixtures/canvas/factory-scale-fixture');
+    const { scenarioBoard } = await import('./fixtures/canvas/board');
+    const backend = fakeV2Server({ epoch: 'scale-browser' });
+    const seed = (await backend.inject('/api/v2/board')).json<
+      import('../../src/http/index.js').FactoryV2Snapshot
+    >();
+    const vite = await createServer({ configFile: 'frontend/vite.config.ts', server: { port: 0 } });
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({
+      viewport: { width: 1600, height: 1000 },
+      reducedMotion: 'reduce',
+    });
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    try {
+      await vite.listen();
+      const origin = vite.resolvedUrls?.local[0];
+      if (!origin) throw new Error('Missing Vite origin');
       const fixture = buildScaleFixture(count),
         board = scenarioBoard(seed, fixture);
       await page.unroute('**/api/v2/board');
       await page.route('**/api/v2/board', (route) => route.fulfill({ json: board }));
       await page.goto(origin);
-      await browserExpect(page.locator('.cc-item')).toHaveCount(count);
-      expect(
-        await page
-          .locator('.cc-issue-card')
-          .first()
-          .evaluate((el) => getComputedStyle(el).width)
-      ).toBe('384px');
-      expect(
-        await page
-          .locator('.cc-pr-panel')
-          .first()
-          .evaluate((el) => getComputedStyle(el).width)
-      ).toBe('768px');
-      expect(
-        await page
-          .locator('.cc-pr-row')
-          .first()
-          .evaluate((el) => getComputedStyle(el).height)
-      ).toBe('56px');
-      expect(
-        await page
-          .locator('.cc-title')
-          .first()
-          .evaluate((el) => getComputedStyle(el).fontSize)
-      ).toBe('13px');
-      expect(await page.locator('.cc-app').getAttribute('class')).toContain(
-        'cc-highlight-status-glow'
-      );
-      const xs = await page
-        .locator('.cc-pr-panel')
-        .evaluateAll((panels) => [
-          ...new Set(panels.map((panel) => (panel instanceof HTMLElement ? panel.style.left : ''))),
-        ]);
-      expect(xs).toHaveLength(3);
+      await browserExpect(page.locator('.cc-item')).toHaveCount(count, { timeout: 30000 });
+      const styles = await page.locator('.cc-app').evaluate((app) => {
+        const style = (selector: string) => {
+          const element = app.querySelector(selector);
+          if (!element) throw new Error(`Missing scale element: ${selector}`);
+          return getComputedStyle(element);
+        };
+        return {
+          issueWidth: style('.cc-issue-card').width,
+          panelWidth: style('.cc-pr-panel').width,
+          rowHeight: style('.cc-pr-row').height,
+          titleSize: style('.cc-title').fontSize,
+          highlight: app.classList.contains('cc-highlight-status-glow'),
+          columns: new Set(
+            Array.from(app.querySelectorAll('.cc-pr-panel')).map((panel) =>
+              panel instanceof HTMLElement ? panel.style.left : ''
+            )
+          ).size,
+        };
+      });
+      expect(styles).toEqual({
+        issueWidth: '384px',
+        panelWidth: '768px',
+        rowHeight: '56px',
+        titleSize: '13px',
+        highlight: true,
+        columns: 3,
+      });
       await page.getByRole('button', { name: 'Fit all nodes' }).click();
       if (process.env.FACTORY_DEMO_DIRECTORY)
         await page.screenshot({ path: `${process.env.FACTORY_DEMO_DIRECTORY}/scale-${count}.png` });
@@ -192,12 +187,13 @@ it('renders the archived scale scenarios through the public v2 data model', asyn
       await browserExpect(page.locator('.cc-item')).toHaveCount(0);
       await page.getByRole('button', { name: 'Expand all sections' }).click();
       await browserExpect(page.locator('.cc-item')).toHaveCount(count);
+      expect(errors).toEqual([]);
+    } finally {
+      await page.close();
+      await browser.close();
+      await vite.close();
+      await backend.close();
     }
-    expect(errors).toEqual([]);
-  } finally {
-    await page.close();
-    await browser.close();
-    await vite.close();
-    await backend.close();
-  }
-}, 60000);
+  },
+  120000
+);

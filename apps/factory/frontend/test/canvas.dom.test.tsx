@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
@@ -28,6 +28,87 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
+it.each([
+  { state: 'open', draft: false, open: 2, drafts: 0 },
+  { state: 'open', draft: true, open: 1, drafts: 1 },
+  { state: 'closed', draft: false, open: 1, drafts: 0 },
+  { state: 'merged', draft: false, open: 1, drafts: 0 },
+  { state: 'unknown', draft: false, open: 1, drafts: 0 },
+] as const)(
+  'counts open PRs for $state / draft $draft without hiding retained recovery',
+  async ({ state, draft, open, drafts }) => {
+    const board = await sample(),
+      target = board.entities.pullRequests['pr:2003'],
+      peer = board.entities.pullRequests['pr:2004'],
+      item = board.entities.items['item:1003'],
+      stack = Object.values(board.entities.stacks).find((s) =>
+        s.pullRequestIdsBaseToTip.includes(target.id)
+      );
+    if (
+      target.metadata.state !== 'known' ||
+      peer.metadata.state !== 'known' ||
+      !stack?.pullRequestIdsBaseToTip.includes(peer.id) ||
+      item.subject.kind !== 'pull-request' ||
+      item.subject.pullRequestId !== target.id
+    )
+      throw new Error('Expected the sample stack and its retained PR work item');
+    const value: FactoryV2Snapshot = {
+      ...board,
+      entities: {
+        ...board.entities,
+        pullRequests: {
+          ...board.entities.pullRequests,
+          [target.id]: {
+            ...target,
+            metadata:
+              state === 'unknown'
+                ? { state: 'unknown', sourceId: target.metadata.sourceId, reason: 'Unavailable' }
+                : { ...target.metadata, value: { ...target.metadata.value, state, draft } },
+          },
+          [peer.id]: {
+            ...peer,
+            metadata: {
+              ...peer.metadata,
+              value: { ...peer.metadata.value, state: 'open', draft: false },
+            },
+          },
+        },
+        items: {
+          ...board.entities.items,
+          [item.id]: {
+            ...item,
+            status: {
+              code: 'manual-recovery',
+              label: 'Manual recovery of retained comparison',
+              active: false,
+              since: null,
+            },
+            attention: { state: 'required', sourceIds: [] },
+          },
+        },
+      },
+    };
+    const client = new FactoryClient(async () => json(value));
+    const { container } = render(<FactoryApp client={client} />);
+    const collapse = await screen.findByRole('button', { name: `Collapse stack ${stack.id}` });
+    const panel = collapse.closest('section');
+    if (!panel) throw new Error('Expected the rendered PR panel');
+    expect(within(panel).getByRole('img', { name: `Open PRs: ${open}` })).toBeTruthy();
+    expect(within(panel).getByRole('img', { name: `Draft PRs: ${drafts}` })).toBeTruthy();
+    expect(container.querySelectorAll('.cc-item')).toHaveLength(
+      Object.keys(value.entities.items).length
+    );
+    expect(screen.getByText('Manual recovery of retained comparison')).toBeTruthy();
+    expect(within(panel).queryByText('? unknown') !== null).toBe(state === 'unknown');
+    if (state === 'closed') {
+      const user = userEvent.setup();
+      await user.click(collapse);
+      expect(within(panel).getByRole('img', { name: `Open PRs: ${open}` })).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: `Expand stack ${stack.id}` }));
+      expect(screen.getByText('Manual recovery of retained comparison')).toBeTruthy();
+    }
+  }
+);
 it('retains last-known items when refresh fails and disables command controls', async () => {
   const board = await sample();
   let offline = false,

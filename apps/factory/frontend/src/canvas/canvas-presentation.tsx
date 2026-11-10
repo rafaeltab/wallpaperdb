@@ -452,7 +452,7 @@ function statusSummary(items: Item[]) {
 }
 export function StackSummary({ items }: { items: Item[] }) {
   const drafts = items.filter((i) => i.draft).length;
-  const open = items.filter((i) => i.draft === false).length;
+  const open = items.filter((i) => i.prState === 'open' && i.draft === false).length;
   const summary = statusSummary(items);
   return (
     <>

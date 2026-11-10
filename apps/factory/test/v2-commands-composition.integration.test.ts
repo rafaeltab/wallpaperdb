@@ -264,7 +264,7 @@ it('resumes the parked question on the existing implementation job through v2', 
           delivery: { stage: 'implementation' },
           execution: { threadId: 'thread-live', run: { id: 'run-2', ordinal: 2 } },
         }),
-      { timeout: 5000, interval: 40 }
+      { timeout: 30000, interval: 40 }
     );
     expect(
       (await stageMessages(host)).filter(

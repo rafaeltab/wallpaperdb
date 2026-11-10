@@ -181,7 +181,8 @@ export function Canvas({
       allParents,
       data.fixture.parentIds,
       reach,
-      direction
+      direction,
+      data.fixture.selectionContextIds
     );
   const isActiveRoute = (r: { source: number; target: number }) =>
     data.routeRelationships

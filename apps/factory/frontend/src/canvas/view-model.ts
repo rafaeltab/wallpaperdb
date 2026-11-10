@@ -24,6 +24,7 @@ export interface CanvasItem {
   status: string;
   active: boolean;
   pr?: number;
+  prState?: 'open' | 'closed' | 'merged';
   draft?: boolean;
   prUrl?: string;
   issueNumbers: { number: number; url?: string }[];
@@ -130,6 +131,7 @@ export function createCanvasProjection() {
         status: item.status.label,
         active: item.status.active,
         pr: pr?.number,
+        prState: pr?.metadata.state === 'known' ? pr.metadata.value.state : undefined,
         prUrl: pr?.metadata.state === 'known' ? pr.metadata.value.url : undefined,
         draft: pr?.metadata.state === 'known' ? pr.metadata.value.draft : undefined,
         issueNumbers: issueIds(item).flatMap((key) => {

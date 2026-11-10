@@ -116,6 +116,7 @@ export const v2Board = sqliteTable('v2_board', {
 export const v2Commands = sqliteTable(
   'v2_commands',
   {
+    executionClaimed: integer('execution_claimed', { mode: 'boolean' }).notNull().default(false),
     retryTarget: text('retry_target', { mode: 'json' }).$type<
       import('../capabilities/board/index.js').RetryTarget
     >(),
@@ -141,7 +142,11 @@ export const v2Commands = sqliteTable(
   },
   (table) => [
     index('v2_commands_plan').on(table.scope, table.planId),
-    uniqueIndex('v2_retry_opportunity').on(table.scope, table.retryKey),
+    uniqueIndex('v2_retry_opportunity')
+      .on(table.scope, table.retryKey)
+      .where(
+        sql`${table.executionClaimed} = 1 OR json_extract(${table.receipt}, '$.state') IS NOT 'rejected' OR json_extract(${table.receipt}, '$.reasons[0].code') IS NOT 'stale-action'`
+      ),
   ]
 );
 export const githubRichFacts = sqliteTable('github_rich_facts', {

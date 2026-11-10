@@ -1,0 +1,3 @@
+DROP INDEX `v2_retry_opportunity`;--> statement-breakpoint
+ALTER TABLE `v2_commands` ADD `execution_claimed` integer DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `v2_retry_opportunity` ON `v2_commands` (`scope`,`retry_key`) WHERE "v2_commands"."execution_claimed" = 1 OR json_extract("v2_commands"."receipt", '$.state') IS NOT 'rejected' OR json_extract("v2_commands"."receipt", '$.reasons[0].code') IS NOT 'stale-action';

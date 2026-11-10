@@ -28,6 +28,414 @@ const job = {
 };
 
 it.each(['controlled', 'sqlite'] as const)(
+  'releases a Retry rejected before execution without losing replay or uncertain protection in %s',
+  async (backend) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const directory = await mkdtemp(`${tmpdir()}/factory-retry-release-`);
+    const input = stoppedImplementationSnapshot();
+    const store =
+      backend === 'sqlite' ? sqliteBoard(directory, 'retry-release') : controlledBoardStore();
+    let effects = 0;
+    const create = async () => {
+      const board = await liveBoard({
+        scopeId: 'retry-release',
+        initial: input,
+        store,
+        autoExecute: false,
+        commands: {
+          execute: () =>
+            Effect.sync(() => {
+              effects++;
+              return { state: 'uncertain', result: null, reasons: [] };
+            }),
+        },
+      });
+      return {
+        board,
+        app: operationsServer({ base: 'b'.repeat(40), run: Effect.runPromise, job, v2: board }),
+      };
+    };
+    const first = await create();
+    try {
+      const action = (await first.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities
+        .actions['action:retry/job:rafaeltab/wallpaperdb/1'];
+      if (action.availability.state !== 'available') throw new Error('Missing Retry');
+      const request = {
+        commandId: '00000000-0000-4000-8000-000000000091',
+        kind: 'retry',
+        actionId: action.id,
+        precondition: action.availability.precondition,
+        payload: {},
+      };
+      expect(
+        (await first.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      await first.board.publish({
+        ...input,
+        recoveries: [
+          {
+            issue: 2,
+            pr: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+            active: true,
+            phase: 'resolving',
+            progress: 'Controlled prerequisite repair',
+          },
+        ],
+      });
+      const busy = (await first.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(busy.meta.factory.concurrency.occupied).toBe(1);
+      expect(busy.entities.actions[action.id].availability.state).toBe('disabled');
+      await first.board.execute();
+      const rejected = (await first.app.inject(`/api/v2/commands/${request.commandId}`)).json();
+      expect(rejected).toMatchObject({ state: 'rejected', reasons: [{ code: 'stale-action' }] });
+      expect(effects).toBe(0);
+      await first.board.publish(input);
+      const restored = (await first.app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities
+        .actions[action.id];
+      expect(restored.availability).toMatchObject({
+        state: 'available',
+        precondition: request.precondition,
+      });
+      const retry = { ...request, commandId: '00000000-0000-4000-8000-000000000092' };
+      expect(
+        (await first.app.inject({ method: 'POST', url: '/api/v2/commands', payload: retry }))
+          .statusCode
+      ).toBe(202);
+      await first.board.execute();
+      const uncertain = (await first.app.inject(`/api/v2/commands/${retry.commandId}`)).json();
+      expect(uncertain.state).toBe('uncertain');
+      expect(effects).toBe(1);
+      expect(
+        (
+          await first.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })
+        ).json()
+      ).toEqual(rejected);
+      await first.app.close();
+      const reopened = await create();
+      try {
+        expect(
+          (
+            await reopened.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })
+          ).json()
+        ).toEqual(rejected);
+        expect(
+          (
+            await reopened.app.inject({ method: 'POST', url: '/api/v2/commands', payload: retry })
+          ).json()
+        ).toEqual(uncertain);
+        expect(
+          (
+            await reopened.app.inject({
+              method: 'POST',
+              url: '/api/v2/commands',
+              payload: { ...request, commandId: '00000000-0000-4000-8000-000000000093' },
+            })
+          ).statusCode
+        ).toBe(412);
+        expect(effects).toBe(1);
+      } finally {
+        await reopened.app.close();
+      }
+    } finally {
+      await first.app.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
+it.each(['controlled', 'sqlite'] as const)(
+  'retains claimed Retry opportunities after rejected or succeeded execution in %s',
+  async (backend) => {
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { sqliteBoard } = await import('../src/adapters/store/index.js');
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    for (const state of ['rejected', 'succeeded'] as const) {
+      const directory = await mkdtemp(`${tmpdir()}/factory-retry-claimed-`);
+      const input = stoppedImplementationSnapshot();
+      let effects = 0;
+      const result: CommandRecord['receipt']['result'] =
+        state === 'succeeded' ? { jobId: 'job:rafaeltab/wallpaperdb/1' } : null;
+      const store =
+        backend === 'sqlite' ? sqliteBoard(directory, 'retry-claimed') : controlledBoardStore();
+      const board = await liveBoard({
+        scopeId: 'retry-claimed',
+        initial: input,
+        autoExecute: false,
+        store,
+        commands: {
+          execute: () =>
+            Effect.sync(() => {
+              effects++;
+              return {
+                state,
+                result,
+                reasons:
+                  state === 'rejected'
+                    ? [{ code: 'stale-action', message: 'Controlled post-claim rejection' }]
+                    : [],
+              };
+            }),
+        },
+      });
+      const app = operationsServer({
+        base: 'b'.repeat(40),
+        run: Effect.runPromise,
+        job,
+        v2: board,
+      });
+      try {
+        const action = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities
+          .actions['action:retry/job:rafaeltab/wallpaperdb/1'];
+        if (action.availability.state !== 'available') throw new Error('Missing Retry');
+        const request = {
+          commandId: '00000000-0000-4000-8000-000000000094',
+          kind: 'retry',
+          actionId: action.id,
+          precondition: action.availability.precondition,
+          payload: {},
+        };
+        expect(
+          (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+            .statusCode
+        ).toBe(202);
+        await board.execute();
+        const receipt = (await app.inject(`/api/v2/commands/${request.commandId}`)).json();
+        expect(receipt.state).toBe(state);
+        expect(
+          (await app.inject({ method: 'POST', url: '/api/v2/commands', payload: request })).json()
+        ).toEqual(receipt);
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/api/v2/commands',
+              payload: { ...request, commandId: '00000000-0000-4000-8000-000000000095' },
+            })
+          ).statusCode
+        ).toBe(412);
+        expect(effects).toBe(1);
+        await app.close();
+        const reopened = await liveBoard({
+          scopeId: 'retry-claimed',
+          initial: input,
+          autoExecute: false,
+          store,
+        });
+        const restoredApp = operationsServer({
+          base: 'b'.repeat(40),
+          run: Effect.runPromise,
+          job,
+          v2: reopened,
+        });
+        try {
+          expect(
+            (
+              await restoredApp.inject({
+                method: 'POST',
+                url: '/api/v2/commands',
+                payload: request,
+              })
+            ).json()
+          ).toEqual(receipt);
+          expect(
+            (
+              await restoredApp.inject({
+                method: 'POST',
+                url: '/api/v2/commands',
+                payload: { ...request, commandId: '00000000-0000-4000-8000-000000000096' },
+              })
+            ).statusCode
+          ).toBe(412);
+          expect(effects).toBe(1);
+        } finally {
+          await restoredApp.close();
+        }
+      } finally {
+        await app.close();
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
+  }
+);
+
+it('upgrades legacy Retry receipts without discarding evidence or releasing uncertain opportunities', async () => {
+  const { mkdtemp, mkdir, readFile, writeFile, copyFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join, resolve } = await import('node:path');
+  const { default: Database } = await import('better-sqlite3');
+  const { drizzle } = await import('drizzle-orm/better-sqlite3');
+  const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+  const { initializeState } = await import('../src/platform/index.js');
+  const { sqliteBoard } = await import('../src/adapters/store/index.js');
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const directory = await mkdtemp(`${tmpdir()}/factory-retry-upgrade-`);
+  try {
+    const stateDirectory = join(directory, 'state');
+    const legacyMigrations = join(directory, 'legacy-migrations');
+    await mkdir(stateDirectory);
+    await mkdir(join(legacyMigrations, 'meta'), { recursive: true });
+    const journal: { entries: { idx: number; tag: string }[] } = JSON.parse(
+      await readFile(resolve('drizzle/meta/_journal.json'), 'utf8')
+    );
+    const entries = journal.entries.filter((entry) => entry.idx <= 13);
+    for (const entry of entries)
+      await copyFile(
+        resolve(`drizzle/${entry.tag}.sql`),
+        join(legacyMigrations, `${entry.tag}.sql`)
+      );
+    await writeFile(
+      join(legacyMigrations, 'meta/_journal.json'),
+      JSON.stringify({ ...journal, entries })
+    );
+    const input = stoppedImplementationSnapshot();
+    const cases = [
+      {
+        state: 'rejected',
+        reasons: [
+          { code: 'stale-action', message: 'The accepted action changed before execution.' },
+        ],
+        releases: true,
+      },
+      {
+        state: 'rejected',
+        reasons: [{ code: 'command-rejected', message: 'Retained rejection' }],
+        releases: false,
+      },
+      { state: 'rejected', reasons: [], releases: false },
+      { state: 'uncertain', reasons: [], releases: false },
+      { state: 'accepted', reasons: [], releases: false },
+      { state: 'running', reasons: [], releases: false },
+      { state: 'succeeded', reasons: [], releases: false },
+    ];
+    const records = [];
+    const client = new Database(join(stateDirectory, 'factory.sqlite'));
+    try {
+      migrate(drizzle(client), { migrationsFolder: legacyMigrations });
+      expect(client.prepare('PRAGMA table_info(v2_commands)').all()).not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'execution_claimed' })])
+      );
+      for (const [index, scenario] of cases.entries()) {
+        const scope = `retry-legacy-${index}`;
+        const preview = await liveBoard({ scopeId: scope, initial: input, autoExecute: false });
+        const app = operationsServer({
+          base: 'b'.repeat(40),
+          run: Effect.runPromise,
+          job,
+          v2: preview,
+        });
+        try {
+          const action = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities
+            .actions['action:retry/job:rafaeltab/wallpaperdb/1'];
+          if (action.availability.state !== 'available') throw new Error('Missing Retry');
+          const request = {
+            commandId: `00000000-0000-4000-8000-${String(200 + index * 2).padStart(12, '0')}`,
+            actionId: action.id,
+            precondition: action.availability.precondition,
+            kind: 'retry',
+            payload: {},
+          };
+          const receipt = {
+            commandId: request.commandId,
+            version: scenario.state === 'accepted' ? '1' : scenario.state === 'running' ? '2' : '3',
+            actionId: action.id,
+            state: scenario.state,
+            acceptedAt: new Date(1000).toISOString(),
+            completedAt:
+              scenario.state === 'accepted' ||
+              scenario.state === 'running' ||
+              scenario.state === 'uncertain'
+                ? null
+                : new Date(2000).toISOString(),
+            reasons: scenario.reasons,
+            result:
+              scenario.state === 'succeeded' ? { jobId: 'job:rafaeltab/wallpaperdb/1' } : null,
+            resultingCursor: null,
+          };
+          const stopped = input.jobs[0];
+          if (stopped.kind !== 'job' || !stopped.retry) throw new Error('Missing failed attempt');
+          const target = {
+            retry: { jobId: stopped.intent.id, ...stopped.retry },
+            scheduleRevision: input.state.revision,
+          };
+          client
+            .prepare(
+              'INSERT INTO v2_commands(id, scope, request, receipt, retry_target) VALUES (?, ?, ?, ?, ?)'
+            )
+            .run(
+              request.commandId,
+              scope,
+              JSON.stringify(request),
+              JSON.stringify(receipt),
+              JSON.stringify(target)
+            );
+          records.push({
+            scope,
+            request,
+            receipt,
+            scenario,
+            nextId: `00000000-0000-4000-8000-${String(201 + index * 2).padStart(12, '0')}`,
+          });
+        } finally {
+          await app.close();
+        }
+      }
+    } finally {
+      client.close();
+    }
+    initializeState(stateDirectory);
+    for (const record of records) {
+      const board = await liveBoard({
+        scopeId: record.scope,
+        initial: input,
+        autoExecute: false,
+        store: sqliteBoard(stateDirectory, record.scope),
+      });
+      const app = operationsServer({
+        base: 'b'.repeat(40),
+        run: Effect.runPromise,
+        job,
+        v2: board,
+      });
+      try {
+        const action = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().entities
+          .actions[record.request.actionId];
+        expect(action.availability).toMatchObject({
+          state: 'available',
+          precondition: record.request.precondition,
+        });
+        const before = (await app.inject(`/api/v2/commands/${record.request.commandId}`)).json();
+        if (record.scenario.state === 'accepted' || record.scenario.state === 'running')
+          expect(before.state).toBe('uncertain');
+        else expect(before).toEqual(record.receipt);
+        const response = await app.inject({
+          method: 'POST',
+          url: '/api/v2/commands',
+          payload: { ...record.request, commandId: record.nextId },
+        });
+        expect(response.statusCode).toBe(record.scenario.releases ? 202 : 412);
+        expect(
+          (
+            await app.inject({ method: 'POST', url: '/api/v2/commands', payload: record.request })
+          ).json()
+        ).toEqual(before);
+        expect((await app.inject(`/api/v2/commands/${record.request.commandId}`)).json()).toEqual(
+          before
+        );
+      } finally {
+        await app.close();
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it.each(['controlled', 'sqlite'] as const)(
   'atomically accepts one Retry opportunity across independent %s HTTP producers and retains replay on reopen',
   async (backend) => {
     const { mkdtemp, rm } = await import('node:fs/promises');
@@ -905,6 +1313,7 @@ it('retains the projection across restart and durably deduplicates commands befo
 function controlledBoardStore(): BoardStore {
   let saved: BoardRecord | undefined;
   const records = new Map<string, CommandRecord>();
+  const executionClaims = new Set<string>();
   return {
     read: () => Effect.succeed(saved),
     save: (record: BoardRecord, expectedCursor: string | null) =>
@@ -923,7 +1332,10 @@ function controlledBoardStore(): BoardStore {
             (existing) =>
               existing.request.kind === 'retry' &&
               existing.request.actionId === record.request.actionId &&
-              existing.request.precondition === record.request.precondition
+              existing.request.precondition === record.request.precondition &&
+              (executionClaims.has(existing.request.commandId) ||
+                existing.receipt.state !== 'rejected' ||
+                existing.receipt.reasons[0]?.code !== 'stale-action')
           )
         )
           return false;
@@ -934,6 +1346,7 @@ function controlledBoardStore(): BoardStore {
       Effect.sync(() => {
         const prior = records.get(record.request.commandId);
         if (prior?.receipt.state !== 'accepted') return false;
+        executionClaims.add(record.request.commandId);
         records.set(record.request.commandId, record);
         return true;
       }),

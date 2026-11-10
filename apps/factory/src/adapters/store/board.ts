@@ -73,7 +73,7 @@ export function sqliteBoard(directory: string, scope = 'test'): BoardStore {
           (db) =>
             db
               .update(v2Commands)
-              .set({ receipt: record.receipt })
+              .set({ receipt: record.receipt, executionClaimed: true })
               .where(
                 and(
                   eq(v2Commands.id, record.request.commandId),

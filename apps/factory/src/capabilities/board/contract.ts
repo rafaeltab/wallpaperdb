@@ -30,7 +30,9 @@ export interface RetryTarget {
 }
 /** A save publishes the board, private notice target and bounded replay atomically. Acceptance binds
  * UUID and full request durably before effects. Retry acceptance also atomically claims
- * its action/precondition; a distinct UUID cannot consume the same opportunity. Claims are never retried after restart:
+ * its action/precondition; a distinct UUID cannot consume the same opportunity. A confirmed stale-action
+ * rejection before a worker claim releases that opportunity while preserving its UUID/request/receipt.
+ * Once a worker claims execution, even a rejected outcome retains the opportunity. Claims are never retried after restart:
  * an interrupted worker remains uncertain until operator reconciliation.
  */
 export interface BoardStore {

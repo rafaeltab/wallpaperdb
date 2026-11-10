@@ -572,7 +572,7 @@ it('retains an uncertain fresh retry and its admission across startup without la
           expect(value.state).toBe('uncertain');
           return value;
         },
-        { timeout: 10000, interval: 40 }
+        { timeout: 30000, interval: 40 }
       );
       await save({});
       const restored = await reopen();

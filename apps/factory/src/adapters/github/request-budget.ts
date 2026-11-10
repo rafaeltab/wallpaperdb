@@ -17,8 +17,18 @@ const stateSchema = z.object({
 });
 type State = z.infer<typeof stateSchema>;
 type Resource = z.infer<typeof resource>;
+type Sample = z.infer<typeof sample>;
 const targetFraction = 0.5;
 const period = (name: string) => (['search', 'code_search'].includes(name) ? 60_000 : 3_600_000);
+const sampleInterval = (name: string, now: number, value: Sample) =>
+  Math.ceil(
+    value.limit === 0
+      ? Math.max(period(name), value.reset - now + 1000)
+      : Math.max(
+          period(name) / (value.limit * targetFraction),
+          (value.reset - now) / (Math.max(1, value.remaining) * targetFraction)
+        )
+  );
 
 export interface RequestClock {
   now(): number;
@@ -73,19 +83,7 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
   };
   const interval = (name: string, now: number) => {
     const samples = get(name).samples.filter((s) => s.reset > now);
-    return Math.ceil(
-      Math.max(
-        0,
-        ...samples.map((s) =>
-          s.limit === 0
-            ? Math.max(period(name), s.reset - now + 1000)
-            : Math.max(
-                period(name) / (s.limit * targetFraction),
-                (s.reset - now) / (Math.max(1, s.remaining) * targetFraction)
-              )
-        )
-      )
-    );
+    return Math.max(0, ...samples.map((s) => sampleInterval(name, now, s)));
   };
   const due = (names: readonly string[], now: number) =>
     Math.max(
@@ -174,8 +172,16 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
         for (const [name, before] of reservation.previous) get(name).nextAt = before;
         for (const name of accounted) {
           const current = get(name),
-            cost = costs.get(name) ?? 2;
-          current.nextAt = Math.max(now, current.nextAt) + interval(name, now) * cost;
+            cost = costs.get(name) ?? 2,
+            at = Math.max(now, current.nextAt);
+          // Completed costs belong to their observed quota windows. Earlier uncertain
+          // reservations and independent secondary backoff keep their own deadlines.
+          current.nextAt = Math.max(
+            at,
+            ...current.samples
+              .filter((s) => s.reset > now)
+              .map((s) => Math.min(s.reset + 1000, at + sampleInterval(name, now, s) * cost))
+          );
         }
       }
       if (success && state.blockedUntil <= now) state.secondaryFailures = 0;

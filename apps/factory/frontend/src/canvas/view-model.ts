@@ -38,6 +38,7 @@ export interface CanvasData {
   stackSpecs: { key: string; ids: number[]; stacked: boolean }[];
   connections: Edge[];
   selectionConnections?: Edge[];
+  selectionContextIds?: number[];
 }
 
 /** Maps opaque contract identities to stable canvas IDs without interpreting their contents. */
@@ -166,10 +167,24 @@ export function createCanvasProjection() {
         ...(parentIds.includes(identity(key)) ? [identity(key)] : []),
       ]),
     ];
+    const contextConnections: Edge[] = [],
+      selectionContextIds = new Set<number>();
+    function selectionNodes(key: string, visible: number[]) {
+      if (visible.length) return visible;
+      const id = identity(key);
+      selectionContextIds.add(id);
+      return [id];
+    }
     for (const edge of Object.values(board.entities.relationships)) {
-      if (edge.kind === 'prerequisite')
-        for (const source of nodes(edge.prerequisiteIssueId))
-          for (const target of nodes(edge.dependantIssueId)) connect(source, target);
+      if (edge.kind === 'prerequisite') {
+        const sources = nodes(edge.prerequisiteIssueId),
+          targets = nodes(edge.dependantIssueId);
+        for (const source of sources) for (const target of targets) connect(source, target);
+        if (!sources.length || !targets.length)
+          for (const source of selectionNodes(edge.prerequisiteIssueId, sources))
+            for (const target of selectionNodes(edge.dependantIssueId, targets))
+              contextConnections.push({ source, target });
+      }
       if (edge.kind === 'pr-base')
         for (const source of prNodes.get(edge.basePullRequestId) ?? [])
           for (const target of prNodes.get(edge.tipPullRequestId) ?? [])
@@ -207,8 +222,10 @@ export function createCanvasProjection() {
       connections,
       selectionConnections: [
         ...connections,
+        ...contextConnections,
         ...stackConnections.filter((edge) => !keys.has(`${edge.source}-${edge.target}`)),
       ],
+      selectionContextIds: [...selectionContextIds],
     };
   };
 }

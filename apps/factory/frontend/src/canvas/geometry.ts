@@ -573,7 +573,8 @@ export function relationshipHighlights(
   parents: Record<number, number>,
   parentIds: number[],
   mode: RelationshipMode,
-  direction: RelationshipDirection = 'both'
+  direction: RelationshipDirection = 'both',
+  contextIds: readonly number[] = []
 ) {
   // A parent completes after its children. Membership points child -> parent.
   // Walk each direction separately; never turn around at a shared parent or dependant.
@@ -608,6 +609,11 @@ export function relationshipHighlights(
   };
   const prerequisites = walk(true, prerequisiteEdges),
     dependants = walk(false, dependantEdges);
+  // Context-only issues connect visible work but are not themselves displayed work.
+  for (const id of contextIds) {
+    prerequisites.delete(id);
+    dependants.delete(id);
+  }
   if (active !== undefined && parentIds.includes(active) && mode === 'direct')
     for (const [child, parent] of Object.entries(parents))
       if (parent === active) prerequisites.add(Number(child));

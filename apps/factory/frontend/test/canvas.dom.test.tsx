@@ -934,6 +934,71 @@ it('shows both relationship directions initially and restores both when the acti
   expect(filter.getAttribute('aria-pressed')).toBe('false');
   expect(document.querySelectorAll('.cc-item.cc-selected,.cc-item.cc-related')).toHaveLength(3);
 });
+it.each(['transitive', 'all'])(
+  'highlights visible work through context-only prerequisites in %s mode',
+  async (mode) => {
+    const seed = await sample(),
+      edge = seed.entities.relationships['relationship:blocker'];
+    if (edge.kind !== 'prerequisite') throw new Error('Expected prerequisite');
+    const board: FactoryV2Snapshot = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        items: {
+          'item:1001': seed.entities.items['item:1001'],
+          'item:1002': seed.entities.items['item:1002'],
+        },
+        issues: {
+          ...seed.entities.issues,
+          'issue:bridge': {
+            ...seed.entities.issues['issue:1001'],
+            id: 'issue:bridge',
+            number: 999,
+          },
+        },
+        stacks: {},
+        relationships: {
+          'relationship:context-first': {
+            ...edge,
+            id: 'relationship:context-first',
+            prerequisiteIssueId: 'issue:1001',
+            dependantIssueId: 'issue:bridge',
+          },
+          'relationship:context-second': {
+            ...edge,
+            id: 'relationship:context-second',
+            prerequisiteIssueId: 'issue:bridge',
+            dependantIssueId: 'issue:1002',
+          },
+        },
+      },
+    };
+    const user = userEvent.setup();
+    render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
+    const first = await screen.findByRole('group', { name: 'Select Add a searchable issue list' }),
+      last = screen.getByRole('group', { name: 'Select Implement the command centre' });
+    await user.click(first);
+    expect(screen.getByRole('button', { name: 'Highlight dependants' }).textContent).toContain(
+      '0 dependants'
+    );
+    expect(last.classList.contains('cc-dimmed')).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Factory settings' }));
+    await user.selectOptions(screen.getByLabelText('Relationship depth'), mode);
+    await user.click(screen.getByRole('button', { name: 'Close Factory controls' }));
+    await user.click(first);
+    expect(screen.getByRole('button', { name: 'Highlight dependants' }).textContent).toContain(
+      '1 dependants'
+    );
+    expect(last.classList.contains('cc-related')).toBe(true);
+    expect(last.classList.contains('cc-dimmed')).toBe(false);
+    expect(document.querySelectorAll('.cc-item')).toHaveLength(2);
+    await user.click(last);
+    expect(screen.getByRole('button', { name: 'Highlight prerequisites' }).textContent).toContain(
+      '1 prerequisites'
+    );
+    expect(first.classList.contains('cc-related')).toBe(true);
+  }
+);
 it('reveals collapsed items when attention highlighting is enabled', async () => {
   const board = await sample(),
     user = userEvent.setup();

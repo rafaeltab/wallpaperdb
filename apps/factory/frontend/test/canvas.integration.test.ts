@@ -2,7 +2,128 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, expect as browserExpect } from '@playwright/test';
 import { createServer } from 'vite';
 import { expect, it } from 'vitest';
-import { fakeV2Server } from '../../src/http/index.js';
+import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
+it('keeps dated attention and toolbar controls accessible at narrow widths', async () => {
+  const backend = fakeV2Server({ epoch: 'attention-browser' });
+  const previous = process.env.FACTORY_BACKEND_URL;
+  let vite: Awaited<ReturnType<typeof createServer>> | undefined;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    const seed = (await backend.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    const board: FactoryV2Snapshot = {
+      ...seed,
+      entities: {
+        ...seed.entities,
+        sources: Object.fromEntries(
+          Object.entries(seed.entities.sources).map(([id, source]) => [
+            id,
+            {
+              ...source,
+              observedAt: source.kind === 'factory' ? null : '2020-01-02T12:00:00.000Z',
+              staleAt: source.kind === 'factory' ? null : '2020-01-02T12:01:00.000Z',
+              refresh: source.kind === 'factory' ? 'unavailable' : 'failed',
+            },
+          ])
+        ),
+      },
+    };
+    await backend.listen({ host: '127.0.0.1', port: 0 });
+    const address = backend.server.address();
+    if (!address || typeof address === 'string') throw new Error('Missing backend address');
+    process.env.FACTORY_BACKEND_URL = `http://127.0.0.1:${address.port}`;
+    vite = await createServer({ configFile: 'frontend/vite.config.ts', server: { port: 0 } });
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    let served = seed;
+    await page.route('**/api/v2/board', (route) => route.fulfill({ json: served }));
+    await vite.listen();
+    const origin = vite.resolvedUrls?.local[0];
+    if (!origin) throw new Error('Missing Vite origin');
+    const warning = page.getByRole('status');
+    const attention = page.getByRole('button', {
+      name: 'Highlight 2 items needing human attention',
+      exact: true,
+    });
+    const date = attention.locator('time');
+    for (const width of [1280, 900, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      served = seed;
+      await page.goto(origin);
+      await browserExpect(attention).toContainText('need attention');
+      const baseline = await attention.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const toolbar = element.closest('header');
+        if (!toolbar) throw new Error('Missing toolbar');
+        const buttons = Array.from(toolbar.querySelectorAll('button')).map((button) =>
+          button.getBoundingClientRect()
+        );
+        return {
+          textTop: range.getBoundingClientRect().top,
+          height: element.getBoundingClientRect().height,
+          controlsHeight:
+            Math.max(...buttons.map((r) => r.bottom)) - Math.min(...buttons.map((r) => r.top)),
+        };
+      });
+      served = board;
+      await page.reload();
+      await browserExpect(warning).toContainText('Attention count may be outdated');
+      await browserExpect(attention).toContainText('as of 2020-01-02 12:00Z');
+      await browserExpect(date).toHaveAttribute('datetime', '2020-01-02T12:00:00.000Z');
+      const bounds = await date.evaluate((element) => {
+        const warning = element.getBoundingClientRect(),
+          toolbar = element.closest('header')?.getBoundingClientRect();
+        if (!toolbar) throw new Error('Missing toolbar');
+        return {
+          top: warning.top,
+          bottom: warning.bottom,
+          toolbarTop: toolbar.top,
+          toolbarBottom: toolbar.bottom,
+          height: toolbar.height,
+        };
+      });
+      expect(bounds.height).toBe(width <= 700 ? 72 : 44);
+      expect(bounds.top, `attention date at width ${width}`).toBeGreaterThanOrEqual(
+        Math.min(bounds.toolbarTop, baseline.textTop)
+      );
+      expect(bounds.bottom).toBeLessThanOrEqual(bounds.toolbarBottom);
+      const controls = await attention.evaluate((element) => {
+        const toolbar = element.closest('header');
+        if (!toolbar) throw new Error('Missing toolbar');
+        const buttons = Array.from(toolbar.querySelectorAll('button')).map((button) =>
+          button.getBoundingClientRect()
+        );
+        return {
+          height: element.getBoundingClientRect().height,
+          controlsHeight:
+            Math.max(...buttons.map((r) => r.bottom)) - Math.min(...buttons.map((r) => r.top)),
+        };
+      });
+      expect(controls).toEqual({
+        height: baseline.height,
+        controlsHeight: baseline.controlsHeight,
+      });
+      await attention.focus();
+      const settings = page.getByRole('button', { name: 'Factory settings', exact: true });
+      await settings.focus();
+      await browserExpect(settings).toBeFocused();
+      const button = await settings.boundingBox();
+      if (!button) throw new Error('Missing settings bounds');
+      expect(button.x).toBeGreaterThanOrEqual(0);
+      expect(button.x + button.width).toBeLessThanOrEqual(width);
+      expect(await page.evaluate(() => window.scrollX)).toBe(0);
+    }
+    expect(errors).toEqual([]);
+  } finally {
+    await browser?.close();
+    await vite?.close();
+    await backend.close();
+    if (previous === undefined) delete process.env.FACTORY_BACKEND_URL;
+    else process.env.FACTORY_BACKEND_URL = previous;
+  }
+}, 60000);
 it('uses the canvas and every command flow against the real fake v2 HTTP server', async () => {
   const backend = fakeV2Server({ epoch: 'browser' });
   await backend.listen({ host: '127.0.0.1', port: 0 });

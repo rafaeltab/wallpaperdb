@@ -453,7 +453,25 @@ it('emits handoff after discovery without assigning the model adapter a discover
             read: () =>
               Effect.sync(() => {
                 now = 31000;
-                return input;
+                return {
+                  ...input,
+                  issues: [
+                    {
+                      number: 42,
+                      url: 'https://github.com/rafaeltab/wallpaperdb/issues/42',
+                      title: 'Ready repair',
+                      body: 'Authorized scope',
+                      author: 'rafaeltab',
+                      open: true,
+                      labels: ['ready-for-agent'],
+                      comments: [],
+                      blockers: [],
+                      parents: [],
+                      blockersReady: true,
+                      prerequisiteEvidence: '',
+                    },
+                  ],
+                };
               }),
           }),
           Layer.succeed(IPlanner, {

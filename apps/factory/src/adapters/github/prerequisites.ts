@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { command } from '../../platform/index.js';
 import { passingChecks, normalizeChecks } from './checks.js';
 import { ancestor } from './ancestry.js';
 import { containsRequired, type JoinBoundary } from './join-boundary.js';
@@ -55,6 +56,7 @@ interface Readiness {
 export async function prerequisiteReadiness(
   config: {
     project: string;
+    fetchIncludedCode?: boolean;
     base: string;
     prBase?: string;
     prerequisites: readonly VerifiedPrerequisite[];
@@ -97,7 +99,11 @@ export async function prerequisiteReadiness(
   return candidateReadiness(config, readiness, [...verified, ...landed], candidate, signal);
 }
 async function openPrerequisite(
-  config: { prerequisites: readonly VerifiedPrerequisite[] },
+  config: {
+    project: string;
+    fetchIncludedCode?: boolean;
+    prerequisites: readonly VerifiedPrerequisite[];
+  },
   number: number,
   evidence: string,
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
@@ -122,6 +128,13 @@ async function openPrerequisite(
     )
   );
   if (!valid(assertion, current, evidence)) return null;
+  if (config.fetchIncludedCode)
+    await command(
+      'git',
+      ['fetch', '--no-write-fetch-head', 'origin', assertion.commit],
+      config.project,
+      signal
+    );
   return {
     ...assertion,
     branch: current.headRefName,

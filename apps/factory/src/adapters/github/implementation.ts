@@ -184,7 +184,7 @@ export function githubIssues(
     const replay = bound ? ((await joins?.evidence(numbers, signal)) ?? []) : [];
     const effective = replayAssertions(assertions, replay);
     const readiness = await prerequisiteReadiness(
-      { ...config, prerequisites: effective },
+      { ...config, fetchIncludedCode: config.selection !== undefined, prerequisites: effective },
       numbers,
       gh,
       signal,

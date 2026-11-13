@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
@@ -116,6 +117,46 @@ it('uses one verified inclusion even when it is not an explicit blocker, and rej
     expect(
       await Effect.runPromise(ambiguous.inspect(580, { includeCodeFromIssues: [573] }))
     ).toMatchObject({ blockersReady: false });
+  } finally {
+    await host.cleanup();
+  }
+});
+
+it('fetches verified included code that is not yet present in the execution repository', async () => {
+  const host = await protocol();
+  const consumer = join(host.directory, 'consumer');
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', host.repository, ...args], { encoding: 'utf8' }).trim();
+  try {
+    execFileSync('git', ['clone', '--no-local', host.repository, consumer]);
+    git('switch', '-c', 'remote-inclusion');
+    git(
+      '-c',
+      'user.name=Test',
+      '-c',
+      'user.email=test@example.invalid',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'remote-only verified code'
+    );
+    const included = git('rev-parse', 'HEAD');
+    expect(() =>
+      execFileSync('git', ['-C', consumer, 'cat-file', '-e', included], { stdio: 'pipe' })
+    ).toThrow();
+    await host.save({ prerequisiteHeads: { 591: included } });
+    const issues = githubIssues({
+      project: consumer,
+      base: host.base,
+      prerequisites: [{ issue: 573, pr: 591, commit: included }],
+      read: host.readGitHub,
+    });
+    expect(
+      await Effect.runPromise(issues.inspect(580, { includeCodeFromIssues: [573] }))
+    ).toMatchObject({
+      blockersReady: true,
+      prerequisite: { base: included, prBase: 'factory/pr-591' },
+    });
   } finally {
     await host.cleanup();
   }

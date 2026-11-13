@@ -147,7 +147,7 @@ export function workflowPostgresLayer(options: Options) {
         await tx.update(wallpaperIntents).set({ state: w }).where(eq(wallpaperIntents.id, w.id));
       };
       const store: WorkflowStorePort = {
-        list: (owner) =>
+        list: (owner, before) =>
           query('list', async (db) => {
             const rows = await db
               .select({ state: wallpaperIntents.state })
@@ -155,10 +155,16 @@ export function workflowPostgresLayer(options: Options) {
               .where(
                 and(
                   eq(wallpaperIntents.ownerNamespace, owner.namespace),
-                  eq(wallpaperIntents.contributorId, owner.subject)
+                  eq(wallpaperIntents.contributorId, owner.subject),
+                  before
+                    ? sql`(${wallpaperIntents.state}->>'createdAt', ${wallpaperIntents.id}) < (${before.createdAt}, ${before.id})`
+                    : undefined
                 )
               )
-              .orderBy(sql`${wallpaperIntents.state}->>'createdAt' desc`)
+              .orderBy(
+                sql`${wallpaperIntents.state}->>'createdAt' desc`,
+                sql`${wallpaperIntents.id} desc`
+              )
               .limit(100);
             return rows.map((row) => row.state);
           }),

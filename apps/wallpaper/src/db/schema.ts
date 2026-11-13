@@ -24,6 +24,12 @@ export const wallpaperIntents = pgTable(
   (t) => [
     uniqueIndex('wallpaper_request_identity').on(t.ownerNamespace, t.contributorId, t.key),
     uniqueIndex('wallpaper_asset_identity').on(t.assetId),
+    index('wallpaper_owner_creations').on(
+      t.ownerNamespace,
+      t.contributorId,
+      sql`(${t.state}->>'createdAt') desc`,
+      t.id.desc()
+    ),
   ]
 );
 export const workflowOutbox = pgTable(

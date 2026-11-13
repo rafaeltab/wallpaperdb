@@ -858,3 +858,60 @@ it('commits one Source registration with its state and rolls both back on a pers
     await runtime.dispose();
   }
 });
+
+it('pages past 100 creations without losing older published or pending work or leaking other owners', async () => {
+  const runtime = ManagedRuntime.make(
+    workflowPostgresLayer({
+      databaseUrl: databaseUrl(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 20,
+    })
+  );
+  const owner = { namespace: 'authors', subject: 'paging-owner' };
+  try {
+    const records: Wallpaper[] = [];
+    for (let i = 0; i < 102; i++) {
+      const w = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, `page-${i}`)));
+      // Equal timestamps exercise the stable identity tie breaker.
+      await runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.change({ kind: 'wallpaper', id: w.id }, (current) => ({
+            wallpaper: current
+              ? {
+                  ...current,
+                  createdAt: '2026-10-22T00:00:00.000Z',
+                  state: i === 0 ? 'published' : 'awaiting-source',
+                }
+              : null,
+            result: undefined,
+          }))
+        )
+      );
+      records.push(w);
+    }
+    await runtime.runPromise(
+      WorkflowStore.use((s) => s.begin({ ...owner, subject: 'other' }, 'other-subject'))
+    );
+    await runtime.runPromise(
+      WorkflowStore.use((s) => s.begin({ ...owner, namespace: 'other' }, 'other-namespace'))
+    );
+    const first = await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)));
+    expect(first).toHaveLength(100);
+    const last = first.at(-1);
+    if (!last) throw new Error('Missing first page');
+    const second = await runtime.runPromise(
+      WorkflowStore.use((s) => s.list(owner, { createdAt: last.createdAt, id: last.id }))
+    );
+    expect(second).toHaveLength(2);
+    const all = [...first, ...second];
+    expect(new Set(all.map((w) => w.id))).toEqual(new Set(records.map((w) => w.id)));
+    expect(
+      all.every((w) => w.owner.namespace === owner.namespace && w.owner.subject === owner.subject)
+    ).toBe(true);
+    expect(all.filter((w) => w.state === 'published')).toHaveLength(1);
+    expect(all.filter((w) => w.state === 'awaiting-source')).toHaveLength(101);
+  } finally {
+    await runtime.dispose();
+  }
+});

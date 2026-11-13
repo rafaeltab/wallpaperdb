@@ -16,8 +16,8 @@ export function creationLayer(ownerNamespace: string) {
     Effect.gen(function* () {
       const store = yield* WorkflowStore;
       return Creation.of({
-        list: (owner) =>
-          owner.namespace === ownerNamespace ? store.list(owner) : Effect.succeed([]),
+        list: (owner, before) =>
+          owner.namespace === ownerNamespace ? store.list(owner, before) : Effect.succeed([]),
         begin: (owner, key, trace) =>
           owner.namespace !== ownerNamespace
             ? Effect.succeed({ kind: 'forbidden' })

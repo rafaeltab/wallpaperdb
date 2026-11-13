@@ -8,6 +8,7 @@ export {
 } from './contract.js';
 export type {
   Creator,
+  CreationPosition,
   WorkflowTrace,
   SourceIntent,
   Wallpaper,

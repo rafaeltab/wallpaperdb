@@ -1,0 +1,1 @@
+CREATE INDEX "wallpaper_owner_creations" ON "wallpaper_intents" USING btree ("owner_namespace","contributor_id",("state"->>'createdAt') desc,"id" DESC NULLS LAST);

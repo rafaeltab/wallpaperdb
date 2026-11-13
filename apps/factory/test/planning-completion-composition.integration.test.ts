@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
@@ -9,6 +10,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -33,7 +35,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
       planner: {
         proposal: {
           selected: [
-            { issue: 581, reason: 'Bounded user-facing repair', dependsOn: [], conflicts: [] },
+            { issue: 581, reason: 'Bounded user-facing repair', includeCodeFromIssues: [] },
           ],
           deferred: [],
         },
@@ -106,6 +108,7 @@ it('keeps discovery and freshness outside the bound model deadline across restar
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -132,7 +135,20 @@ it('keeps discovery and freshness outside the bound model deadline across restar
   try {
     await host.save({
       holds: boundaries,
-      planning: { issues: [] },
+      planning: {
+        issues: [
+          {
+            number: 581,
+            title: 'Lifecycle repair',
+            body: 'Authorized repair',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+            author: { login: 'rafaeltab' },
+            labels: [{ name: 'ready-for-agent' }],
+            comments: [],
+          },
+        ],
+      },
       planner: { proposal: { selected: [], deferred: [] } },
     });
     await Effect.runPromise(

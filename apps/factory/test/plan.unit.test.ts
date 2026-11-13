@@ -23,9 +23,9 @@ const issue: PlanningIssue = {
   blockersReady: true,
   prerequisiteEvidence: '',
 };
-const selection = { issue: 580, reason: 'User-facing bug', dependsOn: [], conflicts: [] };
+const selection = { issue: 580, reason: 'User-facing bug', includeCodeFromIssues: [] };
 const proposal: Proposal = {
-  selected: [{ issue: 580, reason: 'User-facing bug', dependsOn: [], conflicts: [] }],
+  selected: [{ issue: 580, reason: 'User-facing bug', includeCodeFromIssues: [] }],
   deferred: [],
 };
 async function preview(
@@ -38,7 +38,7 @@ async function preview(
   const input: PlanningInput = {
     issues,
     job,
-    capacity: { concurrency: 1, admission: 1 },
+    capacity: { concurrency: issues.length, admission: issues.length },
   };
   const runtime = ManagedRuntime.make(
     PlanLive.pipe(
@@ -171,7 +171,13 @@ it('rejects a cycle behind shared prerequisites without rejecting an independent
       { ...issue, number: 583, blockers: [581] },
       { ...issue, number: 584 },
     ],
-    { selected: [...proposal.selected, { ...selection, issue: 584 }], deferred: [] }
+    {
+      selected: [
+        { ...selection, includeCodeFromIssues: [581, 582] },
+        { ...selection, issue: 584 },
+      ],
+      deferred: [],
+    }
   );
   expect(result.selected).toEqual([{ ...selection, issue: 584 }]);
   expect(result.rejected).toContainEqual({ issue: 580, reason: 'Cyclic explicit dependencies' });
@@ -245,3 +251,40 @@ it.each([
     }
   }
 );
+
+it('rejects inclusion of its own unfinished code', async () => {
+  expect(
+    (
+      await preview([issue], {
+        selected: [{ ...selection, includeCodeFromIssues: [580] }],
+        deferred: [],
+      })
+    ).selected
+  ).toEqual([]);
+});
+it('rejects inclusion of another new implementation in the same batch', async () => {
+  expect(
+    (
+      await preview([issue, { ...issue, number: 579 }], {
+        selected: [selection, { ...selection, issue: 579, includeCodeFromIssues: [580] }],
+        deferred: [],
+      })
+    ).selected
+  ).toEqual([]);
+});
+
+it('invalidates a response omitting a mandatory open prerequisite', async () => {
+  const result = await preview([
+    { ...issue, blockers: [579] },
+    { ...issue, number: 579, open: true, labels: [] },
+  ]);
+  expect(result.selected).toEqual([]);
+  expect(result.rejected).toContainEqual({
+    issue: 580,
+    reason: 'Mandatory prerequisite omitted from inclusion list',
+  });
+});
+it('does not veto independent selected work because an overlapping backlog item is unselected', async () => {
+  const result = await preview([issue, { ...issue, number: 579, title: 'Another browse repair' }]);
+  expect(result.selected).toEqual(proposal.selected);
+});

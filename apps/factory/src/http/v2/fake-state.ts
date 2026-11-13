@@ -272,8 +272,7 @@ export function fakeState(epoch: string, now: () => number, historyLimit: number
             .map((issue) => ({
               issueId: issue.id,
               reason: 'Eligible sample work.',
-              dependsOn: [],
-              conflicts: [],
+              includeCodeFromIssues: [],
             })),
           deferred: [],
           rejected: [],

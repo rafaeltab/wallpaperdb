@@ -26,6 +26,7 @@ export function githubIssues(
     project: string;
     read?: (args: string[], signal?: AbortSignal) => Promise<unknown>;
     base: string;
+    selection?: { readonly included: readonly number[] };
     joins?: JoinConfiguration;
     prBase?: string;
     prerequisites: readonly VerifiedPrerequisite[];
@@ -55,7 +56,49 @@ export function githubIssues(
     contextualPromise({
       admitRecovery,
       try: async (signal) => {
-        return await inspectIssue(number, prepare, signal, candidate);
+        if (candidate?.includeCodeFromIssues === undefined)
+          return await inspectIssue(number, prepare, signal, candidate);
+        const included = candidate.includeCodeFromIssues;
+        if (
+          included.length > 100 ||
+          included.includes(number) ||
+          new Set(included).size !== included.length ||
+          included.some((item) => !Number.isSafeInteger(item) || item < 1)
+        )
+          throw new Error('Invalid included issue identities');
+        let base = candidate.selectionBase;
+        if (!base) {
+          // Fetch failure is authoritative. Never substitute a stale tracking ref or configured pin.
+          const observed = await command(
+            'git',
+            ['ls-remote', '--exit-code', 'origin', 'refs/heads/main'],
+            config.project,
+            signal
+          );
+          base = z
+            .string()
+            .regex(/^[a-f0-9]{40}$/)
+            .parse(observed.trim().split(/\s+/)[0]);
+          await command(
+            'git',
+            ['fetch', '--no-write-fetch-head', 'origin', base],
+            config.project,
+            signal
+          );
+        }
+        const selected = githubIssues(
+          { ...config, base, prBase: 'main', selection: { included } },
+          gh
+        );
+        const comparison = candidate.base
+          ? { base: candidate.base, prBase: candidate.prBase }
+          : undefined;
+        if (prepare && selected.prepare)
+          await runInContext(selected.prepare(number, admitRecovery), signal);
+        return {
+          ...(await runInContext(selected.inspect(number, comparison), signal)),
+          selectionBase: base,
+        };
       },
       catch: (cause) => new Unavailable({ operation: 'inspect-issue', cause }),
     }).pipe(
@@ -145,7 +188,7 @@ export function githubIssues(
       numbers,
       gh,
       signal,
-      candidate
+      candidate?.base ? { base: candidate.base, prBase: candidate.prBase } : undefined
     );
     if (prepare) await prepareFresh(numbers, readiness, pending, bound, signal);
     return publicReadiness(readiness, pending, bound);
@@ -190,7 +233,62 @@ export function githubIssues(
       )
       .flat();
     const numbers = blockerNumbers(native, issue.body);
-    const readiness = await joinReadiness(numbers, prepare, signal, candidate);
+    let readiness;
+    const omitted = config.selection
+      ? numbers.filter((blocker) => !config.selection?.included.includes(blocker))
+      : [];
+    // Verify omissions before constructing any base. Open mandatory code must be explicitly named.
+    let omittedReady = true;
+    for (const blocker of omitted) {
+      const observed = z
+        .object({ number: z.number(), state: z.enum(['OPEN', 'CLOSED']) })
+        .parse(
+          await gh(
+            [
+              'issue',
+              'view',
+              String(blocker),
+              '--repo',
+              'rafaeltab/wallpaperdb',
+              '--json',
+              'number,state',
+            ],
+            signal
+          )
+        );
+      if (observed.number !== blocker) throw new Error('Mismatched explicit blocker');
+      if (observed.state === 'OPEN') {
+        omittedReady = false;
+        break;
+      }
+    }
+    if (omittedReady && omitted.length) {
+      const landing = await prerequisiteReadiness(config, omitted, gh, signal, {
+        base: config.base,
+        prBase: 'main',
+      });
+      omittedReady =
+        landing.blockersReady &&
+        (!landing.prerequisite || landing.prerequisite.base === config.base);
+    }
+    if (!omittedReady)
+      readiness = {
+        blockersReady: false,
+        blockedReason: 'Mandatory prerequisite omitted from inclusion list',
+      };
+    else {
+      readiness = await joinReadiness(
+        config.selection?.included ?? numbers,
+        prepare,
+        signal,
+        candidate
+      );
+      if (config.selection && readiness.blockersReady && !readiness.prerequisite)
+        readiness = {
+          ...readiness,
+          prerequisite: { base: config.base, prBase: 'main', evidence: '[]' },
+        };
+    }
     return {
       open: issue.state === 'OPEN',
       author: issue.author.login,
@@ -292,8 +390,8 @@ export function githubIssues(
         return replayObservation(replay, observed, intent.branch);
       }),
     inspect: (number, candidate) => inspect(number, false, candidate),
-    prepare: (number, admitRecovery) =>
-      Effect.asVoid(inspect(number, true, undefined, admitRecovery)),
+    prepare: (number, admitRecovery, candidate) =>
+      Effect.asVoid(inspect(number, true, candidate, admitRecovery)),
   };
 }
 

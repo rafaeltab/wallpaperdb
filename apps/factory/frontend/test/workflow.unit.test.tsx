@@ -76,7 +76,7 @@ it('renders external proposal prose as text while retaining issue context and de
           issues: [{ number: 12, title: '<script>unsafe</script>', blockers: [4], parents: [2] }],
         },
         selected: [
-          { issue: 12, reason: '<img src=x onerror=alert(1)>', dependsOn: [4], conflicts: [5] },
+          { issue: 12, reason: '<img src=x onerror=alert(1)>', includeCodeFromIssues: [4, 5] },
         ],
         rejected: [{ issue: 3, reason: 'Not ready' }],
       }}

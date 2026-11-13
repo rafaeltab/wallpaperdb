@@ -21,6 +21,8 @@ export const ContinuationAdmission = Context.Service<ContinuationAdmission>(
   'wallpaperdb.factory.ContinuationAdmission'
 );
 export interface Intent {
+  readonly includeCodeFromIssues?: readonly number[];
+  readonly selectionBase?: string;
   readonly id: string;
   readonly issue: number;
   readonly issueUrl: string;
@@ -163,7 +165,14 @@ export interface Issues {
   reconcile?(admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
-  prepare?(issue: number, admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
+  prepare?(
+    issue: number,
+    admitRecovery?: RecoveryAdmission,
+    candidate?: {
+      readonly includeCodeFromIssues: readonly number[];
+      readonly selectionBase?: string;
+    }
+  ): Effect.Effect<void, Unavailable>;
   /** Observe the bound publication and retain known adverse observations locally.
    * External refs and PR metadata are read-only at this boundary. */
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
@@ -173,7 +182,12 @@ export interface Issues {
    * otherwise remain blocked/unavailable. No reservation or launch is changed. */
   inspect(
     issue: number,
-    candidate?: { readonly base: string; readonly prBase?: string }
+    candidate?: {
+      readonly base?: string;
+      readonly prBase?: string;
+      readonly includeCodeFromIssues?: readonly number[];
+      readonly selectionBase?: string;
+    }
   ): Effect.Effect<
     {
       open: boolean;
@@ -183,6 +197,7 @@ export interface Issues {
       blockers: readonly number[];
       prerequisite?: { readonly base: string; readonly prBase: string; readonly evidence: string };
       blockersReady: boolean;
+      selectionBase?: string;
       joinRequired?: boolean;
       recovery?: {
         readonly progress: string;
@@ -215,6 +230,8 @@ export interface Execution {
 }
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
+  readonly includeCodeFromIssues?: readonly number[];
+  readonly selectionBase?: string;
   readonly issue: number;
   readonly prerequisiteEvidence?: string;
   readonly prBase?: string;

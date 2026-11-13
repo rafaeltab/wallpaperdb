@@ -415,8 +415,7 @@ export interface PlanAttempt extends Entity<EntityId<'plan'>> {
     readonly selected: readonly {
       readonly issueId: IssueId;
       readonly reason: string;
-      readonly dependsOn: readonly IssueId[];
-      readonly conflicts: readonly IssueId[];
+      readonly includeCodeFromIssues: readonly IssueId[];
     }[];
     readonly deferred: readonly { readonly issueId: IssueId; readonly reason: string }[];
     readonly rejected: readonly { readonly issueId: IssueId; readonly reason: string }[];

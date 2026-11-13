@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import type { ScheduleState, ScheduleStore } from '../../src/capabilities/plan/index.js';
 export function controlledScheduleStore(): ScheduleStore {
   let state: ScheduleState = {
@@ -8,7 +8,21 @@ export function controlledScheduleStore(): ScheduleStore {
     paused: false,
     admissions: [],
   };
+  let owned = false;
   return {
+    withCycle: (work) =>
+      Effect.suspend(() => {
+        if (owned) return Effect.succeed(Option.none());
+        owned = true;
+        return work.pipe(
+          Effect.map(Option.some),
+          Effect.ensuring(
+            Effect.sync(() => {
+              owned = false;
+            })
+          )
+        );
+      }),
     read: () => Effect.sync(() => state),
     save: (next) =>
       Effect.sync(() => {

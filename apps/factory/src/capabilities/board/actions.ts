@@ -33,7 +33,7 @@ export function actions(
   };
   const factory = snapshot.meta.factory;
   const configure = make('configure', factory.id, true, '', {
-    revision: input.state.revision,
+    revision: input.state.controlsRevision ?? input.state.revision,
     planning: factory.planning,
   });
   const acknowledge = make(

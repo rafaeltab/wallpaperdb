@@ -35,3 +35,4 @@ export { t3Observations } from './schema.js';
 export { v2Board, v2Commands, githubRichFacts } from './schema.js';
 export { githubRequestBudget } from './schema.js';
 export { planningSafety, planningNotices, planningDeadlineFailures } from './schema.js';
+export { acquireCycle } from './cycle-lock.js';

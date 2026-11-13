@@ -21,6 +21,7 @@ import { protocol } from './fixtures/setup.js';
 
 it('runs B and C concurrently from ready A with meaningful linear fork comparisons', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previousPath = process.env.PATH;
   const previousFixture = process.env.FACTORY_FIXTURE;
   process.env.PATH = `${host.directory}:${previousPath}`;
@@ -78,6 +79,7 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
           return {
             job: { kind: 'empty' as const },
             scheduleRevision: state.revision,
+            admissions: state.admissions.map((item) => item.issue),
             capacity: { concurrency: 2, admission: 2 },
             issues: [574, 575].map((number) => ({
               number,
@@ -109,14 +111,16 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
       Layer.succeed(PlanningSource, source),
       Layer.succeed(IPlanner, {
         ownership: () => Effect.succeed(undefined),
-        propose: () =>
+        propose: (input) =>
           Effect.succeed({
-            selected: [574, 575].map((issue) => ({
-              issue,
-              reason: 'Independent forks',
-              dependsOn: [],
-              conflicts: [],
-            })),
+            selected: [574, 575]
+              .filter((issue) => !input.admissions?.includes(issue))
+              .slice(0, input.maximumSelections)
+              .map((issue) => ({
+                issue,
+                reason: 'Independent forks',
+                includeCodeFromIssues: [573],
+              })),
             deferred: [],
           }),
       })

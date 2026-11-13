@@ -457,6 +457,7 @@ async function reservedRuntime(
   const persisted = fileScheduleStore(join(f.host.directory, 'reserved-schedule'));
   let observedReservation = false;
   const store: ScheduleStore = {
+    withCycle: persisted.withCycle,
     read: () => persisted.read(),
     save: (state) =>
       Effect.gen(function* () {

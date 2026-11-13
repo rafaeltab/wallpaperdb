@@ -309,8 +309,8 @@ it('previews automatically discovered work without starting an implementation wo
     planner: {
       proposal: {
         selected: [
-          { issue: 580, reason: 'Thin end-to-end experiment', dependsOn: [], conflicts: [] },
-          { issue: 579, reason: 'Try deferred work', dependsOn: [], conflicts: [] },
+          { issue: 580, reason: 'Thin end-to-end experiment', includeCodeFromIssues: [] },
+          { issue: 579, reason: 'Try deferred work', includeCodeFromIssues: [] },
         ],
         deferred: [],
       },

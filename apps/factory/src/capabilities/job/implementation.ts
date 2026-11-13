@@ -107,6 +107,8 @@ export const JobLive = Layer.effect(
           if (!matchesRestart(latest.retry, command)) return { kind: 'rejected' as const };
           const issue = yield* issues.inspect(intent.issue, {
             base: intent.base,
+            includeCodeFromIssues: intent.includeCodeFromIssues,
+            selectionBase: intent.selectionBase,
             prBase: intent.prBase,
           });
           if (
@@ -174,6 +176,8 @@ export const JobLive = Layer.effect(
           if (!validCommand(command)) return { kind: 'rejected' as const };
           const issue = yield* issues.inspect(command.issue, {
             base: command.base,
+            includeCodeFromIssues: command.includeCodeFromIssues,
+            selectionBase: command.selectionBase,
             prBase: command.prBase,
           });
           if (!eligible(issue)) return { kind: 'rejected' as const };

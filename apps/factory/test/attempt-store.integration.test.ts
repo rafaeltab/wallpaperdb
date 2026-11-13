@@ -127,7 +127,7 @@ it('persists a validated successful advisory result across reopen and refuses co
     await Effect.runPromise(store.create(attempt));
     const result = {
       kind: 'preview' as const,
-      selected: [{ issue: 42, reason: 'Thin experiment', dependsOn: [], conflicts: [] }],
+      selected: [{ issue: 42, reason: 'Thin experiment', includeCodeFromIssues: [] }],
       rejected: [{ issue: 43, reason: 'Unsettled API' }],
       input: {
         issues: [
@@ -153,9 +153,26 @@ it('persists a validated successful advisory result across reopen and refuses co
     expect(await Effect.runPromise(store.pending())).toBeUndefined();
     const { default: Database } = await import('better-sqlite3');
     const client = new Database(join(directory, 'factory.sqlite'));
+    const legacy = JSON.stringify({
+      ...result,
+      selected: [
+        { issue: 42, reason: 'Original advisory choice', dependsOn: [40], conflicts: [43] },
+      ],
+    });
+    client.prepare('UPDATE planning_attempts SET result = ? WHERE id = ?').run(legacy, attempt.id);
+    const historical = await Effect.runPromise(sqliteAttemptStore(directory).get(attempt.id));
+    expect(historical?.result?.selected).toEqual([]);
+    expect(historical?.result?.rejected).toContainEqual({
+      issue: 42,
+      reason:
+        'Historical advisory selection: Original advisory choice. Dependencies: 40. Conflicts: 43. No execution authority.',
+    });
+    expect(
+      client.prepare('SELECT result FROM planning_attempts WHERE id = ?').get(attempt.id)
+    ).toEqual({ result: legacy });
     const corrupt = JSON.stringify({
       ...result,
-      selected: [{ issue: -1, reason: 'Invalid stored selection', dependsOn: [], conflicts: [] }],
+      selected: [{ issue: -1, reason: 'Invalid stored selection', includeCodeFromIssues: [] }],
     });
     try {
       client

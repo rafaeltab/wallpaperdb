@@ -5,7 +5,7 @@ import type { AttemptStore, PlanningAttempt } from '../../capabilities/plan/inde
 import { Unavailable } from '../../capabilities/job/index.js';
 import { stateConnection, planningAttempts as table } from '../../platform/index.js';
 const numbers = z.array(z.number().int().positive().safe());
-const resultSchema = z
+const currentResultSchema = z
   .object({
     kind: z.enum(['preview', 'stale']),
     selected: z.array(
@@ -13,8 +13,7 @@ const resultSchema = z
         .object({
           issue: z.number().int().positive(),
           reason: z.string(),
-          dependsOn: numbers,
-          conflicts: numbers,
+          includeCodeFromIssues: numbers,
         })
         .strict()
     ),
@@ -47,6 +46,29 @@ const resultSchema = z
       .strict(),
   })
   .strict();
+// Legacy previews are retained as historical diagnostics, never executable selections.
+const legacySelection = z
+  .object({
+    issue: z.number().int().positive(),
+    reason: z.string(),
+    dependsOn: numbers,
+    conflicts: numbers,
+  })
+  .strict();
+const resultSchema = z.union([
+  currentResultSchema,
+  currentResultSchema.extend({ selected: z.array(legacySelection) }).transform((result) => ({
+    ...result,
+    selected: [],
+    rejected: [
+      ...result.rejected,
+      ...result.selected.map((item) => ({
+        issue: item.issue,
+        reason: `Historical advisory selection: ${item.reason}. Dependencies: ${item.dependsOn.join(', ') || 'none'}. Conflicts: ${item.conflicts.join(', ') || 'none'}. No execution authority.`,
+      })),
+    ],
+  })),
+]);
 const schema = z
   .object({
     id: z.string().uuid(),

@@ -1,4 +1,4 @@
-import { Context, type Effect } from 'effect';
+import { Context, type Effect, type Option } from 'effect';
 import type { Status, Unavailable, RecoveryStatus } from '../job/index.js';
 export interface PlanningIssue {
   readonly metadata?: {
@@ -47,6 +47,11 @@ export interface PlanningIssue {
 export interface PlanningInput {
   /** Maximum new issues that current free slots and permanent admissions permit. */
   readonly maximumSelections?: number;
+  readonly availableCode?: readonly {
+    readonly issue: number;
+    readonly pr: number;
+    readonly commit: string;
+  }[];
   readonly issues: readonly PlanningIssue[];
   readonly job: Status;
   readonly jobs?: readonly Status[];
@@ -57,6 +62,9 @@ export interface PlanningInput {
 }
 /** Complete bounded discovery, including parent and blocker context. Failure must not yield partial facts. */
 export interface PlanningSource {
+  /** Read-only verification of the exact requested code and mandatory blockers. Allows
+   * verified divergent code whose automatic base construction remains in this cycle. */
+  verify?(selection: Proposal['selected'][number]): Effect.Effect<string | undefined, Unavailable>;
   /** Periodic discovery may coalesce demand without returning cached authority.
    * Undefined means no new observation; explicit previews and freshness checks use read. */
   poll?(): Effect.Effect<PlanningInput | undefined, Unavailable>;
@@ -67,8 +75,7 @@ export interface Proposal {
   readonly selected: readonly {
     issue: number;
     reason: string;
-    dependsOn: readonly number[];
-    conflicts: readonly number[];
+    includeCodeFromIssues: readonly number[];
   }[];
   readonly deferred: readonly { issue: number; reason: string }[];
 }
@@ -101,6 +108,7 @@ export interface Preview {
 }
 export interface Plan {
   preview(attempt?: {
+    maximumSelections?: number;
     requestId?: string;
     automatic?: boolean;
     attemptStartedAt?: number;
@@ -117,7 +125,23 @@ export interface ResumeClaim {
   readonly runId?: string;
   readonly run?: { readonly id: string; readonly ordinal: number };
 }
+export interface ExecutionCycle {
+  readonly requestId: string;
+  readonly startedAt: number;
+  /** Absent until a validated selection is durably accepted. Never a queue of future work. */
+  readonly selected?: Proposal['selected'];
+  readonly scope?: string;
+  readonly modelAttemptId?: string;
+  readonly bases?: readonly { readonly issue: number; readonly base: string }[];
+  readonly concurrency: number;
+  readonly allowance: number;
+}
 export interface ScheduleState {
+  /** Stable across internal cycle bookkeeping; changes with configured controls. */
+  readonly controlsRevision?: number;
+  readonly cycle?: ExecutionCycle;
+  /** An authorization whose recovery journal has not yet been observed. */
+  readonly recovering?: readonly number[];
   readonly revision: number;
   readonly concurrency: number;
   readonly allowance: number;
@@ -131,6 +155,9 @@ export interface ScheduleState {
 /** Atomic revision compare-and-set of controls and all admission reservations.
  * A successful save is durable before any job launch. */
 export interface ScheduleStore {
+  /** Exclusive process-independent execution-cycle ownership. Busy returns None, never
+   * waits recursively. Release on interruption/process exit; retained batch state survives. */
+  withCycle<A>(work: Effect.Effect<A, Unavailable>): Effect.Effect<Option.Option<A>, Unavailable>;
   read(): Effect.Effect<ScheduleState, Unavailable>;
   save(state: ScheduleState): Effect.Effect<boolean, Unavailable>;
 }

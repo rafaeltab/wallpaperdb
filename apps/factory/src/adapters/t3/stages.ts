@@ -290,7 +290,7 @@ function deliveryMatches(
     })
   )
     return false;
-  const index = request.deliveryIndex ?? request.index;
+  const index = deliveryIndex(request);
   if (index === 0 && request.stage === 'implementation')
     return last.startsWith(
       `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}.`
@@ -352,7 +352,16 @@ function currentResume(
 }
 
 function deliveryIdentity(intent: Intent, request: StageRequest) {
-  return `${intent.id}:${request.deliveryIndex ?? request.index}`;
+  return `${intent.id}:${deliveryIndex(request)}`;
+}
+
+function deliveryIndex(request: StageRequest) {
+  // Fresh attempts start a new logical delivery at zero, even when their
+  // immutable pre-upgrade stage occupies a later position in the job journal.
+  return (
+    request.deliveryIndex ??
+    (request.stage === 'implementation' && request.previousRunId === null ? 0 : request.index)
+  );
 }
 
 function publicationBase(intent: Intent, fallback: string) {

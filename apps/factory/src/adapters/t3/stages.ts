@@ -273,6 +273,7 @@ function deliveryMatches(
   const instruction = instructions.at(-1);
   if (!instruction) return false;
   const last = instruction.text;
+  if (last.includes('with delivery=')) return false;
   // Identical legacy claims from another delivery cannot be disambiguated safely.
   // Repeated receipts after this instruction still belong to the same delivery.
   const boundary = detail.messages.lastIndexOf(instruction);

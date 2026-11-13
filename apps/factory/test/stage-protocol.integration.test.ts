@@ -179,6 +179,13 @@ it('reconciles retained review stage 11 from its original prompt after notificat
       );
     for (const messages of [
       [response],
+      [
+        {
+          role: 'user',
+          text: `${prompt} On completion return JSON with delivery="1:11", jobId="1".`,
+        },
+        response,
+      ],
       [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],
       [
         { role: 'user', text: prompt.replace('Stage 11', 'Stage 10') },

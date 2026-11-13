@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Effect, Semaphore } from 'effect';
 import { z } from 'zod';
 import type {
   ObservationSource,
@@ -301,6 +301,7 @@ export function githubObservations(
     ((args: string[], signal?: AbortSignal) =>
       command('gh', args, project, signal).then(JSON.parse));
   const synchronizationCache = projectSynchronization(synchronization);
+  const collections = Semaphore.makeUnsafe(1);
   return {
     read: () =>
       Effect.gen(function* () {
@@ -509,7 +510,7 @@ export function githubObservations(
           { concurrency: 4 }
         );
         return { ...facts, issues };
-      }),
+      }).pipe(collections.withPermits(1)),
   };
 }
 

@@ -218,7 +218,9 @@ export default function ActivityPrototype() {
         ? 'Status unknown'
         : 'Idle';
   const open = !dismissed && (pinned || hovered || focused);
-  const activeReasons = [...new Set([...reasons, ...(paused ? [0] : [])])].sort();
+  const activeReasons = [
+    ...new Set([...reasons.filter((reason) => reason !== 0), ...(paused ? [0] : [])]),
+  ].sort();
   function load(value: string) {
     const t = Date.now();
     setScenario(value);
@@ -282,7 +284,7 @@ export default function ActivityPrototype() {
                   <span>
                     {group.active.length} {units(i, group.active.length)}
                   </span>
-                  <time>{group.start === null ? 'Start unknown' : duration(group.start, now)}</time>
+                  <time>{group.start === null ? '-s' : duration(group.start, now)}</time>
                 </div>
               )}
             </div>
@@ -379,7 +381,7 @@ export default function ActivityPrototype() {
                 <small>
                   {group.active.length
                     ? group.start === null
-                      ? 'Start unknown'
+                      ? '-s'
                       : duration(group.start, now)
                     : 'Inactive'}
                 </small>
@@ -455,20 +457,36 @@ export default function ActivityPrototype() {
           setDismissed(false);
         }}
       >
-        <i className={`ap-dot ${highest >= 0 && !disconnected ? 'active' : ''}`} />
+        <i
+          className={`ap-dot ${highest >= 0 && !disconnected ? 'active' : ''} ${summary === 'Idle' ? 'idle' : ''}`}
+          role="img"
+          aria-label={
+            paused
+              ? 'Admissions paused'
+              : summary === 'Idle'
+                ? 'Idle'
+                : disconnected
+                  ? 'Disconnected'
+                  : uncertain && highest < 0
+                    ? 'Status unknown'
+                    : 'Active'
+          }
+        />
         <span>
           {variant === 'B' && <small>ACTIVITY</small>}
           <b>{summary}</b>
         </span>
         {selected && !disconnected && (
-          <time>{selected.start === null ? 'Start unknown' : duration(selected.start, now)}</time>
+          <time>{selected.start === null ? '-s' : duration(selected.start, now)}</time>
         )}
       </button>
       {open && details}
     </fieldset>
   );
   return (
-    <div className={`ap-prototype ap-variant-${variant} ${reduced ? 'ap-reduced' : ''}`}>
+    <div
+      className={`ap-prototype ap-variant-${variant} ${reduced ? 'ap-reduced' : ''} ${paused ? 'ap-paused' : ''}`}
+    >
       <Canvas
         board={board}
         native={false}

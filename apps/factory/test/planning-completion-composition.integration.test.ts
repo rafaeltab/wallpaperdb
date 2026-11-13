@@ -72,7 +72,9 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
           state: { allowance: 2, concurrency: 1, admissions: [{ issue: 581 }] },
         });
       },
-      { timeout: 5000, interval: 20 }
+      // Git verification and worker startup are real processes; the fake clock
+      // controls the model allowance, independently of this wall-clock wait.
+      { timeout: 15000, interval: 20 }
     );
     await vi.waitFor(
       async () =>
@@ -81,7 +83,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
             (call) => call.args[1] === 'start' && call.args.includes('--worktree')
           )
         ).toHaveLength(1),
-      { timeout: 5000, interval: 20 }
+      { timeout: 15000, interval: 20 }
     );
     const starts = (await host.calls()).filter(
       (call) => call.binary === 't3' && call.args[1] === 'start' && !call.args.includes('--help')

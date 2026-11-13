@@ -1,0 +1,109 @@
+name: Diagnostic 537 (not a repair)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnostic-537.yml'
+      - 'apps/web/test/diagnostics/crop-trace.ts'
+      - 'apps/web/test/components/profile/profile-picture-settings.dom.test.tsx'
+
+permissions:
+  contents: read
+
+jobs:
+  repository-unit:
+    if: github.head_ref == 't3/fix-537-profile-crop-timeout'
+    name: Diagnostic 537 repository units (${{ matrix.replica }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Start budget clock
+        run: date +%s > /tmp/flake537-job-start
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+      - name: Prepare prerequisites before experiments
+        env:
+          CURSOR_SECRET: ${{ secrets.CURSOR_SECRET }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_DOMAIN: ${{ secrets.CLERK_DOMAIN }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          E2E_BASE_TEST_EMAIL: ${{ secrets.E2E_BASE_TEST_EMAIL }}
+          E2E_BASE_TEST_PASSWORD: ${{ secrets.E2E_BASE_TEST_PASSWORD }}
+        run: |
+          make toolchain
+          make install
+          make build TURBO_FLAGS='--filter=!@wallpaperdb/factory'
+      - name: Ten bounded full repository-shard unit executions
+        shell: mise exec -- bash --noprofile --norc -eo pipefail {0}
+        run: |
+          mkdir -p /tmp/flake537-evidence
+          git rev-parse HEAD > /tmp/flake537-evidence/tested-sha.txt
+          lscpu > /tmp/flake537-evidence/runner-cpu.txt
+          make toolchain > /tmp/flake537-evidence/toolchain.txt
+          job_start=$(cat /tmp/flake537-job-start)
+          longest=0
+          target=apps/web/test/components/profile/profile-picture-settings.dom.test.tsx
+          cp "$target" /tmp/flake537-instrumented.tsx
+          for iteration in {1..10}; do
+            now=$(date +%s)
+            remaining=$((job_start + 1140 - now))
+            if (( longest > 0 && remaining < longest + 30 )); then
+              echo "Insufficient remaining allowance for another complete workload: ${remaining}s"
+              exit 1
+            fi
+            rm -f /tmp/flake537-web-results.json /tmp/flake537-trace-*.jsonl
+            destination=/tmp/flake537-evidence/execution-$iteration
+            mkdir -p "$destination"
+            if (( iteration == 1 )); then
+              git show "256476a31463b3ef5d7a45458ae7c7c011ec6aba:$target" > "$target"
+              echo untraced-original-base-file > "$destination/probe-mode.txt"
+            else
+              cp /tmp/flake537-instrumented.tsx "$target"
+              echo traced > "$destination/probe-mode.txt"
+            fi
+            sha256sum "$target" > "$destination/test-source-sha256.txt"
+            start=$(date +%s)
+            set +e
+            make test-unit TURBO_FLAGS='--filter=!@wallpaperdb/factory --force --continue=always' 2>&1 | tee "$destination/workload.log"
+            result=${PIPESTATUS[0]}
+            set -e
+            elapsed=$(( $(date +%s) - start ))
+            if (( elapsed > longest )); then longest=$elapsed; fi
+            echo "execution=$iteration result=$result elapsed=${elapsed}s projected_remaining=$((longest * (10 - iteration)))s allowance_remaining=$((job_start + 1140 - $(date +%s)))s" | tee "$destination/timing.txt"
+            cp /tmp/flake537-web-results.json "$destination/" || true
+            cp /tmp/flake537-trace-*.jsonl "$destination/" || true
+            python - "$destination" <<'PY'
+          import json, pathlib, sys
+          directory = pathlib.Path(sys.argv[1])
+          report = json.loads((directory / 'flake537-web-results.json').read_text())
+          files = [r for r in report['testResults'] if r['name'].endswith('/profile-picture-settings.dom.test.tsx')]
+          assert len(files) == 1, 'Owning file not executed exactly once'
+          tests = files[0]['assertionResults']
+          target = [t for t in tests if t['title'] == 'warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply']
+          assert len(tests) == 55 and len(target) == 1, 'Original file scenarios missing'
+          summary = {'fileTests': len(tests), 'statuses': [t['status'] for t in tests], 'target': target[0]}
+          (directory / 'target-summary.json').write_text(json.dumps(summary, indent=2))
+          print(json.dumps(summary))
+          assert all(t['status'] == 'passed' for t in tests), 'Owning file failed; inspect causal trace before further repeats'
+          PY
+            if (( result != 0 )); then exit "$result"; fi
+          done
+      - name: Retain raw results and bounded lifecycle traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-537-replica-${{ matrix.replica }}
+          path: /tmp/flake537-evidence
+          if-no-files-found: warn
+          retention-days: 30

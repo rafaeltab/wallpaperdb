@@ -1,3 +1,4 @@
+import { createCropTrace } from '../../diagnostics/crop-trace';
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -68,21 +69,36 @@ async function renderPage(initial = profile, openPicture = true) {
 
 describe('Profile picture settings', () => {
   it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async () => {
-    vi.mocked(openPictureSource).mockResolvedValue({ width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
-    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
+    const trace = createCropTrace();
+    vi.mocked(openPictureSource).mockImplementation(() => trace.resolved('decode', { width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture }));
+    vi.mocked(userApi.uploadPicture).mockImplementation(() => trace.resolved('upload', { ...profile, version: 2, pictureAssetId: 'saved' }));
+    vi.mocked(userApi.picturePolicy).mockImplementation(() => trace.resolved('policy', picturePolicy));
+    processPicture.mockImplementation(() => trace.resolved('process', canonical));
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
     client.setQueryData(profileQueryKey(profile.id), profile);
+    trace.watch(client);
+    trace.mark('render:enter');
     render(
       <QueryClientProvider client={client}>
         <ProfilePictureSettings profile={profile} tokenProvider={async () => 'token'} />
       </QueryClientProvider>
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    trace.mark('render:complete');
+    const opener = trace.measure('opener-query', () => screen.getByRole('button', { name: 'Edit profile picture' }));
+    trace.mark('opener-click:enter');
+    await userEvent.setup().click(opener);
+    trace.mark('opener-click:complete');
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    const picker = trace.measure('picker-query', () => screen.getByLabelText('Choose picture'));
+    trace.mark('upload-action:enter');
+    await user.upload(picker, new File(['source'], 'picture.png', { type: 'image/png' }));
+    trace.mark('upload-action:complete');
+    trace.mark('slider-query:enter');
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    trace.mark('slider-query:complete');
+    trace.mark('warning-checks:enter');
     const warning = 'This crop will be enlarged and may look pixelated.';
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
     fireEvent.change(zoom, { target: { value: '3' } });
@@ -91,6 +107,7 @@ describe('Profile picture settings', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveTextContent('Picture quality warning. This crop may look pixelated.');
+    trace.mark('warning-checks:complete');
     const updates: MutationRecord[] = [];
     const observer = new MutationObserver((records) => updates.push(...records));
     observer.observe(status, { subtree: true, childList: true, characterData: true });
@@ -99,14 +116,21 @@ describe('Profile picture settings', () => {
       await act(async () => {});
       expect(updates).toHaveLength(0);
     } finally { observer.disconnect(); }
-    await user.click(screen.getByRole('button', { name: 'Reset crop' }));
+    const reset = trace.measure('reset-query', () => screen.getByRole('button', { name: 'Reset crop' }));
+    trace.mark('reset-click:enter');
+    await user.click(reset);
+    trace.mark('reset-click:complete');
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
     expect(zoom).not.toHaveAttribute('aria-describedby');
     expect(status).toBeEmptyDOMElement();
     fireEvent.change(zoom, { target: { value: '3' } });
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    const apply = trace.measure('apply-query', () => screen.getByRole('button', { name: 'Apply' }));
+    trace.mark('apply-click:enter');
+    await user.click(apply);
+    trace.mark('apply-click:complete');
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    trace.mark('upload-observed');
   });
 
   it('keeps the small-source zoom explanation without announcing pixelation when output needs no enlargement', async () => {

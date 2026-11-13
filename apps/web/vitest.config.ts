@@ -23,6 +23,9 @@ export default mergeConfig(
       globals: true,
       testTimeout: 10000,
       hookTimeout: 10000,
+      // Diagnostic branch only: retain machine-readable results for every full-file execution.
+      reporters: ['default', 'json'],
+      outputFile: '/tmp/flake537-web-results.json',
       projects: [
         {
           extends: true,

@@ -329,6 +329,11 @@ function boundedInput(input: PlanningInput): PlanningInput {
   };
 }
 
+// This exact generated receipt records preparation, not a change to the authorized task.
+// Keep edited receipts and all other maintainer comments in the freshness comparison.
+const joinEvidence =
+  /^Verified issue-only join: https:\/\/github\.com\/rafaeltab\/wallpaperdb\/pull\/[1-9]\d* at [a-f0-9]{40}, tree [a-f0-9]{40}, parent [a-f0-9]{40}\. CI passed on this replayed tree\. Original independent review commit [a-f0-9]{40}; prior published head [a-f0-9]{40}\. Automatic replays retain original review; conflict recovery records classification and applicable review separately in durable operation state\.$/;
+
 export function requirementsIdentity(input: PlanningInput, selected: Proposal['selected']) {
   const numbers = new Set(selected.flatMap((item) => [item.issue, ...item.includeCodeFromIssues]));
   if (!selected.length)
@@ -354,7 +359,13 @@ export function requirementsIdentity(input: PlanningInput, selected: Proposal['s
               number,
               title: issue.title,
               body: issue.body,
-              comments: issue.comments,
+              comments: issue.comments.filter(
+                (comment) =>
+                  !(
+                    ['rafaeltab', 'zero-two-rafaeltab'].includes(comment.author) &&
+                    joinEvidence.test(comment.body)
+                  )
+              ),
               author: issue.author,
               open: issue.open,
               labels: issue.labels,

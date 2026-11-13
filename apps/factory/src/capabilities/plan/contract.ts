@@ -45,6 +45,8 @@ export interface PlanningIssue {
   };
 }
 export interface PlanningInput {
+  /** Maximum new issues that current free slots and permanent admissions permit. */
+  readonly maximumSelections?: number;
   readonly issues: readonly PlanningIssue[];
   readonly job: Status;
   readonly jobs?: readonly Status[];

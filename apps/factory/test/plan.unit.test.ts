@@ -203,3 +203,45 @@ it('rejects a context-only issue even when it otherwise passes every candidate p
   const candidate = { ...context, metadata: { ...context.metadata, candidate: true } };
   expect((await preview([candidate])).selected).toEqual(proposal.selected);
 });
+
+it.each([
+  [3, 2, 2],
+  [-1, 2, 2],
+  [3, -1, 3],
+  [-1, -1, 4],
+  [0, 2, 0],
+])(
+  'bounds model selection by available concurrency %s and admissions %s',
+  async (concurrency, admission, expected) => {
+    const inputs: PlanningInput[] = [];
+    const input: PlanningInput = {
+      issues: [580, 581, 582, 583].map((number) => ({ ...issue, number })),
+      job: { kind: 'empty' },
+      capacity: { concurrency, admission },
+    };
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSource, { read: () => Effect.succeed(input) }),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: (value) =>
+                Effect.sync(() => {
+                  inputs.push(value);
+                  return { selected: [], deferred: [] };
+                }),
+            })
+          )
+        )
+      )
+    );
+    try {
+      await runtime.runPromise(Effect.flatMap(Plan, (plan) => plan.preview()));
+      if (expected === 0) expect(inputs).toEqual([]);
+      else expect(inputs[0]).toHaveProperty('maximumSelections', expected);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

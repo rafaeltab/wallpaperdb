@@ -46,6 +46,7 @@ import {
   IPlanner,
   Scheduler,
   SchedulerLive,
+  capacityOccupied,
   JobPool,
   ScheduleStore,
   ScheduleObservations,
@@ -275,6 +276,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       PlanningSource,
       Effect.map(Job, (job) => {
         const source = githubPlanning(githubConfig(), job);
+        const issueSource = githubIssues(githubConfig());
         let automaticAt = 0;
         const read = () =>
           Effect.gen(function* () {
@@ -288,6 +290,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             return {
               ...input,
               jobs,
+              maximumSelections: Math.max(
+                0,
+                Math.min(
+                  state.allowance === -1 ? Infinity : state.allowance - state.admissions.length,
+                  state.concurrency === -1
+                    ? Infinity
+                    : state.concurrency -
+                        capacityOccupied({
+                          state,
+                          jobs,
+                          recoveries: yield* issueSource.recoveries?.() ?? Effect.succeed([]),
+                        })
+                )
+              ),
               scheduleRevision: state.revision,
               admissions: state.admissions.map((a) => a.issue),
               paused: state.paused,

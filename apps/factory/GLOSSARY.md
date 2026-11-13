@@ -38,6 +38,13 @@ _Avoid_: Agent turn, PR
 **Stage**:
 A bounded responsibility within a job's delivery, such as implementation, independent review, publication, babysitting or CI observation. Finishing an agent turn is not necessarily completing its stage.
 
+**Factory activity**:
+Current coordination work performed by the Software Factory, such as gathering planning information or requesting a plan proposal. It is distinct from a job's delivery stage.
+_Avoid_: Job stage
+
+**Factory status**:
+A summary of current factory coordination and managed job execution, including managed waits. Idle means no managed coordination, execution or wait is underway, independently of whether new work can start.
+
 **Parked job**:
 A job awaiting a maintainer answer whose context and progress are retained. It is neither cancelled nor a satisfied prerequisite for dependent work.
 _Avoid_: Completed job, failed issue

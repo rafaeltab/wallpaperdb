@@ -311,6 +311,7 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
               Effect.succeed({ kind: 'stale', selected: [], rejected: [], input: input() }),
           }),
           Layer.succeed(PlanningSource, {
+            verify: () => Effect.succeed(undefined),
             read: () =>
               Effect.sync(() => {
                 expect(unrelated.kind === 'job' && unrelated.delivery?.ready).toBe(true);
@@ -2634,6 +2635,7 @@ process.exit(result.status ?? 1);
             Layer.succeed(Issues, issues),
             Layer.succeed(Plan, { preview: () => Effect.die('Paused scheduler must not plan') }),
             Layer.succeed(PlanningSource, {
+              verify: () => Effect.succeed(undefined),
               read: () => Effect.die('Paused scheduler must not discover'),
             })
           )

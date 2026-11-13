@@ -1187,7 +1187,10 @@ it.each(['status', 'tick'] as const)(
               pullRequest: () => Effect.die('No PR admission'),
             }),
             Layer.succeed(Plan, { preview: () => Effect.die('Paused: no planning') }),
-            Layer.succeed(PlanningSource, { read: () => Effect.die('Paused: no discovery') })
+            Layer.succeed(PlanningSource, {
+              verify: () => Effect.die('Paused: no verification'),
+              read: () => Effect.die('Paused: no discovery'),
+            })
           )
         )
       )

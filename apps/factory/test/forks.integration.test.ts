@@ -73,6 +73,14 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
       jobs.set(number, await worker.runPromise(Job));
     }
     const source: PlanningSource = {
+      verify: (selection) =>
+        Effect.map(
+          issues.inspect(selection.issue, {
+            includeCodeFromIssues: selection.includeCodeFromIssues,
+          }),
+          (value) =>
+            value.blockersReady || value.joinRequired ? undefined : 'Requested code unavailable'
+        ),
       read: () =>
         Effect.gen(function* () {
           const state = yield* schedule.read();

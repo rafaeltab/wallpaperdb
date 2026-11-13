@@ -32,7 +32,8 @@ async function preview(
   issues = [issue],
   proposed = proposal,
   changed = false,
-  job: PlanningInput['job'] = { kind: 'empty' }
+  job: PlanningInput['job'] = { kind: 'empty' },
+  verify: PlanningSource['verify'] = () => Effect.succeed(undefined)
 ) {
   let reads = 0;
   const input: PlanningInput = {
@@ -45,6 +46,7 @@ async function preview(
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(PlanningSource, {
+            verify,
             read: () => Effect.sync(() => ({ ...input, issues: changed && reads++ ? [] : issues })),
           }),
           Layer.succeed(IPlanner, {
@@ -229,7 +231,10 @@ it.each([
       PlanLive.pipe(
         Layer.provide(
           Layer.mergeAll(
-            Layer.succeed(PlanningSource, { read: () => Effect.succeed(input) }),
+            Layer.succeed(PlanningSource, {
+              verify: () => Effect.succeed(undefined),
+              read: () => Effect.succeed(input),
+            }),
             Layer.succeed(IPlanner, {
               ownership: () => Effect.succeed(undefined),
               propose: (value) =>
@@ -287,4 +292,25 @@ it('invalidates a response omitting a mandatory open prerequisite', async () => 
 it('does not veto independent selected work because an overlapping backlog item is unselected', async () => {
   const result = await preview([issue, { ...issue, number: 579, title: 'Another browse repair' }]);
   expect(result.selected).toEqual(proposal.selected);
+});
+
+it('requires verification of every inclusion and retains no executable subset of an unverifiable batch', async () => {
+  const result = await preview(
+    [issue, { ...issue, number: 579 }],
+    {
+      selected: [selection, { ...selection, issue: 579 }],
+      deferred: [],
+    },
+    false,
+    { kind: 'empty' },
+    (selected) =>
+      Effect.succeed(
+        selected.issue === 579 ? 'Included PR is not independently reviewed' : undefined
+      )
+  );
+  expect(result.selected).toEqual([]);
+  expect(result.rejected).toContainEqual({
+    issue: 579,
+    reason: 'Included PR is not independently reviewed',
+  });
 });

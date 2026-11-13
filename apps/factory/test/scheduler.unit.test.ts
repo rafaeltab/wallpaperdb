@@ -132,6 +132,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
   let publicationFailed = false;
   let issues = [1, 2, 3, 4].map(issue);
   const source = {
+    verify: () => Effect.succeed(undefined),
     read: () =>
       discoveryFailed
         ? Effect.fail(new Unavailable({ operation: 'controlled-discovery', cause: 'offline' }))
@@ -925,6 +926,7 @@ it.each([-1, 1, 2])(
             }),
             Layer.succeed(Plan, { preview: () => Effect.die('Paused admissions must not plan') }),
             Layer.succeed(PlanningSource, {
+              verify: () => Effect.succeed(undefined),
               read: () => Effect.die('Paused admissions must not discover'),
             })
           )

@@ -120,6 +120,7 @@ it('launches a new dependent with remotely landed code after the configured base
             Layer.succeed(ScheduleStore, fileScheduleStore(join(f.host.directory, 'schedule'))),
             Layer.succeed(Plan, { preview: () => Effect.die('Manual admission does not plan') }),
             Layer.succeed(PlanningSource, {
+              verify: () => Effect.succeed(undefined),
               read: () => Effect.die('Manual admission does not discover'),
             })
           )
@@ -502,6 +503,7 @@ async function reservedRuntime(
             preview: () => Effect.die('Reserved slot must reconcile before planning'),
           }),
           Layer.succeed(PlanningSource, {
+            verify: () => Effect.succeed(undefined),
             read: () => Effect.die('Reserved slot must reconcile before discovery'),
           })
         )

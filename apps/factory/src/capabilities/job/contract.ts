@@ -163,8 +163,9 @@ export interface Issues {
    * New issue admissions are never performed by this operation. When supplied,
    * admitRecovery authorizes resumed review before capacity reservation and delivery. */
   reconcile?(admitRecovery?: RecoveryAdmission): Effect.Effect<void, Unavailable>;
-  /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
-   * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
+  /** Prepare the exact included verified code, or legacy explicit prerequisites when absent.
+   * Retain the selected default root through leased, writer-coordinated replay.
+   * No child admission; inspect remains blocked until CI and metadata agree. */
   prepare?(
     issue: number,
     admitRecovery?: RecoveryAdmission,
@@ -176,10 +177,10 @@ export interface Issues {
   /** Observe the bound publication and retain known adverse observations locally.
    * External refs and PR metadata are read-only at this boundary. */
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
-  /** A candidate is a previously selected launch comparison, not a replacement
-   * operator pin. For prerequisites, return that exact base only after current
-   * proof, original-pin containment and target compatibility are verified;
-   * otherwise remain blocked/unavailable. No reservation or launch is changed. */
+  /** Read-only verification. An explicit inclusion list is authoritative for new work:
+   * anchor it at the retained selectionBase or freshly fetched origin/main and return
+   * that root for durable preparation. A supplied final base must pass current proof
+   * and target checks. Without inclusions, retain legacy operator-pin semantics. */
   inspect(
     issue: number,
     candidate?: {

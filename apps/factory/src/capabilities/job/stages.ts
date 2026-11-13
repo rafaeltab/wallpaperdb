@@ -31,7 +31,8 @@ export function reconcileStages(
     if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
     yield* store.saveStage({
       index: initialIndex,
-      ...(initialIndex > 0 ? { ordinal: 1 } : {}),
+      receiptProtocol: intent.receiptProtocol,
+      ...(initialIndex > 0 ? { ordinal: 1, deliveryIndex: 0 } : {}),
       stage: 'implementation',
       threadId: observation.threadId,
       commit: intent.base,
@@ -76,6 +77,7 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
+      receiptProtocol: 'delivery-v1',
       comparison: nextComparison(waiting),
       stage:
         waiting.stage === 'publication'
@@ -116,7 +118,7 @@ function publicationMatches(
 ) {
   if (!evidence?.accepted || pr.kind !== 'found') return false;
   return (
-    evidence.runId === accepted.previousRunId &&
+    evidence.stageIndex === accepted.index - 1 &&
     evidence.commit === accepted.commit &&
     reviewedAssociation(pr, accepted.commit) &&
     Boolean(evidence.linked?.includes(pr.url))
@@ -169,7 +171,8 @@ export function associateStage(
 ) {
   return Effect.gen(function* () {
     if (!associatedRun(evidence, request)) return null;
-    if (!adoptedRunMatches(evidence, request)) return null;
+    const current = yield* currentStage(store);
+    if (current?.index !== request.index || (yield* store.readControl()).cancelled) return null;
     if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
     return evidence;
   });
@@ -188,6 +191,7 @@ function dispatchRepair(
     const request: StageRequest = {
       index: accepted.index + 1,
       stage: 'babysitting',
+      receiptProtocol: 'delivery-v1',
       threadId: accepted.threadId,
       commit: pr.commit,
       comparison: repairComparison(pr, accepted.commit),
@@ -257,14 +261,7 @@ function associatedRun(
   evidence: StageEvidence | null,
   request: StageRequest
 ): evidence is StageEvidence {
-  if (!evidence || evidence.runId === request.previousRunId) return false;
-  const expected = request.ordinal ?? request.index + 1;
-  if (evidence.ordinal === expected) return true;
-  return (
-    request.stage === 'babysitting' &&
-    evidence.ordinal > expected &&
-    evidence.stageIndex === request.index
-  );
+  return evidence !== null && evidence.stageIndex === request.index;
 }
 
 function suspension(
@@ -407,7 +404,6 @@ function adoptAnswer(
     const parkedRun = control.parked?.run;
     const run = observation.run;
     if (run && parkedRun && run.id !== parkedRun.id) {
-      if (run.ordinal <= parkedRun.ordinal) return parkedDelivery(waiting, control);
       const request: StageRequest = {
         ...waiting,
         index: waiting.index + 1,
@@ -427,31 +423,12 @@ function adoptAnswer(
   });
 }
 
-function parkedDelivery(waiting: StageRequest, control: import('./contract.js').Control): Delivery {
-  return {
-    stage: waiting.stage,
-    commit: waiting.commit,
-    ready: false,
-    landed: false,
-    activity: 'awaiting-answer',
-    active: false,
-    question: control.parked?.question,
-  };
-}
-
 export function hasAnsweredQuestion(observation: Observation, questionId: string) {
   return (
     observation.kind === 'found' && observation.answeredQuestions?.includes(questionId) === true
   );
 }
 
-function adoptedRunMatches(evidence: StageEvidence, request: StageRequest) {
-  if (!request.observedRunId) return true;
-  return (
-    evidence.runId === request.observedRunId ||
-    evidence.ordinal > (request.ordinal ?? request.index + 1)
-  );
-}
 function answerContinuation(
   control: import('./contract.js').Control,
   waiting: StageRequest,

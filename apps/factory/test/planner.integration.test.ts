@@ -127,7 +127,14 @@ it('translates a bound assistant proposal and rejects malformed or user messages
       cause: expect.objectContaining({ message: 'Previous advisory planner is still outstanding' }),
     });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
-    await host.save({ planner: { proposal, status: 'completed', runId: 'unrelated-run' } });
+    await host.save({
+      planner: {
+        proposal,
+        status: 'completed',
+        runId: 'unrelated-run',
+        responseRequestId: 'wrong-request',
+      },
+    });
     await expect(Effect.runPromise(adapter.propose(input))).rejects.toMatchObject({
       _tag: 'Unavailable',
     });

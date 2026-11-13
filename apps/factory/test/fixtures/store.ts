@@ -27,9 +27,9 @@ export function controlledStore(): JobStore {
         wait = state;
         return true;
       }),
-    bindRun: (request, runId, ordinal = request.ordinal ?? request.index + 1) =>
+    bindRun: (request, runId) =>
       Effect.sync(() => {
-        const key = `${request.index}:${ordinal}`;
+        const key = `${request.index}:${runId}`;
         const existing = runs.get(key);
         if (existing) return existing === runId;
         runs.set(key, runId);

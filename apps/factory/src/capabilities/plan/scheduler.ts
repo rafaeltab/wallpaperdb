@@ -652,7 +652,7 @@ function recoveredResume(claim: ResumeClaim, jobs: readonly Status[]) {
 }
 function successorRun(previous: ResumeClaim['run'], current: ResumeClaim['run']) {
   if (!previous || !current) return false;
-  return current.id !== previous.id && current.ordinal > previous.ordinal;
+  return current.id !== previous.id;
 }
 
 function resolvedStart(claim: ResumeClaim, result: import('../job/index.js').StartResult) {
@@ -686,9 +686,7 @@ function continuationMatches(
 ) {
   if (target?.kind !== 'job' || target.execution.kind !== 'found') return false;
   return (
-    target.execution.threadId === receipt.threadId &&
-    target.execution.run?.id === receipt.run.id &&
-    target.execution.run.ordinal === receipt.run.ordinal
+    target.execution.threadId === receipt.threadId && target.execution.run?.id === receipt.run.id
   );
 }
 function continuationCapacity(snapshot: ScheduleStatus, reserved = 0) {

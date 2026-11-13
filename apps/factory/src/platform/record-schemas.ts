@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export const intentSchema = z
   .object({
+    receiptProtocol: z.literal('delivery-v1').optional(),
     id: z.string().min(1),
     issue: z.number().int().positive(),
     issueUrl: z.string().url(),
@@ -21,6 +22,7 @@ export const intentSchema = z
   .strict();
 const stageSchema = z
   .object({
+    receiptProtocol: z.literal('delivery-v1').optional(),
     repairOrigin: z.number().int().nonnegative().optional(),
     ordinal: z.number().int().positive().optional(),
     comparison: z

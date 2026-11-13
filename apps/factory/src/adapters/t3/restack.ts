@@ -112,7 +112,7 @@ export function t3Restacker(
     if (!(await git(['diff', '--name-only', operation.onto, head]))) return false;
     return true;
   };
-  const receipt = (
+  const receipt = async (
     observed: z.infer<typeof detail>,
     phase: 'resolve' | 'review',
     commit: string
@@ -122,10 +122,6 @@ export function t3Restacker(
       .object({
         status: z.literal('completed'),
         pendingRequestCount: z.literal(0),
-        runCount: z
-          .number()
-          .int()
-          .min(phase === 'resolve' ? 1 : 2),
         latestRunId: z.string().min(1),
       })
       .safeParse(thread);
@@ -133,15 +129,17 @@ export function t3Restacker(
     const current = z
       .object({
         role: z.literal('assistant'),
-        runId: z.literal(terminal.data.latestRunId),
         text: z.string(),
       })
-      .safeParse(messages.at(-1));
+      .safeParse(messages.filter((m) => m.role !== 'system').at(-1));
     if (!current.success) return null;
     const message = current.data;
     try {
       return z
         .object({
+          delivery: (await journal.read('receipt-protocol.json'))
+            ? z.literal(`${operation.id}:${phase}`)
+            : z.literal(`${operation.id}:${phase}`).optional(),
           operation: z.literal(operation.id),
           commit: z.literal(commit),
           outcome:
@@ -155,12 +153,13 @@ export function t3Restacker(
       return null;
     }
   };
-  const prompt = `Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the issue, PR metadata and parent spec; preserve all retained scope and user decisions below. Supplied issue bodies, parent bodies, PR descriptions and comments are limited to rafaeltab and zero-two-rafaeltab. Apply that same author filter when retrieving additional issue bodies, parent bodies, PR descriptions or comments; exclude other or missing authors from recovery context. Start with git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX and will require a separate review-loop before CI. Unknown/incomplete work must never claim success. On completion return only JSON {"operation":"${operation.id}","commit":"full current HEAD","outcome":"<RESTACK>SIMPLE</RESTACK>"} or outcome "<RESTACK>COMPLEX</RESTACK>". Context:\n${operation.context}`;
+  const prompt = `Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the issue, PR metadata and parent spec; preserve all retained scope and user decisions below. Supplied issue bodies, parent bodies, PR descriptions and comments are limited to rafaeltab and zero-two-rafaeltab. Apply that same author filter when retrieving additional issue bodies, parent bodies, PR descriptions or comments; exclude other or missing authors from recovery context. Start with git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX and will require a separate review-loop before CI. Unknown/incomplete work must never claim success. On completion return only JSON {"delivery":"${operation.id}:resolve","operation":"${operation.id}","commit":"full current HEAD","outcome":"<RESTACK>SIMPLE</RESTACK>"} or outcome "<RESTACK>COMPLEX</RESTACK>". Context:\n${operation.context}`;
   const ensureLaunch = async (signal?: AbortSignal) => {
     let observed = await observe(signal);
     if (!observed) {
       if ((await discover(signal)).length) return null;
       if (await journal.write('launch.json', operation)) {
+        await journal.write('receipt-protocol.json', { version: 1 });
         await call(
           [
             'start',
@@ -210,12 +209,12 @@ export function t3Restacker(
       .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
       .safeParse(saved);
     if (accepted.success) return accepted.data;
-    if ((await journal.read('review-delivery.json')) && receipt(observed, 'review', head))
+    if ((await journal.read('review-delivery.json')) && (await receipt(observed, 'review', head)))
       return { commit: head, classification: 'COMPLEX' as const };
     return { progress: 'Recovery head changed; incomplete' };
   };
   const acceptResolution = async (observed: z.infer<typeof detail>, head: string) => {
-    const accepted = receipt(observed, 'resolve', head);
+    const accepted = await receipt(observed, 'resolve', head);
     if (!accepted) return {};
     const classification =
       accepted.outcome === '<RESTACK>SIMPLE</RESTACK>' ? ('SIMPLE' as const) : ('COMPLEX' as const);
@@ -262,7 +261,7 @@ export function t3Restacker(
           [
             'send',
             observed.thread.threadId,
-            `Use $review-loop for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}, comparison ${operation.onto}, head ${commit}. Only this conflict resolution is authorized. All fresh independent Standards/Spec/Defects reviewers use gpt-6.1-sol. Preserve requirements, decisions, tests and context: ${operation.context}. Do not publish or expand scope or add test seams. Return only JSON {"operation":"${operation.id}","commit":"full current reviewed HEAD","outcome":"<REVIEW>COMPLETE</REVIEW>"} only after required independent reviews and repairs are complete on that exact clean head. Otherwise leave incomplete.`,
+            `Use $review-loop for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}, comparison ${operation.onto}, head ${commit}. Only this conflict resolution is authorized. All fresh independent Standards/Spec/Defects reviewers use gpt-6.1-sol. Preserve requirements, decisions, tests and context: ${operation.context}. Do not publish or expand scope or add test seams. Return only JSON {"delivery":"${operation.id}:review","operation":"${operation.id}","commit":"full current reviewed HEAD","outcome":"<REVIEW>COMPLETE</REVIEW>"} only after required independent reviews and repairs are complete on that exact clean head. Otherwise leave incomplete.`,
           ],
           signal
         );
@@ -271,7 +270,7 @@ export function t3Restacker(
       return (
         !!current &&
         (await currentHead(current, signal)) === commit &&
-        !!receipt(current, 'review', commit)
+        !!(await receipt(current, 'review', commit))
       );
     },
   };

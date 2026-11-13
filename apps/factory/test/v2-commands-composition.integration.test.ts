@@ -162,6 +162,7 @@ it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
         if (cause === 'dirty checkout')
           await writeFile(`${prior.worktreePath}/unfinished.txt`, 'Preserve unfinished work');
         text = JSON.stringify({
+          delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
           jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
           stage: 'implementation',
           base: host.base,
@@ -258,6 +259,7 @@ it('continues an implementation repaired by an ordinary message in its existing 
           role: 'assistant',
           runId: 'manual-repair-2',
           text: JSON.stringify({
+            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
             stage: 'implementation',
             base: host.base,
@@ -313,7 +315,8 @@ it('continues an implementation repaired by an ordinary message in its existing 
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
     expect(sends[0]).toContain('Use $review-loop');
-    expect(sends[0]).toContain('expected run ordinal 3');
+    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).not.toContain('expected run ordinal');
     expect(await readFile(`${prior.worktreePath}/repaired.txt`, 'utf8')).toBe(
       'Manually repaired in the existing session'
     );
@@ -328,6 +331,7 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
     let active = running;
     const result = (commit = host.base) =>
       JSON.stringify({
+        delivery: `${jobId}:0`,
         jobId,
         stage: 'implementation',
         base: host.base,
@@ -345,7 +349,15 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
       text: string,
       messageRun = id
     ) => {
-      await save({ messages: [{ role: 'assistant', runId: messageRun, text }] });
+      await save({
+        messages: [
+          {
+            role: 'assistant',
+            runId: messageRun,
+            text: messageRun === id ? text : text.replace(`${jobId}:0`, `${jobId}:stale`),
+          },
+        ],
+      });
       await writeFile(
         resourcePath,
         JSON.stringify({ ...prior, status, latestRunId: id, runCount: ordinal })
@@ -407,7 +419,8 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
     ).toHaveLength(1);
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
-    expect(sends[0]).toContain('expected run ordinal 5');
+    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).not.toContain('expected run ordinal');
     await save({ complete: true, overrides: { status: 'completed' } });
     await vi.waitFor(
       async () => {
@@ -469,6 +482,7 @@ it('retains a question first observed on a manual repair run across restart', ()
           role: 'assistant',
           runId: 'answer-3',
           text: JSON.stringify({
+            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
             stage: 'implementation',
             base: host.base,
@@ -498,7 +512,8 @@ it('retains a question first observed on a manual repair run across restart', ()
     );
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
-    expect(sends[0]).toContain('expected run ordinal 4');
+    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).not.toContain('expected run ordinal');
   }));
 
 it.each(['unobserved failure', 'cancelled job'])('does not adopt a follow-up after %s', (reason) =>
@@ -530,6 +545,7 @@ it.each(['unobserved failure', 'cancelled job'])('does not adopt a follow-up aft
           role: 'assistant',
           runId: 'unadopted-2',
           text: JSON.stringify({
+            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
             stage: 'implementation',
             base: host.base,
@@ -611,6 +627,7 @@ it('recovers a durable manual adoption before observing a later follow-up', () =
           role: 'assistant',
           runId: 'repair-3',
           text: JSON.stringify({
+            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
             stage: 'implementation',
             base: host.base,
@@ -641,10 +658,11 @@ it('recovers a durable manual adoption before observing a later follow-up', () =
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
     expect(sends[0]).toContain('Stage 3 of factory job');
-    expect(sends[0]).toContain('expected run ordinal 4');
+    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).not.toContain('expected run ordinal');
   }));
 
-it('keeps Retry disabled for replacement evidence at an already-bound run ordinal', () =>
+it('retains manual recovery for a continuation at the same ordinal', () =>
   composed(async ({ running, host, save }) => {
     await start(running);
     const configure = {
@@ -678,14 +696,14 @@ it('keeps Retry disabled for replacement evidence at an already-bound run ordina
         const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
         expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
           execution: { state: 'known', value: { state: 'finished', runId: 'replacement-run' } },
-          occupiesCapacity: true,
+          occupiesCapacity: false,
         });
         expect(board.meta.factory.concurrency).toEqual({
           limit: { kind: 'limited', maximum: 2 },
-          occupied: 1,
+          occupied: 0,
         });
         expect(board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']).toMatchObject({
-          availability: { state: 'disabled' },
+          availability: { state: 'available' },
         });
       },
       { timeout: 8000, interval: 40 }
@@ -751,15 +769,19 @@ it.each(['adopted-run pin', 'predecessor-run identity'])(
           const board = (await current.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
           expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
             execution: { state: 'known', value: { state: 'finished', runId: candidate } },
-            occupiesCapacity: true,
+            occupiesCapacity: association === 'predecessor-run identity',
           });
           expect(board.meta.factory.concurrency).toEqual({
             limit: { kind: 'limited', maximum: 2 },
-            occupied: 1,
+            occupied: association === 'predecessor-run identity' ? 1 : 0,
           });
           expect(
             board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']
-          ).toMatchObject({ availability: { state: 'disabled' } });
+          ).toMatchObject({
+            availability: {
+              state: association === 'predecessor-run identity' ? 'disabled' : 'available',
+            },
+          });
         },
         { timeout: 8000, interval: 40 }
       );
@@ -903,6 +925,7 @@ it('manually retries incomplete implementation in a fresh original-base worktree
             role: 'assistant',
             runId: 'run-1',
             text: JSON.stringify({
+              delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
               jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
               stage: 'implementation',
               base: host.base,

@@ -15,8 +15,12 @@ const markers = {
   babysitting: '<PR>READY</PR>',
   ci: '',
 };
-export function receiptInstructions(intent: Intent, stage: StageRequest['stage']) {
-  return `On successful completion only, return one JSON object as your entire final message with jobId=${JSON.stringify(intent.id)}, stage=${JSON.stringify(stage)}, base=${JSON.stringify(intent.base)}, commit=full current HEAD, outcome=${JSON.stringify(markers[stage])}, tests=true, coverage=true, crap=true, reviews=${stage === 'implementation' ? 'false' : 'true'}. True values attest completed applicable required checks, configured CRAP and fresh independent Standards/Spec/Defects review at the reported commit. Never claim missing checks. No Markdown fences or other text. Keep detailed evidence in the outside-repository ledger and preserve it for subsequent stages.`;
+export function receiptInstructions(
+  intent: Intent,
+  stage: StageRequest['stage'],
+  delivery = `${intent.id}:0`
+) {
+  return `On successful completion only, return one JSON object as your entire final message with delivery=${JSON.stringify(delivery)}, jobId=${JSON.stringify(intent.id)}, stage=${JSON.stringify(stage)}, base=${JSON.stringify(intent.base)}, commit=full current HEAD, outcome=${JSON.stringify(markers[stage])}, tests=true, coverage=true, crap=true, reviews=${stage === 'implementation' ? 'false' : 'true'}. True values attest completed applicable required checks, configured CRAP and fresh independent Standards/Spec/Defects review at the reported commit. Never claim missing checks. No Markdown fences or other text. Keep detailed evidence in the outside-repository ledger and preserve it for subsequent stages.`;
 }
 const receiptSchema = z
   .object({
@@ -111,7 +115,7 @@ export function stageExecution(
         if (binding.kind !== 'found' || binding.threadId !== request.threadId) return null;
         return yield* Effect.tryPromise({
           try: async (signal) => {
-            const raw = await call(['show', request.threadId, '--messages', '1'], signal);
+            const raw = await call(['show', request.threadId, '--messages', '1000'], signal);
             const observed = outcome(raw, intent, request);
             if (!observed) {
               const pending = pendingRun(raw, request, intent);
@@ -155,16 +159,15 @@ function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   if (request.resume && request.stage !== 'babysitting')
     return resumePrompt(intent, request, scope);
   if (request.stage === 'babysitting')
-    return `${request.continuation || request.resume ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. ${scope}. ${replayInstructions(request)} Reconcile current GitHub CI and any existing watcher before acting. If CI is already successful, verify and return the required receipt without starting another watcher, retrying CI or editing code. Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${intent.id}:${request.index}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)} For babysitting only, include delivery="${intent.id}:${request.index}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
+    return `${request.continuation || request.resume ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${deliveryIdentity(intent, request)}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. ${scope}. ${replayInstructions(request)} Reconcile current GitHub CI and any existing watcher before acting. If CI is already successful, verify and return the required receipt without starting another watcher, retrying CI or editing code. Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${deliveryIdentity(intent, request)}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))} For babysitting only, include delivery="${deliveryIdentity(intent, request)}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
   const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';
-  return `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal ?? request.index + 1}; predecessor run ${request.previousRunId}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage)}`;
+  return `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; delivery ${deliveryIdentity(intent, request)}; accepted predecessor commit ${request.commit}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
 }
 function completed(thread: z.infer<typeof stageDetail>['thread'], request: StageRequest) {
   return (
     thread.threadId === request.threadId &&
     thread.status === 'completed' &&
     thread.pendingRequestCount === 0 &&
-    expectedRun(thread.runCount, request) &&
     Boolean(thread.latestRunId)
   );
 }
@@ -187,7 +190,7 @@ function matchesReceipt(
     result.base === intent.base &&
     result.outcome === markers[request.stage] &&
     (request.stage === 'implementation' || result.reviews) &&
-    (request.stage !== 'babysitting' || result.delivery === deliveryIdentity(intent, request))
+    (result.delivery === undefined || result.delivery === deliveryIdentity(intent, request))
   );
 }
 function outcome(raw: unknown, intent: Intent, request: StageRequest) {
@@ -195,16 +198,14 @@ function outcome(raw: unknown, intent: Intent, request: StageRequest) {
   if (!detail.success) return null;
   const { thread, messages } = detail.data;
   if (!completed(thread, request)) return null;
-  const result = receiptForRun(messages.at(-1), thread.latestRunId);
+  const result = receiptFromMessage(messages.filter((m) => m.role !== 'system').at(-1));
   if (!result || !matchesReceipt(result, intent, request)) return null;
+  if (!deliveryMatches(result.delivery, detail.data, intent, request)) return null;
   return { thread: { ...thread, latestRunId: thread.latestRunId ?? '' }, result };
 }
 
-function receiptForRun(
-  message: z.infer<typeof stageDetail>['messages'][number] | undefined,
-  runId: string | null
-) {
-  if (message?.role !== 'assistant' || message.runId !== runId) return null;
+function receiptFromMessage(message: z.infer<typeof stageDetail>['messages'][number] | undefined) {
+  if (message?.role !== 'assistant') return null;
   return parseReceipt(message.text);
 }
 
@@ -212,10 +213,11 @@ function pendingRun(raw: unknown, request: StageRequest, intent: Intent) {
   const detail = stageDetail.safeParse(raw);
   if (!detail.success) return null;
   const { thread } = detail.data;
+  const waitingForGitHub = waitingReceipt(detail.data, request, intent);
   if (
     thread.threadId !== request.threadId ||
-    !expectedRun(thread.runCount, request) ||
-    !thread.latestRunId
+    !thread.latestRunId ||
+    (thread.latestRunId === request.previousRunId && !waitingForGitHub)
   )
     return null;
   return {
@@ -223,8 +225,8 @@ function pendingRun(raw: unknown, request: StageRequest, intent: Intent) {
     ordinal: thread.runCount,
     commit: request.commit,
     accepted: false,
-    waitingForGitHub: waitingReceipt(detail.data, request, intent),
-    stageIndex: waitingReceipt(detail.data, request, intent) ? request.index : undefined,
+    waitingForGitHub,
+    stageIndex: request.index,
   };
 }
 
@@ -234,8 +236,8 @@ function waitingReceipt(
   intent: Intent
 ) {
   if (request.stage !== 'babysitting' || !completed(detail.thread, request)) return false;
-  const message = detail.messages.at(-1);
-  if (message?.role !== 'assistant' || message.runId !== detail.thread.latestRunId) return false;
+  const message = detail.messages.filter((m) => m.role !== 'system').at(-1);
+  if (message?.role !== 'assistant') return false;
   try {
     return z
       .object({
@@ -252,9 +254,46 @@ function waitingReceipt(
   }
 }
 
-function expectedRun(ordinal: number, request: StageRequest) {
-  const initial = request.ordinal ?? request.index + 1;
-  return request.stage === 'babysitting' ? ordinal >= initial : ordinal === initial;
+/** Old deliveries did not request a delivery field. Only the last factory instruction
+ * in the retained transcript can associate such a receipt. Truncated/ambiguous history
+ * stays pending; compatibility never resends completed work or weakens new deliveries. */
+function deliveryMatches(
+  delivery: string | undefined,
+  detail: z.infer<typeof stageDetail>,
+  intent: Intent,
+  request: StageRequest
+) {
+  if (delivery !== undefined) return delivery === deliveryIdentity(intent, request);
+  if (request.receiptProtocol || request.stage === 'babysitting') return false;
+  const instructions = detail.messages.filter(
+    (m) =>
+      m.role === 'user' &&
+      (/Stage \d+ of factory job /.test(m.text) || m.text.startsWith('Use $implement for '))
+  );
+  const last = instructions.at(-1)?.text;
+  if (!last) return false;
+  const index = request.deliveryIndex ?? request.index;
+  if (index === 0 && request.stage === 'implementation')
+    return last.startsWith(
+      `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}.`
+    );
+  const skill =
+    request.stage === 'review'
+      ? '$review-loop'
+      : request.stage === 'implementation'
+        ? '$implement'
+        : '$publish-pr';
+  const original =
+    last.startsWith(`Use ${skill} for `) && last.includes(`pinned comparison ${intent.base},`);
+  const resumed =
+    last.startsWith(`Resume the existing ${request.stage} stage of this issue job`) &&
+    last.includes(`Use ${skill}.`) &&
+    last.includes(`base=${JSON.stringify(intent.base)},`);
+  return (
+    last.includes(`Stage ${index} of factory job ${intent.id};`) &&
+    last.includes(intent.issueUrl) &&
+    (original || resumed)
+  );
 }
 
 function sendBinding(
@@ -281,7 +320,7 @@ function resumePrompt(intent: Intent, request: StageRequest, scope: string) {
     babysitting: '$babysit-pr',
     ci: '$babysit-pr',
   };
-  return `Resume the existing ${request.stage} stage of this issue job in this owning thread/worktree. Do not admit another job, launch a worker, create another worktree or expand scope. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal}; predecessor run ${request.previousRunId}. ${scope}. Keep the existing stage handoffs and watchdog association. Reconcile actual external outcomes before any side effect. For publication, inspect and reuse the existing PR and publication journal before considering creation; never create a duplicate or republish an already matching head. For already successful CI, verify the existing outcome and return the required receipt without starting another watcher or retrying CI. Use ${skills[request.stage]}. ${receiptInstructions(intent, request.stage)}`;
+  return `Resume the existing ${request.stage} stage of this issue job in this owning thread/worktree. Do not admit another job, launch a worker, create another worktree or expand scope. Stage ${request.index} of factory job ${intent.id}; delivery ${deliveryIdentity(intent, request)}; predecessor run ${request.previousRunId}. ${scope}. Keep the existing stage handoffs and watchdog association. Reconcile actual external outcomes before any side effect. For publication, inspect and reuse the existing PR and publication journal before considering creation; never create a duplicate or republish an already matching head. For already successful CI, verify the existing outcome and return the required receipt without starting another watcher or retrying CI. Use ${skills[request.stage]}. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
 }
 
 function currentResume(
@@ -290,7 +329,6 @@ function currentResume(
 ) {
   return (
     binding.run?.id === request.previousRunId &&
-    binding.run?.ordinal === (request.ordinal ?? request.index + 1) - 1 &&
     ['completed', 'interrupted', 'failed', 'cancelled'].includes(binding.status)
   );
 }

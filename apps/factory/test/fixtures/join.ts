@@ -14,6 +14,7 @@ export async function joinFixture(
       loseLaunch?: boolean;
       repair?: boolean;
       staleRun?: boolean;
+      wrongDelivery?: boolean;
       responseThreadId?: string;
       mcp?: boolean;
       outcome?: 'SIMPLE' | 'COMPLEX';

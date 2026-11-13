@@ -345,6 +345,7 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
+          delivery: `${saved.operation}:resolve`,
           operation: saved.operation,
           commit: saved.head,
           outcome: '<RESTACK>COMPLEX</RESTACK>',
@@ -2086,6 +2087,7 @@ it.each(['C', 'B'])(
               role: 'assistant',
               runId,
               text: JSON.stringify({
+                delivery: `${intent.id}:${index}`,
                 jobId: intent.id,
                 stage,
                 base: start.parent,
@@ -2655,6 +2657,7 @@ process.exit(result.status ?? 1);
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
+          delivery: `${saved.operation}:resolve`,
           operation: saved.operation,
           commit: saved.head,
           outcome: '<RESTACK>COMPLEX</RESTACK>',

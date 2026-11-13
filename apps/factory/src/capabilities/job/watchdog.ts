@@ -51,7 +51,7 @@ function explicitWait(
   evidence: StageEvidence | null
 ): evidence is StageEvidence {
   if (!evidence?.waitingForGitHub) return false;
-  return observation.status === 'completed' && evidence.runId !== request.previousRunId;
+  return observation.status === 'completed' && evidence.stageIndex === request.index;
 }
 function suspended(store: JobStore, request: StageRequest, delivery: Delivery, question: boolean) {
   return Effect.gen(function* () {
@@ -108,6 +108,7 @@ function continueWaiting(
       ...request,
       index: request.index + 1,
       commit: evidence.commit,
+      receiptProtocol: 'delivery-v1',
       previousRunId: evidence.runId,
       ordinal: evidence.ordinal + 1,
       continuation: true,

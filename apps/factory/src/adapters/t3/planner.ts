@@ -93,12 +93,13 @@ export function t3Planner(config: {
   let needsRecovery = true;
   const terminal = (status: string) =>
     ['idle', 'completed', 'interrupted', 'failed', 'cancelled'].includes(status);
-  const observe = async (run: { threadId: string; runId: string }, signal: AbortSignal) =>
-    z
+  const observedRuns = new Map<string, string>();
+  const observe = async (run: { threadId: string; runId: string }, signal: AbortSignal) => {
+    const detail = z
       .object({
         thread: z.object({
           threadId: z.literal(run.threadId),
-          latestRunId: z.literal(run.runId),
+          latestRunId: z.string().min(1),
           status: z.string(),
           settled: z.boolean().optional(),
           providerInstanceId: z.literal('codex'),
@@ -109,6 +110,9 @@ export function t3Planner(config: {
         ),
       })
       .parse(await call(['show', run.threadId, '--messages', '20'], signal));
+    observedRuns.set(detail.thread.threadId, detail.thread.latestRunId);
+    return detail;
+  };
   type Record = Awaited<ReturnType<typeof journal.save>>;
   const reportDeadline = async (record: Record) => {
     if (
@@ -196,7 +200,10 @@ export function t3Planner(config: {
     // alone never releases ownership, and a lost response still permits terminal evidence.
     let interruptionFailure: unknown;
     try {
-      await interrupt(run, signal);
+      await interrupt(
+        { threadId: run.threadId, runId: observedRuns.get(run.threadId) ?? run.runId },
+        signal
+      );
     } catch (cause) {
       interruptionFailure = cause;
     }
@@ -295,7 +302,7 @@ export function t3Planner(config: {
         await finish(previous, detail, signal);
         return { kind: 'stale' as const };
       }
-      return await poll(previous, previous.run, signal);
+      return await poll(previous, signal);
     }
     if (previous && !previous.retired) {
       if (!previous.run)
@@ -310,15 +317,11 @@ export function t3Planner(config: {
         completed.completedAt !== undefined &&
         ['completed', 'idle'].includes(detail.thread.status)
       )
-        return translateProposal(detail.messages, previous.run.runId, previous.requestId);
+        return translateProposal(detail.messages, previous.requestId);
     }
     return undefined;
   };
-  const poll = async (
-    bound: Awaited<ReturnType<typeof journal.save>>,
-    run: { threadId: string; runId: string },
-    signal: AbortSignal
-  ) => {
+  const poll = async (bound: Awaited<ReturnType<typeof journal.save>>, signal: AbortSignal) => {
     if (bound.deadline === undefined) throw new Error('Missing durable model deadline');
     for (;;) {
       const detail = await observeOwned(bound, signal);
@@ -327,7 +330,7 @@ export function t3Planner(config: {
         if (['completed', 'idle'].includes(detail.thread.status)) {
           if (completed.completedAt === undefined)
             throw new ModelDeadline('Model deadline exceeded');
-          return translateProposal(detail.messages, run.runId, bound.requestId);
+          return translateProposal(detail.messages, bound.requestId);
         }
         throw new Error('Planner did not complete');
       }
@@ -493,7 +496,7 @@ export function t3Planner(config: {
               run: launched,
               phase: 'running',
             });
-            return await poll(bound, launched, signal);
+            return await poll(bound, signal);
           } finally {
             busy = false;
           }
@@ -512,10 +515,10 @@ export function t3Planner(config: {
 
 function translateProposal(
   messages: readonly { role: string; runId?: string; text: string }[],
-  runId: string,
   requestId: string
 ) {
-  const final = messages.filter((m) => m.role === 'assistant' && m.runId === runId).at(-1);
+  const final = messages.filter((m) => m.role !== 'system').at(-1);
+  if (final?.role !== 'assistant') throw new Error('Missing planner response');
   const proposal = proposalSchema.parse(JSON.parse(final?.text ?? 'null'));
   if (proposal.requestId !== requestId) throw new Error('Planner request mismatch');
   return { selected: proposal.selected, deferred: proposal.deferred };

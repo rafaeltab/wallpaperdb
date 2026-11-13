@@ -53,6 +53,7 @@ export function Canvas({
   canConfigure,
   children,
   notice,
+  activityPrototype,
 }: {
   board: Board;
   native: boolean;
@@ -69,6 +70,7 @@ export function Canvas({
   canConfigure: boolean;
   children?: ReactNode;
   notice?: ReactNode;
+  activityPrototype?: ReactNode;
 }) {
   const [projection] = useState(createCanvasProjection);
   const fixture = useMemo(() => projection(board), [projection, board]);
@@ -575,6 +577,7 @@ export function Canvas({
             <i />
             {paused ? 'Paused' : 'Running'}
           </span>
+          {activityPrototype}
           <AttentionControl
             board={board}
             count={attentionIds.size}

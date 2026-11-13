@@ -24,6 +24,7 @@
     "service:activate": "node scripts/activate.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/main.ts --migrate-only",
+    "prototype:activity": "__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=zerotwo vite --config frontend/vite.config.ts --host 0.0.0.0 --port 4717 --strictPort --mode activity-prototype",
     "dev:frontend": "vite --config frontend/vite.config.ts",
     "dev:interface-v2": "node --import tsx src/http/v2/demo.ts"
   },

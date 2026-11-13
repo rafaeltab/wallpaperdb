@@ -14,14 +14,9 @@ defaults:
 jobs:
   observe:
     if: github.head_ref == 't3/fix-443-avatar-loading-flake'
-    name: Avatar observation (${{ matrix.lane }})
+    name: Two pristine Web Chromium observations
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        # Recover only the missing untraced observation; the other lanes already ran.
-        lane: [repository-1]
+    timeout-minutes: 5
     env:
       TURBO_TOKEN: ''
       TURBO_TEAM: ''
@@ -50,8 +45,7 @@ jobs:
             fi
           done
       - run: make run PACKAGE=web SCRIPT=test:browser:install
-      - name: Restore byte-identical untraced target for the first representative observation
-        if: matrix.lane == 'repository-1'
+      - name: Restore byte-identical untraced target
         run: |
           git fetch --no-tags --depth=1 origin 256476a31463b3ef5d7a45458ae7c7c011ec6aba
           git restore --source=256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts
@@ -59,35 +53,23 @@ jobs:
       - name: Record trace mode and source identities
         run: |
           mkdir -p artifacts/443
-          echo 'repository-1 is untraced; repository-2 and browser lanes are traced' | tee artifacts/443/mode.txt
+          echo 'pristine target and browser configuration; no tracing evaluated' | tee artifacts/443/mode.txt
           git hash-object apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts | tee artifacts/443/source-hashes.txt
-      - name: Prepare repository workload
-        if: startsWith(matrix.lane, 'repository-')
-        run: make check TURBO_FLAGS='--filter=!@wallpaperdb/factory'
-      - name: Representative uncached unit and integration workload
-        if: startsWith(matrix.lane, 'repository-')
-        run: |
-          mkdir -p artifacts/443
-          git rev-parse HEAD | tee artifacts/443/commit.txt
-          make test-unit TURBO_FLAGS='--filter=!@wallpaperdb/factory --force' 2>&1 | tee artifacts/443/unit.log
-          make test-integration TURBO_FLAGS='--filter=!@wallpaperdb/factory --force' 2>&1 | tee artifacts/443/integration.log
       - name: Prepare browser exports and generated routes
-        if: startsWith(matrix.lane, 'browser-')
         run: make check-types PACKAGE=web
-      - name: Ten complete Chromium suites with normal file and worker parallelism
-        if: startsWith(matrix.lane, 'browser-')
+      - name: Two pristine complete Web integration suites with normal parallelism
         run: |
           mkdir -p artifacts/443
           git rev-parse HEAD | tee artifacts/443/commit.txt
-          for observation in $(seq 1 10); do
-            echo "443 observation $observation of 10; lane ${{ matrix.lane }}"
-            make run PACKAGE=web SCRIPT=test:browser ARGS='--silent=false' 2>&1 | tee "artifacts/443/browser-$observation.log"
+          for observation in 1 2; do
+            echo "443 pristine observation $observation of 2"
+            make test-integration PACKAGE=web FORCE=1 2>&1 | tee "artifacts/443/pristine-$observation.log"
           done
       - name: Preserve diagnostics on success or failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: avatar-443-${{ matrix.lane }}
+          name: avatar-443-pristine
           path: |
             artifacts/443
             apps/web/.vitest/attachments

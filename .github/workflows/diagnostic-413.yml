@@ -1,4 +1,4 @@
-name: Diagnostic 413 removal lifecycle
+name: Diagnostic 413 untraced confirmation
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   observe:
-    name: Diagnostic 413 (${{ matrix.observation }})
+    name: Diagnostic 413 untraced (${{ matrix.observation }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -34,22 +34,20 @@ jobs:
           nproc
           cat packages/react-muuri/vitest.config.ts
           cat packages/vitest-config/src/defaults.ts
-      - name: Execute representative full unit workload without test-result cache
+      - name: Restore exact unmodified base source and target test
+        run: |
+          git restore --source=256476a31463b3ef5d7a45458ae7c7c011ec6aba -- packages/react-muuri/src/MuuriGrid.tsx packages/react-muuri/test/integration/dynamic-items.test.tsx
+          git diff 256476a31463b3ef5d7a45458ae7c7c011ec6aba --exit-code -- packages/react-muuri/src/MuuriGrid.tsx packages/react-muuri/test/integration/dynamic-items.test.tsx
+          git hash-object packages/react-muuri/src/MuuriGrid.tsx packages/react-muuri/test/integration/dynamic-items.test.tsx
+      - name: Untraced representative full unit workload without test-result cache
         run: |
           mkdir -p diagnostic-413
           set -o pipefail
-          make test-unit PACKAGE=react-muuri TURBO_FLAGS='--filter=@wallpaperdb/react-muuri --force -- --silent=false' 2>&1 | tee diagnostic-413/full-unit.log
-      - name: Ten bounded fresh full-file observations, no test retries
-        run: |
-          set -o pipefail
-          for observation in $(seq 1 10); do
-            echo "Full-file observation $observation of 10"
-            make run PACKAGE=react-muuri SCRIPT=test:unit ARGS="test/integration/dynamic-items.test.tsx --silent=false --reporter=default --reporter=json --outputFile=$GITHUB_WORKSPACE/diagnostic-413/file-$observation.json" 2>&1 | tee "diagnostic-413/file-$observation.log"
-          done
+          make test-unit PACKAGE=react-muuri TURBO_FLAGS='--filter=@wallpaperdb/react-muuri --force -- --silent=false' 2>&1 | tee diagnostic-413/untraced-full-unit.log
       - name: Preserve lifecycle traces and actual test counts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diagnostic-413-${{ matrix.observation }}
+          name: diagnostic-413-untraced-${{ matrix.observation }}
           path: diagnostic-413/
           if-no-files-found: warn

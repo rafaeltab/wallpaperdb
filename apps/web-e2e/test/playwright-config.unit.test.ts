@@ -45,7 +45,37 @@ describe("buildWebE2EConfig", () => {
     expect(config.projects?.map((project) => project.name)).toEqual([
       "setup:base-user",
       "chromium",
+      "setup:base-user:http",
+      "chromium:http",
     ]);
+  });
+
+  it("runs only the upload journey on a non-loopback HTTP hostname with its own real login", () => {
+    const config = buildWebE2EConfig({
+      INGRESS_PORT: "8120",
+      E2E_ARTIFACTS_DIR: "/tmp/e2e",
+    });
+    const setup = config.projects?.find(
+      (project) => project.name === "setup:base-user:http",
+    );
+    const journey = config.projects?.find(
+      (project) => project.name === "chromium:http",
+    );
+    expect(setup?.use?.baseURL).toBe("http://wallpaperdb-http.test:8120/web");
+    expect(setup?.metadata?.authStorageStatePath).toBe(
+      "/tmp/e2e/.auth/http-base-user.json",
+    );
+    expect(journey?.dependencies).toEqual(["setup:base-user:http"]);
+    expect(String(journey?.testMatch)).toBe(String(/upload\.spec\.ts/));
+    expect(journey?.use).toEqual(
+      expect.objectContaining({
+        baseURL: "http://wallpaperdb-http.test:8120/web",
+        storageState: "/tmp/e2e/.auth/http-base-user.json",
+        launchOptions: {
+          args: ["--host-resolver-rules=MAP wallpaperdb-http.test 127.0.0.1"],
+        },
+      }),
+    );
   });
 
   it("honors an explicit Playwright base URL override", () => {

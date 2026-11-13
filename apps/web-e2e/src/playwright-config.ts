@@ -1,5 +1,5 @@
 import { devices, type PlaywrightTestConfig } from "@playwright/test";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { BASE_USER_AUTH, resolveAuthStorageStatePath } from "./auth-state";
 import { buildWebE2EBaseUrl } from "./environment-contract";
@@ -23,6 +23,21 @@ export function buildWebE2EConfig(
 > {
   const authSetupProjectName = `setup:${BASE_USER_AUTH.name}`;
   const artifacts = env.E2E_ARTIFACTS_DIR;
+
+  const httpBaseUrl = new URL(buildWebE2EBaseUrl(env));
+  httpBaseUrl.protocol = "http:";
+  httpBaseUrl.hostname = "wallpaperdb-http.test";
+  const httpAuthState = join(
+    dirname(resolveAuthStorageStatePath(env)),
+    "http-base-user.json",
+  );
+  const httpBrowser = {
+    ...devices["Desktop Chrome"],
+    baseURL: httpBaseUrl.toString(),
+    launchOptions: {
+      args: ["--host-resolver-rules=MAP wallpaperdb-http.test 127.0.0.1"],
+    },
+  };
 
   return {
     testDir: "./specs",
@@ -63,6 +78,18 @@ export function buildWebE2EConfig(
           ...devices["Desktop Chrome"],
           storageState: resolveAuthStorageStatePath(env),
         },
+      },
+      {
+        name: "setup:base-user:http",
+        testMatch: /.*\.setup\.ts/,
+        use: httpBrowser,
+        metadata: { authStorageStatePath: httpAuthState },
+      },
+      {
+        name: "chromium:http",
+        dependencies: ["setup:base-user:http"],
+        testMatch: /upload\.spec\.ts/,
+        use: { ...httpBrowser, storageState: httpAuthState },
       },
     ],
   };

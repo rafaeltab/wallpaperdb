@@ -37,7 +37,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
   const preview = (): Preview => ({
     kind: stale ? 'stale' : 'preview',
     selected: [
-      { issue: 3, reason: '<img src=x onerror="alert(1)">', dependsOn: [2], conflicts: [4] },
+      { issue: 3, reason: '<img src=x onerror="alert(1)">', includeCodeFromIssues: [2, 4] },
     ],
     rejected: [],
     input: {
@@ -109,8 +109,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
     const plan = page.locator('#plan');
     await browserExpect(plan).toContainText('Explicit prerequisites: #1');
     await browserExpect(plan).toContainText('Parent specs: #571');
-    await browserExpect(plan).toContainText('Proposed dependencies: #2');
-    await browserExpect(plan).toContainText('Proposed conflicts: #4');
+    await browserExpect(plan).toContainText('Include code from: #2, #4');
     await browserExpect(plan.getByRole('link', { name: '#571', exact: true })).toHaveAttribute(
       'href',
       'https://github.com/rafaeltab/wallpaperdb/issues/571'

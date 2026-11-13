@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { githubIssues, githubPlanning } from '../src/adapters/github/index.js';
@@ -7,6 +8,7 @@ import { join } from 'node:path';
 import { protocol } from './fixtures/setup.js';
 it('collects full trusted scope, fallback blockers, parent context and job state', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -191,6 +193,7 @@ process.exit(result.status ?? 1);
 
 it('deduplicates converging parents, blockers and cycles and retains PRs without an issue', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;

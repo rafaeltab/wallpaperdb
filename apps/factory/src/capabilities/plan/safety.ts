@@ -80,6 +80,7 @@ export const PlanningSafetyLive = Layer.effect(
               ...snapshot.schedule,
               ...command,
               revision: snapshot.schedule.revision + 1,
+              controlsRevision: snapshot.schedule.revision + 1,
             },
           });
           return result === 'saved' ? ('saved' as const) : ('conflict' as const);
@@ -131,7 +132,12 @@ export const PlanningSafetyLive = Layer.effect(
               failure,
               schedule:
                 count === 3 && !snapshot.schedule.paused
-                  ? { ...snapshot.schedule, revision: snapshot.schedule.revision + 1, paused: true }
+                  ? {
+                      ...snapshot.schedule,
+                      revision: snapshot.schedule.revision + 1,
+                      controlsRevision: snapshot.schedule.revision + 1,
+                      paused: true,
+                    }
                   : undefined,
             });
             if (result !== 'conflict') return;

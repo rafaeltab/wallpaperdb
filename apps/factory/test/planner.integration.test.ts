@@ -8,7 +8,7 @@ it('translates a bound assistant proposal and rejects malformed or user messages
   const previous = process.env.FACTORY_FIXTURE;
   process.env.FACTORY_FIXTURE = host.configFile;
   const proposal = {
-    selected: [{ issue: 580, reason: 'Thin end-to-end preview', dependsOn: [], conflicts: [] }],
+    selected: [{ issue: 580, reason: 'Thin end-to-end preview', includeCodeFromIssues: [] }],
     deferred: [],
   };
   try {
@@ -80,6 +80,12 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     for (const patch of [
       { role: 'user' },
       { malformed: true },
+      {
+        proposal: {
+          selected: [{ issue: 580, reason: 'Legacy execution', dependsOn: [], conflicts: [] }],
+          deferred: [],
+        },
+      },
       { status: 'failed' },
       { responseRequestId: 'stale-request' },
     ]) {
@@ -714,7 +720,7 @@ it('reattaches an exact bound attempt when only incidental job elapsed time adva
   }
 });
 
-it('sends the complete flat metadata index over stdin without bodies or duplicate jobs', async () => {
+it('sends metadata and retained owning scope over stdin without duplicate jobs', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -815,7 +821,7 @@ it('sends the complete flat metadata index over stdin without bodies or duplicat
     expect(prompt).toContain('# Running issues\n\n- #9: active\n- #8: parked');
     expect(prompt.match(/^- #9: active$/gm)).toHaveLength(1);
     expect(prompt).not.toContain('- #7:');
-    expect(prompt).not.toContain('PRIVATE_JOB_SENTINEL');
+    expect(prompt).toContain('PRIVATE_JOB_SENTINEL');
     expect(prompt).toContain('fetch its full issue body and all trusted maintainer comments');
     for (const omitted of [
       'PRIVATE_BODY_SENTINEL',

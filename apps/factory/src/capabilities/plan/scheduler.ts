@@ -1,7 +1,8 @@
-import { Effect, Layer, Option, Semaphore } from 'effect';
-import { Issues, Time, type Start, type Status } from '../job/index.js';
+import { Effect, Layer, Option, Semaphore, Random } from 'effect';
+import { Issues, Time, Unavailable, type Start, type Status } from '../job/index.js';
 import {
   Plan,
+  IPlanner,
   PlanningSource,
   ScheduleStore,
   ScheduleObservations,
@@ -9,12 +10,11 @@ import {
   Scheduler,
   type ScheduleState,
   type ScheduleStatus,
-  type Preview,
   type PlanningInput,
-  type Proposal,
   type ResumeClaim,
+  type ExecutionCycle,
 } from './contract.js';
-import { validate, locallyBlocked, planningInputIdentity } from './implementation.js';
+import { locallyBlocked, planningInputIdentity, requirementsIdentity } from './implementation.js';
 import { PlanningSafety } from './safety-contract.js';
 const limit = (value: number) => Number.isSafeInteger(value) && (value === -1 || value > 0);
 const active = (job: Status) => holdsSlot(job, false) && job.kind === 'job';
@@ -31,7 +31,16 @@ const slots = (state: ScheduleState, jobs: readonly Status[]) =>
     )
   ).length;
 const recoverySlots = (snapshot: ScheduleStatus) =>
-  (snapshot.recoveries ?? []).filter((item) => item.active !== false).length;
+  new Set([
+    ...(snapshot.recoveries ?? [])
+      .filter((item) => item.active !== false)
+      .map((item) => item.issue),
+    ...(snapshot.state.recovering ?? []),
+  ]).size;
+const batchSlots = (state: ScheduleState) =>
+  (state.cycle?.selected ?? []).filter(
+    (selection) => !state.admissions.some((admission) => admission.issue === selection.issue)
+  ).length;
 const available = (snapshot: ScheduleStatus) => {
   const { state, jobs } = snapshot;
   return (
@@ -47,6 +56,7 @@ export const SchedulerLive = Layer.effect(
     const observations = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleObservations));
     const pool = yield* JobPool;
     const plan = yield* Plan;
+    const planner = Option.getOrUndefined(yield* Effect.serviceOption(IPlanner));
     const issues = yield* Issues;
     const source = yield* PlanningSource;
     const time = yield* Time;
@@ -54,8 +64,7 @@ export const SchedulerLive = Layer.effect(
     const writers = yield* Semaphore.make(1);
     const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
-    let retryPreview: Preview | undefined;
-    let pendingSuccess: Preview | undefined;
+
     const observe = (
       state: ScheduleState
     ): Effect.Effect<ScheduleStatus, import('../job/index.js').Unavailable> =>
@@ -76,7 +85,19 @@ export const SchedulerLive = Layer.effect(
     const status = () =>
       Effect.gen(function* () {
         const snapshot = yield* Effect.flatMap(store.read(), observe);
-        return { ...snapshot, recoveries: yield* issues.recoveries?.() ?? Effect.succeed([]) };
+        const recoveries = yield* issues.recoveries?.() ?? Effect.succeed([]);
+        const remaining = snapshot.state.recovering?.filter(
+          (number) => !recoveries.some((item) => item.issue === number)
+        );
+        if (remaining && remaining.length !== snapshot.state.recovering?.length) {
+          const next = {
+            ...snapshot.state,
+            revision: snapshot.state.revision + 1,
+            recovering: remaining,
+          };
+          if (yield* store.save(next)) return { ...snapshot, state: next, recoveries };
+        }
+        return { ...snapshot, recoveries };
       }).pipe(Effect.tap((snapshot) => observations?.publish(snapshot) ?? Effect.void));
     const reserve = (command: Start, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
@@ -99,11 +120,21 @@ export const SchedulerLive = Layer.effect(
         if (continuation) return yield* reserveContinuation(issue, continuation, snapshot);
         const recoveries = snapshot.recoveries ?? [];
         if (recoveries.some((item) => item.issue === issue && item.active !== false)) return true;
-        return (
-          snapshot.state.concurrency === -1 ||
-          slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) <
+        if (snapshot.state.recovering?.includes(issue)) return true;
+        if (snapshot.state.cycle && snapshot.state.cycle.selected === undefined) return false;
+        if (
+          snapshot.state.concurrency !== -1 &&
+          slots(snapshot.state, snapshot.jobs) +
+            recoverySlots(snapshot) +
+            batchSlots(snapshot.state) >=
             snapshot.state.concurrency
-        );
+        )
+          return false;
+        return yield* store.save({
+          ...snapshot.state,
+          revision: snapshot.state.revision + 1,
+          recovering: [...(snapshot.state.recovering ?? []), issue],
+        });
       }).pipe(
         // Job.status can reconcile the same repair that requested capacity.
         // A nested query must defer, never wait on its own observation or send.
@@ -119,7 +150,11 @@ export const SchedulerLive = Layer.effect(
         const target = snapshot.jobs.find(
           (job) => job.kind === 'job' && job.intent.issue === issue
         );
-        if (!continuationMatches(target, receipt)) return false;
+        if (
+          !continuationMatches(target, receipt) ||
+          (snapshot.state.cycle && snapshot.state.cycle.selected === undefined)
+        )
+          return false;
         const claim: ResumeClaim = {
           issue,
           index: receipt.index,
@@ -128,7 +163,7 @@ export const SchedulerLive = Layer.effect(
         };
         const prior = snapshot.state.resuming?.find((value) => value.issue === issue);
         if (prior) return sameResume(prior, claim);
-        if (!continuationCapacity(snapshot)) return false;
+        if (!continuationCapacity(snapshot, batchSlots(snapshot.state))) return false;
         return yield* store.save({
           ...snapshot.state,
           revision: snapshot.state.revision + 1,
@@ -166,44 +201,262 @@ export const SchedulerLive = Layer.effect(
         }
         return issue;
       });
-    const dispatch = (preview: Preview, base: string, initialRevision: number) =>
+    const saveCycle = (state: ScheduleState, cycle: ExecutionCycle | undefined) =>
       Effect.gen(function* () {
-        let revision = initialRevision;
-        for (const selection of preview.selected) {
-          const current = yield* status();
-          if (!currentDispatch(current, revision)) break;
-          const validated = validate(
-            { selected: [selection], deferred: [] },
-            {
-              ...preview.input,
-              jobs: current.jobs,
-              admissions: current.state.admissions.map((a) => a.issue),
-            }
-          );
-          if (!validated.selected.length) continue;
-          const planned = plannedStart(selection, preview, base);
-
-          const inspected = yield* prepareIssue(selection.issue, current.jobs);
-          const after = yield* status();
-          if (after.state.revision !== current.state.revision) break;
-          if (!dispatchable(inspected, after.jobs)) continue;
-          const command = prerequisiteStart(planned, inspected.prerequisite);
-          if (!(yield* reserve(command, after))) continue;
-          revision++;
-          yield* (yield* pool.job(selection.issue)).start(command);
-        }
+        const saved = yield* store.save({
+          ...state,
+          controlsRevision: state.controlsRevision ?? state.revision,
+          revision: state.revision + 1,
+          cycle,
+        });
+        if (saved) yield* status();
+        return saved;
       });
-    const retry = (preview: Preview | undefined, base: string, revision: number) =>
+    const replan = (state: ScheduleState) =>
       Effect.gen(function* () {
-        if (preview) yield* dispatch(preview, base, revision);
+        const startedAt = yield* time.now();
+        return yield* saveCycle(state, {
+          requestId: `cycle-${startedAt}-${yield* Random.nextInt}`,
+          startedAt,
+          concurrency: state.concurrency,
+          allowance: state.allowance,
+        });
+      });
+    const selectedPreparation = (cycle: ExecutionCycle) => (_issue: number) =>
+      Effect.map(
+        store.read(),
+        (state) =>
+          !state.paused &&
+          state.cycle?.requestId === cycle.requestId &&
+          state.concurrency === cycle.concurrency &&
+          state.allowance === cycle.allowance &&
+          batchSlots(state) > 0
+      );
+    const dispatch = (cycle: ExecutionCycle) =>
+      Effect.gen(function* () {
+        for (const selection of cycle.selected ?? []) {
+          let snapshot = yield* status();
+          if (snapshot.state.paused || snapshot.state.cycle?.requestId !== cycle.requestId) return;
+          if (snapshot.state.admissions.some((item) => item.issue === selection.issue)) continue;
+          const input = yield* source.read();
+          if (
+            requirementsIdentity(input, cycle.selected ?? []) !== cycle.scope ||
+            snapshot.state.concurrency !== cycle.concurrency ||
+            snapshot.state.allowance !== cycle.allowance
+          ) {
+            yield* Effect.logWarning(
+              'Accepted selection invalidated by external requirements or controls; gather and replan',
+              { requestId: cycle.requestId, issue: selection.issue }
+            );
+            yield* replan(snapshot.state);
+            return;
+          }
+          let selectionBase = snapshot.state.cycle?.bases?.find(
+            (item) => item.issue === selection.issue
+          )?.base;
+          let inspected = yield* issues.inspect(selection.issue, {
+            includeCodeFromIssues: selection.includeCodeFromIssues,
+            selectionBase,
+          });
+          if (
+            !eligible({
+              ...inspected,
+              blockersReady: inspected.blockersReady || !!inspected.joinRequired,
+            }) ||
+            locallyBlocked(selection.includeCodeFromIssues, snapshot.jobs)
+          ) {
+            yield* Effect.logWarning(
+              'Accepted selection is no longer executable; gather and replan',
+              { issue: selection.issue, reason: inspected.blockedReason }
+            );
+            yield* replan(yield* store.read());
+            return;
+          }
+          if (!selectionBase) {
+            selectionBase = inspected.selectionBase;
+            if (!selectionBase)
+              return yield* Effect.fail(
+                new Unavailable({ operation: 'selection-base-missing', cause: selection.issue })
+              );
+            const state = yield* store.read();
+            if (state.cycle?.requestId !== cycle.requestId) return;
+            if (
+              !(yield* saveCycle(state, {
+                ...state.cycle,
+                bases: [
+                  ...(state.cycle.bases ?? []),
+                  { issue: selection.issue, base: selectionBase },
+                ],
+              }))
+            )
+              return;
+          }
+          if (inspected.joinRequired) {
+            yield* issues.prepare?.(selection.issue, selectedPreparation(cycle), {
+              includeCodeFromIssues: selection.includeCodeFromIssues,
+              selectionBase,
+            }) ?? Effect.void;
+            inspected = yield* issues.inspect(selection.issue, {
+              includeCodeFromIssues: selection.includeCodeFromIssues,
+              selectionBase,
+            });
+          }
+          // Preparation can remain in an explicit recovery/verification state. The durable batch owns the retry.
+          if (!dispatchable(inspected, snapshot.jobs)) return;
+          const fresh = yield* source.read();
+          snapshot = yield* status();
+          if (snapshot.state.paused) return;
+          if (requirementsIdentity(fresh, cycle.selected ?? []) !== cycle.scope) {
+            yield* Effect.logWarning('Requirements changed during preparation; gather and replan', {
+              requestId: cycle.requestId,
+            });
+            yield* replan(snapshot.state);
+            return;
+          }
+          if (!inspected.prerequisite)
+            return yield* Effect.fail(
+              new Unavailable({ operation: 'selection-comparison-missing', cause: selection.issue })
+            );
+          const command: Start = {
+            issue: selection.issue,
+            includeCodeFromIssues: selection.includeCodeFromIssues,
+            selectionBase,
+            base: inspected.prerequisite.base,
+            prBase: inspected.prerequisite.prBase,
+            prerequisiteEvidence: inspected.prerequisite.evidence,
+            context: '',
+          };
+          if (!(yield* reserve(command, snapshot))) return;
+          const result = yield* (yield* pool.job(selection.issue)).start(command);
+          if (result.kind === 'rejected' || result.kind === 'occupied')
+            yield* Effect.logWarning(
+              'Reserved admission did not report a new started job; retained for reconciliation',
+              { issue: selection.issue, result: result.kind }
+            );
+        }
+        const state = yield* store.read();
+        if (
+          state.cycle?.requestId === cycle.requestId &&
+          (cycle.selected ?? []).every((item) =>
+            state.admissions.some((admission) => admission.issue === item.issue)
+          )
+        )
+          yield* saveCycle(state, undefined);
+      });
+    const tick = () =>
+      Effect.gen(function* () {
+        yield* reconcile();
+        let snapshot = yield* status();
+        if (snapshot.state.paused) return snapshot;
+        let cycle = snapshot.state.cycle;
+        if (cycle?.selected !== undefined) {
+          if (cycle.modelAttemptId) yield* planningSafety.accepted(cycle.modelAttemptId);
+          if (cycle.selected.length) {
+            yield* dispatch(cycle);
+            return yield* status();
+          }
+          const input = yield* source.read();
+          if (
+            requirementsIdentity(input, []) === cycle.scope &&
+            cycle.concurrency === snapshot.state.concurrency &&
+            cycle.allowance === snapshot.state.allowance
+          ) {
+            lastInput = planningInputIdentity({ ...input, scheduleRevision: undefined });
+            yield* saveCycle(snapshot.state, undefined);
+            return yield* status();
+          }
+          if (!(yield* saveCycle(snapshot.state, undefined))) return yield* status();
+          snapshot = yield* status();
+          cycle = undefined;
+        }
+        if (!available(snapshot)) return snapshot;
+        if (!cycle) {
+          const gatheredAt = yield* time.now();
+          const input = yield* source.poll?.() ?? source.read();
+          if (!input || !hasFrontier(input, snapshot.state)) return snapshot;
+          const signature = planningInputIdentity({ ...input, scheduleRevision: undefined });
+          if (signature === lastInput) return snapshot;
+          cycle = {
+            requestId: `cycle-${yield* time.now()}-${yield* Random.nextInt}`,
+            startedAt: gatheredAt,
+            concurrency: snapshot.state.concurrency,
+            allowance: snapshot.state.allowance,
+          };
+          if (!(yield* saveCycle(snapshot.state, cycle))) return yield* status();
+        }
+        const free = Math.min(
+          snapshot.state.concurrency === -1
+            ? Infinity
+            : snapshot.state.concurrency -
+                slots(snapshot.state, snapshot.jobs) -
+                recoverySlots(snapshot),
+          snapshot.state.allowance === -1
+            ? Infinity
+            : snapshot.state.allowance - snapshot.state.admissions.length
+        );
+        const preview = yield* plan
+          .preview({
+            maximumSelections: Number.isFinite(free) ? Math.max(0, free) : undefined,
+            requestId: cycle.requestId,
+            automatic: true,
+            attemptStartedAt: cycle.startedAt,
+            progress: () => Effect.void,
+          })
+          .pipe(
+            Effect.tapError(() =>
+              Effect.gen(function* () {
+                const ownership = planner
+                  ? yield* planner.ownership(false, cycle.requestId)
+                  : undefined;
+                if (ownership?.retired) {
+                  const state = yield* store.read();
+                  if (state.cycle?.requestId === cycle.requestId)
+                    yield* saveCycle(state, undefined);
+                }
+              })
+            )
+          );
+        if (preview.kind === 'paused') return yield* status();
+        snapshot = yield* status();
+        if (
+          preview.kind === 'stale' ||
+          preview.input.scheduleRevision !== snapshot.state.revision
+        ) {
+          yield* replan(snapshot.state);
+          return yield* status();
+        }
+        // Retain selection before acceptance bookkeeping or base/launch effects. Exact request ownership
+        // also replays a completed proposal after a crash or failed local publication.
+        const accepted: ExecutionCycle = {
+          ...cycle,
+          selected: preview.selected,
+          scope: requirementsIdentity(preview.input, preview.selected),
+          modelAttemptId: preview.modelAttemptId,
+        };
+        if (!(yield* saveCycle(snapshot.state, accepted))) return yield* status();
+        if (preview.modelAttemptId) yield* planningSafety.accepted(preview.modelAttemptId);
+        lastInput = planningInputIdentity({ ...preview.input, scheduleRevision: undefined });
+        if (accepted.selected?.length) yield* dispatch(accepted);
+        else yield* saveCycle(yield* store.read(), undefined);
         return yield* status();
       });
+    const owned = <A>(
+      work: Effect.Effect<A, Unavailable>,
+      busy: () => Effect.Effect<A, Unavailable>
+    ) =>
+      store
+        .withCycle(work)
+        .pipe(Effect.flatMap(Option.match({ onNone: busy, onSome: Effect.succeed })));
     const claimResume = (claim: ResumeClaim, target: Status, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
         const { state } = snapshot;
         // A prior uncertain send must be reconciled, never retried based on a rejected stale command.
         if (state.resuming?.some((existing) => existing.issue === claim.issue)) return false;
-        if (!resumeCapacity(target, snapshot)) return false;
+        if (
+          !resumeCapacity(target, snapshot) ||
+          (batchSlots(snapshot.state) > 0 && !active(target))
+        )
+          return false;
         return yield* store.save({
           ...state,
           revision: state.revision + 1,
@@ -253,13 +506,20 @@ export const SchedulerLive = Layer.effect(
           if (result.kind === 'rejected' || resolvedStart(claim, result))
             yield* releaseResume(claim);
           return result;
-        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.retry')),
+        }).pipe(
+          (work) => owned(work, () => Effect.succeed({ kind: 'occupied' as const })),
+          writers.withPermits(1),
+          Effect.withSpan('factory.scheduler.retry')
+        ),
       authorizeRecovery: admitRecovery,
       status,
       configure: (command) =>
         Effect.gen(function* () {
           if (!limit(command.concurrency) || !limit(command.allowance)) return 'rejected' as const;
-          return yield* planningSafety.configure(command);
+          const state = yield* store.read();
+          if (command.revision !== state.revision && command.revision !== state.controlsRevision)
+            return 'conflict' as const;
+          return yield* planningSafety.configure({ ...command, revision: state.revision });
         }).pipe(Effect.withSpan('factory.scheduler.configure')),
       start: (command) =>
         Effect.gen(function* () {
@@ -268,53 +528,23 @@ export const SchedulerLive = Layer.effect(
           if (!eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }))
             return { kind: 'rejected' as const };
           const before = yield* status();
-          if (!available(before)) return { kind: 'occupied' as const };
+          if (batchSlots(before.state) || !available(before)) return { kind: 'occupied' as const };
           issue = yield* prepareIssue(command.issue, before.jobs, issue);
           const snapshot = yield* status();
           if (!dispatchable(issue, snapshot.jobs)) return { kind: 'rejected' as const };
           const resolved = prerequisiteStart(command, issue.prerequisite);
           if (!(yield* reserve(resolved, snapshot))) return { kind: 'occupied' as const };
           return yield* (yield* pool.job(command.issue)).start(resolved);
-        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.start')),
-      tick: (base) =>
-        Effect.gen(function* () {
-          yield* reconcile();
-          const snapshot = yield* status();
-          if (!available(snapshot)) return snapshot;
-          // Retry the local success record before spending another provider read.
-          if (pendingSuccess?.modelAttemptId)
-            yield* planningSafety.accepted(pendingSuccess.modelAttemptId);
-          const attemptStartedAt = yield* time.now();
-          const input = yield* pendingSuccess ? source.read() : (source.poll?.() ?? source.read());
-          if (!input) return snapshot;
-          const signature = planningInputIdentity(input);
-          if (pendingSuccess && planningInputIdentity(pendingSuccess.input) !== signature)
-            pendingSuccess = undefined;
-          if (!hasFrontier(input, snapshot.state)) return snapshot;
-          if (!pendingSuccess && signature === lastInput) {
-            return yield* retry(retryPreview, base, snapshot.state.revision);
-          }
-          const preview =
-            pendingSuccess ??
-            (yield* plan.preview({
-              automatic: true,
-              attemptStartedAt,
-              progress: () => Effect.void,
-            }));
-          if (preview.kind !== 'preview') return yield* status();
-          // Source freshness is checked by Plan; this CAS binds local controls/jobs to its proposal.
-          if (preview.input.scheduleRevision !== snapshot.state.revision) {
-            pendingSuccess = undefined;
-            return yield* status();
-          }
-          pendingSuccess = preview;
-          if (preview.modelAttemptId) yield* planningSafety.accepted(preview.modelAttemptId);
-          lastInput = planningInputIdentity(preview.input);
-          retryPreview = joinPreview(preview);
-          pendingSuccess = undefined;
-          yield* dispatch(preview, base, snapshot.state.revision);
-          return yield* status();
-        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.tick')),
+        }).pipe(
+          (work) => owned(work, () => Effect.succeed({ kind: 'occupied' as const })),
+          writers.withPermits(1),
+          Effect.withSpan('factory.scheduler.start')
+        ),
+      tick: (_base) =>
+        owned(tick(), status).pipe(
+          writers.withPermits(1),
+          Effect.withSpan('factory.scheduler.tick')
+        ),
       resume: (command) =>
         Effect.gen(function* () {
           const snapshot = yield* status();
@@ -334,7 +564,11 @@ export const SchedulerLive = Layer.effect(
           if (result.kind === 'rejected' || resolvedStart(claim, result))
             yield* releaseResume(claim);
           return result;
-        }).pipe(writers.withPermits(1), Effect.withSpan('factory.scheduler.resume')),
+        }).pipe(
+          (work) => owned(work, () => Effect.succeed({ kind: 'occupied' as const })),
+          writers.withPermits(1),
+          Effect.withSpan('factory.scheduler.resume')
+        ),
       cancel: (id) =>
         Effect.gen(function* () {
           const job = yield* commandJob(id);
@@ -385,21 +619,6 @@ function resumeCapacity(target: Status, snapshot: ScheduleStatus) {
     slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) < snapshot.state.concurrency
   );
 }
-function plannedStart(
-  selection: Proposal['selected'][number],
-  preview: Preview,
-  base: string
-): Start {
-  return {
-    issue: selection.issue,
-    base,
-    context: '',
-    prerequisiteEvidence:
-      preview.input.issues.find((issue) => issue.number === selection.issue)
-        ?.prerequisiteEvidence ?? '',
-  };
-}
-
 function observedRun(job: Status) {
   return job.kind === 'job' && job.execution.kind === 'found' ? job.execution.run : undefined;
 }
@@ -450,18 +669,6 @@ function dispatchable(
   return eligible(issue) && !locallyBlocked(issue.blockers, jobs);
 }
 
-function currentDispatch(snapshot: ScheduleStatus, revision: number) {
-  return snapshot.state.revision === revision && available(snapshot);
-}
-
-function joinPreview(preview: Preview) {
-  return preview.selected.some((selection) =>
-    preview.input.issues.some((issue) => issue.number === selection.issue && issue.joinRequired)
-  )
-    ? preview
-    : undefined;
-}
-
 function continuationMatches(
   target: Status | undefined,
   receipt: import('../job/index.js').ContinuationReceipt
@@ -473,10 +680,11 @@ function continuationMatches(
     target.execution.run.ordinal === receipt.run.ordinal
   );
 }
-function continuationCapacity(snapshot: ScheduleStatus) {
+function continuationCapacity(snapshot: ScheduleStatus, reserved = 0) {
   return (
     snapshot.state.concurrency === -1 ||
-    slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) < snapshot.state.concurrency
+    slots(snapshot.state, snapshot.jobs) + recoverySlots(snapshot) + reserved <
+      snapshot.state.concurrency
   );
 }
 

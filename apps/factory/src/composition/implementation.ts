@@ -272,10 +272,13 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     projectId: configuration.FACTORY_T3_PROJECT_ID,
   });
   const planningDeps = Layer.mergeAll(
+    Layer.succeed(ScheduleStore, scheduleStore),
     Layer.effect(
       PlanningSource,
       Effect.map(Job, (job) => {
-        const source = githubPlanning(githubConfig(), job);
+        const source = githubPlanning(githubConfig(), job, () =>
+          Effect.map(scheduleStore.read(), (state) => state.admissions.map((item) => item.issue))
+        );
         const issueSource = githubIssues(githubConfig());
         let automaticAt = 0;
         const read = () =>
@@ -311,6 +314,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             };
           });
         return {
+          verify: source.verify,
           read,
           poll: () =>
             Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),

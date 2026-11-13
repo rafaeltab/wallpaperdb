@@ -5,6 +5,11 @@ export const intentSchema = z
     issue: z.number().int().positive(),
     issueUrl: z.string().url(),
     issueTitle: z.string().optional(),
+    includeCodeFromIssues: z.array(z.number().int().positive()).optional(),
+    selectionBase: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/)
+      .optional(),
     prerequisiteEvidence: z.string().optional(),
     prBase: z.string().optional(),
     base: z.string().regex(/^[a-f0-9]{40}$/),
@@ -99,6 +104,41 @@ const scheduleSchema = z
       .int()
       .refine((v) => v === -1 || v > 0),
     paused: z.boolean(),
+    controlsRevision: z.number().int().min(-1).optional(),
+    recovering: z.array(z.number().int().positive()).optional(),
+    cycle: z
+      .object({
+        requestId: z.string().min(1),
+        startedAt: z.number().finite(),
+        concurrency: z.number().int(),
+        allowance: z.number().int(),
+        selected: z
+          .array(
+            z
+              .object({
+                issue: z.number().int().positive(),
+                reason: z.string(),
+                includeCodeFromIssues: z.array(z.number().int().positive()).max(100),
+              })
+              .strict()
+          )
+          .max(1000)
+          .optional(),
+        scope: z.string().optional(),
+        modelAttemptId: z.string().optional(),
+        bases: z
+          .array(
+            z
+              .object({
+                issue: z.number().int().positive(),
+                base: z.string().regex(/^[a-f0-9]{40}$/),
+              })
+              .strict()
+          )
+          .optional(),
+      })
+      .strict()
+      .optional(),
     resuming: z
       .array(
         z
@@ -119,6 +159,11 @@ const scheduleSchema = z
       z
         .object({
           issue: z.number().int().positive(),
+          includeCodeFromIssues: z.array(z.number().int().positive()).optional(),
+          selectionBase: z
+            .string()
+            .regex(/^[a-f0-9]{40}$/)
+            .optional(),
           prerequisiteEvidence: z.string().optional(),
           prBase: z.string().optional(),
           base: z.string().regex(/^[a-f0-9]{40}$/),

@@ -304,7 +304,7 @@ it.each(['preview', 'stale'] as const)(
     };
     const selected =
       kind === 'preview'
-        ? [{ issue: 42, reason: 'Thin experiment', dependsOn: [], conflicts: [] }]
+        ? [{ issue: 42, reason: 'Thin experiment', includeCodeFromIssues: [] }]
         : [];
     const rejected = kind === 'stale' ? [{ issue: 0, reason: 'Inputs changed' }] : [];
     let calls = 0;

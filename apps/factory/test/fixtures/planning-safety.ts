@@ -20,7 +20,12 @@ export const controlledPlanningSafetyLayer = Layer.effect(
         Effect.gen(function* () {
           const current = yield* schedule.read();
           if (current.revision !== command.revision) return 'conflict' as const;
-          return (yield* schedule.save({ ...current, ...command, revision: current.revision + 1 }))
+          return (yield* schedule.save({
+            ...current,
+            ...command,
+            revision: current.revision + 1,
+            controlsRevision: current.revision + 1,
+          }))
             ? ('saved' as const)
             : ('conflict' as const);
         }),

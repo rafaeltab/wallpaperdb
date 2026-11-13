@@ -1,9 +1,10 @@
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
   IPlanner,
+  ScheduleStore,
   type PlanningInput,
   type PlanningIssue,
   type Proposal,
@@ -57,8 +58,27 @@ function selectionReason(
 }
 function semanticReason(item: Proposal['selected'][number], input: PlanningInput) {
   if (!item.reason.trim()) return 'Missing semantic rationale';
-  if (item.dependsOn.length) return 'Inferred prerequisite requires resolution before selection';
-  if (item.conflicts.length) return 'Semantic conflict requires resolution before selection';
+  if ('dependsOn' in item || 'conflicts' in item || !Array.isArray(item.includeCodeFromIssues))
+    return 'Legacy proposal has no execution authority';
+  if (new Set(item.includeCodeFromIssues).size !== item.includeCodeFromIssues.length)
+    return 'Duplicate included issue';
+  if (item.includeCodeFromIssues.some((number) => !Number.isSafeInteger(number) || number < 1))
+    return 'Invalid included issue';
+  if (
+    item.includeCodeFromIssues.some(
+      (number) =>
+        !input.issues.some((issue) => issue.number === number || issue.blockers.includes(number)) &&
+        !knownJobs(input).some(
+          (job) =>
+            job.kind === 'job' &&
+            job.intent.issue === number &&
+            (job.delivery?.ready || job.delivery?.landed)
+        )
+    )
+  )
+    return 'Unknown included issue';
+  if (locallyBlocked(item.includeCodeFromIssues, knownJobs(input)))
+    return 'Included implementation is unresolved';
   if (knownJobs(input).some((job) => job.kind === 'job' && job.intent.issue === item.issue))
     return 'Already active or parked';
   if (input.admissions?.includes(item.issue)) return 'Already admitted';
@@ -72,13 +92,34 @@ function repeated(issue: number, proposal: Proposal) {
 }
 export function validate(proposal: Proposal, input: PlanningInput) {
   const cyclic = cycleCheck(input.issues);
+  const selectedIssues = new Set(proposal.selected.map((item) => item.issue));
+  const invalidBatch = proposal.selected.some((item) =>
+    item.includeCodeFromIssues?.some((number) => selectedIssues.has(number))
+  );
+  const omittedMandatory = proposal.selected.some((item) =>
+    input.issues
+      .find((issue) => issue.number === item.issue)
+      ?.blockers.some(
+        (number) =>
+          input.issues.some((issue) => issue.number === number && issue.open) &&
+          !item.includeCodeFromIssues?.includes(number)
+      )
+  );
+  const overCapacity =
+    input.maximumSelections !== undefined && proposal.selected.length > input.maximumSelections;
   const selected: Proposal['selected'][number][] = [];
   const rejected = input.issues.flatMap((i) => {
     const reason = exclusion(i) ?? (cyclic(i.number) ? 'Cyclic explicit dependencies' : undefined);
     return reason ? [{ issue: i.number, reason }] : [];
   });
   for (const item of proposal.selected) {
-    const reason = selectionReason(item, input, repeated(item.issue, proposal), cyclic);
+    const reason = omittedMandatory
+      ? 'Mandatory prerequisite omitted from inclusion list'
+      : invalidBatch
+        ? 'Inclusion names unfinished selected work'
+        : overCapacity
+          ? 'Proposal exceeds maximum selection count'
+          : selectionReason(item, input, repeated(item.issue, proposal), cyclic);
     if (reason) rejected.push({ issue: item.issue, reason });
     else selected.push(item);
   }
@@ -105,6 +146,7 @@ export const PlanLive = Layer.effect(
   Effect.gen(function* () {
     const source = yield* PlanningSource;
     const planner = yield* IPlanner;
+    const store = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleStore));
     let pending = false;
     return {
       preview: (attempt) =>
@@ -115,8 +157,11 @@ export const PlanLive = Layer.effect(
           return yield* Effect.gen(function* () {
             if (attempt) yield* attempt.progress('discovery');
             const observed = yield* source.read();
-            const input = boundedInput(observed);
-            if (!input.maximumSelections || input.paused)
+            const input = boundedInput({
+              ...observed,
+              maximumSelections: attempt?.maximumSelections ?? observed.maximumSelections,
+            });
+            if (!input.maximumSelections || (input.paused && attempt?.automatic))
               return {
                 kind: 'preview' as const,
                 selected: [],
@@ -147,8 +192,22 @@ export const PlanLive = Layer.effect(
               ownership?.automatic && ownership.phase === 'succeeded' && ownership.run
                 ? ownership.requestId
                 : undefined;
+            const validated = validate(proposal, input);
+            const verify = source.verify;
+            const unavailable =
+              verify && validated.selected.length
+                ? yield* Effect.forEach(validated.selected, (selection) =>
+                    Effect.map(verify(selection), (reason) =>
+                      reason ? { issue: selection.issue, reason } : undefined
+                    )
+                  )
+                : [];
             if (attempt) yield* attempt.progress('freshness');
-            const current = boundedInput(yield* source.read());
+            const currentObserved = yield* source.read();
+            const current = boundedInput({
+              ...currentObserved,
+              maximumSelections: attempt?.maximumSelections ?? currentObserved.maximumSelections,
+            });
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
               return {
                 kind: 'stale' as const,
@@ -158,9 +217,20 @@ export const PlanLive = Layer.effect(
                 ],
                 input: current,
               };
+            if (unavailable.some(Boolean))
+              return {
+                kind: 'preview' as const,
+                selected: [],
+                rejected: [
+                  ...validated.rejected,
+                  ...unavailable.filter((item) => item !== undefined),
+                ],
+                input,
+                modelAttemptId,
+              };
             return {
               kind: 'preview' as const,
-              ...validate(proposal, input),
+              ...validated,
               input,
               modelAttemptId,
             };
@@ -171,7 +241,32 @@ export const PlanLive = Layer.effect(
               })
             )
           );
-        }).pipe(Effect.withSpan('factory.plan.preview')),
+        }).pipe(
+          (work) =>
+            !store || attempt?.automatic
+              ? work
+              : store
+                  .withCycle(
+                    Effect.gen(function* () {
+                      const retained = (yield* store.read()).cycle;
+                      if (retained && retained.selected?.length !== 0)
+                        return yield* Effect.fail(
+                          new Unavailable({ operation: 'plan-busy', cause: null })
+                        );
+                      return yield* work;
+                    })
+                  )
+                  .pipe(
+                    Effect.flatMap(
+                      Option.match({
+                        onNone: () =>
+                          Effect.fail(new Unavailable({ operation: 'plan-busy', cause: null })),
+                        onSome: Effect.succeed,
+                      })
+                    )
+                  ),
+          Effect.withSpan('factory.plan.preview')
+        ),
     };
   })
 );
@@ -218,4 +313,34 @@ function boundedInput(input: PlanningInput): PlanningInput {
         Math.min(bounded(input.capacity.concurrency), bounded(input.capacity.admission))
     ),
   };
+}
+
+export function requirementsIdentity(input: PlanningInput, selected: Proposal['selected']) {
+  const numbers = new Set(selected.flatMap((item) => [item.issue, ...item.includeCodeFromIssues]));
+  if (!selected.length) input.issues.forEach((issue) => numbers.add(issue.number));
+  for (const number of numbers) {
+    const issue = input.issues.find((item) => item.number === number);
+    issue?.parents.forEach((parent) => numbers.add(parent));
+    issue?.blockers.forEach((blocker) => numbers.add(blocker));
+  }
+  return JSON.stringify(
+    [...numbers]
+      .sort((a, b) => a - b)
+      .map((number) => {
+        const issue = input.issues.find((item) => item.number === number);
+        return issue
+          ? {
+              number,
+              body: issue.body,
+              comments: issue.comments,
+              author: issue.author,
+              open: issue.open,
+              labels: issue.labels,
+              blockers: issue.blockers,
+              parents: issue.parents,
+              candidate: issue.metadata?.candidate,
+            }
+          : { number, missing: true };
+      })
+  );
 }

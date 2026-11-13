@@ -34,6 +34,8 @@ function setup(lostSend = true, immediate = false) {
   const issues: Issues = {
     inspect: (n) =>
       Effect.succeed({
+        selectionBase: base,
+        prerequisite: { base, prBase: 'main', evidence: '[]' },
         open: true,
         author: 'rafaeltab',
         labels: ['ready-for-agent'],
@@ -152,7 +154,7 @@ function setup(lostSend = true, immediate = false) {
       ownership: () => Effect.succeed(undefined),
       propose: () =>
         Effect.succeed({
-          selected: [{ issue: 2, reason: 'Independent thin slice', dependsOn: [], conflicts: [] }],
+          selected: [{ issue: 2, reason: 'Independent thin slice', includeCodeFromIssues: [] }],
           deferred: [],
         }),
     })

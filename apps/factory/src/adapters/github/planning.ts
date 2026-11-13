@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { z } from 'zod';
 import { Unavailable, type Job } from '../../capabilities/job/index.js';
 import type { PlanningSource, PlanningIssue } from '../../capabilities/plan/index.js';
+import { contextualPromise, runInContext } from './context.js';
 import { observeIssue } from './observations.js';
 import { command } from '../../platform/index.js';
 import { githubIssues, blockerNumbers } from './implementation.js';
@@ -20,13 +21,25 @@ const issueSchema = z.object({
 });
 export function githubPlanning(
   config: Parameters<typeof githubIssues>[0],
-  job: Job
+  job: Job,
+  contextIssues?: () => Effect.Effect<readonly number[], Unavailable>
 ): PlanningSource {
   const gh =
     config.read ??
     (async (args: string[], signal?: AbortSignal) =>
       JSON.parse(await command('gh', args, config.project, signal)));
   return {
+    verify: (selection) =>
+      Effect.map(
+        githubIssues(config).inspect(selection.issue, {
+          includeCodeFromIssues: selection.includeCodeFromIssues,
+        }),
+        (issue) =>
+          (issue.blockersReady || issue.joinRequired) && !issue.recovery?.question
+            ? undefined
+            : (issue.blockedReason ??
+              'Included code or explicit prerequisites are not verified and executable')
+      ),
     read: () =>
       Effect.gen(function* () {
         // Cache only this refresh. Freshness validation creates an independent cache.
@@ -51,6 +64,17 @@ export function githubPlanning(
           { ...config, readyPrerequisites: prerequisites ? () => prerequisites : undefined },
           read
         );
+        const currentCode = [
+          ...(prerequisites
+            ? yield* contextualPromise({
+                try: (signal) => runInContext(prerequisites, signal),
+                defaultRecoveryAdmission: config.admitRecovery,
+                catch: (cause) => new Unavailable({ operation: 'planning-code-context', cause }),
+              })
+            : []),
+          ...config.prerequisites,
+        ];
+        const owningIssues = contextIssues ? yield* contextIssues() : [];
         const collected = yield* Effect.tryPromise({
           try: async (signal) => {
             const candidates = z
@@ -75,7 +99,11 @@ export function githubPlanning(
                 )
               );
             if (candidates.length >= 1000) throw new Error('Discovery exceeds supported bound');
-            const queue = candidates.map((i) => i.number);
+            const queue = [
+              ...candidates.map((i) => i.number),
+              ...currentCode.map((item) => item.issue),
+              ...owningIssues,
+            ];
             const result: Omit<PlanningIssue, 'blockersReady' | 'prerequisiteEvidence'>[] = [];
             const seen = new Set<number>();
             while (queue.length) {
@@ -161,7 +189,12 @@ export function githubPlanning(
           collected,
           (issue) =>
             Effect.gen(function* () {
-              const readiness = yield* issues.inspect(issue.number);
+              const readiness = yield* issues.inspect(
+                issue.number,
+                issue.blockers.length && !issue.blockers.includes(issue.number)
+                  ? { includeCodeFromIssues: issue.blockers }
+                  : undefined
+              );
               return {
                 ...issue,
                 blockersReady: readiness.blockersReady,
@@ -178,6 +211,7 @@ export function githubPlanning(
         );
         return {
           issues: enriched,
+          availableCode: currentCode.map(({ issue, pr, commit }) => ({ issue, pr, commit })),
           job: yield* job.status(),
           capacity: { concurrency: 1 as const, admission: 1 as const },
         };

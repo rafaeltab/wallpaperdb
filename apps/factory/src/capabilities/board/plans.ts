@@ -31,7 +31,7 @@ export function planDetails(
   const referenced = new Set<number>();
   for (const selected of attempt.result?.selected ?? []) {
     referenced.add(selected.issue);
-    for (const n of [...selected.dependsOn, ...selected.conflicts]) referenced.add(n);
+    for (const n of selected.includeCodeFromIssues) referenced.add(n);
   }
   for (const rejected of attempt.result?.rejected ?? [])
     if (rejected.issue > 0) referenced.add(rejected.issue);
@@ -93,8 +93,7 @@ export function planDetails(
           selected: attempt.result.selected.map((s) => ({
             issueId: issueId(s.issue),
             reason: s.reason,
-            dependsOn: s.dependsOn.map(issueId),
-            conflicts: s.conflicts.map(issueId),
+            includeCodeFromIssues: s.includeCodeFromIssues.map(issueId),
           })),
           rejected: attempt.result.rejected
             .filter((r) => r.issue > 0)

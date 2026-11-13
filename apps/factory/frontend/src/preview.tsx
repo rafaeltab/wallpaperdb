@@ -58,10 +58,7 @@ export function PlanResult({
             #{selection.issue}: {selection.reason}
           </p>
           <p>
-            Proposed dependencies: <Issues numbers={selection.dependsOn} />
-          </p>
-          <p>
-            Proposed conflicts: <Issues numbers={selection.conflicts} />
+            Include code from: <Issues numbers={selection.includeCodeFromIssues} />
           </p>
         </article>
       ))}

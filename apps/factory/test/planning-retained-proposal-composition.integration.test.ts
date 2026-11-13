@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -11,6 +12,7 @@ it('processes a retained selection even when its input matches an older deferred
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 9, 12));
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -117,8 +119,7 @@ it('processes a retained selection even when its input matches an older deferred
             {
               issue: 581,
               reason: 'The new model selects the restored input',
-              dependsOn: [],
-              conflicts: [],
+              includeCodeFromIssues: [],
             },
           ],
           deferred: [],

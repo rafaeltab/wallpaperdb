@@ -1,5 +1,5 @@
-import { publisher, requiredRecord } from '../../platform/index.js';
-import { Effect } from 'effect';
+import { publisher, requiredRecord, acquireCycle } from '../../platform/index.js';
+import { Effect, Option } from 'effect';
 import { z } from 'zod';
 import {
   intentSchema,
@@ -145,6 +145,28 @@ export function fileScheduleStore(
     }
   };
   return {
+    withCycle: (work) =>
+      Effect.acquireUseRelease(
+        Effect.tryPromise({
+          try: (signal) => acquireCycle(directory, signal),
+          catch: (cause) => new Unavailable({ operation: 'execution-cycle-lock', cause }),
+        }),
+        (lease) =>
+          lease
+            ? Effect.raceFirst(
+                Effect.map(work, Option.some),
+                Effect.tryPromise({
+                  try: () => lease.lost,
+                  catch: (cause) =>
+                    new Unavailable({ operation: 'execution-cycle-ownership-lost', cause }),
+                })
+              )
+            : Effect.succeed(Option.none()),
+        (lease) => (lease ? Effect.promise(() => lease.release()) : Effect.void)
+      ).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.store.execution-cycle')
+      ),
     read: () => effect('read-schedule', read),
     save: (state) =>
       effect('save-schedule', async () => {

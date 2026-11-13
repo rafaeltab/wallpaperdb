@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect, Layer, Tracer } from 'effect';
@@ -16,6 +17,7 @@ import { protocol } from './fixtures/setup.js';
 import type { FactoryV2Snapshot } from '../src/http/index.js';
 it('exports telemetry with incoming trace context through the composed runtime and closes its exporter', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const prior = process.env.FACTORY_FIXTURE;
   const previousPath = process.env.PATH;
   process.env.PATH = host.directory + ':' + previousPath;
@@ -138,6 +140,7 @@ it.each([false, true])(
   'bounds a stalled collector with blocked worker %s during cleanup without leaving exporter sockets',
   async (blockedWorker) => {
     const host = await protocol();
+    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
     const prior = process.env.FACTORY_FIXTURE;
     const priorPath = process.env.PATH;
     process.env.PATH = host.directory + ':' + priorPath;

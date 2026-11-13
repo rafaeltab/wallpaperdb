@@ -50,7 +50,20 @@ it('reattaches a durable planner run after process death without launching anoth
   try {
     await ready();
     await host.save({
-      planning: { candidates: [], issues: [] },
+      planning: {
+        issues: [
+          {
+            number: 581,
+            title: 'Lifecycle repair',
+            body: 'Authorized repair',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+            author: { login: 'rafaeltab' },
+            labels: [{ name: 'ready-for-agent' }],
+            comments: [],
+          },
+        ],
+      },
       planner: { status: 'running', proposal: { selected: [], deferred: [] } },
     });
     const submitted = await fetch(`${origin}/api/plan`, {
@@ -83,7 +96,20 @@ it('reattaches a durable planner run after process death without launching anoth
       ).status
     ).toBe(409);
     await host.save({
-      planning: { candidates: [], issues: [] },
+      planning: {
+        issues: [
+          {
+            number: 581,
+            title: 'Lifecycle repair',
+            body: 'Authorized repair',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/581',
+            author: { login: 'rafaeltab' },
+            labels: [{ name: 'ready-for-agent' }],
+            comments: [],
+          },
+        ],
+      },
       planner: { proposal: { selected: [], deferred: [] } },
     });
     await vi.waitFor(

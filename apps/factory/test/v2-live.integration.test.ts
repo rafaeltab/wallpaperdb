@@ -1464,7 +1464,7 @@ it('searches the local issue index with generation-bound pages and publishes adv
       phase: 'succeeded',
       result: {
         kind: 'preview',
-        selected: [{ issue: 1, reason: 'Next', dependsOn: [], conflicts: [] }],
+        selected: [{ issue: 1, reason: 'Next', includeCodeFromIssues: [] }],
         rejected: [{ issue: 2, reason: 'Not ready' }],
         input: {
           issues: [
@@ -2443,7 +2443,7 @@ it.each(['startup', 'publication'])(
       phase: 'succeeded',
       result: {
         kind: 'preview',
-        selected: [{ issue: 99, reason: 'Historical selection', dependsOn: [98], conflicts: [] }],
+        selected: [{ issue: 99, reason: 'Historical selection', includeCodeFromIssues: [98] }],
         rejected: [{ issue: 100, reason: 'Not ready' }],
         input: {
           issues: [98, 99, 100].map((number) => ({

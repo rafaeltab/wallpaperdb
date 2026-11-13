@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -8,6 +9,7 @@ import { protocol } from './fixtures/setup.js';
 import { sqliteObservations } from '../src/adapters/store/index.js';
 it('validates host configuration before serving and composes the real driving and storage adapters', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const configuration = {
     FACTORY_PROJECT: host.repository,
     FACTORY_T3_PROJECT_ID: 'project-id',
@@ -49,6 +51,7 @@ it('validates host configuration before serving and composes the real driving an
 });
 it('continues admitted work through publication without an operations-page observer', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -174,6 +177,7 @@ it('continues admitted work through publication without an operations-page obser
 
 it('continuously admits a validated semantic plan through production adapters without page traffic', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -191,9 +195,7 @@ it('continuously admits a validated semantic plan through production adapters wi
     planning: { issues: [candidate] },
     planner: {
       proposal: {
-        selected: [
-          { issue: 581, reason: 'Thin end-to-end experiment', dependsOn: [], conflicts: [] },
-        ],
+        selected: [{ issue: 581, reason: 'Thin end-to-end experiment', includeCodeFromIssues: [] }],
         deferred: [],
       },
     },
@@ -247,6 +249,7 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -322,6 +325,7 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
 
 it('serves the live v2 producer and executes durable control commands on the existing origin', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = host.directory + ':' + previous.path;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -395,6 +399,7 @@ it.each(['accept', 'accept-committed', 'claim', 'claim-committed', 'finish'] as 
   'recovers durable control responsibility after a SQLite %s failure without repeating effects',
   async (boundary) => {
     const host = await protocol();
+    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
     process.env.PATH = `${host.directory}:${previous.path}`;
     process.env.FACTORY_FIXTURE = host.configFile;

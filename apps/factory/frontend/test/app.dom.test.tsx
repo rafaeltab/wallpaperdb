@@ -289,7 +289,7 @@ it('keeps stage progress visible through freshness validation, renders advisory 
     input: {
       issues: [{ number: 12, title: '<script>untrusted</script>', blockers: [4], parents: [2] }],
     },
-    selected: [{ issue: 12, reason: 'Thin experiment', dependsOn: [4], conflicts: [5] }],
+    selected: [{ issue: 12, reason: 'Thin experiment', includeCodeFromIssues: [4, 5] }],
     rejected: [],
   };
   vi.stubGlobal('fetch', async (_path: string, options?: RequestInit) => {

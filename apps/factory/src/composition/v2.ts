@@ -157,7 +157,7 @@ function commandAdapter(config: {
         }
         if (command.kind === 'configure') {
           const result = yield* config.scheduler.configure({
-            revision: input.state.revision,
+            revision: input.state.controlsRevision ?? input.state.revision,
             paused: command.payload.paused,
             concurrency:
               command.payload.concurrency.kind === 'unlimited'

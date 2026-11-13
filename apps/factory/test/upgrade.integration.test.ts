@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -8,6 +9,7 @@ it.each(['{"format":2}', 'null', '{broken'])(
   'rejects incompatible durable state %s before consulting external services and preserves it',
   async (manifest) => {
     const host = await protocol();
+    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
     const state = join(host.directory, 'state');
     await mkdir(state);
     await writeFile(join(state, 'format.json'), manifest);
@@ -31,6 +33,7 @@ it.each(['{"format":2}', 'null', '{broken'])(
 
 it('adopts pre-manifest state without discarding controls or reservations', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = process.env.FACTORY_FIXTURE;
   const previousPath = process.env.PATH;
   process.env.PATH = host.directory + ':' + previousPath;

@@ -26,8 +26,7 @@ const proposalSchema = z
           .object({
             issue: z.number().int().positive().safe(),
             reason,
-            dependsOn: numbers,
-            conflicts: numbers,
+            includeCodeFromIssues: numbers,
           })
           .strict()
       )

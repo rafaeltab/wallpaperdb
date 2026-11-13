@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { readFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
@@ -12,6 +13,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
     const host = await protocol();
+    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
     process.env.PATH = `${host.directory}:${previous.path}`;
     process.env.FACTORY_FIXTURE = host.configFile;
@@ -159,6 +161,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
 
 it('allows supported terminal cleanup latency when submitting a preview after process loss', async () => {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -235,6 +238,7 @@ it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
   'preserves automatic result consumption after process loss, %s',
   async (ordering) => {
     const host = await protocol();
+    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
     process.env.PATH = `${host.directory}:${previous.path}`;
     process.env.FACTORY_FIXTURE = host.configFile;
@@ -281,7 +285,7 @@ it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
     };
     const originalProposal = {
       selected: [
-        { issue: 581, reason: 'Original ready issue proposal', dependsOn: [], conflicts: [] },
+        { issue: 581, reason: 'Original ready issue proposal', includeCodeFromIssues: [] },
       ],
       deferred: [],
     };
@@ -337,8 +341,7 @@ it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
               {
                 issue: 581,
                 reason: 'Fresh proposal for changed capacity',
-                dependsOn: [],
-                conflicts: [],
+                includeCodeFromIssues: [],
               },
             ],
             deferred: [],

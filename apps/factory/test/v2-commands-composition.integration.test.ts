@@ -24,6 +24,7 @@ async function composed(
   initialControl?: { paused: boolean }
 ) {
   const host = await protocol();
+  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -1153,7 +1154,7 @@ it('submits one retained advisory preview through v2 while the composed factory 
     {
       planner: {
         proposal: {
-          selected: [{ issue: 577, reason: 'Advisory selection', dependsOn: [], conflicts: [] }],
+          selected: [{ issue: 577, reason: 'Advisory selection', includeCodeFromIssues: [] }],
           deferred: [],
         },
       },

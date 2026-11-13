@@ -103,7 +103,9 @@ async function openPrerequisite(
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
   signal?: AbortSignal
 ) {
-  const assertion = config.prerequisites.find((item) => item.issue === number);
+  const assertions = config.prerequisites.filter((item) => item.issue === number);
+  if (new Set(assertions.map((item) => item.pr)).size !== 1) return null;
+  const assertion = assertions[0];
   if (!assertion) return null;
   const current = pr.parse(
     await gh(

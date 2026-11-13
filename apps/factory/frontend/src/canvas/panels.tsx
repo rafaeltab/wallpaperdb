@@ -653,7 +653,7 @@ export function Plan({
                     </marker>
                   </defs>
                   {selected.flatMap((s, i) =>
-                    s.dependsOn.map((dep) => {
+                    s.includeCodeFromIssues.map((dep) => {
                       const target = selected.findIndex((s) => s.issueId === dep);
                       if (target < 0) return null;
                       return (
@@ -681,11 +681,10 @@ export function Plan({
                 <section key={s.issueId}>
                   <h4>{issueName(s.issueId)}</h4>
                   <p>
-                    Proposed prerequisites:{' '}
-                    {s.dependsOn.length ? s.dependsOn.map(issueName).join(', ') : 'None'}
-                  </p>
-                  <p>
-                    Conflicts: {s.conflicts.length ? s.conflicts.map(issueName).join(', ') : 'None'}
+                    Include code from:{' '}
+                    {s.includeCodeFromIssues.length
+                      ? s.includeCodeFromIssues.map(issueName).join(', ')
+                      : 'None'}
                   </p>
                 </section>
               ))}

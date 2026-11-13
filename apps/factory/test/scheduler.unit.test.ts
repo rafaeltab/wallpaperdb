@@ -1,6 +1,6 @@
 import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
 import { Time } from '../src/capabilities/job/index.js';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Deferred } from 'effect';
 import { expect, it } from 'vitest';
 import {
   PlanLive,
@@ -33,7 +33,20 @@ const issue = (number: number): PlanningIssue => ({
   prerequisiteEvidence: '',
 });
 function fixture(hooks?: { read: () => void; propose: (deadline?: number) => void }) {
-  const store = controlledScheduleStore();
+  const persisted = controlledScheduleStore();
+  let failSelection = false;
+  const store = {
+    ...persisted,
+    save: (next: import('../src/capabilities/plan/index.js').ScheduleState) =>
+      failSelection && next.cycle?.selected !== undefined
+        ? Effect.fail(
+            new Unavailable({ operation: 'controlled-selection-persistence', cause: null })
+          )
+        : persisted.save(next),
+  };
+  let planGate: Effect.Effect<void> = Effect.void;
+  const proposals = new Map<string, import('../src/capabilities/plan/index.js').Proposal>();
+  const preparationDecisions: boolean[] = [];
   const snapshot = () => Effect.runSync(store.read());
   const preparations: number[] = [];
   let recoveries: NonNullable<ScheduleStatus['recoveries']> = [];
@@ -149,8 +162,9 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
     Layer.succeed(Issues, {
       recoveries: () => Effect.sync(() => recoveries),
       reconcile: () => Effect.sync(() => reconciliation()),
-      prepare: (number) =>
-        Effect.sync(() => {
+      prepare: (number, authorize) =>
+        Effect.gen(function* () {
+          if (authorize) preparationDecisions.push(yield* authorize(number));
           preparations.push(number);
           if (prepared)
             issues = issues.map((i) =>
@@ -172,6 +186,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
         Effect.sync(() => {
           const candidate = issues.find((i) => i.number === number);
           return {
+            selectionBase: base,
             open: candidate?.open ?? false,
             author: candidate?.author ?? '',
             labels: candidate?.labels ?? [],
@@ -179,7 +194,9 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
             blockersReady: candidate?.blockersReady ?? false,
             joinRequired: candidate?.joinRequired,
             url: issue(number).url,
-            prerequisite: candidate?.prerequisite,
+            prerequisite:
+              candidate?.prerequisite ??
+              (candidate?.blockersReady ? { base, prBase: 'main', evidence: '[]' } : undefined),
           };
         }),
       pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
@@ -190,36 +207,67 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
     Layer.succeed(IPlanner, {
       ownership: () => Effect.succeed(undefined),
       propose: (_input, attempt) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          const retained = attempt?.requestId ? proposals.get(attempt.requestId) : undefined;
+          if (retained) return retained;
           hooks?.propose(attempt?.deadline);
           duringPlan?.();
-          return {
-            selected: issues.map((i) => ({
-              issue: i.number,
-              reason: 'Thin user-facing slice',
-              dependsOn: [],
-              conflicts: [],
-            })),
+          yield* planGate;
+          const proposal = {
+            selected: issues
+              .filter(
+                (i) =>
+                  !_input.admissions?.includes(i.number) &&
+                  !i.blockers.some((number) =>
+                    _input.jobs?.some(
+                      (job) =>
+                        job.kind === 'job' &&
+                        job.intent.issue === number &&
+                        !job.delivery?.ready &&
+                        !job.delivery?.landed
+                    )
+                  )
+              )
+              .slice(0, _input.maximumSelections)
+              .map((i) => ({
+                issue: i.number,
+                reason: 'Thin user-facing slice',
+                includeCodeFromIssues: i.blockers,
+              })),
             deferred: [],
           };
+          if (attempt?.requestId) proposals.set(attempt.requestId, proposal);
+          return proposal;
         }),
     })
   );
-  const runtime = ManagedRuntime.make(
-    SchedulerLive.pipe(
-      Layer.provide(controlledPlanningSafetyLayer),
-      Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
-      Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
-      Layer.provide(deps)
-    )
+  const layers = SchedulerLive.pipe(
+    Layer.provide(controlledPlanningSafetyLayer),
+    Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
+    Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
+    Layer.provide(deps)
   );
+  let runtime = ManagedRuntime.make(layers);
   return {
-    runtime,
+    get runtime() {
+      return runtime;
+    },
+    reopen: async () => {
+      await runtime.dispose();
+      runtime = ManagedRuntime.make(layers);
+    },
     setRecoveries: (values: NonNullable<ScheduleStatus['recoveries']>) => {
       recoveries = values;
     },
     statuses,
     published,
+    preparationDecisions,
+    gatePlan: (gate: Effect.Effect<void>) => {
+      planGate = gate;
+    },
+    failSelectedPersistence: (value: boolean) => {
+      failSelection = value;
+    },
     failDiscovery: () => {
       discoveryFailed = true;
     },
@@ -662,6 +710,8 @@ it('admits both forks at the verified prerequisite tip and retains their PR targ
     expect(f.snapshot().admissions.slice(1)).toEqual(
       [2, 3].map((number) => ({
         issue: number,
+        includeCodeFromIssues: [1],
+        selectionBase: base,
         base: a,
         prBase: 'factory/A',
         context: '',
@@ -706,10 +756,10 @@ it('prepares a divergent join before reserving E and launches only from its veri
     expect(f.launches).toEqual([]);
     expect(f.snapshot().admissions).toEqual([]);
     f.prepareSucceeds();
-    expect(await f.run((s) => s.start({ issue: 5, base, context: '' }))).toMatchObject({
-      kind: 'job',
-      intent: { base: 'b'.repeat(40), prBase: 'factory/C' },
-    });
+    await f.run((s) => s.tick(base));
+    expect(f.snapshot().admissions).toMatchObject([
+      { issue: 5, base: 'b'.repeat(40), prBase: 'factory/C' },
+    ]);
     expect(f.launches).toEqual([5]);
   } finally {
     await f.runtime.dispose();
@@ -960,6 +1010,100 @@ it('does not pass the preflight discovery clock as a model deadline', async () =
     await f.runtime.runPromise(scheduler.tick(base));
   } finally {
     clock.mockRestore();
+    await f.runtime.dispose();
+  }
+});
+
+it('retains the accepted batch through restart and preparation without another planner call', async () => {
+  let plans = 0;
+  const f = fixture({
+    read: () => {},
+    propose: () => {
+      plans++;
+    },
+  });
+  f.setIssues([{ ...issue(5), blockersReady: false, joinRequired: true }]);
+  try {
+    await f.run((s) => s.tick(base));
+    expect(f.snapshot().cycle?.selected?.map((s) => s.issue)).toEqual([5]);
+    await f.reopen();
+    f.prepareSucceeds();
+    await f.run((s) => s.tick(base));
+    expect(plans).toBe(1);
+    expect(f.launches).toEqual([5]);
+    expect(f.snapshot().cycle).toBeUndefined();
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('does not let a concurrent cycle or manual start consume a batch slot during planning', async () => {
+  const entered = await Effect.runPromise(Deferred.make<void>());
+  const release = await Effect.runPromise(Deferred.make<void>());
+  let plans = 0;
+  const f = fixture({
+    read: () => {},
+    propose: () => {
+      plans++;
+    },
+  });
+  f.gatePlan(
+    Effect.gen(function* () {
+      yield* Deferred.succeed(entered, undefined);
+      yield* Deferred.await(release);
+    })
+  );
+  try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 2, allowance: 2, paused: false }));
+    const first = f.run((s) => s.tick(base));
+    await Effect.runPromise(Deferred.await(entered));
+    const competing = f.run((s) => s.tick(base));
+    const manual = f.run((s) => s.start({ issue: 3, base, context: '' }));
+    expect(plans).toBe(1);
+    expect(f.launches).toEqual([]);
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await Promise.all([first, competing]);
+    expect(await manual).toMatchObject({ kind: 'occupied' });
+    expect(f.launches).toEqual([1, 2]);
+    expect(plans).toBe(1);
+  } finally {
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await f.runtime.dispose();
+  }
+});
+it('retries local selection persistence across restart without buying another model plan', async () => {
+  let plans = 0;
+  const f = fixture({
+    read: () => {},
+    propose: () => {
+      plans++;
+    },
+  });
+  try {
+    f.failSelectedPersistence(true);
+    await expect(f.run((s) => s.tick(base))).rejects.toMatchObject({
+      operation: 'controlled-selection-persistence',
+    });
+    expect(f.launches).toEqual([]);
+    await f.reopen();
+    f.failSelectedPersistence(false);
+    await f.run((s) => s.tick(base));
+    expect(plans).toBe(1);
+    expect(f.launches).toEqual([1]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+it('uses the owned preparation reservation at concurrency one and automatically launches its selection', async () => {
+  const f = fixture();
+  f.setIssues([{ ...issue(5), blockersReady: false, joinRequired: true }]);
+  f.prepareSucceeds();
+  try {
+    await f.run((s) => s.tick(base));
+    expect(f.preparationDecisions).toEqual([true]);
+    expect(f.launches).toEqual([5]);
+    expect(f.snapshot().admissions).toHaveLength(1);
+  } finally {
     await f.runtime.dispose();
   }
 });

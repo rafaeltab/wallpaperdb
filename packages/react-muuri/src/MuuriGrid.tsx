@@ -14,6 +14,9 @@ import type Muuri from 'muuri';
 import type { Item, GridOptions } from 'muuri';
 import type { MuuriContextValue, MuuriGridProps } from './types/index.js';
 
+// Temporary observation only for the #413 diagnostic draft.
+export const diagnostic413: unknown[] = [];
+
 /**
  * MuuriGrid component - the main container for Muuri layout.
  *
@@ -156,6 +159,18 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
     }
   }, [ref, grid]);
 
+  const trace413 = (event: string, ...state: unknown[]) => {
+    if (htmlProps.id === 'diagnostic-413') {
+      diagnostic413.push([event, performance.now(), ...state]);
+    }
+  };
+  const identities413 = (items: Item[]) =>
+    items.map((item) => ({
+      id: item.getElement()?.querySelector('[data-testid]')?.getAttribute('data-testid'),
+      active: item.isActive(),
+      destroyed: item.isDestroyed(),
+    }));
+
   // Initialize Muuri
   useEffect(() => {
     if (!containerRef.current || typeof window === 'undefined') return;
@@ -165,7 +180,9 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
 
     const initMuuri = async () => {
       // Dynamic import to avoid SSR issues
+      trace413('import-start');
       const MuuriModule = await import('muuri');
+      trace413('import-end', isCancelled);
       const MuuriClass = MuuriModule.default;
 
       if (isCancelled || !containerRef.current) return;
@@ -222,8 +239,14 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       // Create Muuri instance
       muuriInstance = new MuuriClass(containerRef.current, options);
 
+      trace413(
+        'constructed',
+        initialItems.map((el) => el.querySelector('[data-testid]')?.getAttribute('data-testid'))
+      );
+
       // Bind event listeners
       muuriInstance.on('layoutStart', (items, isInstant) => {
+        trace413('layoutStart', identities413(items), isInstant);
         callbacksRef.current.onLayoutStart?.(items, isInstant);
       });
 
@@ -234,6 +257,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
             registration.onLayout?.();
           }
         }
+        trace413('layoutEnd', identities413(items));
         callbacksRef.current.onLayoutEnd?.(items);
       });
 
@@ -242,6 +266,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       });
 
       muuriInstance.on('remove', (items, indices) => {
+        trace413('remove', identities413(items), indices);
         callbacksRef.current.onRemove?.(items, indices);
       });
 
@@ -250,6 +275,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       });
 
       muuriInstance.on('hideEnd', (items) => {
+        trace413('hideEnd', identities413(items));
         callbacksRef.current.onHide?.(items);
       });
 
@@ -300,6 +326,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       // Add any items that were registered before Muuri initialized
       if (initialItems.length > 0 && !isCancelled) {
         muuriInstance.add(initialItems, { layout: false });
+        trace413('initial-added', identities413(muuriInstance.getItems()));
         // Update itemsMapRef with the Muuri items
         const muuriItems = muuriInstance.getItems();
         for (const [, registration] of itemsMapRef.current.entries()) {
@@ -314,6 +341,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
 
       if (!isCancelled) {
         isInitializedRef.current = true;
+        trace413('setGrid', identities413(muuriInstance.getItems()));
         setGrid(muuriInstance);
       }
     };
@@ -380,14 +408,25 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
   const unregisterItem = useCallback(
     (key: string): void => {
       const registration = itemsMapRef.current.get(key);
+      trace413(
+        'unregister',
+        key,
+        !!grid,
+        !!registration?.item,
+        isInitializedRef.current,
+        grid ? identities413(grid.getItems()) : null
+      );
       if (registration) {
         if (registration.item && grid) {
           const itemToRemove = registration.item;
           // Hide the item instantly (no animation since React is unmounting)
+          trace413('before-hide', identities413([itemToRemove]));
           grid.hide([itemToRemove], { instant: true });
+          trace413('after-hide', identities413([itemToRemove]));
           // Remove the item from Muuri's tracking and trigger layout
           // so remaining items reposition to fill the gap
           grid.remove([itemToRemove], { removeElements: false, layout: true });
+          trace413('after-remove', identities413(grid.getItems()));
         } else {
           // Remove from pending if not yet added
           const index = pendingItemsRef.current.indexOf(registration.element);

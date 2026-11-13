@@ -199,7 +199,7 @@ export function locallyBlocked(blockers: readonly number[], jobs: readonly Statu
 }
 
 export function planningInputIdentity(input: PlanningInput) {
-  return JSON.stringify(comparable(input));
+  return JSON.stringify(comparable(boundedInput(input)));
 }
 
 function boundedInput(input: PlanningInput): PlanningInput {

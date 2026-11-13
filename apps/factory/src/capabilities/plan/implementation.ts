@@ -114,7 +114,26 @@ export const PlanLive = Layer.effect(
           pending = true;
           return yield* Effect.gen(function* () {
             if (attempt) yield* attempt.progress('discovery');
-            const input = yield* source.read();
+            const observed = yield* source.read();
+            const input = boundedInput(observed);
+            if (!input.maximumSelections || input.paused)
+              return {
+                kind: 'preview' as const,
+                selected: [],
+                rejected: input.issues.map((issue) => ({
+                  issue: issue.number,
+                  reason:
+                    exclusion(issue) ??
+                    (knownJobs(input).some(
+                      (job) => job.kind === 'job' && job.intent.issue === issue.number
+                    )
+                      ? 'Already active or parked'
+                      : input.admissions?.includes(issue.number)
+                        ? 'Already admitted'
+                        : 'No available selection capacity'),
+                })),
+                input,
+              };
             if (attempt) yield* attempt.progress('handoff');
             const proposal = yield* planner.propose(input, {
               requestId: attempt?.requestId,
@@ -129,7 +148,7 @@ export const PlanLive = Layer.effect(
                 ? ownership.requestId
                 : undefined;
             if (attempt) yield* attempt.progress('freshness');
-            const current = yield* source.read();
+            const current = boundedInput(yield* source.read());
             if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
               return {
                 kind: 'stale' as const,
@@ -181,4 +200,22 @@ export function locallyBlocked(blockers: readonly number[], jobs: readonly Statu
 
 export function planningInputIdentity(input: PlanningInput) {
   return JSON.stringify(comparable(input));
+}
+
+function boundedInput(input: PlanningInput): PlanningInput {
+  const candidates = input.issues.filter(
+    (issue) =>
+      !exclusion(issue) &&
+      !input.admissions?.includes(issue.number) &&
+      !knownJobs(input).some((job) => job.kind === 'job' && job.intent.issue === issue.number)
+  ).length;
+  const bounded = (value: number) => (value === -1 ? candidates : Math.max(0, value));
+  return {
+    ...input,
+    maximumSelections: Math.min(
+      candidates,
+      input.maximumSelections ??
+        Math.min(bounded(input.capacity.concurrency), bounded(input.capacity.admission))
+    ),
+  };
 }

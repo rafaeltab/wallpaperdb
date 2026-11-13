@@ -638,7 +638,109 @@ export async function runProtocol(
           }))
         );
       } else if (args[0] === 'api' && args[1] === 'graphql') {
-        if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
+        const query = args.join(' ');
+        const projectIssue = (n: number) => {
+          const item =
+            config.planning.issues.find((i: { number: number }) => i.number === n) ??
+            config.planning.context;
+          if (!item) return null;
+          const conn = (nodes: unknown[]) => ({ nodes, pageInfo: { hasNextPage: false } });
+          return {
+            ...item,
+            parent:
+              config.planning.foreignParent ??
+              (config.planning.parent
+                ? {
+                    number: config.planning.parent,
+                    url: `https://github.com/rafaeltab/wallpaperdb/issues/${config.planning.parent}`,
+                  }
+                : (item.parent ?? null)),
+            labels: conn(item.labels),
+            assignees: conn([]),
+            comments: { totalCount: item.comments.length },
+            projectItems: {
+              ...conn(config.planning.projectItems ?? []),
+              pageInfo: { hasNextPage: config.planning.incompleteMetadata ?? false },
+            },
+            blockedBy: conn(
+              (config.planning.blockers ?? []).map((b: { number: number; html_url?: string }) => ({
+                number: b.number,
+                url: b.html_url ?? `https://github.com/rafaeltab/wallpaperdb/issues/${b.number}`,
+              }))
+            ),
+            closedByPullRequestsReferences: conn(config.planning.nativePulls?.[n] ?? []),
+            timelineItems: conn([]),
+          };
+        };
+        const allPulls = [
+          ...(config.planning.openPulls ?? []),
+          ...Object.values(config.planning.nativePulls ?? {}).flat(),
+          ...(config.planning.openPullPages ?? []).flatMap(
+            (p: { data: { repository: { pullRequests: { nodes: unknown[] } } } }) =>
+              p.data.repository.pullRequests.nodes
+          ),
+        ];
+        if (query.includes('projectV2(number:7)')) {
+          const refs = [
+            ...config.planning.issues.map(
+              (i: { number: number; url: string; state: string; updatedAt?: string }) => ({
+                ...i,
+                __typename: 'Issue',
+              })
+            ),
+            ...allPulls,
+          ];
+          const unique = new Map(
+            refs.map((i: { number: number; __typename: string }) => [
+              `${i.__typename}/${i.number}`,
+              i,
+            ])
+          );
+          const pages = config.planning.openPullPages;
+          reply([
+            {
+              data: {
+                user: {
+                  projectV2: {
+                    id: 'P7',
+                    items: {
+                      nodes: [...unique.values()].map(
+                        (value: { number: number; __typename: string; updatedAt?: string }) => {
+                          return {
+                            id: `${value.__typename}/${value.number}`,
+                            updatedAt: value.updatedAt ?? '2026-11-13T00:00:00Z',
+                            isArchived: false,
+                            content: {
+                              ...value,
+                              updatedAt: value.updatedAt ?? '2026-11-13T00:00:00Z',
+                            },
+                          };
+                        }
+                      ),
+                      pageInfo: {
+                        hasNextPage:
+                          pages?.at(-1)?.data.repository.pullRequests.pageInfo.hasNextPage ?? false,
+                        endCursor: null,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ]);
+        } else if (/[ip]\d+:(?:issue|pullRequest)\(number:/.test(query)) {
+          const values: Record<string, unknown> = {};
+          for (const match of query.matchAll(/([ip]\d+):(issue|pullRequest)\(number:(\d+)\)/g)) {
+            const n = Number(match[3]);
+            values[match[1]] =
+              match[2] === 'issue'
+                ? projectIssue(n)
+                : (config.planning.hydratedPulls?.[n] ??
+                  allPulls.find((p: { number: number }) => p.number === n) ??
+                  null);
+          }
+          reply({ data: { repository: values } });
+        } else if (args.join(' ').includes('pullRequests(first:100,states:OPEN'))
           reply(
             config.planning.openPullPages ?? [
               {

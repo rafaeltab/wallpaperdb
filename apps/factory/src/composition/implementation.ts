@@ -349,7 +349,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
                   };
                 });
             }),
-            metadataGithub
+            metadataGithub,
+            { directory: configuration.FACTORY_STATE }
           )
         )
       )

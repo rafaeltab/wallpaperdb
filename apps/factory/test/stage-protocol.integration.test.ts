@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Execution } from '../src/adapters/t3/index.js';
+import { fileStore } from '../src/adapters/store/index.js';
+import { initializeState } from '../src/platform/index.js';
 import type { Intent, StageRequest } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
 type Fixture = {
@@ -108,6 +110,15 @@ it('reconciles retained review stage 11 from its original prompt after notificat
       ordinal: 12,
       previousRunId: 'implementation-result',
     };
+    const directory = join(host.directory, 'legacy-review');
+    await mkdir(directory);
+    await writeFile(join(directory, 'stage-11.json'), JSON.stringify(retained));
+    const originalAssociation = JSON.stringify({ ...retained, runId: 'run-12' });
+    await writeFile(join(directory, 'stage-11-run.json'), originalAssociation);
+    initializeState(directory);
+    const store = fileStore(directory);
+    const restored = await Effect.runPromise(store.readStage(11));
+    if (!restored) throw new Error('Missing retained review');
     const prompt = `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job 1; expected run ordinal 12; predecessor run implementation-result; reviewed starting commit ${host.base}.`;
     const receipt = {
       jobId: '1',
@@ -138,10 +149,34 @@ it('reconciles retained review stage 11 from its original prompt after notificat
       project: host.repository,
       projectId: 'project-id',
     });
-    expect(await Effect.runPromise(reopened.inspectStage(intent, retained))).toMatchObject({
+    const evidence = await Effect.runPromise(reopened.inspectStage(intent, restored));
+    expect(evidence).toMatchObject({
       accepted: true,
       stageIndex: 11,
     });
+    if (!evidence) throw new Error('Missing review evidence');
+    expect(await Effect.runPromise(store.bindRun(restored, evidence.runId, evidence.ordinal))).toBe(
+      true
+    );
+    expect(await Effect.runPromise(fileStore(directory).bindRun(restored, evidence.runId, 1))).toBe(
+      true
+    );
+    expect(await readFile(join(directory, 'stage-11-run.json'), 'utf8')).toBe(originalAssociation);
+    expect(await Effect.runPromise(fileStore(directory).readStage(11))).toEqual(retained);
+    if (process.env.FACTORY_RECEIPT_DEMO === '1')
+      process.stdout.write(
+        JSON.stringify({
+          scenario: 'Retained review across notification wakes and restart',
+          stage: restored.index,
+          legacyOrdinal: restored.ordinal,
+          observedOrdinal: evidence.ordinal,
+          accepted: evidence.accepted,
+          receiptStage: evidence.stageIndex,
+          originalAssociationPreserved: true,
+          newDeliveries: (await host.calls()).filter((call) => call.args[1] === 'send').length,
+          protocols: 'isolated controlled T3 and production Git/SQLite adapters',
+        }) + '\n'
+      );
     for (const messages of [
       [response],
       [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],

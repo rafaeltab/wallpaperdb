@@ -129,16 +129,46 @@ export async function registerCreationHttp<E>(
   };
   app.get('/wallpapers', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
+    const parsed = z
+      .object({
+        cursor: z
+          .string()
+          .max(160)
+          .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z~[A-Za-z0-9_-]{1,128}$/)
+          .refine((value) => {
+            const date = value.split('~')[0];
+            return (
+              date !== undefined &&
+              Number.isFinite(Date.parse(date)) &&
+              new Date(date).toISOString() === date
+            );
+          })
+          .optional(),
+      })
+      .strict()
+      .safeParse(request.query);
+    if (!parsed.success)
+      return reply.code(400).type('application/problem+json').send(problem(400, 'invalid-request'));
+    const [createdAt, id] = parsed.data.cursor?.split('~') ?? [];
+    const before = createdAt && id ? { createdAt, id } : undefined;
     const result = await runtime.runPromise(
       Effect.gen(function* () {
         const auth = yield* CreatorAuthentication;
         const owner = yield* auth.verify(request.headers.authorization);
         if (!owner) return { kind: 'unauthorized' as const };
         const c = yield* Creation;
-        return { kind: 'list' as const, wallpapers: yield* c.list(owner) };
+        return { kind: 'list' as const, wallpapers: yield* c.list(owner, before) };
       }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const })))
     );
-    if (result.kind === 'list') return { wallpapers: result.wallpapers.map(publicWallpaper) };
+    if (result.kind === 'list') {
+      const last = result.wallpapers.at(-1);
+      return {
+        wallpapers: result.wallpapers.map(publicWallpaper),
+        ...(result.wallpapers.length === 100 && last
+          ? { nextCursor: `${last.createdAt}~${last.id}` }
+          : {}),
+      };
+    }
     const status = result.kind === 'unauthorized' ? 401 : 503;
     return reply
       .code(status)

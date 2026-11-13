@@ -144,3 +144,61 @@ it('reports infrastructure failure safely as retryable unavailability', async ()
     await app.close();
   }
 });
+
+it('translates bounded list continuations using the verified owner and rejects malformed cursors', async () => {
+  const owner = { namespace: 'authors', subject: 'creator' };
+  const calls: unknown[] = [];
+  const wallpaper = {
+    id: 'wlp_last',
+    owner,
+    key: 'private',
+    commandId: 'private',
+    creationEventId: 'private',
+    createdAt: '2026-10-22T00:00:00.000Z',
+    state: 'awaiting-source' as const,
+    assetId: 'asset',
+    intent: null,
+    sourceId: null,
+    initialAnalysisSourceId: null,
+  };
+  const app = Fastify();
+  await registerCreationHttp(
+    app,
+    Layer.mergeAll(
+      Layer.succeed(CreatorAuthentication, { verify: () => Effect.succeed(owner) }),
+      Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) }),
+      Layer.succeed(Creation, {
+        list: (principal, before) => {
+          calls.push({ principal, before });
+          return Effect.succeed(
+            before ? [wallpaper] : Array.from({ length: 100 }, () => wallpaper)
+          );
+        },
+        begin: () => Effect.succeed({ kind: 'unavailable' }),
+        get: () => Effect.succeed({ kind: 'unavailable' }),
+        expectSource: () => Effect.succeed({ kind: 'unavailable' }),
+        assetResult: () => Effect.succeed('ignored'),
+        sourceAccepted: () => Effect.succeed('ignored'),
+      })
+    )
+  );
+  try {
+    const first = await app.inject({ url: '/wallpapers' });
+    const cursor = '2026-10-22T00:00:00.000Z~wlp_last';
+    expect(first.json().nextCursor).toBe(cursor);
+    const second = await app.inject({ url: `/wallpapers?cursor=${encodeURIComponent(cursor)}` });
+    expect(second.json().wallpapers).toHaveLength(1);
+    expect(second.json().nextCursor).toBeUndefined();
+    expect(calls).toEqual([
+      { principal: owner, before: undefined },
+      { principal: owner, before: { createdAt: wallpaper.createdAt, id: wallpaper.id } },
+    ]);
+    for (const invalid of ['bad', 'x'.repeat(300), '2026-99-99T00:00:00.000Z~wlp_last'])
+      expect(
+        (await app.inject({ url: `/wallpapers?cursor=${encodeURIComponent(invalid)}` })).statusCode
+      ).toBe(400);
+    expect(calls).toHaveLength(2);
+  } finally {
+    await app.close();
+  }
+});

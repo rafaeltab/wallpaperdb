@@ -33,7 +33,7 @@ vi.mock('@/lib/api/wallpaper', () => ({
   resumeWallpaperWithDetails: vi.fn(),
 }));
 vi.mock('@/features/wallpaper-creation/adapters/http', () => ({
-  recentCreations: vi.fn(async () => []),
+  recentCreations: vi.fn(async () => ({ wallpapers: [] })),
   downloadOriginal: vi.fn(),
 }));
 
@@ -146,9 +146,9 @@ it('replaces saved-creation feedback on account changes without resetting the pu
     sourceId: null,
     createdAt: '2026-10-23T00:00:00Z',
   };
-  vi.mocked(recentCreations).mockImplementation(async () =>
-    session.userId === 'resume-owner-a' ? [receipt] : []
-  );
+  vi.mocked(recentCreations).mockImplementation(async () => ({
+    wallpapers: session.userId === 'resume-owner-a' ? [receipt] : [],
+  }));
   const requests: { signal: AbortSignal | undefined; resolve: (result: UploadResult) => void }[] =
     [];
   vi.mocked(resumeWallpaperWithDetails).mockImplementation(

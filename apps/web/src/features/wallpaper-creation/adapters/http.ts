@@ -202,9 +202,27 @@ export function browserCreationApi(): CreationApi<File> {
       }),
   };
 }
-export async function recentCreations(signal?: AbortSignal): Promise<readonly WallpaperStatus[]> {
-  const value = object(await (await request(`${wallpaperUrl}/wallpapers`, { signal })).json());
-  if (!Array.isArray(value.wallpapers)) throw new Error('Invalid Wallpaper list');
+export async function recentCreations(
+  signal?: AbortSignal,
+  cursor?: string
+): Promise<{ readonly wallpapers: readonly WallpaperStatus[]; readonly nextCursor?: string }> {
+  const value = object(
+    await (
+      await request(
+        `${wallpaperUrl}/wallpapers${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+        { signal }
+      )
+    ).json()
+  );
+  if (
+    !Array.isArray(value.wallpapers) ||
+    value.wallpapers.length > 100 ||
+    (value.nextCursor !== undefined &&
+      (typeof value.nextCursor !== 'string' ||
+        value.nextCursor.length === 0 ||
+        value.nextCursor.length > 160))
+  )
+    throw new Error('Invalid Wallpaper list');
   const wallpapers = value.wallpapers.map(status);
   const result: WallpaperStatus[] = [];
   // Keep progress lookups bounded while Asset retains authority for candidate facts.
@@ -228,7 +246,10 @@ export async function recentCreations(signal?: AbortSignal): Promise<readonly Wa
       result.push({ ...wallpaper, candidateStatus: 'unavailable' });
     }
   }
-  return result;
+  return {
+    wallpapers: result,
+    ...(typeof value.nextCursor === 'string' ? { nextCursor: value.nextCursor } : {}),
+  };
 }
 export async function downloadOriginal(wallpaper: WallpaperStatus, signal: AbortSignal) {
   if (!wallpaper.assetId) return;

@@ -16,8 +16,15 @@ _Avoid_: Parent spec
 The ready issues whose prerequisites are satisfied and whose required code can be made available for execution. Membership does not reserve capacity or authorize a planner to bypass admission checks.
 
 **Plan proposal**:
-A planner's advisory selection and ordering of issues, including its dependency and conflict assessments. A proposal is not an admission or a promise that selected work will start.
+A planner's bounded selection of issues that can proceed together, with the required existing issue code identified for each. A proposal remains advisory until the factory accepts it for execution; previewing it does not create an admission.
 _Avoid_: Execution authorization
+
+**Included issue code**:
+Verified changes from an existing issue that a selected issue requires in its execution base. Inclusion identifies required code, not unfinished work to be scheduled.
+_Avoid_: Conflict, future prerequisite
+
+**Execution cycle**:
+The factory-owned process of gathering current information, planning a batch, preparing its execution bases and starting its implementers. Only one such cycle can own execution at a time.
 
 **Admission**:
 The durable reservation of a distinct issue for factory execution. Continuing, repairing or restacking that issue does not create another admission.

@@ -430,6 +430,12 @@ async function preflightBrowser() {
 	};
 	environment.PLAYWRIGHT_BASE_URL = baseUrl;
 	rememberSecrets(browserEnvironment);
+	await run("make", [
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		`ARGS=--authorized-origin http://wallpaperdb-http.test:${worktree.INGRESS_PORT}`,
+	]);
 	await run("docker", ["compose", "version"], { capture: true });
 	await run("docker", ["buildx", "version"], { capture: true });
 	// Compose can include values in parse errors. Load generated secrets before invoking it.

@@ -140,10 +140,15 @@ function fixture(t: TestContext): Fixture {
 			/* Red before implementation. */
 		}
 	}
-	for (const name of ["test-utils", "testcontainers", "web-e2e"] as const) {
+	for (const name of [
+		"test-utils",
+		"testcontainers",
+		"web-e2e",
+		"asset",
+	] as const) {
 		const directory = join(
 			root,
-			name === "web-e2e" ? "apps" : "packages",
+			name === "web-e2e" || name === "asset" ? "apps" : "packages",
 			name,
 		);
 		mkdirSync(directory, { recursive: true });
@@ -386,6 +391,17 @@ async function browserFixture(
 	ready: boolean | "hang" = true,
 ) {
 	const f = fixture(t);
+	writeFileSync(
+		join(f.root, "pnpm"),
+		`#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync('calls.jsonl', JSON.stringify(['pnpm', ...args]) + String.fromCharCode(10));
+process.exit(Number(process.env.TEST_AUTHORITY_EXIT || 0));
+`,
+		{ mode: 0o700 },
+	);
+
 	const server = createServer((_req, res) => {
 		if (ready === "hang") return;
 		res.writeHead(ready ? 200 : 503);
@@ -1674,3 +1690,36 @@ for (const failure of ["none", "build", "browser"] as const) {
 		).toBeTruthy();
 	});
 }
+
+test("browser setup provisions its exact HTTP origin before building the stack", async (t) => {
+	const f = await browserFixture(t);
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	expect(result.status, result.stderr).toBe(0);
+	const calls = f.calls();
+	const provision = calls.findIndex(
+		(call) => call[0] === "pnpm" && call.includes("dev:configure"),
+	);
+	const build = calls.findIndex(
+		(call) =>
+			call.includes("build") && call.includes("infra/docker-compose.apps.yml"),
+	);
+	expect(provision >= 0 && build > provision).toBeTruthy();
+	expect(calls[provision]).toContain("--authorized-origin");
+	const ingressPort = /^INGRESS_PORT=(\d+)/m.exec(
+		readFileSync(join(f.root, ".worktree"), "utf8"),
+	)?.[1];
+	expect(calls[provision]).toContain(
+		`http://wallpaperdb-http.test:${ingressPort}`,
+	);
+});
+
+test("failed origin provisioning stops before building or starting the stack", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_AUTHORITY_EXIT = "42";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	expect(result.status, result.stderr).not.toBe(0);
+	expect(result.stderr).toMatch(/Error 42/);
+	expect(
+		f.calls().some((call) => call.includes("build") || call.includes("up")),
+	).toBe(false);
+});

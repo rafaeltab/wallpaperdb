@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: make install
 
+      - name: Configure the non-secure browser test origin
+        run: make run PACKAGE=asset SCRIPT=dev:configure ARGS='--authorized-origin http://wallpaperdb-http.test:$(INGRESS_PORT)'
+
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'
         uses: vercel/setup-turborepo-remote-cache-action@v1.1.0

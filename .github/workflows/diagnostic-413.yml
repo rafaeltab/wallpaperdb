@@ -1,0 +1,55 @@
+name: Diagnostic 413 removal lifecycle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/diagnostic-413.yml'
+      - 'packages/react-muuri/**'
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    name: Diagnostic 413 (${{ matrix.observation }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        observation: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+      - run: make toolchain
+      - run: make install
+      - name: Prepare dependency outputs before experiments
+        run: make build PACKAGE=vitest-config
+      - name: Record tested revision and scheduling
+        run: |
+          git rev-parse HEAD
+          nproc
+          cat packages/react-muuri/vitest.config.ts
+          cat packages/vitest-config/src/defaults.ts
+      - name: Execute representative full unit workload without test-result cache
+        run: |
+          mkdir -p diagnostic-413
+          set -o pipefail
+          make test-unit PACKAGE=react-muuri TURBO_FLAGS='--filter=@wallpaperdb/react-muuri --force -- --silent=false' 2>&1 | tee diagnostic-413/full-unit.log
+      - name: Ten bounded fresh full-file observations, no test retries
+        run: |
+          set -o pipefail
+          for observation in $(seq 1 10); do
+            echo "Full-file observation $observation of 10"
+            make run PACKAGE=react-muuri SCRIPT=test:unit ARGS="test/integration/dynamic-items.test.tsx --silent=false --reporter=default --reporter=json --outputFile=$GITHUB_WORKSPACE/diagnostic-413/file-$observation.json" 2>&1 | tee "diagnostic-413/file-$observation.log"
+          done
+      - name: Preserve lifecycle traces and actual test counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-413-${{ matrix.observation }}
+          path: diagnostic-413/
+          if-no-files-found: warn

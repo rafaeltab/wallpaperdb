@@ -85,12 +85,13 @@ export const JobLive = Layer.effect(
         if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
         const evidence = yield* resumeEvidence(execution, activeIntent, waiting, observed);
         if (!evidence) return { kind: 'rejected' as const };
-        const request = {
+        const request: import('./contract.js').StageRequest = {
           ...waiting,
           index: waiting.index + 1,
           ordinal: evidence.ordinal + 1,
           previousRunId: evidence.runId,
           resume: true,
+          receiptProtocol: 'delivery-v1',
           observedRunId: undefined,
           question: undefined,
           deliveryIndex: undefined,
@@ -194,6 +195,7 @@ export const JobLive = Layer.effect(
             issueTitle: issue.title,
             branch: `factory/job-${id}`,
             expectedStage: 'implementation',
+            receiptProtocol: 'delivery-v1',
           };
           if (!(yield* store.reserve(intent))) return { kind: 'occupied' as const };
           if (yield* store.claimLaunch()) yield* execution.launch(intent);

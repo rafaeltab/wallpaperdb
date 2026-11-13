@@ -3362,11 +3362,7 @@ function correctionEvidenceValid(authority: RepairAuthority, head: string, commi
 }
 function correctionRunValid(authority: RepairAuthority) {
   const { request, evidence } = authority;
-  return (
-    evidence.runId !== request.previousRunId &&
-    evidence.ordinal === (request.ordinal ?? request.index + 1) &&
-    evidence.stageIndex === request.index
-  );
+  return evidence.stageIndex === request.index;
 }
 function correctionComparisonValid(request: StageRequest, item: Intent['replay'][number]) {
   if (request.comparison?.base !== item.onto || request.comparison.prBase !== item.target)
@@ -3452,9 +3448,7 @@ function reviewedRetryEvidence({ request, evidence }: RepairAuthority) {
     !evidence.accepted &&
     evidence.worktreeClean === true &&
     evidence.commit === request.commit &&
-    evidence.ordinal === (request.ordinal ?? request.index + 1) &&
-    evidence.runId !== request.previousRunId &&
-    (evidence.stageIndex === undefined || evidence.stageIndex === request.index)
+    evidence.stageIndex === request.index
   );
 }
 

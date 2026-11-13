@@ -81,6 +81,7 @@ export function retryStage(
       ordinal: (waiting.ordinal ?? waiting.index + 1) + 1,
       previousRunId: command.runId,
       resume: true,
+      receiptProtocol: 'delivery-v1',
       observedRunId: undefined,
       question: undefined,
       deliveryIndex: undefined,
@@ -119,12 +120,7 @@ function matchingEvidence(
   stage: StageRequest,
   run: { id: string; ordinal: number }
 ): evidence is StageEvidence {
-  return (
-    evidence !== null &&
-    evidence.runId === run.id &&
-    evidence.ordinal === run.ordinal &&
-    evidence.ordinal === (stage.ordinal ?? stage.index + 1)
-  );
+  return evidence !== null && evidence.runId === run.id && evidence.stageIndex === stage.index;
 }
 
 function retryWorktree(stage: StageRequest, evidence: StageEvidence) {

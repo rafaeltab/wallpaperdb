@@ -107,7 +107,7 @@ it('imports complete execution and publication journals without changing identit
     expect(await Effect.runPromise(store.claimLaunch())).toBe(false);
     expect(await Effect.runPromise(store.claimStage(0))).toBe(false);
     expect(await Effect.runPromise(store.bindRun(stage, 'retained-run'))).toBe(true);
-    expect(await Effect.runPromise(store.bindRun(stage, 'different-run'))).toBe(false);
+    expect(await Effect.runPromise(store.bindRun(stage, 'different-run'))).toBe(true);
     for (const [name, value] of Object.entries(snapshot)) {
       expect(await readFile(join(root, name), 'utf8')).toBe(originals.get(name));
       if (name !== 'format.json') {

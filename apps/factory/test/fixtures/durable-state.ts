@@ -23,7 +23,7 @@ function isRecord(path: string) {
   if (['joins', 'planner'].includes(basename(root))) return true;
   return (
     /^(?:joins|planner|issue-[1-9]\d*)\//.test(key) ||
-    /^(?:intent|launch-claimed|stage-\d+(?:-claimed|-run(?:-\d+)?)?|(?:control|wait|schedule|planner)-\d+)\.json$/.test(
+    /^(?:intent|launch-claimed|stage-\d+(?:-claimed|-run(?:-[a-f0-9]+)?)?|(?:control|wait|schedule|planner)-\d+)\.json$/.test(
       key
     )
   );

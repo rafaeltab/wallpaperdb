@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { publisher, requiredRecord, acquireCycle } from '../../platform/index.js';
 import { Effect, Option } from 'effect';
 import { z } from 'zod';
@@ -61,13 +62,10 @@ export function fileStore(directory: string): JobStore {
         if (state.revision !== (current?.revision ?? -1) + 1) return false;
         return publish(`wait-${state.revision}.json`, waitSchema.parse(state));
       }),
-    bindRun: (request, runId, ordinal = request.ordinal ?? request.index + 1) =>
+    bindRun: (request, runId) =>
       effect('bind-run', async () => {
-        const initial = request.ordinal ?? request.index + 1;
-        const name =
-          ordinal === initial
-            ? `stage-${request.index}-run.json`
-            : `stage-${request.index}-run-${ordinal}.json`;
+        const key = createHash('sha256').update(runId).digest('hex');
+        const name = `stage-${request.index}-run-${key}.json`;
         await publish(name, { ...stageSchema.parse(request), runId });
         const saved = stageSchema
           .extend({ runId: z.string().min(1) })

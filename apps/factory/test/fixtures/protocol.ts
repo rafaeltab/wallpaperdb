@@ -300,6 +300,9 @@ export async function runProtocol(
               text:
                 config.restack.question ??
                 JSON.stringify({
+                  delivery: config.restack.wrongDelivery
+                    ? `${operation}:review`
+                    : `${operation}:resolve`,
                   operation: config.restack.stale ? 'stale' : operation,
                   commit: head,
                   outcome: config.restack.outcome
@@ -350,6 +353,7 @@ export async function runProtocol(
             role: 'assistant',
             runId: 'review-run',
             text: JSON.stringify({
+              delivery: `${state.operation}:review`,
               operation: state.operation,
               commit: state.head,
               outcome: config.restack.review ? '<REVIEW>COMPLETE</REVIEW>' : 'incomplete',
@@ -1055,7 +1059,7 @@ export async function runProtocol(
       );
       const resource = JSON.parse(readFileSync(path, 'utf8'));
       const index = Number(args[3].match(/Stage (\d+) of factory/)![1]);
-      resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
+      resource.runCount = resource.runCount + 1;
       resource.stageIndex = index;
       resource.stage = args[3].includes('$babysit-pr')
         ? 'babysitting'
@@ -1126,11 +1130,7 @@ export async function runProtocol(
                     role: 'assistant',
                     runId: resource.latestRunId,
                     text: JSON.stringify({
-                      ...(resource.stage === 'babysitting'
-                        ? {
-                            delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex}`,
-                          }
-                        : {}),
+                      delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex ?? 0}`,
                       jobId:
                         resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8),
                       stage: 'babysitting',
@@ -1139,8 +1139,8 @@ export async function runProtocol(
                     }),
                   },
                 ]
-              : (((config.holdPublication && resource?.runCount === 3) ||
-                (config.holdReview && resource?.runCount === 2)
+              : (((config.holdPublication && resource?.stage === 'publication') ||
+                (config.holdReview && resource?.stage === 'review')
                   ? []
                   : config.messages) ??
                 (config.complete && resource
@@ -1149,11 +1149,7 @@ export async function runProtocol(
                         role: 'assistant',
                         runId: resource.latestRunId,
                         text: JSON.stringify({
-                          ...(resource.stage === 'babysitting'
-                            ? {
-                                delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex}`,
-                              }
-                            : {}),
+                          delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex ?? 0}`,
                           jobId:
                             resource.title.match(/\[factory:(.*)\]$/)?.[1] ??
                             resource.title.slice(8),

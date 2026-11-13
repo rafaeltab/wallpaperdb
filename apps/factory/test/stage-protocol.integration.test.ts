@@ -13,6 +13,56 @@ type Fixture = {
   request: StageRequest;
   review: StageRequest;
 };
+it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
+  'accepts later-turn %s by delivery and rejects a different delivery regardless of turn',
+  (stage) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const current = { ...request, stage, index: 11, ordinal: 12 };
+      const receipt = {
+        delivery: '1:11',
+        jobId: '1',
+        stage,
+        base: host.base,
+        commit: host.base,
+        outcome: {
+          implementation: '<TASK>COMPLETE</TASK>',
+          review: '<REVIEW>COMPLETE</REVIEW>',
+          publication: '<PR>CREATED</PR>',
+          babysitting: '<PR>READY</PR>',
+        }[stage],
+        tests: true,
+        coverage: true,
+        crap: true,
+        reviews: stage !== 'implementation',
+      };
+      for (const runCount of [14, 1, 500]) {
+        await host.save({
+          overrides: { status: 'completed', runCount, latestRunId: 'notification-wake' },
+          messages: [
+            { role: 'assistant', runId: 'notification-wake', text: JSON.stringify(receipt) },
+            { role: 'system', text: 'Delegated reviewer completed in another turn.' },
+          ],
+        });
+        expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+          accepted: true,
+          stageIndex: 11,
+        });
+      }
+      await host.save({
+        overrides: { status: 'completed', runCount: 12, latestRunId: 'notification-wake' },
+        messages: [
+          {
+            role: 'assistant',
+            runId: 'notification-wake',
+            text: JSON.stringify({ ...receipt, delivery: '1:10' }),
+          },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        accepted: true,
+      });
+    })
+);
 async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
@@ -49,12 +99,85 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
     await host.cleanup();
   }
 }
+it('reconciles retained review stage 11 from its original prompt after notification wakes and restart', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const retained = {
+      ...request,
+      index: 11,
+      stage: 'review' as const,
+      ordinal: 12,
+      previousRunId: 'implementation-result',
+    };
+    const prompt = `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job 1; expected run ordinal 12; predecessor run implementation-result; reviewed starting commit ${host.base}.`;
+    const receipt = {
+      jobId: '1',
+      stage: 'review',
+      base: host.base,
+      commit: host.base,
+      outcome: '<REVIEW>COMPLETE</REVIEW>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    const response = { role: 'assistant', runId: 'run-14', text: JSON.stringify(receipt) };
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+      messages: [
+        { role: 'user', text: prompt },
+        { role: 'assistant', text: 'Independent reviewers completed.' },
+        response,
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, retained))).toMatchObject({
+      accepted: true,
+      stageIndex: 11,
+    });
+    const reopened = t3Execution({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    expect(await Effect.runPromise(reopened.inspectStage(intent, retained))).toMatchObject({
+      accepted: true,
+      stageIndex: 11,
+    });
+    for (const messages of [
+      [response],
+      [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],
+      [
+        { role: 'user', text: prompt },
+        { role: 'user', text: prompt.replace('Stage 11', 'Stage 13') },
+        response,
+      ],
+      [{ role: 'user', text: prompt.replace(intent.base, 'f'.repeat(40)) }, response],
+    ]) {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+        messages,
+      });
+      expect(await Effect.runPromise(reopened.inspectStage(intent, retained))).not.toMatchObject({
+        accepted: true,
+      });
+    }
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+      messages: [{ role: 'user', text: prompt }, response],
+    });
+    expect(
+      await Effect.runPromise(
+        reopened.inspectStage(intent, { ...retained, receiptProtocol: 'delivery-v1' })
+      )
+    ).not.toMatchObject({ accepted: true });
+    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+  }));
 it('accepts only a structured outcome of the expected completed run at the clean current commit', () =>
   stageFixture(async ({ host, adapter, intent, request, review }) => {
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
     const receipt = {
+      delivery: '1:0',
       jobId: '1',
       stage: 'implementation',
       base: host.base,
@@ -76,23 +199,31 @@ it('accepts only a structured outcome of the expected completed run at the clean
     });
     for (const message of [
       { ...valid, role: 'user' },
-      { ...valid, runId: 'old' },
       { ...valid, text: `> ${valid.text}` },
       { ...valid, text: '<TASK>COMPLETE</TASK>' },
       { ...valid, text: JSON.stringify({ ...receipt, tests: false }) },
       { ...valid, text: JSON.stringify({ ...receipt, base: 'a'.repeat(40) }) },
+      { ...valid, text: JSON.stringify({ ...receipt, jobId: 'another-job' }) },
+      { ...valid, text: JSON.stringify({ ...receipt, outcome: '<PR>CREATED</PR>' }) },
+      { ...valid, text: JSON.stringify({ ...receipt, coverage: false }) },
+      { ...valid, text: JSON.stringify({ ...receipt, crap: false }) },
+      { ...valid, text: JSON.stringify({ ...receipt, unexpected: true }) },
     ]) {
       await host.save({ overrides: finished, messages: [message] });
       expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
         accepted: true,
       });
     }
-    await host.save({ overrides: { ...finished, runCount: 2 }, messages: [valid] });
+    await host.save({
+      overrides: { ...finished, runCount: 2 },
+      messages: [{ ...valid, text: JSON.stringify({ ...receipt, delivery: '1:99' }) }],
+    });
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
     const reviewReceipt = {
       ...receipt,
+      delivery: '1:1',
       stage: 'review',
       outcome: '<REVIEW>COMPLETE</REVIEW>',
       reviews: false,
@@ -208,7 +339,6 @@ it('recognizes only the current expected assistant waiting receipt, without acce
     });
     for (const invalid of [
       { ...message, role: 'user' },
-      { ...message, runId: 'old' },
       { ...message, text: `> ${message.text}` },
       { ...message, text: '<PR>READY</PR>' },
     ]) {
@@ -382,13 +512,14 @@ it('retries a failed implementation with its existing thread, ordinal, scope and
     expect(sends[0].args).toContain('thread-live');
     expect(sends[0].args).toContain(`${intent.id}:stage:1`);
     expect(sends[0].args[3]).toContain('Use $implement');
-    expect(sends[0].args[3]).toContain('expected run ordinal 2');
+    expect(sends[0].args[3]).toContain('delivery 1:1');
     expect(sends[0].args[3]).toContain(intent.issueUrl);
     await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
       _tag: 'Unavailable',
       operation: 'stage-binding-changed',
     });
     const receipt = {
+      delivery: '1:1',
       jobId: intent.id,
       stage: 'implementation',
       base: intent.base,
@@ -410,7 +541,13 @@ it('retries a failed implementation with its existing thread, ordinal, scope and
     });
     await host.save({
       overrides: { status: 'completed' },
-      messages: [{ role: 'assistant', runId: 'run-1', text: JSON.stringify(receipt) }],
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: JSON.stringify({ ...receipt, delivery: '1:0' }),
+        },
+      ],
     });
     expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
       accepted: false,
@@ -442,7 +579,7 @@ it.each(['publication', 'babysitting'] as const)(
       };
       await host.save({
         idempotency: true,
-        overrides: { status: 'failed', runCount: 99, latestRunId: `run-${ordinal}` },
+        overrides: { status: 'failed', runCount: 99, latestRunId: `wrong-predecessor` },
       });
       await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
         _tag: 'Unavailable',
@@ -463,7 +600,7 @@ it.each(['publication', 'babysitting'] as const)(
           : 'without starting another watcher'
       );
       const receipt = {
-        ...(stage === 'babysitting' ? { delivery: `${intent.id}:${index + 1}` } : {}),
+        delivery: `${intent.id}:${index + 1}`,
         jobId: intent.id,
         stage,
         base: intent.base,
@@ -475,15 +612,15 @@ it.each(['publication', 'babysitting'] as const)(
         reviews: true,
       };
       await host.save({
-        overrides: { status: 'completed' },
+        overrides: { status: 'completed', runCount: 99, latestRunId: 'later-turn' },
         messages: [
           { role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(receipt) },
         ],
       });
       expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
         accepted: true,
-        ordinal: ordinal + 1,
-        runId: `run-${ordinal + 1}`,
+        ordinal: 99,
+        runId: 'later-turn',
       });
       const stale =
         stage === 'babysitting'

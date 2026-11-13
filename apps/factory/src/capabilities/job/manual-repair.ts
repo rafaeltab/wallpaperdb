@@ -79,7 +79,7 @@ export function adoptManualRepair(
         : stage.observedRunId && stage.ordinal
           ? { id: stage.observedRunId, ordinal: stage.ordinal }
           : undefined;
-    if (!previous || run.id === previous.id || run.ordinal <= previous.ordinal) return undefined;
+    if (!previous || run.id === previous.id) return undefined;
     const request: StageRequest = {
       ...stage,
       index: stage.index + 1,
@@ -105,7 +105,6 @@ export function adoptManualRepair(
     const saved = yield* store.readStage(request.index);
     return saved?.stage === request.stage &&
       saved.threadId === request.threadId &&
-      saved.ordinal === run.ordinal &&
       saved.observedRunId === run.id &&
       saved.repairOrigin === origin.index
       ? saved

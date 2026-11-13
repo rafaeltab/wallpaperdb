@@ -47,8 +47,7 @@ export function restartAction(
       !evidence ||
       evidence.accepted ||
       evidence.runId !== observed.run.id ||
-      evidence.ordinal !== observed.run.ordinal ||
-      evidence.ordinal !== (stage.ordinal ?? stage.index + 1)
+      evidence.stageIndex !== stage.index
     )
       return undefined;
     if (!(yield* associateStage(store, evidence, stage))) return undefined;

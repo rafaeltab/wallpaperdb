@@ -110,7 +110,7 @@ it('reattaches a durable planner run after process death without launching anoth
           },
         ],
       },
-      planner: { proposal: { selected: [], deferred: [] } },
+      planner: { runId: 'post-restart-continuation', proposal: { selected: [], deferred: [] } },
     });
     await vi.waitFor(
       async () => {

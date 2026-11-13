@@ -80,12 +80,13 @@ function setup(lostSend = true, immediate = false) {
                         run: { id: 'run-1', ordinal: 1 },
                         ...observations.get(number),
                       })),
-                    inspectStage: () =>
+                    inspectStage: (_intent, request) =>
                       Effect.sync(() => {
                         const run = observations.get(number)?.run ?? { id: 'run-1', ordinal: 1 };
                         return {
                           runId: run.id,
                           ordinal: run.ordinal,
+                          stageIndex: request.index,
                           commit: base,
                           accepted: false,
                         };

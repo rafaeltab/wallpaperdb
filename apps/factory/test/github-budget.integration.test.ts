@@ -414,18 +414,43 @@ it('accounts for explicit GraphQL costs on every page across metadata and issue 
             comments: [],
           },
         ],
-        openPullPages: [
+        projectPages: [
           {
             data: {
-              repository: {
-                pullRequests: { nodes: [], pageInfo: { hasNextPage: true, endCursor: 'next' } },
+              user: {
+                projectV2: {
+                  id: 'P7',
+                  items: {
+                    nodes: [
+                      {
+                        id: 'I577',
+                        updatedAt: '2026-11-13T00:00:00Z',
+                        isArchived: false,
+                        content: {
+                          __typename: 'Issue',
+                          number: 577,
+                          state: 'OPEN',
+                          url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
+                          updatedAt: '2026-11-13T00:00:00Z',
+                        },
+                      },
+                    ],
+                    pageInfo: { hasNextPage: true, endCursor: 'next' },
+                  },
+                },
               },
             },
           },
           {
             data: {
-              repository: {
-                pullRequests: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+              user: {
+                projectV2: {
+                  id: 'P7',
+                  items: {
+                    nodes: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                  },
+                },
               },
             },
           },
@@ -438,16 +463,28 @@ it('accounts for explicit GraphQL costs on every page across metadata and issue 
       signal: stop.signal,
       clock,
     });
+    let previousPaginated = false;
+    let waitAfterPages: number | undefined;
+    const metadata = async (args: string[], signal?: AbortSignal) => {
+      const before = clock.now();
+      const value = await requests(args, signal);
+      if (previousPaginated) waitAfterPages = clock.now() - before;
+      previousPaginated = args.includes('--paginate');
+      return value;
+    };
     const source = githubObservations(
       host.repository,
       () => Effect.succeed([]),
       undefined,
-      requests
+      metadata
     );
     expect(await Effect.runPromise(source.read())).toMatchObject({
       issues: [{ number: 577 }],
       pullRequests: [],
     });
+    // The two index pages each cost three points. The next operation must
+    // wait for all six, irrespective of later metadata hydration calls.
+    expect(waitAfterPages).toBeGreaterThanOrEqual(6000);
     const afterMetadata = clock.now() - startedAt;
     expect(afterMetadata).toBeGreaterThanOrEqual(3000);
     const issues = githubIssues(
@@ -455,7 +492,7 @@ it('accounts for explicit GraphQL costs on every page across metadata and issue 
       requests
     );
     expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
-    expect(clock.now() - startedAt - afterMetadata).toBeGreaterThanOrEqual(6000);
+    expect(clock.now() - startedAt - afterMetadata).toBeGreaterThanOrEqual(3000);
   }));
 
 it('waits through primary exhaustion and obtains usable quota after the reset', async () =>
@@ -684,7 +721,7 @@ it('serves admitted-work observations before already queued background collectio
     const indexes = received.flatMap((call, index) =>
       call.args[0] === 'api' &&
       call.args[1] === 'graphql' &&
-      call.args.some((a: string) => a.includes('issues('))
+      call.args.some((a: string) => a.includes('projectV2(number:7)'))
         ? [index]
         : []
     );

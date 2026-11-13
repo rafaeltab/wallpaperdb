@@ -681,6 +681,10 @@ export async function runProtocol(
           ),
         ];
         if (query.includes('projectV2(number:7)')) {
+          if (config.planning.projectPages) {
+            reply(config.planning.projectPages);
+            return 0;
+          }
           const refs = [
             ...config.planning.issues.map(
               (i: { number: number; url: string; state: string; updatedAt?: string }) => ({

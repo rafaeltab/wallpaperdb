@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
@@ -9,8 +8,7 @@ import { protocol } from './fixtures/setup.js';
 it('admits an automatic proposal after discovery outlasts the model time allowance', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -107,8 +105,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
 it('keeps discovery and freshness outside the bound model deadline across restart', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;

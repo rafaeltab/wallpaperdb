@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { runProtocol } from './protocol.js';
 import { stripTypeScriptTypes } from 'node:module';
-export async function protocol() {
+export async function protocol(options: { origin?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
   execFileSync('git', ['init', '--initial-branch=main', repository]);
@@ -23,6 +23,8 @@ export async function protocol() {
   const base = execFileSync('git', ['-C', repository, 'rev-parse', 'HEAD'], {
     encoding: 'utf8',
   }).trim();
+  if (options.origin)
+    execFileSync('git', ['-C', repository, 'remote', 'add', 'origin', repository]);
   const configFile = join(directory, 'config.json');
   const authorizationFile = join(directory, 'mcp-authorization');
   await writeFile(authorizationFile, 'Bearer controlled-fixture', { mode: 0o600 });

@@ -23,8 +23,7 @@ async function composed(
   options: object = {},
   initialControl?: { paused: boolean }
 ) {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;

@@ -88,6 +88,8 @@ export interface IPlanner {
     reconcile?: boolean,
     requestId?: string
   ): Effect.Effect<PlannerOwnership | undefined, Unavailable>;
+  /** A stale result retires the previous bound run conclusively before allowing a
+   * fresh request; it never launches a replacement model within this call. */
   propose(
     input: PlanningInput,
     attempt?: {
@@ -96,7 +98,7 @@ export interface IPlanner {
       automatic?: boolean;
       attemptStartedAt?: number;
     }
-  ): Effect.Effect<Proposal | { readonly kind: 'paused' }, Unavailable>;
+  ): Effect.Effect<Proposal | { readonly kind: 'paused' | 'stale' }, Unavailable>;
 }
 export const IPlanner = Context.Service<IPlanner>('wallpaperdb.factory.IPlanner');
 export interface Preview {

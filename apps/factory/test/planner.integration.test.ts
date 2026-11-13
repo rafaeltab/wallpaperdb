@@ -563,7 +563,7 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
     await expect(
       Effect.runPromise(t3Planner(config).propose({ ...input, paused: true }, attempt))
-    ).rejects.toMatchObject({ _tag: 'Unavailable' });
+    ).resolves.toEqual({ kind: 'stale' });
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
@@ -841,6 +841,68 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
       .read();
     expect((record?.deadline ?? 0) - Date.now()).toBeGreaterThan(590000);
   } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('keeps changed automatic inputs bound until the prior exact run is conclusively retired', async () => {
+  const { vi } = await import('vitest');
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const controller = new AbortController();
+  let pending: Promise<unknown> | undefined;
+  try {
+    const configuration = {
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      ...host.mcp,
+      stateDirectory: `${host.directory}/planner-state`,
+    };
+    const input = {
+      issues: [],
+      job: { kind: 'empty' as const },
+      capacity: { concurrency: 1, admission: 2 },
+    };
+    const attempt = { requestId: 'retained-automatic-request', automatic: true };
+    const proposal = { selected: [], deferred: [] };
+    await host.save({ planner: { status: 'running', proposal } });
+    pending = Effect.runPromise(t3Planner(configuration).propose(input, attempt), {
+      signal: controller.signal,
+    }).catch(() => undefined);
+    await vi.waitFor(
+      async () => expect((await host.calls()).some((call) => call.args[1] === 'show')).toBe(true),
+      { timeout: 5000, interval: 20 }
+    );
+    controller.abort();
+    await pending;
+    const reopened = t3Planner(configuration);
+    const changed = { ...input, capacity: { concurrency: 1, admission: 3 } };
+    await expect(Effect.runPromise(reopened.propose(changed, attempt))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    const retained = await Effect.runPromise(reopened.ownership(false, attempt.requestId));
+    expect(retained).toMatchObject({ run: { threadId: 'planner-thread', runId: 'planner-run' } });
+    expect(retained?.retired).not.toBe(true);
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    await host.save({ planner: { status: 'completed', proposal } });
+    expect(await Effect.runPromise(reopened.propose(changed, attempt))).toEqual({ kind: 'stale' });
+    expect(await Effect.runPromise(reopened.ownership(false, attempt.requestId))).toMatchObject({
+      retired: true,
+    });
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+    expect(
+      await Effect.runPromise(
+        reopened.propose(changed, { ...attempt, requestId: 'fresh-automatic-request' })
+      )
+    ).toEqual(proposal);
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(2);
+  } finally {
+    controller.abort();
+    await pending;
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;
     await host.cleanup();

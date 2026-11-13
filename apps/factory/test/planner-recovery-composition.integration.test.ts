@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { readFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
@@ -12,8 +11,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
   async (scenario) => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
-    const host = await protocol();
-    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+    const host = await protocol({ origin: true });
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
     process.env.PATH = `${host.directory}:${previous.path}`;
     process.env.FACTORY_FIXTURE = host.configFile;
@@ -160,8 +158,7 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
 );
 
 it('allows supported terminal cleanup latency when submitting a preview after process loss', async () => {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -237,8 +234,7 @@ it('allows supported terminal cleanup latency when submitting a preview after pr
 it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
   'preserves automatic result consumption after process loss, %s',
   async (ordering) => {
-    const host = await protocol();
-    execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+    const host = await protocol({ origin: true });
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
     process.env.PATH = `${host.directory}:${previous.path}`;
     process.env.FACTORY_FIXTURE = host.configFile;

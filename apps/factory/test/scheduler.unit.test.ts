@@ -1176,3 +1176,30 @@ it('automatically replans a retained selection when its issue title changes the 
     await f.runtime.dispose();
   }
 });
+
+it('keeps an interrupted cycle exclusive while its model result awaits local persistence', async () => {
+  let plans = 0;
+  const f = fixture({
+    read: () => {},
+    propose: () => {
+      plans++;
+    },
+  });
+  try {
+    f.failSelectedPersistence(true);
+    await expect(f.run((s) => s.tick(base))).rejects.toMatchObject({
+      operation: 'controlled-selection-persistence',
+    });
+    expect(await f.run((s) => s.start({ issue: 3, base, context: '' }))).toMatchObject({
+      kind: 'occupied',
+    });
+    expect(await f.run((s) => s.authorizeRecovery(42))).toBe(false);
+    expect(f.launches).toEqual([]);
+    f.failSelectedPersistence(false);
+    await f.run((s) => s.tick(base));
+    expect(plans).toBe(1);
+    expect(f.launches).toEqual([1]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});

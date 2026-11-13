@@ -1,12 +1,10 @@
-import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
 it('bounds HTTP draining and cancels the underlying observer process while preserving external work', async () => {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const oldPath = process.env.PATH;
   const oldFixture = process.env.FACTORY_FIXTURE;
   process.env.PATH = `${host.directory}:${oldPath}`;

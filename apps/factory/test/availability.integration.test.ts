@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { writeFile } from 'node:fs/promises';
@@ -8,8 +7,7 @@ import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
 
 it('exports actual scheduler failure while liveness succeeds, then recovers through an intentional pause and owning question', async () => {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -147,8 +145,7 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
 });
 
 it('keeps telemetry disabled despite an ambient OTLP endpoint', async () => {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previous = {
     fixture: process.env.FACTORY_FIXTURE,
     endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,

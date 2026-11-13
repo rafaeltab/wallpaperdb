@@ -185,8 +185,23 @@ export const PlanLive = Layer.effect(
               automatic: attempt?.automatic,
               attemptStartedAt: attempt?.attemptStartedAt,
             });
-            if ('kind' in proposal)
-              return { kind: 'paused' as const, selected: [], rejected: [], input };
+            if ('kind' in proposal) {
+              if (proposal.kind === 'paused')
+                return { kind: 'paused' as const, selected: [], rejected: [], input };
+              if (attempt) yield* attempt.progress('freshness');
+              return {
+                kind: 'stale' as const,
+                selected: [],
+                rejected: [
+                  {
+                    issue: 0,
+                    reason:
+                      'Inputs changed; the previous bound planner was reconciled. Gather and replan.',
+                  },
+                ],
+                input: boundedInput(yield* source.read()),
+              };
+            }
             const ownership = attempt?.automatic ? yield* planner.ownership(false) : undefined;
             const modelAttemptId =
               ownership?.automatic && ownership.phase === 'succeeded' && ownership.run

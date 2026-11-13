@@ -40,6 +40,8 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
     paused: true,
     resuming: [{ issue: 1, index: 0, questionId: 'q', run: { id: 'run-1', ordinal: 1 } }],
     admissions: first.admissions,
+    cycle: first.cycle,
+    recovering: first.recovering,
   });
   expect(await Effect.runPromise(store.save({ ...read, revision: 0 }))).toBe(false);
   expect(await Effect.runPromise(store.save({ ...read, revision: 1, paused: false }))).toBe(true);

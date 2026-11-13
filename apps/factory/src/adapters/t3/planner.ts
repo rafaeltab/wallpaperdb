@@ -286,10 +286,15 @@ export function t3Planner(config: {
       if (
         (previous.inputIdentity ?? previous.input) !==
         (previous.inputIdentity ? planningInputIdentity(input) : JSON.stringify(input))
-      )
-        throw new Error(
-          'Original planner inputs changed; request a fresh preview after reconciliation'
-        );
+      ) {
+        // Changed requirements invalidate the proposal, not the exact run's ownership.
+        // Reconcile and settle that run before authorizing a fresh automatic request.
+        const detail = await observeOwned(previous, signal);
+        if (!terminal(detail.thread.status))
+          throw new Error('Previous bound planner remains outstanding after inputs changed');
+        await finish(previous, detail, signal);
+        return { kind: 'stale' as const };
+      }
       return await poll(previous, previous.run, signal);
     }
     if (previous && !previous.retired) {

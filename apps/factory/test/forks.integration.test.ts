@@ -20,8 +20,7 @@ import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { protocol } from './fixtures/setup.js';
 
 it('runs B and C concurrently from ready A with meaningful linear fork comparisons', async () => {
-  const host = await protocol();
-  execFileSync('git', ['-C', host.repository, 'remote', 'add', 'origin', host.repository]);
+  const host = await protocol({ origin: true });
   const previousPath = process.env.PATH;
   const previousFixture = process.env.FACTORY_FIXTURE;
   process.env.PATH = `${host.directory}:${previousPath}`;

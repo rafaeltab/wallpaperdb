@@ -422,7 +422,18 @@ export const SchedulerLive = Layer.effect(
           preview.kind === 'stale' ||
           preview.input.scheduleRevision !== snapshot.state.revision
         ) {
-          yield* replan(snapshot.state);
+          yield* Effect.logWarning(
+            'Planning inputs changed before batch acceptance; gather and replan',
+            {
+              requestId: cycle.requestId,
+              reason:
+                preview.kind === 'stale'
+                  ? 'Requirements or planning inputs changed'
+                  : 'Schedule changed during planning',
+            }
+          );
+          if (snapshot.state.paused) yield* saveCycle(snapshot.state, undefined);
+          else yield* replan(snapshot.state);
           return yield* status();
         }
         // Retain selection before acceptance bookkeeping or base/launch effects. Exact request ownership
@@ -454,7 +465,7 @@ export const SchedulerLive = Layer.effect(
         if (state.resuming?.some((existing) => existing.issue === claim.issue)) return false;
         if (
           !resumeCapacity(target, snapshot) ||
-          (batchSlots(snapshot.state) > 0 && !active(target))
+          (snapshot.state.cycle !== undefined && !active(target))
         )
           return false;
         return yield* store.save({
@@ -528,7 +539,7 @@ export const SchedulerLive = Layer.effect(
           if (!eligible({ ...issue, blockersReady: issue.blockersReady || !!issue.joinRequired }))
             return { kind: 'rejected' as const };
           const before = yield* status();
-          if (batchSlots(before.state) || !available(before)) return { kind: 'occupied' as const };
+          if (before.state.cycle || !available(before)) return { kind: 'occupied' as const };
           issue = yield* prepareIssue(command.issue, before.jobs, issue);
           const snapshot = yield* status();
           if (!dispatchable(issue, snapshot.jobs)) return { kind: 'rejected' as const };

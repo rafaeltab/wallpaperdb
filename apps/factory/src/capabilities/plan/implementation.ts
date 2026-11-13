@@ -331,6 +331,7 @@ export function requirementsIdentity(input: PlanningInput, selected: Proposal['s
         return issue
           ? {
               number,
+              title: issue.title,
               body: issue.body,
               comments: issue.comments,
               author: issue.author,

@@ -1149,3 +1149,28 @@ it('keeps recovery authorization reserved until an active owning journal is obse
     await f.runtime.dispose();
   }
 });
+
+it('automatically replans a retained selection when its issue title changes the authorized task', async () => {
+  let plans = 0;
+  const f = fixture({
+    read: () => {},
+    propose: () => {
+      plans++;
+    },
+  });
+  f.setIssues([{ ...issue(5), blockersReady: false, joinRequired: true }]);
+  try {
+    await f.run((s) => s.tick(base));
+    f.setIssues([
+      { ...issue(5), title: 'Changed authorized task', blockersReady: false, joinRequired: true },
+    ]);
+    f.prepareSucceeds();
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([]);
+    await f.run((s) => s.tick(base));
+    expect(plans).toBe(2);
+    expect(f.launches).toEqual([5]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});

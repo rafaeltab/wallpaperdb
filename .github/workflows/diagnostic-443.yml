@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   observe:
     if: github.head_ref == 't3/fix-443-avatar-loading-flake'
@@ -16,7 +20,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [repository-1, repository-2, browser-1, browser-2]
+        # Recover only the missing untraced observation; the other lanes already ran.
+        lane: [repository-1]
     env:
       TURBO_TOKEN: ''
       TURBO_TEAM: ''
@@ -48,6 +53,7 @@ jobs:
       - name: Restore byte-identical untraced target for the first representative observation
         if: matrix.lane == 'repository-1'
         run: |
+          git fetch --no-tags --depth=1 origin 256476a31463b3ef5d7a45458ae7c7c011ec6aba
           git restore --source=256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts
           git diff --exit-code 256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts
       - name: Record trace mode and source identities

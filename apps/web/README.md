@@ -21,6 +21,10 @@ Local static Profile picture sources follow [Ingestor's dimension admission limi
 
 The SDR editor rejects JPEG gain-map declarations and PNG `cICP` color declarations before rasterization. Unqualified HDR sources must not silently become SDR uploads; [ADR 0009](../../docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) assigns HDR processing to Asset, and the [confirmed source policy](https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514) requires classification before SDR normalization.
 
+## Development access
+
+Uploads support non-secure development HTTP origins, including remote Tailscale hostnames. The [browser UUID helper](src/lib/browser-uuid.ts) retains cryptographic UUID v4 identifiers when native `crypto.randomUUID()` is unavailable. The [browser journey guidance](../web-e2e/README.md) describes automatic localhost and non-secure HTTP regression coverage through real services.
+
 ## Frontend feature decisions
 
 Feature policies use plain TypeScript, while React and browser adapters handle rendering and effects. See the [coding guidelines index](../../CODING_STANDARDS.md) for frontend guidance and the [architecture test](test/features/feature-architecture.test.ts) for enforced feature boundaries.

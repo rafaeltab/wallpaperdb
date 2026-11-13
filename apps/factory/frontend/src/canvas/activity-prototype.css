@@ -45,3 +45,26 @@
 .ap-switch { width:250px; padding:2px; bottom:12px; background:#24242e; border-color:#43434f; color:#c0c0ce; box-shadow:0 4px 12px #0005; }
 .ap-switch small { display:none; }.ap-switch b { font-size:10px; font-weight:400; }.ap-switch button { color:#b1b1bf; padding:7px 10px; font-size:15px; }
 @media(max-width:700px) { .ap-details-D { width:auto; max-height:calc(100dvh - 155px); }.ap-lab:not([open]) { bottom:54px; }.ap-switch { left:auto; right:12px; transform:none; width:230px; }.ap-details-D .ap-row { min-height:40px; } }
+
+/* Match the three toolbar statuses without merging their meanings. */
+.ap-variant-D .cc-toolbar .cc-runtime,
+.ap-variant-D .cc-toolbar .ap-summary,
+.ap-variant-D .cc-toolbar .cc-attention-toggle {
+  display:inline-flex; align-items:center; gap:6px; padding:0; border:0;
+  background:transparent; border-radius:0; font-size:11px; font-weight:400; line-height:16px;
+}
+.ap-variant-D .cc-toolbar .ap-summary>span { display:inline; }
+.ap-variant-D .cc-toolbar .ap-summary b { font-size:inherit; font-weight:inherit; }
+.ap-variant-D .cc-toolbar .ap-summary time { padding:0; margin-left:6px; border:0; font-size:inherit; line-height:inherit; }
+.ap-variant-D .cc-toolbar .cc-runtime>i,
+.ap-variant-D .cc-toolbar .ap-summary>.ap-dot { width:5px; height:5px; border:0; box-shadow:none; }
+.ap-variant-D .cc-toolbar .cc-attention-toggle>svg { display:none; }
+.ap-variant-D .cc-toolbar .cc-attention-toggle::before { content:''; width:5px; height:5px; flex-shrink:0; border-radius:50%; background:currentColor; }
+.ap-details-D .ap-restrictions { align-items:baseline; font-size:10px; line-height:16px; }
+.ap-details-D .ap-restrictions>small,
+.ap-details-D .ap-restrictions ul { font-size:inherit; line-height:inherit; }
+.ap-details-D .ap-updated { flex-direction:row; align-items:baseline; flex-wrap:wrap; gap:3px 8px; }
+.ap-details-D .ap-updated>time,.ap-details-D .ap-updated>span { white-space:nowrap; }
+.ap-details-D .ap-updated>.ap-warning { flex-basis:100%; }
+.ap-switch a { display:inline-flex; align-items:center; color:#b1b1bf; padding:7px 10px; font-size:15px; text-decoration:none; }
+.ap-switch a:focus-visible { outline:2px solid #83aff0; outline-offset:-2px; }

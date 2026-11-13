@@ -45,6 +45,11 @@ const restrictions = [
 ];
 type Item = { id: string; category: number; start: number | null };
 const variants = ['A', 'B', 'C', 'D'];
+const variantHref = (variant: string) => {
+  const url = new URL(location.href);
+  url.searchParams.set('variant', variant);
+  return `${url.pathname}${url.search}${url.hash}`;
+};
 const variantNames = ['Compact ledger', 'Wide activity console', 'Inspector rail', 'Minimal B + C'];
 const units = (n: number, count: number) => {
   const noun = [3, 10].includes(n) ? 'PR' : [0, 1, 2, 11].includes(n) ? 'issue' : 'operation';
@@ -81,18 +86,38 @@ function PrototypeSwitcher({
 }) {
   return (
     <nav className="ap-switch" aria-label="Prototype variations">
-      <button type="button" onClick={() => change(-1)} aria-label="Previous variant">
+      <a
+        href={variantHref(
+          variants[(variants.indexOf(variant) - 1 + variants.length) % variants.length]
+        )}
+        onClick={(e) => {
+          if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            change(-1);
+          }
+        }}
+        aria-label="Previous variant"
+      >
         ←
-      </button>
+      </a>
       <span>
         <small>THROWAWAY · #717</small>
         <b>
           {variant} · {variantNames[variants.indexOf(variant)]}
         </b>
       </span>
-      <button type="button" onClick={() => change(1)} aria-label="Next variant">
+      <a
+        href={variantHref(variants[(variants.indexOf(variant) + 1) % variants.length])}
+        onClick={(e) => {
+          if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+            e.preventDefault();
+            change(1);
+          }
+        }}
+        aria-label="Next variant"
+      >
         →
-      </button>
+      </a>
     </nav>
   );
 }
@@ -115,20 +140,39 @@ export default function ActivityPrototype() {
   const [dismissed, setDismissed] = useState(false);
   const [reduced, setReduced] = useState(false);
   const hoverClose = useRef<number | undefined>(undefined);
+  const anchor = useRef<HTMLFieldSetElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [seed] = useState(() => fakeFixture('prototype', new Date().toISOString()));
   const board = { ...seed, meta: { ...seed.meta, factory: { ...seed.meta.factory, paused } } };
   const change = useCallback(
-    (step: number) =>
-      setVariant((v) => {
-        const next = variants[(variants.indexOf(v) + step + 3) % 3];
-        const url = new URL(location.href);
-        url.searchParams.set('variant', next);
-        history.replaceState(null, '', url);
-        return next;
-      }),
-    []
+    (step: number) => {
+      const next = variants[(variants.indexOf(variant) + step + variants.length) % variants.length];
+      history.pushState(null, '', variantHref(next));
+      setVariant(next);
+    },
+    [variant]
   );
+  useEffect(() => {
+    const sync = () => {
+      const value = new URLSearchParams(location.search).get('variant');
+      setVariant(value && variants.includes(value) ? value : 'D');
+    };
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !anchor.current?.contains(event.target)) {
+        clearTimeout(hoverClose.current);
+        setPinned(false);
+        setHovered(false);
+        setFocused(false);
+        setDismissed(true);
+      }
+    };
+    window.addEventListener('popstate', sync);
+    document.addEventListener('pointerdown', outside);
+    return () => {
+      window.removeEventListener('popstate', sync);
+      document.removeEventListener('pointerdown', outside);
+    };
+  }, []);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => {
@@ -215,19 +259,6 @@ export default function ActivityPrototype() {
         className="ap-details ap-details-D"
         aria-label="Factory activity details"
       >
-        <header>
-          <b>{disconnected ? 'Last known activity' : 'Activity'}</b>
-          <button
-            type="button"
-            aria-label="Close activity details"
-            onClick={() => {
-              setPinned(false);
-              setDismissed(true);
-            }}
-          >
-            ×
-          </button>
-        </header>
         {uncertain && <p className="ap-warning">Execution outcome unknown</p>}
         <div className="ap-rows">
           {groups.map((group, i) => (
@@ -291,7 +322,7 @@ export default function ActivityPrototype() {
               .replace('T', ' ')
               .replace(/\.\d+Z$/, ' UTC')}
           </time>
-          <span>{age(lastSuccess, now)}</span>
+          <span title={age(lastSuccess, now)}>{duration(lastSuccess, now)} ago</span>
         </footer>
       </section>
     ) : (
@@ -394,6 +425,7 @@ export default function ActivityPrototype() {
     );
   const activity = (
     <fieldset
+      ref={anchor}
       aria-label="Factory activity"
       className={`ap-anchor ap-anchor-${variant === 'D' ? 'B' : variant}`}
       onMouseEnter={() => {
@@ -431,7 +463,6 @@ export default function ActivityPrototype() {
         {selected && !disconnected && (
           <time>{selected.start === null ? 'Start unknown' : duration(selected.start, now)}</time>
         )}
-        <span className="ap-chevron">⌄</span>
       </button>
       {open && details}
     </fieldset>

@@ -280,7 +280,7 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
 });
 
 it('previews automatically discovered work without starting an implementation worker', async () => {
-  const host = await protocol();
+  const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -308,11 +308,8 @@ it('previews automatically discovered work without starting an implementation wo
     },
     planner: {
       proposal: {
-        selected: [
-          { issue: 580, reason: 'Thin end-to-end experiment', includeCodeFromIssues: [] },
-          { issue: 579, reason: 'Try deferred work', includeCodeFromIssues: [] },
-        ],
-        deferred: [],
+        selected: [{ issue: 580, reason: 'Thin end-to-end experiment', includeCodeFromIssues: [] }],
+        deferred: [{ issue: 579, reason: 'Not ready for agent' }],
       },
     },
   });

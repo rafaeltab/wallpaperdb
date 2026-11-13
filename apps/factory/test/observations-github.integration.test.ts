@@ -336,7 +336,7 @@ it('collects comparison-bound PR titles, drafts, mergeability, checks and review
     });
   }));
 
-it('indexes non-ready open issues locally without fetching per-issue context for them', async () =>
+it('indexes non-ready open issues locally from project metadata', async () =>
   withGithub(async (host) => {
     await host.save({
       planning: {
@@ -360,12 +360,12 @@ it('indexes non-ready open issues locally without fetching per-issue context for
     ]);
     expect(
       (await host.calls()).filter(
-        (c) => c.binary === 'gh' && c.args.join(' ').includes('issue(number:91)')
+        (c) => c.binary === 'gh' && c.args[0] === 'api' && c.args[1]?.includes('/issues/91/')
       )
     ).toHaveLength(0);
   }));
 
-it('collects a shared related PR once without nesting check/review connections in each issue query', async () =>
+it('collects shared related PR checks and reviews once without nesting them in each issue query', async () =>
   withGithub(async (host) => {
     const second = {
       ...issue,
@@ -394,9 +394,13 @@ it('collects a shared related PR once without nesting check/review connections i
       { number: 42, state: 'MERGED', linkedIssues: [1, 2], title: 'Shared prerequisite' },
     ]);
     const calls = (await host.calls()).filter((c) => c.binary === 'gh' && c.args[1] === 'graphql');
-    expect(calls.filter((c) => c.args.join(' ').includes('pullRequest(number:42)'))).toHaveLength(
-      1
-    );
+    expect(
+      calls.filter(
+        (c) =>
+          c.args.join(' ').includes('pullRequest(number:42)') &&
+          c.args.join(' ').includes('reviews(first:')
+      )
+    ).toHaveLength(1);
     expect(
       calls
         .filter((c) => /issue\(number:\d+\)/.test(c.args.join(' ')))

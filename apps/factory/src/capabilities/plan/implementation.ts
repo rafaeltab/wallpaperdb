@@ -194,14 +194,13 @@ export const PlanLive = Layer.effect(
                 : undefined;
             const validated = validate(proposal, input);
             const verify = source.verify;
-            const unavailable =
-              verify && validated.selected.length
-                ? yield* Effect.forEach(validated.selected, (selection) =>
-                    Effect.map(verify(selection), (reason) =>
-                      reason ? { issue: selection.issue, reason } : undefined
-                    )
+            const unavailable = validated.selected.length
+              ? yield* Effect.forEach(validated.selected, (selection) =>
+                  Effect.map(verify(selection), (reason) =>
+                    reason ? { issue: selection.issue, reason } : undefined
                   )
-                : [];
+                )
+              : [];
             if (attempt) yield* attempt.progress('freshness');
             const currentObserved = yield* source.read();
             const current = boundedInput({

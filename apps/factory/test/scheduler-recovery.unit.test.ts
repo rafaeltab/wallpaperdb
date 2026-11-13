@@ -114,6 +114,7 @@ function setup(lostSend = true, immediate = false) {
       }),
   };
   const source: PlanningSource = {
+    verify: () => Effect.succeed(undefined),
     read: () =>
       Effect.gen(function* () {
         const state = yield* schedule.read();

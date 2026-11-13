@@ -64,7 +64,7 @@ export interface PlanningInput {
 export interface PlanningSource {
   /** Read-only verification of the exact requested code and mandatory blockers. Allows
    * verified divergent code whose automatic base construction remains in this cycle. */
-  verify?(selection: Proposal['selected'][number]): Effect.Effect<string | undefined, Unavailable>;
+  verify(selection: Proposal['selected'][number]): Effect.Effect<string | undefined, Unavailable>;
   /** Periodic discovery may coalesce demand without returning cached authority.
    * Undefined means no new observation; explicit previews and freshness checks use read. */
   poll?(): Effect.Effect<PlanningInput | undefined, Unavailable>;

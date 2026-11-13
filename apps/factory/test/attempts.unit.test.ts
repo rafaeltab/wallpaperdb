@@ -450,6 +450,7 @@ it('emits handoff after discovery without assigning the model adapter a discover
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(PlanningSource, {
+            verify: () => Effect.succeed(undefined),
             read: () =>
               Effect.sync(() => {
                 now = 31000;

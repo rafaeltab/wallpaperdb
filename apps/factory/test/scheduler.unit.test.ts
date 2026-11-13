@@ -1107,3 +1107,45 @@ it('uses the owned preparation reservation at concurrency one and automatically 
     await f.runtime.dispose();
   }
 });
+
+it('keeps recovery authorization reserved until an active owning journal is observed', async () => {
+  const f = fixture();
+  try {
+    f.setRecoveries([
+      {
+        issue: 42,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+        active: false,
+        progress: 'Waiting for capacity',
+      },
+    ]);
+    expect(await f.run((s) => s.authorizeRecovery(42))).toBe(true);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([]);
+    expect(f.snapshot().recovering).toEqual([42]);
+    f.setRecoveries([
+      {
+        issue: 42,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+        active: true,
+        progress: 'Running',
+      },
+    ]);
+    await f.run((s) => s.status());
+    expect(f.snapshot().recovering).toEqual([]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([]);
+    f.setRecoveries([
+      {
+        issue: 42,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+        active: false,
+        progress: 'Complete',
+      },
+    ]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});

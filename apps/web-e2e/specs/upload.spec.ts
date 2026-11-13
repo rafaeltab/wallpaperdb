@@ -11,11 +11,33 @@ const uploadFixturePaths = [
 
 test("seeded base user can create and replace a Source through the browser UI", async ({
   page,
-}) => {
+}, testInfo) => {
+  const uuidErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    if (error.message.includes("randomUUID")) uuidErrors.push(error.message);
+  });
+  // Establish the actual browser contract before mounting the upload screen.
+  await page.goto("/web/");
+  const context = await page.evaluate(() => ({
+    origin: location.origin,
+    secure: window.isSecureContext,
+    randomUUID: typeof crypto.randomUUID,
+    browser: navigator.userAgent,
+  }));
+  await testInfo.attach("browser-uuid-context", {
+    body: JSON.stringify(context),
+    contentType: "application/json",
+  });
+  if (testInfo.project.name === "chromium:http") {
+    expect(context.origin).toContain("http://wallpaperdb-http.test:");
+    expect(context.secure).toBe(false);
+    expect(context.randomUUID).toBe("undefined");
+  }
   await page.goto("/web/upload");
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
   await expect(page.getByTestId("upload-page")).toBeVisible();
+  expect(uuidErrors).toEqual([]);
 
   const creating = page
     .waitForResponse(
@@ -148,4 +170,5 @@ test("seeded base user can create and replace a Source through the browser UI", 
       .update(await readFile(uploadFixturePaths[1]))
       .digest("hex"),
   );
+  expect(uuidErrors).toEqual([]);
 });

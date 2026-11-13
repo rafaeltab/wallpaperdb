@@ -15,7 +15,7 @@ test.setTimeout(60000);
 
 test("authenticates the seeded base user and saves browser state", async ({
   page,
-}) => {
+}, testInfo) => {
   const { email, password } = resolveAuthCredentials(process.env);
 
   await ensureAuthPersonaBypassesClientTrust(process.env);
@@ -73,7 +73,9 @@ test("authenticates the seeded base user and saves browser state", async ({
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
 
-  const storageStatePath = resolveAuthStorageStatePath(process.env);
+  const storageStatePath =
+    testInfo.project.metadata.authStorageStatePath ??
+    resolveAuthStorageStatePath(process.env);
   mkdirSync(dirname(storageStatePath), { recursive: true });
   await page.context().storageState({ path: storageStatePath });
 });

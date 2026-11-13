@@ -68,7 +68,7 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
-  it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async () => {
+  it.each(['original-page', 'current-component'] as const)('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply (%s fixture)', async (fixture) => {
     const trace = createCropTrace();
     vi.mocked(openPictureSource).mockImplementation(() => trace.resolved('decode', { width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture }));
     vi.mocked(userApi.uploadPicture).mockImplementation(() => trace.resolved('upload', { ...profile, version: 2, pictureAssetId: 'saved' }));
@@ -82,7 +82,9 @@ describe('Profile picture settings', () => {
     trace.mark('render:enter');
     render(
       <QueryClientProvider client={client}>
-        <ProfilePictureSettings profile={profile} tokenProvider={async () => 'token'} />
+        {fixture === 'original-page'
+          ? <ProfileSettingsPage />
+          : <ProfilePictureSettings profile={profile} tokenProvider={async () => 'token'} />}
       </QueryClientProvider>
     );
     trace.mark('render:complete');

@@ -1,0 +1,88 @@
+name: Diagnostic 443 (not a repair)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: github.head_ref == 't3/fix-443-avatar-loading-flake'
+    name: Avatar observation (${{ matrix.lane }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [repository-1, repository-2, browser-1, browser-2]
+    env:
+      TURBO_TOKEN: ''
+      TURBO_TEAM: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+      - run: make toolchain
+      - name: Prepare dependencies before observation
+        run: make install
+        env:
+          CURSOR_SECRET: ${{ secrets.CURSOR_SECRET }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_DOMAIN: ${{ secrets.CLERK_DOMAIN }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          E2E_BASE_TEST_EMAIL: ${{ secrets.E2E_BASE_TEST_EMAIL }}
+          E2E_BASE_TEST_PASSWORD: ${{ secrets.E2E_BASE_TEST_PASSWORD }}
+      - name: Use supported public Ubuntu archive
+        run: |
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ]; then
+              sudo sed -i -E 's#(mirror\+file:/etc/apt/apt-mirrors\.txt|https?://azure\.archive\.ubuntu\.com/ubuntu)/?([[:space:]]|$)#https://archive.ubuntu.com/ubuntu/\2#g' "$source"
+            fi
+          done
+      - run: make run PACKAGE=web SCRIPT=test:browser:install
+      - name: Restore byte-identical untraced target for the first representative observation
+        if: matrix.lane == 'repository-1'
+        run: |
+          git restore --source=256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts
+          git diff --exit-code 256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts
+      - name: Record trace mode and source identities
+        run: |
+          mkdir -p artifacts/443
+          echo 'repository-1 is untraced; repository-2 and browser lanes are traced' | tee artifacts/443/mode.txt
+          git hash-object apps/web/test/browser/profile-picture-loading.spec.tsx apps/web/vitest.browser.config.ts | tee artifacts/443/source-hashes.txt
+      - name: Prepare repository workload
+        if: startsWith(matrix.lane, 'repository-')
+        run: make check TURBO_FLAGS='--filter=!@wallpaperdb/factory'
+      - name: Representative uncached unit and integration workload
+        if: startsWith(matrix.lane, 'repository-')
+        run: |
+          mkdir -p artifacts/443
+          git rev-parse HEAD | tee artifacts/443/commit.txt
+          make test-unit TURBO_FLAGS='--filter=!@wallpaperdb/factory --force' 2>&1 | tee artifacts/443/unit.log
+          make test-integration TURBO_FLAGS='--filter=!@wallpaperdb/factory --force' 2>&1 | tee artifacts/443/integration.log
+      - name: Prepare browser exports and generated routes
+        if: startsWith(matrix.lane, 'browser-')
+        run: make check-types PACKAGE=web
+      - name: Ten complete Chromium suites with normal file and worker parallelism
+        if: startsWith(matrix.lane, 'browser-')
+        run: |
+          mkdir -p artifacts/443
+          git rev-parse HEAD | tee artifacts/443/commit.txt
+          for observation in $(seq 1 10); do
+            echo "443 observation $observation of 10; lane ${{ matrix.lane }}"
+            make run PACKAGE=web SCRIPT=test:browser ARGS='--silent=false' 2>&1 | tee "artifacts/443/browser-$observation.log"
+          done
+      - name: Preserve diagnostics on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: avatar-443-${{ matrix.lane }}
+          path: |
+            artifacts/443
+            apps/web/.vitest/attachments
+          if-no-files-found: warn

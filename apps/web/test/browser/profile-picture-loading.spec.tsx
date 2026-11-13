@@ -1,6 +1,8 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { cdp, page } from 'vitest/browser';
+import { Profiler } from 'react';
+import { profilePictureTrace } from './profile-picture-trace';
 import type {} from '@vitest/browser-playwright';
 import { ProfilePictureImage } from '../../src/components/profile/profile-picture';
 import '../../src/index.css';
@@ -25,13 +27,16 @@ it.each([undefined, 'flex size-6 shrink-0 items-center justify-center object-cov
     const body = canvas.toDataURL().split(',')[1];
     // Prevent delivery until after the loading presentation has been measured.
     const session = cdp();
+    const trace = profilePictureTrace(session, className);
+    await session.send('Network.enable');
     await session.send('Network.setCacheDisabled', { cacheDisabled: true });
-    let receive: (event: { requestId: string }) => void = () => {};
-    const paused = new Promise<string>((resolve) => { receive = ({ requestId }) => resolve(requestId); });
+    let receive: (event: { requestId: string; networkId?: string; request?: { url: string }; resourceType?: string }) => void = () => {};
+    const paused = new Promise<string>((resolve) => { receive = (event) => { trace.record('Fetch.requestPaused', { requestId: event.requestId, networkId: event.networkId, url: event.request?.url, resourceType: event.resourceType }); resolve(event.requestId); }; });
     session.on('Fetch.requestPaused', receive);
     await session.send('Fetch.enable', { patterns: [{ urlPattern: '*avatar-delayed*' }] });
     try {
-      const view = render(<ProfilePictureImage profile={{ id: 'ada', displayName: 'Ada Lovelace', picture: { id: 'delayed', url: `/avatar-delayed?size=${className ? 'small' : 'large'}` } }} className={className} />);
+      const view = render(<Profiler id="avatar" onRender={(_, phase) => trace.snapshot(`react-${phase}`)}><ProfilePictureImage profile={{ id: 'ada', displayName: 'Ada Lovelace', picture: { id: 'delayed', url: `/avatar-delayed?size=${className ? 'small' : 'large'}` } }} className={className} /></Profiler>);
+      trace.snapshot('render-returned');
       const pending = screen.getByRole('img');
       const before = pending.getBoundingClientRect();
       const borderWidth = getComputedStyle(pending).borderWidth;
@@ -45,12 +50,16 @@ it.each([undefined, 'flex size-6 shrink-0 items-center justify-center object-cov
       await expect.poll(() => getComputedStyle(spinner).animationName).toBe('none');
       expect(screen.getByRole('status').textContent).toBe('Loading profile picture');
       const { frameTree } = await session.send('Page.getFrameTree');
+      trace.snapshot('before-AX-query');
       const frames = [frameTree, ...(frameTree.childFrames ?? [])];
       const accessibility = await Promise.all(frames.map(({ frame }) => session.send('Accessibility.getFullAXTree', { frameId: frame.id })));
+      trace.snapshot('after-AX-query');
       expect(accessibility.some(({ nodes }) => nodes.some((node) => !node.ignored && node.role?.value === 'status'))).toBe(true);
       expect(screen.getByAltText("Ada Lovelace's profile picture").getAttribute('aria-hidden')).toBe('true');
       const attempt = screen.getByAltText<HTMLImageElement>("Ada Lovelace's profile picture");
+      trace.snapshot('before-fulfill');
       await session.send('Fetch.fulfillRequest', { requestId: await paused, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body });
+      trace.record('fulfilled');
       await expect.element(page.getByRole('img', { name: "Ada Lovelace's profile picture" })).toBeVisible();
       await expect.poll(() => screen.queryByRole('status')).toBeNull();
       expect(screen.getByAltText("Ada Lovelace's profile picture")).toBe(attempt);
@@ -63,12 +72,15 @@ it.each([undefined, 'flex size-6 shrink-0 items-center justify-center object-cov
       expect(ready.getBoundingClientRect().x).toBe(before.x);
       expect(getComputedStyle(ready).borderWidth).toBe(borderWidth);
       // A terminal failure uses the same dimensions and explains the fallback.
+      trace.snapshot('success-assertions-passed');
       vi.useFakeTimers();
       view.rerender(<ProfilePictureImage profile={{ id: 'ada', displayName: 'Ada Lovelace', picture: { id: 'failure', url: '/avatar-delayed?failure' } }} className={className} />);
       await act(async () => vi.advanceTimersByTimeAsync(15000));
       expect(screen.getByRole('img').textContent).toBe('AL');
       expect(screen.getByRole('img').getBoundingClientRect().width).toBe(before.width);
+      trace.snapshot('terminal-assertions-passed');
     } finally {
+      trace.stop();
       session.off('Fetch.requestPaused', receive);
       await session.send('Fetch.disable');
       await session.send('Network.setCacheDisabled', { cacheDisabled: false });

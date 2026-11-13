@@ -26,6 +26,7 @@ export default mergeConfig(
     },
     test: {
       name: 'picture-browser-contracts',
+      silent: false, // Temporary #443 diagnostics must survive successful hosted executions.
       include: ['test/browser/*.spec.{ts,tsx}'],
       testTimeout: 10000,
       coverage: {

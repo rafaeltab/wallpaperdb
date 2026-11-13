@@ -29,6 +29,13 @@
       "when": 1792791361419,
       "tag": "0003_puzzling_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794613685817,
+      "tag": "0004_serious_living_tribunal",
+      "breakpoints": true
     }
   ]
 }

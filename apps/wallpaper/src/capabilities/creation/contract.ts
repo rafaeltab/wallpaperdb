@@ -65,8 +65,15 @@ export interface SourceAcceptance extends SourceIntent {
   readonly occurrenceId: string;
   readonly trace?: WorkflowTrace;
 }
+export interface CreationPosition {
+  readonly createdAt: string;
+  readonly id: string;
+}
 export interface CreationPort {
-  readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
+  readonly list: (
+    owner: Creator,
+    before?: CreationPosition
+  ) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
   readonly begin: (
     owner: Creator,
     key: string,
@@ -95,8 +102,13 @@ export class Creation extends Context.Service<Creation, CreationPort>()(
  * together, including through an ambiguous commit. Registration writes and exact
  * pair lookups share that transaction and perform bounded indexed work without
  * loading or rewriting registration history. Asset identity is globally unique. */
+/** Lists at most 100 records, newest first by immutable createdAt then id.
+ * before is exclusive. Both owner components constrain every page. */
 export interface WorkflowStorePort {
-  readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
+  readonly list: (
+    owner: Creator,
+    before?: CreationPosition
+  ) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
   readonly begin: (
     owner: Creator,
     key: string,

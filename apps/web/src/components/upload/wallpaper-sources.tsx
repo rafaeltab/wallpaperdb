@@ -1,3 +1,4 @@
+import { browserUuid } from '@/lib/browser-uuid';
 import { useAuth } from '@clerk/react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -30,7 +31,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
   const [batch] = useState(() =>
     createWallpaperSourceBatch(
       browserSourceBatchApi(),
-      wallpaperId ? { wallpaperId } : { creationKey: crypto.randomUUID() }
+      wallpaperId ? { wallpaperId } : { creationKey: browserUuid() }
     )
   );
   const snapshot = useSyncExternalStore(batch.subscribe, batch.getSnapshot, batch.getSnapshot);

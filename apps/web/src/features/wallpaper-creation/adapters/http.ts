@@ -1,3 +1,4 @@
+import { browserUuid } from '@/lib/browser-uuid';
 import { getAuthToken } from '@/lib/auth/token-provider';
 import {
   type CandidateStatus,
@@ -375,7 +376,7 @@ export function browserSourceBatchApi(): SourceBatchApi<File> {
   const path = (asset: string, id: string) =>
     `${assetUrl}/assets/${encodeURIComponent(asset)}/source-candidates/${encodeURIComponent(id)}`;
   return {
-    identifier: () => crypto.randomUUID(),
+    identifier: () => browserUuid(),
     begin: creation.begin,
     wallpaper: creation.status,
     list: ownedSources,

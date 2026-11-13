@@ -16,6 +16,10 @@ test("seeded base user can create and replace a Source through the browser UI", 
   page.on("pageerror", (error) => {
     if (error.message.includes("randomUUID")) uuidErrors.push(error.message);
   });
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("randomUUID"))
+      uuidErrors.push(message.text());
+  });
   // Establish the actual browser contract before mounting the upload screen.
   await page.goto("/web/");
   const context = await page.evaluate(() => ({
@@ -24,6 +28,7 @@ test("seeded base user can create and replace a Source through the browser UI", 
     randomUUID: typeof crypto.randomUUID,
     browser: navigator.userAgent,
   }));
+  console.info("Upload UUID browser context", context);
   await testInfo.attach("browser-uuid-context", {
     body: JSON.stringify(context),
     contentType: "application/json",

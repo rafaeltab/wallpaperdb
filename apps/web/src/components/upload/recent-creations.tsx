@@ -40,10 +40,11 @@ function RecentCreationsForOwner({
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(new Set<string>());
   const [resuming, setResuming] = useState<ReadonlySet<string>>(new Set());
+  const [cursor, setCursor] = useState<string>();
   const query = useQuery({
-    queryKey: ['wallpaper-creations', userId],
+    queryKey: ['wallpaper-creations', userId, cursor],
     enabled: !!isSignedIn,
-    queryFn: ({ signal }) => recentCreations(signal),
+    queryFn: ({ signal }) => recentCreations(signal, cursor),
     refetchInterval: 2000,
   });
   return (
@@ -64,11 +65,29 @@ function RecentCreationsForOwner({
         </p>
       )}
       {error && <p role="alert">{error}</p>}
-      {query.data?.length === 0 && (
-        <p className="text-sm text-muted-foreground">No creations yet.</p>
+      {query.data?.wallpapers.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {cursor ? 'No older creations.' : 'No creations yet.'}
+        </p>
       )}
+      <nav aria-label="Creation pages" className="flex gap-4">
+        {cursor && (
+          <button type="button" className="text-sm underline" onClick={() => setCursor(undefined)}>
+            Newest creations
+          </button>
+        )}
+        {query.data?.nextCursor && (
+          <button
+            type="button"
+            className="text-sm underline"
+            onClick={() => setCursor(query.data?.nextCursor)}
+          >
+            Older creations
+          </button>
+        )}
+      </nav>
       <ul className="space-y-3">
-        {query.data?.map((w) => (
+        {query.data?.wallpapers.map((w) => (
           <li
             key={w.wallpaperId}
             className="rounded-lg border p-3 space-y-2"

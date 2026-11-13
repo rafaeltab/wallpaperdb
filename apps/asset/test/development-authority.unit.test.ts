@@ -75,3 +75,72 @@ it('selects the configured development Clerk issuer from the explicit domain or 
   ).toBe('https://unconfigured.clerk.accounts.dev');
   expect(() => developmentIssuer({ CLERK_PUBLISHABLE_KEY: 'invalid' })).toThrow();
 });
+
+it('adds explicitly configured origins to both services without losing existing origins or credentials', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'asset-dev-origins-'));
+  const options = {
+    issuer: 'https://selected.clerk.accounts.dev',
+    ingress: 'http://localhost:8970',
+  };
+  try {
+    await configureDevelopment(directory, options);
+    const path = join(directory, 'apps/asset/.authority.json');
+    const initial = readAuthority(path);
+    await configureDevelopment(directory, {
+      ...options,
+      additionalAuthorizedOrigins: ['http://zerotwo:8970', 'http://wallpaperdb-http.test:8970/'],
+    });
+    await configureDevelopment(directory, {
+      ...options,
+      additionalAuthorizedOrigins: ['http://zerotwo:8970'],
+    });
+    await configureDevelopment(directory, options);
+    const configured = readAuthority(path);
+    const expected = [
+      'http://localhost:8970',
+      'http://127.0.0.1:8970',
+      'http://zerotwo:8970',
+      'http://wallpaperdb-http.test:8970',
+    ];
+    expect(configured.identityProviders.clerk?.authorizedParties).toEqual(expected);
+    expect(configured.broker).toEqual(initial.broker);
+    expect(configured.applications).toEqual(initial.applications);
+    expect(configured.identityProviders.clerk?.requireAuthorizedParty).toBe(
+      initial.identityProviders.clerk?.requireAuthorizedParty
+    );
+    const workflow = JSON.parse(
+      await readFile(join(directory, 'apps/wallpaper/.workflow.json'), 'utf8')
+    );
+    expect(workflow.identityProviders[0].authorizedParties).toEqual(expected);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it.each([
+  '*',
+  'file:///tmp/origin',
+  'http://example.test/path',
+  'http://user:password@example.test',
+  'https://example.test?query=yes',
+])('rejects an additional origin that is not an HTTP(S) origin: %s', async (origin) => {
+  const directory = await mkdtemp(join(tmpdir(), 'asset-invalid-origin-'));
+  try {
+    await configureDevelopment(directory, {
+      issuer: 'https://selected.clerk.accounts.dev',
+      ingress: 'http://localhost:8970',
+    });
+    const path = join(directory, 'apps/asset/.authority.json');
+    const before = await readFile(path, 'utf8');
+    await expect(
+      configureDevelopment(directory, {
+        issuer: 'https://selected.clerk.accounts.dev',
+        ingress: 'http://localhost:8970',
+        additionalAuthorizedOrigins: [origin],
+      })
+    ).rejects.toThrow();
+    expect(await readFile(path, 'utf8')).toBe(before);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

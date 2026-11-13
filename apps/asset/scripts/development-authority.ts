@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { parse } from 'dotenv';
 import { parseAuthority } from '../src/authority.js';
 import { renderBrokerConfiguration } from '../src/adapters/commands/index.js';
@@ -41,7 +42,11 @@ const secret = () => randomBytes(32).toString('hex');
 const credential = (user: string) => ({ user, password: secret(), revision: '1' });
 export async function configureDevelopment(
   root: string,
-  options: { readonly issuer: string; readonly ingress: string }
+  options: {
+    readonly issuer: string;
+    readonly ingress: string;
+    readonly additionalAuthorizedOrigins?: readonly string[];
+  }
 ) {
   const path = join(root, 'apps/asset/.authority.json');
   const budget = { maxBytes: 16 * 1024 * 1024, maxMessages: 10000 };
@@ -109,6 +114,28 @@ export async function configureDevelopment(
     }
   }
   let authority = parseAuthority(raw);
+  const additionalOrigins = (options.additionalAuthorizedOrigins ?? []).map((value) => {
+    const url = new URL(value);
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+    )
+      throw new Error('Authorized origin must be an HTTP(S) origin');
+    return url.origin;
+  });
+  let originsChanged = false;
+  if (additionalOrigins.length) {
+    const provider = authority.identityProviders.clerk;
+    if (!provider) throw new Error('Development Clerk identity provider is required');
+    const origins = [...new Set([...provider.authorizedParties, ...additionalOrigins])];
+    originsChanged = origins.length !== provider.authorizedParties.length;
+    raw.identityProviders.clerk.authorizedParties = origins;
+    authority = parseAuthority(raw);
+  }
   const resolvesPlaceholder =
     authority.identityProviders.clerk?.issuer === 'https://unconfigured.clerk.accounts.dev' &&
     options.issuer !== 'https://unconfigured.clerk.accounts.dev';
@@ -121,7 +148,7 @@ export async function configureDevelopment(
   await mkdir(join(root, 'infra/nats'), { recursive: true });
   if (!existing)
     await writeFile(path, `${JSON.stringify(raw, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-  else if (resolvesPlaceholder || upgraded)
+  else if (resolvesPlaceholder || upgraded || originsChanged)
     await writeFile(path, `${JSON.stringify(raw, null, 2)}\n`, { mode: 0o600 });
   await chmod(path, 0o600);
   const brokerPath = join(root, 'infra/nats/.generated.conf');
@@ -184,6 +211,9 @@ export async function configureDevelopment(
   return authority.identity;
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  const { values } = parseArgs({
+    options: { 'authorized-origin': { type: 'string', multiple: true } },
+  });
   const root = resolve('../..');
   const environment = parse(await readFile(join(root, 'apps/user/.env'), 'utf8'));
   const worktree = await readFile(join(root, '.worktree'), 'utf8');
@@ -191,6 +221,7 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   if (!port) throw new Error('Run worktree setup before generating Asset authority');
   const identity = await configureDevelopment(root, {
     issuer: developmentIssuer(environment),
+    additionalAuthorizedOrigins: values['authorized-origin'],
     ingress: `http://localhost:${port}`,
   });
   process.stdout.write(`Asset development authority ready: ${identity}\n`);

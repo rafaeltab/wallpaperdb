@@ -316,11 +316,18 @@ function boundedInput(input: PlanningInput): PlanningInput {
 
 export function requirementsIdentity(input: PlanningInput, selected: Proposal['selected']) {
   const numbers = new Set(selected.flatMap((item) => [item.issue, ...item.includeCodeFromIssues]));
-  if (!selected.length) input.issues.forEach((issue) => numbers.add(issue.number));
+  if (!selected.length)
+    input.issues.forEach((issue) => {
+      numbers.add(issue.number);
+    });
   for (const number of numbers) {
     const issue = input.issues.find((item) => item.number === number);
-    issue?.parents.forEach((parent) => numbers.add(parent));
-    issue?.blockers.forEach((blocker) => numbers.add(blocker));
+    issue?.parents.forEach((parent) => {
+      numbers.add(parent);
+    });
+    issue?.blockers.forEach((blocker) => {
+      numbers.add(blocker);
+    });
   }
   return JSON.stringify(
     [...numbers]

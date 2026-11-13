@@ -233,7 +233,10 @@ export function githubIssues(
       )
       .flat();
     const numbers = blockerNumbers(native, issue.body);
-    let readiness;
+    let readiness: Pick<
+      Effect.Success<ReturnType<Issues['inspect']>>,
+      'blockersReady' | 'prerequisite' | 'joinRequired' | 'recovery' | 'blockedReason'
+    >;
     const omitted = config.selection
       ? numbers.filter((blocker) => !config.selection?.included.includes(blocker))
       : [];

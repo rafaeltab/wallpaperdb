@@ -1,10 +1,13 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Option } from 'effect';
+import { controlledScheduleStore } from './fixtures/schedule-store.js';
+import type { Unavailable } from '../src/capabilities/job/index.js';
 import { expect, it } from 'vitest';
 import {
   Plan,
   PlanLive,
   PlanningSource,
   IPlanner,
+  ScheduleStore,
   type PlanningInput,
   type PlanningIssue,
   type Proposal,
@@ -66,6 +69,70 @@ async function preview(
 it('shows a semantic proposal without dispatch', async () => {
   expect((await preview()).selected).toEqual(proposal.selected);
 });
+
+it.each([false, true])(
+  'waits for brief cycle ownership without bypassing a retained batch=%s',
+  async (retained) => {
+    const store = controlledScheduleStore();
+    if (retained)
+      await Effect.runPromise(
+        store.save({
+          revision: 0,
+          concurrency: 1,
+          allowance: 1,
+          paused: true,
+          admissions: [],
+          cycle: { requestId: 'retained', startedAt: 0, concurrency: 1, allowance: 1 },
+        })
+      );
+    let busy = true;
+    let models = 0;
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(ScheduleStore, {
+              ...store,
+              withCycle: <A>(work: Effect.Effect<A, Unavailable>) =>
+                Effect.suspend(() => {
+                  if (busy) {
+                    busy = false;
+                    return Effect.succeed(Option.none<A>());
+                  }
+                  return store.withCycle(work);
+                }),
+            }),
+            Layer.succeed(PlanningSource, {
+              read: () =>
+                Effect.succeed({
+                  issues: [issue],
+                  job: { kind: 'empty' },
+                  capacity: { concurrency: 1, admission: 1 },
+                }),
+              verify: () => Effect.succeed(undefined),
+            }),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: () =>
+                Effect.sync(() => {
+                  models++;
+                  return proposal;
+                }),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const result = runtime.runPromise(Effect.flatMap(Plan, (plan) => plan.preview()));
+      if (retained) await expect(result).rejects.toMatchObject({ operation: 'plan-busy' });
+      else expect((await result).selected).toEqual(proposal.selected);
+      expect(models).toBe(retained ? 0 : 1);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
 
 it.each([
   { ...issue, open: false },

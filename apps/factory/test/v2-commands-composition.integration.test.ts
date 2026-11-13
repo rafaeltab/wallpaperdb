@@ -1104,17 +1104,19 @@ it('submits one retained advisory preview through v2 while the composed factory 
         throw new Error('Missing retained preview');
       const planId = result.result.planId;
       await vi.waitFor(
-        async () =>
-          expect(
-            (await running.app.inject(`/api/v2/plans/${encodeURIComponent(planId)}`)).json()
-          ).toMatchObject({
+        async () => {
+          const detail = (
+            await running.app.inject(`/api/v2/plans/${encodeURIComponent(planId)}`)
+          ).json();
+          expect(detail, JSON.stringify(detail)).toMatchObject({
             attempt: {
               id: planId,
               phase: 'succeeded',
               basis: { controlVersion: before.meta.factory.version },
               result: { selected: [{ issueId: 'issue:rafaeltab/wallpaperdb/577' }] },
             },
-          }),
+          });
+        },
         { timeout: 10000, interval: 40 }
       );
       const planner = JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8'));

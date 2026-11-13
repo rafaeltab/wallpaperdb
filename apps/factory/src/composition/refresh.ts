@@ -1,4 +1,14 @@
 import { observationRefreshIntervalMs } from '../capabilities/observe/index.js';
+import { appendFileSync } from 'node:fs';
+
+// Temporary diagnostic branch only. No lifecycle changes.
+function diagnostic(kind: string) {
+  if (process.env.DIAG682_LOG)
+    appendFileSync(
+      process.env.DIAG682_LOG,
+      JSON.stringify({ at: Date.now(), pid: process.pid, kind }) + '\n'
+    );
+}
 
 /** Composition owns metadata work independently of the HTTP request that asks for it. */
 export function observationWorker(refresh: () => Promise<void>) {
@@ -17,7 +27,9 @@ export function observationWorker(refresh: () => Promise<void>) {
         timer = undefined;
         if (closed || (!clients && Date.now() >= activeUntil)) return;
         nextAt = Date.now() + observationRefreshIntervalMs;
+        diagnostic('refresh-start');
         pending = refresh().finally(() => {
+          diagnostic('refresh-end');
           pending = undefined;
           schedule();
         });

@@ -5,6 +5,7 @@ import { chromium, expect as browserExpect } from '@playwright/test';
 import { expect, it } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
 import { protocol } from './fixtures/setup.js';
+import { flake682 } from './fixtures/flake682.js';
 it('starts one deliberately selected job and observes stage, elapsed time and work links', async () => {
   const host = await protocol();
   const path = process.env.PATH;
@@ -524,6 +525,24 @@ it.each(['implementation', 'publication'] as const)(
       });
       try {
         const page = await browser.newPage();
+        page.on('response', async (response) => {
+          if (!response.url().endsWith('/api/scheduler')) return;
+          const receivedAt = Date.now();
+          try {
+            flake682('browser-snapshot', {
+              directory: host.directory,
+              stage,
+              receivedAt,
+              status: response.status(),
+              body: await response.json(),
+            });
+          } catch {
+            /* Reload can cancel the body of an ordinary in-flight response. */
+          }
+        });
+        page.on('pageerror', (error) =>
+          flake682('page-error', { directory: host.directory, stage, message: error.message })
+        );
         const address = running.app.server.address();
         if (!address || typeof address === 'string') throw new Error('Missing listener');
         await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
@@ -533,6 +552,7 @@ it.each(['implementation', 'publication'] as const)(
         const before = await (
           await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
         ).json();
+        flake682('job-before', { directory: host.directory, stage, body: before });
         let publication: string | undefined;
         if (stage === 'publication') {
           await host.save({
@@ -546,6 +566,11 @@ it.each(['implementation', 'publication'] as const)(
               const observation = await (
                 await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
               ).json();
+              flake682('job-publication-poll', {
+                directory: host.directory,
+                stage,
+                body: observation,
+              });
               return {
                 stage: observation.delivery?.stage,
                 run: observation.execution?.run?.id,
@@ -555,10 +580,30 @@ it.each(['implementation', 'publication'] as const)(
           publication = await readFile(join(host.directory, 'pr.json'), 'utf8');
         }
         await host.save({ overrides: { status: 'interrupted' } });
+        flake682('reload-start', { directory: host.directory, stage });
         await page.reload();
-        await browserExpect(
-          page.getByRole('button', { name: 'Retry existing stage' })
-        ).toBeVisible();
+        flake682('reload-end', { directory: host.directory, stage });
+        try {
+          await browserExpect(
+            page.getByRole('button', { name: 'Retry existing stage' })
+          ).toBeVisible();
+          flake682('retry-visible', { directory: host.directory, stage });
+        } catch (error) {
+          // Failure-only reads occur after the original assertion has failed.
+          flake682('retry-missing', {
+            directory: host.directory,
+            stage,
+            dom: await page.locator('body').innerText(),
+            config: await readFile(host.configFile, 'utf8'),
+            resource: await readFile(join(host.directory, 'resource.json'), 'utf8'),
+          });
+          flake682('job-after-failure', {
+            directory: host.directory,
+            stage,
+            body: await (await page.request.get(`http://127.0.0.1:${address.port}/api/job`)).json(),
+          });
+          throw error;
+        }
         const delivered = page.waitForResponse(
           (response) =>
             response.url().endsWith('/api/job/resume') && response.request().method() === 'POST'
@@ -575,6 +620,7 @@ it.each(['implementation', 'publication'] as const)(
         const resumed = await (
           await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
         ).json();
+        flake682('job-resumed', { directory: host.directory, stage, body: resumed });
         expect(resumed.intent).toEqual(before.intent);
         expect(resumed.execution.run).toEqual(
           stage === 'publication' ? { id: 'run-4', ordinal: 4 } : { id: 'run-2', ordinal: 2 }

@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { runProtocol } from './protocol.js';
 import { stripTypeScriptTypes } from 'node:module';
+import { flake682 } from './flake682.js';
 export async function protocol() {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
@@ -93,6 +94,7 @@ export async function protocol() {
       const next = `${configFile}.next`;
       await writeFile(next, JSON.stringify({ ...config, ...patch }));
       await rename(next, configFile);
+      flake682('config-saved', { directory, patch });
     },
     calls: async () =>
       (await readFile(join(directory, 'calls.jsonl'), 'utf8'))

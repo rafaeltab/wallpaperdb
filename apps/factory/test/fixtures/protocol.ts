@@ -46,6 +46,32 @@ export async function runProtocol(
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
+    // Temporary #682 diagnostic. Capture only observation identity, never prompts/auth.
+    if (nodeProcess.env.DIAG682_LOG && ['list', 'show', 't3_thread_read'].includes(args[1])) {
+      const resourcePath = join(config.directory, 'resource.json');
+      const resource = existsSync(resourcePath)
+        ? JSON.parse(readFileSync(resourcePath, 'utf8'))
+        : null;
+      appendFileSync(
+        nodeProcess.env.DIAG682_LOG,
+        JSON.stringify({
+          at: Date.now(),
+          pid: nodeProcess.pid,
+          kind: 'protocol-read',
+          directory: config.directory,
+          operation: args.slice(0, 2),
+          status: config.overrides?.status,
+          pendingRequestCount: config.overrides?.pendingRequestCount,
+          resource: resource && {
+            threadId: resource.threadId,
+            latestRunId: resource.latestRunId,
+            runCount: resource.runCount,
+            status: resource.status,
+            stage: resource.stage,
+          },
+        }) + '\n'
+      );
+    }
     const hold = async (boundary: string) => {
       const separate = config.holds?.includes(boundary);
       if (!separate && config.hold !== boundary) return;

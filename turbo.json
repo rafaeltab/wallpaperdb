@@ -15,6 +15,7 @@
         }
     },
     "globalPassThroughEnv": [
+        "DIAG682_LOG",
         "GITHUB_ACTIONS",
         "COMPOSE_PROJECT_NAME"
     ],

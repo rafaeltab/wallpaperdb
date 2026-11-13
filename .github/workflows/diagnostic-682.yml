@@ -1,0 +1,60 @@
+name: Diagnostic 682 (not a fix)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  operations:
+    if: github.head_ref == 't3/fix-682-factory-retry-control'
+    name: Diagnostic 682 (${{ matrix.batch }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [1, 2]
+    permissions:
+      contents: read
+    env:
+      TURBO_TOKEN: ''
+      TURBO_TEAM: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.17'
+          install_args: --locked
+      - name: Prepare prerequisites before experiments
+        run: |
+          make toolchain
+          make install
+          make build
+          make run PACKAGE=factory SCRIPT=test:browser:install
+          mkdir -p "$RUNNER_TEMP/diagnostic-682"
+          git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-682/head.txt"
+          git diff 13ad562b5ea464aa1eab2577a6b1834f797e07bc..HEAD -- apps/factory/test apps/factory/src/composition apps/factory/vitest.e2e.config.ts turbo.json Makefile > "$RUNNER_TEMP/diagnostic-682/historical.diff"
+          cat apps/factory/vitest.e2e.config.ts packages/vitest-config/src/defaults.ts > "$RUNNER_TEMP/diagnostic-682/test-config.txt"
+      - name: Representative ordinary Container E2E workload (uncached tests)
+        env:
+          DIAG682_LOG: ${{ runner.temp }}/diagnostic-682/representative.jsonl
+        run: |
+          set -o pipefail
+          make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb/web-e2e --force' 2>&1 | tee "$RUNNER_TEMP/diagnostic-682/representative.log"
+      - name: Ten complete operations files (no test retries)
+        run: |
+          set -o pipefail
+          for execution in $(seq 1 10); do
+            echo "Full operations execution $execution of 10; batch ${{ matrix.batch }}"
+            export DIAG682_LOG="$RUNNER_TEMP/diagnostic-682/operations-$execution.jsonl"
+            make run PACKAGE=factory SCRIPT=test:e2e ARGS="test/operations.e2e.test.ts --reporter=json --outputFile=$RUNNER_TEMP/diagnostic-682/operations-$execution.json" 2>&1 | tee "$RUNNER_TEMP/diagnostic-682/operations-$execution.log"
+          done
+      - name: Preserve diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-682-batch-${{ matrix.batch }}
+          path: ${{ runner.temp }}/diagnostic-682
+          if-no-files-found: warn

@@ -1177,6 +1177,50 @@ it('automatically replans a retained selection when its issue title changes the 
   }
 });
 
+it.each([false, true])(
+  'retains prepared work across join evidence while detecting scope edits=%s',
+  async (scopeEdit) => {
+    let plans = 0;
+    const f = fixture({
+      read: () => {},
+      propose: () => {
+        plans++;
+      },
+    });
+    const selected = { ...issue(5), blockers: [3], blockersReady: false, joinRequired: true };
+    const included = { ...issue(3), open: false };
+    f.setIssues([selected, included]);
+    try {
+      await f.run((s) => s.configure({ revision: 0, concurrency: 1, allowance: 1, paused: false }));
+      await f.run((s) => s.tick(base));
+      const evidence = `Verified issue-only join: https://github.com/rafaeltab/wallpaperdb/pull/103 at ${'b'.repeat(40)}, tree ${'c'.repeat(40)}, parent ${'d'.repeat(40)}. CI passed on this replayed tree. Original independent review commit ${'e'.repeat(40)}; prior published head ${'f'.repeat(40)}. Automatic replays retain original review; conflict recovery records classification and applicable review separately in durable operation state.`;
+      f.setIssues([
+        selected,
+        {
+          ...included,
+          comments: [
+            {
+              author: 'rafaeltab',
+              body: evidence + (scopeEdit ? '\nAlso change the authorized behavior.' : ''),
+            },
+          ],
+        },
+      ]);
+      f.prepareSucceeds();
+      await f.run((s) => s.tick(base));
+      expect(f.launches).toEqual(scopeEdit ? [] : [5]);
+      expect(plans).toBe(1);
+      if (scopeEdit) {
+        await f.run((s) => s.tick(base));
+        expect(plans).toBe(2);
+        expect(f.launches).toEqual([5]);
+      }
+    } finally {
+      await f.runtime.dispose();
+    }
+  }
+);
+
 it('keeps an interrupted cycle exclusive while its model result awaits local persistence', async () => {
   let plans = 0;
   const f = fixture({

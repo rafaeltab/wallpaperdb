@@ -525,24 +525,26 @@ it.each(['implementation', 'publication'] as const)(
       });
       try {
         const page = await browser.newPage();
-        page.on('response', async (response) => {
-          if (!response.url().endsWith('/api/scheduler')) return;
-          const receivedAt = Date.now();
-          try {
-            flake682('browser-snapshot', {
-              directory: host.directory,
-              stage,
-              receivedAt,
-              status: response.status(),
-              body: await response.json(),
-            });
-          } catch {
-            /* Reload can cancel the body of an ordinary in-flight response. */
-          }
-        });
-        page.on('pageerror', (error) =>
-          flake682('page-error', { directory: host.directory, stage, message: error.message })
-        );
+        if (process.env.DIAG682_LOG) {
+          page.on('response', async (response) => {
+            if (!response.url().endsWith('/api/scheduler')) return;
+            const receivedAt = Date.now();
+            try {
+              flake682('browser-snapshot', {
+                directory: host.directory,
+                stage,
+                receivedAt,
+                status: response.status(),
+                body: await response.json(),
+              });
+            } catch {
+              /* Reload can cancel the body of an ordinary in-flight response. */
+            }
+          });
+          page.on('pageerror', (error) =>
+            flake682('page-error', { directory: host.directory, stage, message: error.message })
+          );
+        }
         const address = running.app.server.address();
         if (!address || typeof address === 'string') throw new Error('Missing listener');
         await page.goto(`http://127.0.0.1:${address.port}/?view=operations`);
@@ -589,19 +591,27 @@ it.each(['implementation', 'publication'] as const)(
           ).toBeVisible();
           flake682('retry-visible', { directory: host.directory, stage });
         } catch (error) {
-          // Failure-only reads occur after the original assertion has failed.
-          flake682('retry-missing', {
-            directory: host.directory,
-            stage,
-            dom: await page.locator('body').innerText(),
-            config: await readFile(host.configFile, 'utf8'),
-            resource: await readFile(join(host.directory, 'resource.json'), 'utf8'),
-          });
-          flake682('job-after-failure', {
-            directory: host.directory,
-            stage,
-            body: await (await page.request.get(`http://127.0.0.1:${address.port}/api/job`)).json(),
-          });
+          if (process.env.DIAG682_LOG) {
+            try {
+              // Failure-only reads occur after the original assertion has failed.
+              flake682('retry-missing', {
+                directory: host.directory,
+                stage,
+                dom: await page.locator('body').innerText(),
+                config: await readFile(host.configFile, 'utf8'),
+                resource: await readFile(join(host.directory, 'resource.json'), 'utf8'),
+              });
+              flake682('job-after-failure', {
+                directory: host.directory,
+                stage,
+                body: await (
+                  await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+                ).json(),
+              });
+            } catch (diagnosticError) {
+              console.error('Diagnostic capture failed after original assertion', diagnosticError);
+            }
+          }
           throw error;
         }
         const delivered = page.waitForResponse(

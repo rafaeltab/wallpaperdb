@@ -9,7 +9,7 @@ jobs:
     if: github.head_ref == 't3/fix-682-factory-retry-control'
     name: Diagnostic 682 (${{ matrix.batch }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 26
     strategy:
       fail-fast: false
       matrix:
@@ -38,14 +38,22 @@ jobs:
           git diff 13ad562b5ea464aa1eab2577a6b1834f797e07bc..HEAD -- apps/factory/test apps/factory/src/composition apps/factory/vitest.e2e.config.ts turbo.json Makefile > "$RUNNER_TEMP/diagnostic-682/historical.diff"
           cat apps/factory/vitest.e2e.config.ts packages/vitest-config/src/defaults.ts > "$RUNNER_TEMP/diagnostic-682/test-config.txt"
       - name: Representative ordinary Container E2E workload (uncached tests)
-        env:
-          DIAG682_LOG: ${{ runner.temp }}/diagnostic-682/representative.jsonl
         run: |
           set -o pipefail
+          if [ '${{ matrix.batch }}' = 2 ]; then
+            git restore --source=256476a31463b3ef5d7a45458ae7c7c011ec6aba -- apps/factory/test/operations.e2e.test.ts apps/factory/test/fixtures/setup.ts apps/factory/test/fixtures/protocol.ts apps/factory/src/composition/refresh.ts
+            unset DIAG682_LOG
+            echo 'Untraced representative workload: target, fixtures and refresh source restored to base'
+          else
+            export DIAG682_LOG="$RUNNER_TEMP/diagnostic-682/representative.jsonl"
+            echo 'Traced representative workload'
+          fi
+          git diff -- apps/factory/test/operations.e2e.test.ts apps/factory/test/fixtures/setup.ts apps/factory/test/fixtures/protocol.ts apps/factory/src/composition/refresh.ts > "$RUNNER_TEMP/diagnostic-682/representative-source.diff"
           make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb/web-e2e --force' 2>&1 | tee "$RUNNER_TEMP/diagnostic-682/representative.log"
       - name: Ten complete operations files (no test retries)
         run: |
           set -o pipefail
+          git restore --source=HEAD -- apps/factory/test/operations.e2e.test.ts apps/factory/test/fixtures/setup.ts apps/factory/test/fixtures/protocol.ts apps/factory/src/composition/refresh.ts
           for execution in $(seq 1 10); do
             echo "Full operations execution $execution of 10; batch ${{ matrix.batch }}"
             export DIAG682_LOG="$RUNNER_TEMP/diagnostic-682/operations-$execution.jsonl"

@@ -1,5 +1,5 @@
-// THROWAWAY #717: three top-bar/detail layouts on the factory canvas.
-// Question: which activity hierarchy is easiest to scan? ?prototype=activity&variant=A|B|C
+// THROWAWAY #717: D refines the maintainer-selected B summary + C details.
+// Question: which activity hierarchy is easiest to scan? ?prototype=activity&variant=A|B|C|D
 // Simulated memory only. No backend, provider calls, or production design verdict.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fakeFixture } from '../../../src/http/v2/fake-fixture';
@@ -44,8 +44,8 @@ const restrictions = [
   'Eligibility could not be established. Missing evidence is not a no-work result.',
 ];
 type Item = { id: string; category: number; start: number | null };
-const variants = ['A', 'B', 'C'];
-const variantNames = ['Compact ledger', 'Wide activity console', 'Inspector rail'];
+const variants = ['A', 'B', 'C', 'D'];
+const variantNames = ['Compact ledger', 'Wide activity console', 'Inspector rail', 'Minimal B + C'];
 const units = (n: number, count: number) => {
   const noun = [3, 10].includes(n) ? 'PR' : [0, 1, 2, 11].includes(n) ? 'issue' : 'operation';
   return count === 1 ? noun : `${noun}s`;
@@ -107,7 +107,7 @@ export default function ActivityPrototype() {
   const [scenario, setScenario] = useState('Concurrent work');
   const [variant, setVariant] = useState(() => {
     const v = new URLSearchParams(location.search).get('variant');
-    return v && variants.includes(v) ? v : 'A';
+    return v && variants.includes(v) ? v : 'D';
   });
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -208,108 +208,194 @@ export default function ActivityPrototype() {
     if (value === 'Planning context')
       setItems([{ id: 'automatic planning', category: 6, start: t - 56000 }]);
   }
-  const details = (
-    <section
-      id="activity-details"
-      className={`ap-details ap-details-${variant}`}
-      aria-label="Factory activity details"
-      aria-live="off"
-    >
-      <header>
-        <div>
-          <small>{disconnected ? 'LAST KNOWN ACTIVITY' : 'FACTORY ACTIVITY'}</small>
-          <h2>{summary}</h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setPinned(false);
-            setDismissed(true);
-          }}
-          aria-label="Close activity details"
-        >
-          ×
-        </button>
-      </header>
-      <p className="ap-caption">
-        {disconnected
-          ? 'Connection lost. Retained details may be stale.'
-          : 'All managed work, in delivery priority order.'}{' '}
-        {uncertain && 'Execution outcome requires manual investigation.'}
-      </p>
-      <div className="ap-rows">
-        {groups.map((group, i) => (
-          <div key={group.name} className={`ap-row ${group.active.length ? 'is-active' : ''}`}>
-            <span className="ap-order">{String(i + 1).padStart(2, '0')}</span>
-            <i
-              className={`ap-dot ${group.active.length ? 'active' : ''}`}
-              role="img"
-              aria-label={group.active.length ? 'Active' : 'Inactive'}
-            />
-            <div className="ap-row-main">
+  const details =
+    variant === 'D' ? (
+      <section
+        id="activity-details"
+        className="ap-details ap-details-D"
+        aria-label="Factory activity details"
+      >
+        <header>
+          <b>{disconnected ? 'Last known activity' : 'Activity'}</b>
+          <button
+            type="button"
+            aria-label="Close activity details"
+            onClick={() => {
+              setPinned(false);
+              setDismissed(true);
+            }}
+          >
+            ×
+          </button>
+        </header>
+        {uncertain && <p className="ap-warning">Execution outcome unknown</p>}
+        <div className="ap-rows">
+          {groups.map((group, i) => (
+            <div
+              key={group.name}
+              className={`ap-row ${group.active.length ? 'is-active' : ''}`}
+              title={
+                group.active.length
+                  ? `${purposes[i]}. ${group.active.map((item) => item.id).join(', ')}`
+                  : 'Inactive'
+              }
+            >
+              <i
+                className={`ap-dot ${group.active.length ? 'active' : ''}`}
+                role="img"
+                aria-label={group.active.length ? 'Active' : 'Inactive'}
+              />
               <b>{group.name}</b>
-              <small>{group.active.length ? purposes[i] : 'Inactive'}</small>
               {group.active.length > 0 && (
-                <em>{group.active.map((item) => item.id).join(' · ')}</em>
+                <div className="ap-metric">
+                  <span>
+                    {group.active.length} {units(i, group.active.length)}
+                  </span>
+                  <time>{group.start === null ? 'Start unknown' : duration(group.start, now)}</time>
+                </div>
               )}
             </div>
-            <div className="ap-row-metric">
-              <b>
-                {group.active.length
-                  ? `${group.active.length} ${units(i, group.active.length)}`
-                  : '—'}
-              </b>
-              <small>
-                {group.active.length
-                  ? group.start === null
-                    ? 'Start unknown'
-                    : duration(group.start, now)
-                  : 'Inactive'}
-              </small>
-            </div>
-          </div>
-        ))}
-      </div>
-      <aside className="ap-context">
-        <div>
-          <small>STARTING NEW WORK</small>
-          {activeReasons.length ? (
+          ))}
+        </div>
+        {activeReasons.length > 0 && (
+          <div className="ap-restrictions">
+            <small>New work</small>
             <ul>
               {activeReasons.map((i) => (
-                <li key={i}>{restrictions[i]}</li>
+                <li key={i}>
+                  {
+                    [
+                      'Admissions paused',
+                      'Concurrency full',
+                      'Admission allowance exhausted',
+                      'No ready-filter matches',
+                      'No eligible issues found by planner',
+                      'Eligibility unknown',
+                    ][i]
+                  }
+                </li>
               ))}
             </ul>
-          ) : (
-            <p>No observed admission restrictions.</p>
+          </div>
+        )}
+        <footer className="ap-updated">
+          {failures > 0 && (
+            <span className="ap-warning">
+              {disconnected ? 'Disconnected · last known data' : `Refresh failed ${failures}/3`}
+            </span>
           )}
-        </div>
-        <div className="ap-freshness">
-          <small>LAST SUCCESSFUL REFRESH</small>
-          <p>
+          <time dateTime={new Date(lastSuccess).toISOString()}>
+            Updated{' '}
             {new Date(lastSuccess)
               .toISOString()
               .replace('T', ' ')
               .replace(/\.\d+Z$/, ' UTC')}
-            <br />
-            <span>{age(lastSuccess, now)}</span>
-          </p>
-          {failures > 0 && (
-            <p className="ap-warning">
-              {failures} consecutive failed {failures === 1 ? 'attempt' : 'attempts'}
-              {!disconnected && ' · retrying'}
-            </p>
-          )}
-          <p className="ap-note">
-            Elapsed time uses the newest current start. It does not prove recent progress.
-          </p>
+          </time>
+          <span>{age(lastSuccess, now)}</span>
+        </footer>
+      </section>
+    ) : (
+      <section
+        id="activity-details"
+        className={`ap-details ap-details-${variant}`}
+        aria-label="Factory activity details"
+        aria-live="off"
+      >
+        <header>
+          <div>
+            <small>{disconnected ? 'LAST KNOWN ACTIVITY' : 'FACTORY ACTIVITY'}</small>
+            <h2>{summary}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPinned(false);
+              setDismissed(true);
+            }}
+            aria-label="Close activity details"
+          >
+            ×
+          </button>
+        </header>
+        <p className="ap-caption">
+          {disconnected
+            ? 'Connection lost. Retained details may be stale.'
+            : 'All managed work, in delivery priority order.'}{' '}
+          {uncertain && 'Execution outcome requires manual investigation.'}
+        </p>
+        <div className="ap-rows">
+          {groups.map((group, i) => (
+            <div key={group.name} className={`ap-row ${group.active.length ? 'is-active' : ''}`}>
+              <span className="ap-order">{String(i + 1).padStart(2, '0')}</span>
+              <i
+                className={`ap-dot ${group.active.length ? 'active' : ''}`}
+                role="img"
+                aria-label={group.active.length ? 'Active' : 'Inactive'}
+              />
+              <div className="ap-row-main">
+                <b>{group.name}</b>
+                <small>{group.active.length ? purposes[i] : 'Inactive'}</small>
+                {group.active.length > 0 && (
+                  <em>{group.active.map((item) => item.id).join(' · ')}</em>
+                )}
+              </div>
+              <div className="ap-row-metric">
+                <b>
+                  {group.active.length
+                    ? `${group.active.length} ${units(i, group.active.length)}`
+                    : '—'}
+                </b>
+                <small>
+                  {group.active.length
+                    ? group.start === null
+                      ? 'Start unknown'
+                      : duration(group.start, now)
+                    : 'Inactive'}
+                </small>
+              </div>
+            </div>
+          ))}
         </div>
-      </aside>
-    </section>
-  );
+        <aside className="ap-context">
+          <div>
+            <small>STARTING NEW WORK</small>
+            {activeReasons.length ? (
+              <ul>
+                {activeReasons.map((i) => (
+                  <li key={i}>{restrictions[i]}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>No observed admission restrictions.</p>
+            )}
+          </div>
+          <div className="ap-freshness">
+            <small>LAST SUCCESSFUL REFRESH</small>
+            <p>
+              {new Date(lastSuccess)
+                .toISOString()
+                .replace('T', ' ')
+                .replace(/\.\d+Z$/, ' UTC')}
+              <br />
+              <span>{age(lastSuccess, now)}</span>
+            </p>
+            {failures > 0 && (
+              <p className="ap-warning">
+                {failures} consecutive failed {failures === 1 ? 'attempt' : 'attempts'}
+                {!disconnected && ' · retrying'}
+              </p>
+            )}
+            <p className="ap-note">
+              Elapsed time uses the newest current start. It does not prove recent progress.
+            </p>
+          </div>
+        </aside>
+      </section>
+    );
   const activity = (
     <fieldset
       aria-label="Factory activity"
-      className={`ap-anchor ap-anchor-${variant}`}
+      className={`ap-anchor ap-anchor-${variant === 'D' ? 'B' : variant}`}
       onMouseEnter={() => {
         clearTimeout(hoverClose.current);
         setHovered(true);
@@ -368,15 +454,8 @@ export default function ActivityPrototype() {
         onCommand={() => {}}
         activityPrototype={activity}
       />
-      <aside className="ap-lab" aria-label="Prototype scenario controls">
-        <header>
-          <b>Design playground</b>
-          <span>Simulated · no persistence</span>
-        </header>
-        <p>
-          Hover or focus the activity in the top bar. Click to pin. Escape closes. Canvas cards are
-          sample context.
-        </p>
+      <details className="ap-lab" aria-label="Prototype scenario controls">
+        <summary>Simulation controls</summary>
         <label>
           Scenario
           <select value={scenario} onChange={(e) => load(e.target.value)}>
@@ -456,10 +535,7 @@ export default function ActivityPrototype() {
           <input type="checkbox" checked={reduced} onChange={(e) => setReduced(e.target.checked)} />
           Preview reduced motion
         </label>
-        <p className="ap-note">
-          2 restacking PRs + 8 queued = 2 counted. Unmanaged PR #999 is waiting for CI and excluded.
-          Managed waits persist between checks.
-        </p>
+
         <details>
           <summary>Relevant simulated state</summary>
           <pre>
@@ -479,8 +555,7 @@ export default function ActivityPrototype() {
             )}
           </pre>
         </details>
-        <p className="ap-note">Awaiting maintainer design selection. No variant approved.</p>
-      </aside>
+      </details>
       <PrototypeSwitcher variant={variant} change={change} />
     </div>
   );

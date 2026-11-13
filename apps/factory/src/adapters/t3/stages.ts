@@ -200,7 +200,7 @@ function outcome(raw: unknown, intent: Intent, request: StageRequest) {
   if (!completed(thread, request)) return null;
   const result = receiptFromMessage(messages.filter((m) => m.role !== 'system').at(-1));
   if (!result || !matchesReceipt(result, intent, request)) return null;
-  if (!deliveryMatches(result.delivery, detail.data, intent, request)) return null;
+  if (!deliveryMatches(result, detail.data, intent, request)) return null;
   return { thread: { ...thread, latestRunId: thread.latestRunId ?? '' }, result };
 }
 
@@ -258,20 +258,37 @@ function waitingReceipt(
  * in the retained transcript can associate such a receipt. Truncated/ambiguous history
  * stays pending; compatibility never resends completed work or weakens new deliveries. */
 function deliveryMatches(
-  delivery: string | undefined,
+  result: z.infer<typeof receiptSchema>,
   detail: z.infer<typeof stageDetail>,
   intent: Intent,
   request: StageRequest
 ) {
-  if (delivery !== undefined) return delivery === deliveryIdentity(intent, request);
+  if (result.delivery !== undefined) return result.delivery === deliveryIdentity(intent, request);
   if (request.receiptProtocol || request.stage === 'babysitting') return false;
   const instructions = detail.messages.filter(
     (m) =>
       m.role === 'user' &&
       (/Stage \d+ of factory job /.test(m.text) || m.text.startsWith('Use $implement for '))
   );
-  const last = instructions.at(-1)?.text;
-  if (!last) return false;
+  const instruction = instructions.at(-1);
+  if (!instruction) return false;
+  const last = instruction.text;
+  // Identical legacy claims from another delivery cannot be disambiguated safely.
+  // Repeated receipts after this instruction still belong to the same delivery.
+  const boundary = detail.messages.lastIndexOf(instruction);
+  if (
+    detail.messages.slice(0, boundary).some((message) => {
+      const prior = receiptFromMessage(message);
+      return (
+        prior?.jobId === result.jobId &&
+        prior.stage === result.stage &&
+        prior.base === result.base &&
+        prior.commit === result.commit &&
+        prior.outcome === result.outcome
+      );
+    })
+  )
+    return false;
   const index = request.deliveryIndex ?? request.index;
   if (index === 0 && request.stage === 'implementation')
     return last.startsWith(

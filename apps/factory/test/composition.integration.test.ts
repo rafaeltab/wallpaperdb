@@ -136,6 +136,7 @@ it('continues admitted work through publication without an operations-page obser
       base: host.base,
       prs: [pr],
       overrides: { status: 'completed', runCount: 5, latestRunId: 'watcher-5' },
+      holdReview: true,
     });
     await vi.waitFor(
       async () =>

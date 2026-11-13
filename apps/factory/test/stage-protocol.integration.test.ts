@@ -181,6 +181,12 @@ it('reconciles retained review stage 11 from its original prompt after notificat
       [response],
       [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],
       [
+        { role: 'user', text: prompt.replace('Stage 11', 'Stage 10') },
+        response,
+        { role: 'user', text: prompt },
+        response,
+      ],
+      [
         { role: 'user', text: prompt },
         { role: 'user', text: prompt.replace('Stage 11', 'Stage 13') },
         response,

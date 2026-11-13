@@ -1,4 +1,4 @@
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option, Schedule } from 'effect';
 import { Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
@@ -8,6 +8,7 @@ import {
   type PlanningInput,
   type PlanningIssue,
   type Proposal,
+  type Preview,
 } from './contract.js';
 const trusted = (author: string) => author === 'rafaeltab' || author === 'zero-two-rafaeltab';
 function exclusion(issue: PlanningIssue): string | undefined {
@@ -271,6 +272,12 @@ export const PlanLive = Layer.effect(
                     })
                   )
                   .pipe(
+                    // Only retry acquisition. A busy observation has run none of work's effects.
+                    Effect.repeat({
+                      while: (value: Option.Option<Preview>) => Option.isNone(value),
+                      times: 20,
+                      schedule: Schedule.spaced('50 millis'),
+                    }),
                     Effect.flatMap(
                       Option.match({
                         onNone: () =>

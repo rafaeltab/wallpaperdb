@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { diagnostic413, MuuriGrid } from '../../src/MuuriGrid.js';
+import { MuuriGrid } from '../../src/MuuriGrid.js';
 import { MuuriItem } from '../../src/MuuriItem.js';
 
 describe('Dynamic Items Integration', () => {
@@ -239,12 +239,7 @@ describe('Dynamic Items Integration', () => {
 
         return (
           <div>
-            <MuuriGrid
-              id="diagnostic-413"
-              layoutDuration={300}
-              onLayoutStart={onLayoutStart}
-              onLayoutEnd={onLayoutEnd}
-            >
+            <MuuriGrid layoutDuration={300} onLayoutStart={onLayoutStart} onLayoutEnd={onLayoutEnd}>
               {items.map((id) => (
                 <MuuriItem key={id}>
                   <div data-testid={`item-${id}`} style={{ width: 100, height: 100 }}>
@@ -264,57 +259,45 @@ describe('Dynamic Items Integration', () => {
         );
       }
 
-      diagnostic413.length = 0;
-      try {
-        render(<DynamicGrid />);
+      render(<DynamicGrid />);
 
-        await waitFor(
-          () => {
-            expect(screen.getByTestId('item-1')).toBeInTheDocument();
-            expect(screen.getByTestId('item-2')).toBeInTheDocument();
-            expect(screen.getByTestId('item-3')).toBeInTheDocument();
-          },
-          { timeout: 1000 }
-        );
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('item-1')).toBeInTheDocument();
+          expect(screen.getByTestId('item-2')).toBeInTheDocument();
+          expect(screen.getByTestId('item-3')).toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
 
-        diagnostic413.push([
-          'clear',
-          performance.now(),
-          onLayoutStart.mock.calls.length,
-          onLayoutEnd.mock.calls.length,
-        ]);
-        // Clear any initial layout calls
-        onLayoutStart.mockClear();
-        onLayoutEnd.mockClear();
+      // Clear any initial layout calls
+      onLayoutStart.mockClear();
+      onLayoutEnd.mockClear();
 
-        // Remove item 2
-        await act(async () => {
-          diagnostic413.push(['click', performance.now()]);
-          fireEvent.click(screen.getByTestId('remove-2'));
-        });
+      // Remove item 2
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('remove-2'));
+      });
 
-        // Wait for the item to be removed
-        await waitFor(
-          () => {
-            expect(screen.queryByTestId('item-2')).not.toBeInTheDocument();
-          },
-          { timeout: 1000 }
-        );
+      // Wait for the item to be removed
+      await waitFor(
+        () => {
+          expect(screen.queryByTestId('item-2')).not.toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
 
-        // BUG: Layout callbacks should be called after removing an item
-        // Currently, the remove() call with layout: true may not trigger
-        // animated layout if the item removal is instantaneous
-        await waitFor(
-          () => {
-            expect(onLayoutStart).toHaveBeenCalled();
-          },
-          { timeout: 1000 }
-        );
+      // BUG: Layout callbacks should be called after removing an item
+      // Currently, the remove() call with layout: true may not trigger
+      // animated layout if the item removal is instantaneous
+      await waitFor(
+        () => {
+          expect(onLayoutStart).toHaveBeenCalled();
+        },
+        { timeout: 1000 }
+      );
 
-        expect(onLayoutEnd).toHaveBeenCalled();
-      } finally {
-        console.log('[DEBUG-413]', JSON.stringify(diagnostic413));
-      }
+      expect(onLayoutEnd).toHaveBeenCalled();
     });
 
     it('should trigger hide animation before removing item', async () => {

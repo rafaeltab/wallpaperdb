@@ -42,27 +42,27 @@ export const MuuriItem = forwardRef<HTMLDivElement, MuuriItemProps>(function Muu
   const [isPositioned, setIsPositioned] = useState(false);
   const [item, setItem] = useState<MuuriItemType | null>(null);
   const muuriContext = useContext(MuuriContext);
+  const registerItem = muuriContext?.registerItem;
+  const unregisterItem = muuriContext?.unregisterItem;
   const isRegisteredRef = useRef(false);
 
   // Register with grid on mount
   useEffect(() => {
-    if (!elementRef.current || !muuriContext || isRegisteredRef.current) return;
+    if (!elementRef.current || !registerItem || !unregisterItem || isRegisteredRef.current) return;
 
     isRegisteredRef.current = true;
-    const muuriItem = muuriContext.registerItem(elementRef.current, key, () =>
-      setIsPositioned(true)
-    );
+    const muuriItem = registerItem(elementRef.current, key, () => setIsPositioned(true));
     if (muuriItem) {
       setItem(muuriItem);
     }
 
     return () => {
       if (isRegisteredRef.current) {
-        muuriContext.unregisterItem(key);
+        unregisterItem(key);
         isRegisteredRef.current = false;
       }
     };
-  }, [muuriContext, key]);
+  }, [registerItem, unregisterItem, key]);
 
   // Update item when grid initializes (for items registered before grid was ready)
   useEffect(() => {

@@ -19,7 +19,13 @@ it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
   'accepts later-turn %s by delivery and rejects a different delivery regardless of turn',
   (stage) =>
     stageFixture(async ({ host, adapter, intent, request }) => {
-      const current = { ...request, stage, index: 11, ordinal: 12 };
+      const current = {
+        ...request,
+        stage,
+        index: 11,
+        ordinal: 12,
+        previousRunId: 'accepted-predecessor',
+      };
       const receipt = {
         delivery: '1:11',
         jobId: '1',
@@ -219,6 +225,58 @@ it('reconciles retained review stage 11 from its original prompt after notificat
     ).not.toMatchObject({ accepted: true });
     expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
   }));
+it('accepts a retained legacy fresh attempt without rewriting its nonzero initial stage', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const retained = { ...request, index: 3, ordinal: 1 };
+    const directory = join(host.directory, 'legacy-retry');
+    await mkdir(directory);
+    const original = JSON.stringify(retained);
+    await writeFile(join(directory, 'stage-3.json'), original);
+    initializeState(directory);
+    const store = fileStore(directory);
+    expect(await Effect.runPromise(store.saveStage({ ...retained, deliveryIndex: 0 }))).toBe(false);
+    const restored = await Effect.runPromise(fileStore(directory).readStage(3));
+    if (!restored) throw new Error('Missing retained fresh attempt');
+    const receipt = {
+      jobId: intent.id,
+      stage: 'implementation',
+      base: intent.base,
+      commit: host.base,
+      outcome: '<TASK>COMPLETE</TASK>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: false,
+    };
+    const messages = [
+      {
+        role: 'user',
+        text: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Legacy initial launch.`,
+      },
+      { role: 'assistant', runId: 'later-continuation', text: JSON.stringify(receipt) },
+    ];
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 99 },
+      messages,
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, restored))).toMatchObject({
+      accepted: true,
+      stageIndex: 3,
+    });
+    for (const delivery of ['1:0', '1:3']) {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 1 },
+        messages: [{ role: 'assistant', text: JSON.stringify({ ...receipt, delivery }) }],
+      });
+      expect((await Effect.runPromise(adapter.inspectStage(intent, restored)))?.accepted).toBe(
+        delivery === '1:0'
+      );
+    }
+    expect(await readFile(join(directory, 'stage-3.json'), 'utf8')).toBe(original);
+    expect(await Effect.runPromise(fileStore(directory).readStage(3))).toEqual(retained);
+    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+  }));
+
 it('accepts only a structured outcome of the expected completed run at the clean current commit', () =>
   stageFixture(async ({ host, adapter, intent, request, review }) => {
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({

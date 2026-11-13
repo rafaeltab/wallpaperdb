@@ -1,3 +1,4 @@
+import { browserUuid } from '@/lib/browser-uuid';
 import { uploadWallpaperWithDetails } from '@/lib/api/wallpaper';
 import { createUploadQueue } from '../index';
 
@@ -11,7 +12,7 @@ export function createBrowserUploadQueue() {
           file,
           keys.get(file) ??
             (() => {
-              const key = crypto.randomUUID();
+              const key = browserUuid();
               keys.set(file, key);
               return key;
             })(),

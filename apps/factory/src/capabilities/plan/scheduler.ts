@@ -87,7 +87,7 @@ export const SchedulerLive = Layer.effect(
         const snapshot = yield* Effect.flatMap(store.read(), observe);
         const recoveries = yield* issues.recoveries?.() ?? Effect.succeed([]);
         const remaining = snapshot.state.recovering?.filter(
-          (number) => !recoveries.some((item) => item.issue === number)
+          (number) => !recoveries.some((item) => item.issue === number && item.active !== false)
         );
         if (remaining && remaining.length !== snapshot.state.recovering?.length) {
           const next = {

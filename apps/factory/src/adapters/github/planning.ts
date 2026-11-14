@@ -1,3 +1,4 @@
+import { nativeDependencyPages } from './handback.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { Unavailable, type Job } from '../../capabilities/job/index.js';
@@ -130,15 +131,7 @@ export function githubPlanning(
                           ],
                           signal
                         ),
-                        read(
-                          [
-                            'api',
-                            `repos/rafaeltab/wallpaperdb/issues/${number}/dependencies/blocked_by`,
-                            '--paginate',
-                            '--slurp',
-                          ],
-                          signal
-                        ),
+                        nativeDependencyPages(read, number, signal),
                         observeIssue(
                           config.project,
                           number,

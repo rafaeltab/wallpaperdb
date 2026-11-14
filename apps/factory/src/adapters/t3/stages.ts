@@ -4,6 +4,7 @@ import {
   type Execution,
   type Intent,
   type StageRequest,
+  stageDeliveryIndex,
   Unavailable,
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
@@ -290,7 +291,7 @@ function deliveryMatches(
     })
   )
     return false;
-  const index = deliveryIndex(request);
+  const index = stageDeliveryIndex(request);
   if (index === 0 && request.stage === 'implementation')
     return last.startsWith(
       `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}.`
@@ -352,16 +353,7 @@ function currentResume(
 }
 
 function deliveryIdentity(intent: Intent, request: StageRequest) {
-  return `${intent.id}:${deliveryIndex(request)}`;
-}
-
-function deliveryIndex(request: StageRequest) {
-  // Fresh attempts start a new logical delivery at zero, even when their
-  // immutable pre-upgrade stage occupies a later position in the job journal.
-  return (
-    request.deliveryIndex ??
-    (request.stage === 'implementation' && request.previousRunId === null ? 0 : request.index)
-  );
+  return `${intent.id}:${stageDeliveryIndex(request)}`;
 }
 
 function publicationBase(intent: Intent, fallback: string) {

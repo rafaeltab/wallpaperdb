@@ -135,21 +135,21 @@ export function dependencyHandback(
 }
 
 export async function readNativeBlockers(gh: Read, number: number, signal: AbortSignal) {
+  return z
+    .array(z.array(z.object({ number: z.number().int().positive() })))
+    .parse(await nativeDependencyPages(gh, number, signal))
+    .flat();
+}
+export async function nativeDependencyPages(
+  gh: Read,
+  number: number,
+  signal: AbortSignal
+): Promise<unknown> {
   try {
-    return z
-      .array(z.array(z.object({ number: z.number().int().positive() })))
-      .parse(
-        await gh(
-          [
-            'api',
-            `repos/${repo}/issues/${number}/dependencies/blocked_by`,
-            '--paginate',
-            '--slurp',
-          ],
-          signal
-        )
-      )
-      .flat();
+    return await gh(
+      ['api', `repos/${repo}/issues/${number}/dependencies/blocked_by`, '--paginate', '--slurp'],
+      signal
+    );
   } catch (cause) {
     if (!(cause instanceof Error) || !/HTTP (404|410|422)|not supported/i.test(cause.message))
       throw cause;

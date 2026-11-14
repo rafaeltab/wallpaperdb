@@ -1,3 +1,4 @@
+import { nativeDependencyPages } from './handback.js';
 import { Effect, Fiber, Queue, Semaphore } from 'effect';
 import { z } from 'zod';
 import { Unavailable } from '../../capabilities/job/index.js';
@@ -217,12 +218,7 @@ export async function observeIssue(
       '-f',
       `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${n}) { ${issueFields} closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } } } } }`,
     ]),
-    gh([
-      'api',
-      `repos/rafaeltab/wallpaperdb/issues/${n}/dependencies/blocked_by`,
-      '--paginate',
-      '--slurp',
-    ]),
+    nativeDependencyPages(gh, n, signal),
   ]);
   const native = z
     .array(z.array(z.object({ number, html_url: z.string().url() })))

@@ -25,7 +25,7 @@ export function receiptInstructions(
 \`\`\`typescript
 ${responseShape}
 \`\`\`
-Use version 1, jobId=${JSON.stringify(intent.id)}, implemented=${JSON.stringify(String(intent.issue))} and base=${JSON.stringify(intent.base)}. Every true check attests successful required local validation at checked, including formatting and lint. Established repository exemptions require a reason in the retained evidence. checked must match the current clean owning HEAD. ${stage === 'implementation' ? '' : 'reviewed must match checked and attest fresh independent Standards, Spec and Defects reviews at that commit.'} ${['publication', 'babysitting'].includes(stage) ? 'published must also match checked and the authoritative linked PR head.' : ''} Keep detailed validation, review and demonstration evidence in the outside-repository ledger. Do not invent successful checks or a waiting outcome. Registered waits and PR watchers keep you busy until their continuations settle.`;
+Use version 1, jobId=${JSON.stringify(intent.id)}, implemented=${JSON.stringify(String(intent.issue))} and base=${JSON.stringify(intent.base)}. Every true check attests successful required local validation at checked, including formatting and lint. Established repository exemptions require a reason in the retained evidence. checked must match the current clean owning HEAD. ${stage === 'implementation' ? '' : 'reviewed must match checked and attest fresh independent Standards, Spec and Defects reviews at that commit.'} ${['publication', 'babysitting'].includes(stage) ? 'published must also match checked and the authoritative linked PR head.' : ''} Keep detailed validation, review and demonstration evidence in the outside-repository ledger. If prerequisite work is needed, return the dependencies variant without claiming completion or successful checks. Do not invent successful checks or a waiting outcome. Registered waits and PR watchers keep you busy until their continuations settle.`;
 }
 const receiptSchema = z.discriminatedUnion('kind', [
   z
@@ -215,6 +215,8 @@ function comparisonIntent(intent: Intent, request: StageRequest): Intent {
 }
 function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   const scope = `Only ${intent.issueUrl} is authorized. Preserve retained scope and decisions. Only rafaeltab and zero-two-rafaeltab may expand scope. Retained context: ${intent.context}`;
+  if (request.handback)
+    return `Abandon this attempt for validated prerequisites ${JSON.stringify(request.handback)}. Stage ${request.index} of factory job ${intent.id}. ${scope}. Record the blocking edges through the repository GitHub dependency conventions, reusing existing edges and native dependencies where supported, documented body fallback otherwise. Do not relabel or admit prerequisites. Close only an open PR for this attempt's exact branch ${intent.branch}; retain branches, thread, worktree, scope decisions and audit evidence. Leave issue ${intent.issueUrl} open and restore its agreed plan status Planned. Do not clean Git or implement more work. Reread edges, PR closure and project status. Return the same version 1 dependencies response with jobId=${JSON.stringify(intent.id)} and requireUnimplementedIssues=${JSON.stringify(request.handback)}. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
   if (request.reconciliation) return reconciliationPrompt(intent, request, scope);
   if (request.resume && request.stage !== 'babysitting')
     return resumePrompt(intent, request, scope);

@@ -2,6 +2,7 @@ import { z } from 'zod';
 export const intentSchema = z
   .object({
     receiptProtocol: z.literal('delivery-v1').optional(),
+    generation: z.number().int().nonnegative().optional(),
     id: z.string().min(1),
     issue: z.number().int().positive(),
     issueUrl: z.string().url(),
@@ -23,6 +24,7 @@ export const intentSchema = z
 const stageSchema = z
   .object({
     receiptProtocol: z.literal('delivery-v1').optional(),
+    handback: z.array(z.string()).optional(),
     reconciliation: z.enum(['state', 'migration']).optional(),
     repairOrigin: z.number().int().nonnegative().optional(),
     ordinal: z.number().int().positive().optional(),
@@ -166,6 +168,27 @@ const scheduleSchema = z
           .strict()
       )
       .optional(),
+    released: z
+      .array(
+        z
+          .object({
+            jobId: z.string().min(1),
+            admission: z
+              .object({
+                issue: z.number().int().positive(),
+                generation: z.number().int().nonnegative().optional(),
+                base: z.string().regex(/^[a-f0-9]{40}$/),
+                context: z.string(),
+                includeCodeFromIssues: z.array(z.number().int().positive()).optional(),
+                selectionBase: z.string().optional(),
+                prerequisiteEvidence: z.string().optional(),
+                prBase: z.string().optional(),
+              })
+              .strict(),
+          })
+          .strict()
+      )
+      .optional(),
     admissions: z.array(
       z
         .object({
@@ -175,6 +198,7 @@ const scheduleSchema = z
             .string()
             .regex(/^[a-f0-9]{40}$/)
             .optional(),
+          generation: z.number().int().nonnegative().optional(),
           prerequisiteEvidence: z.string().optional(),
           prBase: z.string().optional(),
           base: z.string().regex(/^[a-f0-9]{40}$/),

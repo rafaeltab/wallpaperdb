@@ -1,3 +1,4 @@
+import { dependencyHandback } from './handback.js';
 import { recoverReconciliation, requestReconciliation } from './reconciliation.js';
 import { Effect } from 'effect';
 import {
@@ -254,6 +255,19 @@ function reconcileStage(
     yield* deliver(store, execution, intent, waiting);
     const observed = yield* execution.inspectStage(intent, waiting);
     const evidence = yield* associateStage(store, observed, waiting);
+    const handback = yield* dependencyHandback(
+      store,
+      issues,
+      intent,
+      waiting,
+      evidence,
+      reconciliationLimit
+    );
+    if (handback) {
+      const next = yield* currentStage(store);
+      if (next) yield* deliver(store, execution, intent, next);
+      return handback;
+    }
     const delivery: Delivery = {
       stage: waiting.stage,
       commit: waiting.commit,

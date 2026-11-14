@@ -74,6 +74,24 @@ export const SchedulerLive = Layer.effect(
           const job = yield* pool.job(admission.issue);
           jobs.push(yield* job.status());
         }
+        const abandoned = jobs.flatMap((job, index) =>
+          job.kind === 'job' && job.delivery?.activity === 'dependency-handback'
+            ? [{ jobId: job.intent.id, admission: state.admissions[index] ?? job.intent }]
+            : []
+        );
+        if (abandoned.length) {
+          const removed = new Set(abandoned.map((item) => item.admission.issue));
+          const next = {
+            ...state,
+            revision: state.revision + 1,
+            admissions: state.admissions.filter((item) => !removed.has(item.issue)),
+            released: [...(state.released ?? []), ...abandoned],
+            resuming: state.resuming?.filter((item) => !removed.has(item.issue)),
+            cycle: undefined,
+          };
+          if (yield* store.save(next)) return yield* observe(next);
+          return yield* observe(yield* store.read());
+        }
         const remaining = (state.resuming ?? []).filter((claim) => !recoveredResume(claim, jobs));
         if (remaining.length !== state.resuming?.length && state.resuming) {
           const next = { ...state, revision: state.revision + 1, resuming: remaining };
@@ -108,7 +126,23 @@ export const SchedulerLive = Layer.effect(
         return yield* store.save({
           ...state,
           revision: state.revision + 1,
-          admissions: [...state.admissions, command],
+          admissions: [
+            ...state.admissions,
+            {
+              ...command,
+              ...((state.released ?? []).some((item) => item.admission.issue === command.issue)
+                ? {
+                    generation: (state.released ?? []).filter(
+                      (item) => item.admission.issue === command.issue
+                    ).length,
+                    context:
+                      (state.released ?? [])
+                        .filter((item) => item.admission.issue === command.issue)
+                        .at(-1)?.admission.context ?? command.context,
+                  }
+                : {}),
+            },
+          ],
         });
       });
     const admitRecovery = (
@@ -327,7 +361,9 @@ export const SchedulerLive = Layer.effect(
             context: '',
           };
           if (!(yield* reserve(command, snapshot))) return;
-          const result = yield* (yield* pool.job(selection.issue)).start(command);
+          const result = yield* (yield* pool.job(selection.issue)).start(
+            (yield* store.read()).admissions.find((item) => item.issue === command.issue) ?? command
+          );
           if (result.kind === 'rejected' || result.kind === 'occupied')
             yield* Effect.logWarning(
               'Reserved admission did not report a new started job; retained for reconciliation',
@@ -545,7 +581,10 @@ export const SchedulerLive = Layer.effect(
           if (!dispatchable(issue, snapshot.jobs)) return { kind: 'rejected' as const };
           const resolved = prerequisiteStart(command, issue.prerequisite);
           if (!(yield* reserve(resolved, snapshot))) return { kind: 'occupied' as const };
-          return yield* (yield* pool.job(command.issue)).start(resolved);
+          return yield* (yield* pool.job(command.issue)).start(
+            (yield* store.read()).admissions.find((item) => item.issue === command.issue) ??
+              resolved
+          );
         }).pipe(
           (work) => owned(work, () => Effect.succeed({ kind: 'occupied' as const })),
           writers.withPermits(1),

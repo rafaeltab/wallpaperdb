@@ -54,3 +54,25 @@ it('recovers the pending reconciliation once and retains exhaustion across fresh
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('retains handback responsibility through restart without resending the instruction', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-handback-restart-'));
+  let f = await completionFixture(3, fileStore(directory));
+  try {
+    f.state({ idle: true, dependencies: ['758'] });
+    await f.status();
+    await f.status();
+    expect(f.sends).toHaveLength(1);
+    await f.close();
+    f = await completionFixture(3, fileStore(directory));
+    f.state({ idle: true, run: 2, dependencies: ['758'], handbackVerified: true });
+    expect(await f.status()).toMatchObject({
+      delivery: { activity: 'dependency-handback', active: false },
+    });
+    expect(f.sends).toHaveLength(0);
+    expect(await Effect.runPromise(fileStore(directory).read())).toMatchObject({ issue: 757 });
+  } finally {
+    await f.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

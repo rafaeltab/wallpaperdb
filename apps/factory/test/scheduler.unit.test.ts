@@ -1247,3 +1247,38 @@ it('keeps an interrupted cycle exclusive while its model result awaits local per
     await f.runtime.dispose();
   }
 });
+
+it('refunds a one-admission allowance once and retains abandoned attempt evidence across reopen', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.tick(base));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing first admission');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        commit: base,
+        ready: false,
+        landed: false,
+        active: false,
+        activity: 'dependency-handback',
+      },
+    });
+    const released = await f.run((s) => s.status());
+    expect(released.state.admissions).toEqual([]);
+    expect(released.state.released).toMatchObject([
+      { jobId: first.intent.id, admission: { issue: 1 } },
+    ]);
+    await f.reopen();
+    await f.run((s) => s.status());
+    expect(f.snapshot().released).toHaveLength(1);
+    // Another ready issue can consume the restored allowance, without admitting prerequisites.
+    f.setIssues([issue(2)]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1, 2]);
+    expect(f.snapshot().admissions.map((item) => item.issue)).toEqual([2]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});

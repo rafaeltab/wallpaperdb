@@ -27,6 +27,12 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
       bases: [{ issue: 2, base: 'a'.repeat(40) }],
     },
     recovering: [4],
+    released: [
+      {
+        jobId: 'abandoned',
+        admission: { issue: 5, generation: 0, base: 'a'.repeat(40), context: 'Retained decisions' },
+      },
+    ],
   };
   const competing = await Promise.all([
     Effect.runPromise(store.save(first)),
@@ -42,6 +48,7 @@ export async function scheduleContract(store: ScheduleStore, reopen: () => Sched
     admissions: first.admissions,
     cycle: first.cycle,
     recovering: first.recovering,
+    released: first.released,
   });
   expect(await Effect.runPromise(store.save({ ...read, revision: 0 }))).toBe(false);
   expect(await Effect.runPromise(store.save({ ...read, revision: 1, paused: false }))).toBe(true);

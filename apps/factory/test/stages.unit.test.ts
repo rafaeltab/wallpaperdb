@@ -229,7 +229,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
                 runId,
                 ordinal,
                 commit,
-                accepted,
+                accepted: accepted && ['completed', 'idle'].includes(status),
                 linked: links,
                 waitingForGitHub: waiting,
                 worktreeClean,

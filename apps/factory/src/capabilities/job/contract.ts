@@ -325,6 +325,7 @@ export interface StageEvidence {
   readonly runId: string;
   readonly ordinal: number;
   readonly commit: string;
+  /** A current completed state verified against instruction history, complete inactivity and clean Git. */
   readonly accepted: boolean;
   /** Actual owning worktree cleanliness when observed by the execution adapter. Absence is no proof. */
   readonly worktreeClean?: boolean;

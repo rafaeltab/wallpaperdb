@@ -260,7 +260,7 @@ function reconcileStage(
       ready: false,
       landed: false,
     };
-    const verified = completedEvidence(observation, evidence) ? evidence : null;
+    const verified = completedEvidence(evidence) ? evidence : null;
     const publication =
       verified && ['publication', 'babysitting'].includes(waiting.stage)
         ? yield* issues.pullRequest(intent)
@@ -401,13 +401,8 @@ function suspension(
     return undefined;
   });
 }
-function completedEvidence(
-  observation: Extract<Observation, { kind: 'found' }>,
-  evidence: StageEvidence | null
-): evidence is StageEvidence {
-  return (
-    ['completed', 'idle'].includes(observation.status) && evidence !== null && evidence.accepted
-  );
+function completedEvidence(evidence: StageEvidence | null): evidence is StageEvidence {
+  return evidence?.accepted === true;
 }
 function questionInterruption(
   store: JobStore,

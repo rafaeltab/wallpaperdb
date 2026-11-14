@@ -153,6 +153,13 @@ export function stageExecution(
               signal
             );
             const detail = stageDetail.parse(raw);
+            if (
+              !['idle', 'completed', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+                detail.thread.status
+              ) ||
+              detail.thread.pendingRequestCount !== 0
+            )
+              return null;
             const activity = await inactive(request.threadId, detail.thread.latestRunId, signal);
             if (activity !== 'idle') {
               if (activity !== 'waiting') return null;

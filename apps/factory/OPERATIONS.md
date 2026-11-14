@@ -6,6 +6,8 @@ The host's user manager must remain available after logout. Verify that lingerin
 
 Retain the active release's pinned Node installation, private configuration and dedicated user unit until recovery has been verified. The [installer](scripts/install.ts) records the executable path; moving or removing that installation can break an otherwise intact release.
 
+Completion verification requires the structured T3 MCP connection configured in the [composition root](src/composition/implementation.ts). CLI transcript output alone cannot establish descendant inactivity or registered waits. Missing connection or activity evidence leaves completion unverified.
+
 ## Upgrade and recovery
 
 Stop all writers and back up the entire state directory, including database journals, before migration or restoration. Retain the previous release, unit and private configuration. Verify copied production state through the [migration-only entry point](src/main.ts). Starting a full factory against that copy can contact retained external workers even while admissions are paused. Development and demonstrations need isolated state and controlled external endpoints.

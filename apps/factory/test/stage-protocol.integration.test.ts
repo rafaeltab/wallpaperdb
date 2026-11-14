@@ -43,7 +43,7 @@ it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
         crap: true,
         reviews: stage !== 'implementation',
       };
-      for (const runCount of [14, 1, 500]) {
+      for (const runCount of [14, 27, 500]) {
         await host.save({
           overrides: { status: 'completed', runCount, latestRunId: 'notification-wake' },
           messages: [

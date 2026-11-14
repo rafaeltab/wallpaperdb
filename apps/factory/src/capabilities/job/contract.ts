@@ -277,7 +277,7 @@ export interface Job {
 export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
-/** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; ordinals are observation metadata only. */
+/** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
   readonly receiptProtocol?: 'delivery-v1';
   /** Original verified recovery stage authorizing this manually started continuation. */

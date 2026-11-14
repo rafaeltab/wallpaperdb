@@ -1,0 +1,7 @@
+# Retain relative provider run order
+
+The maintainer clarified [issue #747](https://github.com/rafaeltab/wallpaperdb/issues/747): run numbers may determine the order of T3 results, but the factory cannot predict one exact completion run. This supersedes the prohibition on run-number ordering in [ADR 0006](0006-order-completion-by-logical-delivery.md). Its logical-delivery, validated-receipt and compatibility decisions remain in force; [ADR 0001](0001-keep-execution-authority-in-the-factory.md) does not require completion from an originating run.
+
+Compare a continuation with previously observed or accepted runs to reject stale observations and results. Accept skipped run numbers and multiple continuations of the same logical delivery. Never require equality with a predicted ordinal, an exact next run or the originating provider run ID. Ordering evidence cannot replace the receipt's operation, delivery, comparison, required attestations and current clean commit, or bypass cancellation and uncertain-effect claims.
+
+Manual repair and answered questions retain their observed predecessor order across restart. Restack review must follow its accepted resolution when that retained ordinal is available. Existing provider-ID observations and legacy delivery reconciliation remain compatible; this correction does not introduce another receipt protocol. See the [completion contract](../../README.md#completion-and-ordering).

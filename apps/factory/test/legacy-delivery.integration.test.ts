@@ -163,15 +163,15 @@ for (const explicit of [false, true]) {
           crap: true,
           reviews: false,
         };
-        const complete = (delivery: string | undefined) =>
+        const complete = (delivery: string | undefined, ordinal = 13) =>
           host.save({
-            overrides: { status: 'completed', latestRunId: 'manual-2', runCount: 2 },
+            overrides: { status: 'completed', latestRunId: `manual-${ordinal}`, runCount: ordinal },
             messages: [
               prompt,
               { role: 'user', text: 'Finish this existing implementation.' },
               {
                 role: 'assistant',
-                runId: 'manual-2',
+                runId: `manual-${ordinal}`,
                 text: JSON.stringify({ ...receipt, ...(delivery ? { delivery } : {}) }),
               },
             ],
@@ -181,7 +181,15 @@ for (const explicit of [false, true]) {
         expect(await status()).toMatchObject({
           delivery: { stage: 'implementation', ready: false },
         });
-        await complete(explicit ? `${attempt.id}:0` : undefined);
+        await complete(explicit ? `${attempt.id}:0` : undefined, 9);
+        expect(await status()).toMatchObject({
+          delivery: { stage: 'implementation', ready: false },
+        });
+        expect(await status()).toMatchObject({
+          delivery: { stage: 'implementation', ready: false },
+        });
+        await complete(explicit ? `${attempt.id}:0` : undefined, 21);
+        await status();
         expect(await status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
         expect(await readFile(join(directory, 'stage-3.json'), 'utf8')).toBe(original);
         expect(await Effect.runPromise(fileStore(directory).readStage(3))).toEqual(initial);

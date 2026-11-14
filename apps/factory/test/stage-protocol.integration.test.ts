@@ -225,6 +225,54 @@ it('reconciles retained review stage 11 from its original prompt after notificat
     ).not.toMatchObject({ accepted: true });
     expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
   }));
+it('keeps saturated legacy history uncertain while accepting a long explicit-delivery receipt', () =>
+  stageFixture(async ({ host, adapter, intent, review }) => {
+    const request = { ...review, index: 11, ordinal: 12 };
+    const prompt = {
+      role: 'user',
+      text: `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job ${intent.id}; legacy delivery.`,
+    };
+    const receipt = {
+      jobId: intent.id,
+      stage: 'review',
+      base: intent.base,
+      commit: host.base,
+      outcome: '<REVIEW>COMPLETE</REVIEW>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    const response = { role: 'assistant', runId: 'review-wake', text: JSON.stringify(receipt) };
+    const notes = Array.from({ length: 998 }, (_, index) => ({
+      role: 'system',
+      text: `Background work ${index}`,
+    }));
+    const visible = [...notes, prompt, response];
+    const full = [
+      { ...prompt, text: prompt.text.replace('Stage 11', 'Stage 10') },
+      response,
+      ...visible,
+    ];
+    const inspect = async (messages: typeof visible, current: StageRequest = request) => {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'review-wake', runCount: 14 },
+        messages,
+      });
+      return Effect.runPromise(adapter.inspectStage(intent, current));
+    };
+    expect(await inspect(full)).not.toMatchObject({ accepted: true });
+    // The provider returns only the latest requested messages, hiding the old claim.
+    expect(await inspect(full.slice(-1000))).not.toMatchObject({ accepted: true });
+    expect(await inspect([...notes.slice(1), prompt, response])).toMatchObject({ accepted: true });
+    expect(
+      await inspect(
+        [...notes, prompt, { ...response, text: JSON.stringify({ ...receipt, delivery: '1:11' }) }],
+        { ...request, receiptProtocol: 'delivery-v1' }
+      )
+    ).toMatchObject({ accepted: true });
+  }));
+
 it('accepts a retained legacy fresh attempt without rewriting its nonzero initial stage', () =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const retained = { ...request, index: 3, ordinal: 1 };

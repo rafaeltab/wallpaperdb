@@ -686,9 +686,7 @@ function continuationMatches(
 ) {
   if (target?.kind !== 'job' || target.execution.kind !== 'found') return false;
   return (
-    target.execution.threadId === receipt.threadId &&
-    target.execution.run?.id === receipt.run.id &&
-    target.execution.run.ordinal === receipt.run.ordinal
+    target.execution.threadId === receipt.threadId && target.execution.run?.id === receipt.run.id
   );
 }
 function continuationCapacity(snapshot: ScheduleStatus, reserved = 0) {

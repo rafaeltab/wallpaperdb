@@ -106,6 +106,7 @@ it.each([undefined, false, true])(
           role: 'assistant',
           runId: 'resolve-run',
           text: JSON.stringify({
+            delivery: `${saved.operation}:resolve`,
             operation: saved.operation,
             commit: saved.head,
             outcome: '<RESTACK>COMPLEX</RESTACK>',

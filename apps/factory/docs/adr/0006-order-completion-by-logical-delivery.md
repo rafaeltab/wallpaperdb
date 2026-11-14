@@ -1,0 +1,5 @@
+# Order completion by logical delivery
+
+A factory stage can span independent-review notifications, maintainer continuations and watcher wakes. Following the maintainer decision in [issue #747](https://github.com/rafaeltab/wallpaperdb/issues/747), validated JSON receipts identify the logical operation and delivery; provider run numbers and originating-run equality cannot authorize completion or determine stage order. This supersedes the run-binding completion clause of [ADR 0001](0001-keep-execution-authority-in-the-factory.md), while preserving factory authority, accepted predecessor state, pinned comparisons and current clean-commit checks.
+
+Outstanding deliveries must survive an upgrade without repeating external work. Legacy receipts require their retained factory instruction to establish the delivery, accepting a pending operation when history is insufficient rather than risking a stale replay. Provider IDs remain useful for observation and targeted interruption. The [completion contract](../../README.md#completion-and-ordering) and [upgrade guide](../../OPERATIONS.md#upgrade-and-recovery) describe the protocol and compatibility limits.

@@ -836,7 +836,11 @@ it.each([
   { outcome: 'SIMPLE' as const, review: false, ready: true },
   { outcome: 'COMPLEX' as const, review: true, ready: true },
   { outcome: 'COMPLEX' as const, review: true, repair: true, ready: true },
-  { outcome: 'SIMPLE' as const, staleRun: true, ready: false },
+  { outcome: 'COMPLEX' as const, review: true, resolveOrdinal: 8, reviewOrdinal: 21, ready: true },
+  { outcome: 'COMPLEX' as const, review: true, resolveOrdinal: 8, reviewOrdinal: 4, ready: false },
+  { outcome: 'COMPLEX' as const, review: true, resolveOrdinal: 8, reviewOrdinal: 8, ready: false },
+  { outcome: 'SIMPLE' as const, staleRun: true, ready: true },
+  { outcome: 'SIMPLE' as const, wrongDelivery: true, ready: false },
   { outcome: 'SIMPLE' as const, responseThreadId: 'different-thread', ready: false },
   { outcome: 'COMPLEX' as const, review: false, ready: false },
   { outcome: undefined, review: false, ready: false },
@@ -999,10 +1003,11 @@ it.each(['SIMPLE', 'COMPLEX'] as const)(
                     branch: 'C',
                     model: 'gpt-6.1-sol',
                   }),
-                inspectStage: () =>
+                inspectStage: (_intent, request) =>
                   Effect.succeed({
                     runId: 'publication',
                     ordinal: 3,
+                    stageIndex: request.index,
                     commit: f.c,
                     accepted: true,
                     linked: ['https://github.com/rafaeltab/wallpaperdb/pull/104'],
@@ -1228,6 +1233,7 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
           role: 'assistant',
           runId: 'resolve-run',
           text: JSON.stringify({
+            delivery: `${saved.operation}:resolve`,
             operation: saved.operation,
             commit: saved.head,
             outcome: '<RESTACK>SIMPLE</RESTACK>',

@@ -14,6 +14,7 @@ import {
   type ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
+import { stageDeliveryIndex } from './delivery.js';
 import { adoptManualRepair, recoverManualRepair, retainManualRepair } from './manual-repair.js';
 
 export function reconcileStages(
@@ -31,7 +32,8 @@ export function reconcileStages(
     if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
     yield* store.saveStage({
       index: initialIndex,
-      ...(initialIndex > 0 ? { ordinal: 1 } : {}),
+      receiptProtocol: intent.receiptProtocol,
+      ...(initialIndex > 0 ? { ordinal: 1, deliveryIndex: 0 } : {}),
       stage: 'implementation',
       threadId: observation.threadId,
       commit: intent.base,
@@ -76,6 +78,7 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
+      receiptProtocol: 'delivery-v1',
       comparison: nextComparison(waiting),
       stage:
         waiting.stage === 'publication'
@@ -102,10 +105,23 @@ function advance(
 export function currentStage(store: JobStore) {
   return Effect.gen(function* () {
     let latest: StageRequest | null = null;
+    const stages = new Map<number, StageRequest>();
     for (let index = 0; ; index++) {
       const saved = yield* store.readStage(index);
       if (!saved) return latest;
-      latest = saved;
+      stages.set(index, saved);
+      const source = stages.get(saved.deliveryIndex ?? saved.index);
+      // Pre-upgrade adoptions copied the initial journal position as an alias.
+      // Resolve only a proven same-thread initial implementation; preserve the
+      // immutable records and every explicitly delivered successor's identity.
+      latest =
+        !saved.receiptProtocol &&
+        saved.stage === 'implementation' &&
+        source?.stage === 'implementation' &&
+        source.threadId === saved.threadId &&
+        source.previousRunId === null
+          ? { ...saved, deliveryIndex: stageDeliveryIndex(source) }
+          : saved;
     }
   });
 }
@@ -116,7 +132,7 @@ function publicationMatches(
 ) {
   if (!evidence?.accepted || pr.kind !== 'found') return false;
   return (
-    evidence.runId === accepted.previousRunId &&
+    evidence.stageIndex === accepted.index - 1 &&
     evidence.commit === accepted.commit &&
     reviewedAssociation(pr, accepted.commit) &&
     Boolean(evidence.linked?.includes(pr.url))
@@ -169,7 +185,14 @@ export function associateStage(
 ) {
   return Effect.gen(function* () {
     if (!associatedRun(evidence, request)) return null;
-    if (!adoptedRunMatches(evidence, request)) return null;
+    const current = yield* currentStage(store);
+    const control = yield* store.readControl();
+    if (
+      current?.index !== request.index ||
+      control.cancelled ||
+      !stageRunOrder(current, control, { id: evidence.runId, ordinal: evidence.ordinal })
+    )
+      return null;
     if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
     return evidence;
   });
@@ -188,6 +211,7 @@ function dispatchRepair(
     const request: StageRequest = {
       index: accepted.index + 1,
       stage: 'babysitting',
+      receiptProtocol: 'delivery-v1',
       threadId: accepted.threadId,
       commit: pr.commit,
       comparison: repairComparison(pr, accepted.commit),
@@ -214,7 +238,12 @@ function reconcileStage(
   continuation?: ContinuationAdmission
 ) {
   return Effect.gen(function* () {
-    const suspended = yield* suspension(store, waiting, observation);
+    const control = yield* controlForStage(store, waiting);
+    if (!control.cancelled && observation.run && !stageRunOrder(waiting, control, observation.run))
+      return control.parked?.index === waiting.index
+        ? parkedDelivery(waiting, control)
+        : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };
+    const suspended = yield* suspension(store, waiting, observation, control);
     if (suspended) {
       yield* questionInterruption(store, execution, issues, intent, waiting, observation, time);
       return suspended;
@@ -257,23 +286,57 @@ function associatedRun(
   evidence: StageEvidence | null,
   request: StageRequest
 ): evidence is StageEvidence {
-  if (!evidence || evidence.runId === request.previousRunId) return false;
-  const expected = request.ordinal ?? request.index + 1;
-  if (evidence.ordinal === expected) return true;
   return (
-    request.stage === 'babysitting' &&
-    evidence.ordinal > expected &&
-    evidence.stageIndex === request.index
+    evidence !== null &&
+    evidence.stageIndex === request.index &&
+    // Delivered ordinals encode a lower bound after the accepted predecessor,
+    // not the one turn expected to complete this delivery.
+    (request.observedRunId !== undefined ||
+      request.previousRunId === null ||
+      request.ordinal === undefined ||
+      evidence.ordinal >= request.ordinal)
+  );
+}
+
+export function stageRunOrder(
+  waiting: StageRequest,
+  control: import('./contract.js').Control,
+  run: { readonly id: string; readonly ordinal: number }
+) {
+  const retained =
+    waiting.ordinal === undefined
+      ? undefined
+      : waiting.observedRunId
+        ? { id: waiting.observedRunId, ordinal: waiting.ordinal }
+        : waiting.previousRunId
+          ? {
+              id: waiting.previousRunId,
+              ordinal: waiting.ordinal - (waiting.stage === 'ci' ? 0 : 1),
+            }
+          : undefined;
+  const observations = [
+    retained,
+    control.parked?.index === waiting.index ? control.parked.run : undefined,
+    control.manualRepair?.index === waiting.index ? control.manualRepair.run : undefined,
+  ];
+  return (
+    !control.cancelled &&
+    observations.every(
+      (prior) =>
+        !prior ||
+        run.ordinal > prior.ordinal ||
+        (run.ordinal === prior.ordinal && run.id === prior.id)
+    )
   );
 }
 
 function suspension(
   store: JobStore,
   waiting: StageRequest,
-  observation: Extract<Observation, { kind: 'found' }>
+  observation: Extract<Observation, { kind: 'found' }>,
+  control: import('./contract.js').Control
 ) {
   return Effect.gen(function* () {
-    const control = yield* controlForStage(store, waiting);
     if (control.cancelled)
       return {
         stage: waiting.stage,
@@ -415,7 +478,7 @@ function adoptAnswer(
         previousRunId: parkedRun.id,
         observedRunId: run.id,
         question: observation.question,
-        deliveryIndex: waiting.deliveryIndex ?? waiting.index,
+        deliveryIndex: stageDeliveryIndex(waiting),
         resume: false,
       };
       yield* store.saveStage(request);
@@ -445,13 +508,6 @@ export function hasAnsweredQuestion(observation: Observation, questionId: string
   );
 }
 
-function adoptedRunMatches(evidence: StageEvidence, request: StageRequest) {
-  if (!request.observedRunId) return true;
-  return (
-    evidence.runId === request.observedRunId ||
-    evidence.ordinal > (request.ordinal ?? request.index + 1)
-  );
-}
 function answerContinuation(
   control: import('./contract.js').Control,
   waiting: StageRequest,
@@ -460,7 +516,10 @@ function answerContinuation(
   if (control.parked?.index !== waiting.index) return false;
   if (!hasAnsweredQuestion(observation, control.parked.question.id)) return false;
   return Boolean(
-    observation.run && control.parked.run && observation.run.id !== control.parked.run.id
+    observation.run &&
+      control.parked.run &&
+      observation.run.id !== control.parked.run.id &&
+      observation.run.ordinal > control.parked.run.ordinal
   );
 }
 function adoptedDelivery(

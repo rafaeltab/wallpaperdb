@@ -77,7 +77,7 @@ function validate(namespace: string, name: string, value: unknown) {
     const parsed = stageSchema.parse(value);
     if (parsed.index !== Number(name.split('-')[1].slice(0, -5)))
       throw new Error('Invalid stage index');
-  } else if (/^stage-\d+-run(?:-\d+)?\.json$/.test(name))
+  } else if (/^stage-\d+-run(?:-[a-f0-9]+)?\.json$/.test(name))
     stageSchema.extend({ runId: z.string().min(1) }).parse(value);
   else if (/^writer-\d+\.json$/.test(name)) z.object({ key: z.string().min(1) }).parse(value);
   else if (value === null || typeof value !== 'object')
@@ -125,7 +125,7 @@ function legacy(
     } else if (entry.name.endsWith('.json') && entry.name !== 'format.json') {
       if (
         !namespace &&
-        !/^(?:intent|launch-claimed|stage-\d+(?:-claimed|-run(?:-\d+)?)?|(?:control|wait|schedule|planner)-\d+)\.json$/.test(
+        !/^(?:intent|launch-claimed|stage-\d+(?:-claimed|-run(?:-[a-f0-9]+)?)?|(?:control|wait|schedule|planner)-\d+)\.json$/.test(
           entry.name
         )
       )

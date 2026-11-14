@@ -209,7 +209,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     );
     const watcher = {
       ...waiting,
-      overrides: { status: 'completed', runCount: 5, latestRunId: 'watcher-5' },
+      overrides: { status: 'completed', runCount: 14, latestRunId: 'watcher-14' },
     };
     await host.save(watcher);
     await vi.waitFor(

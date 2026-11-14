@@ -21,6 +21,7 @@ export const ContinuationAdmission = Context.Service<ContinuationAdmission>(
   'wallpaperdb.factory.ContinuationAdmission'
 );
 export interface Intent {
+  readonly receiptProtocol?: 'delivery-v1';
   readonly includeCodeFromIssues?: readonly number[];
   readonly selectionBase?: string;
   readonly id: string;
@@ -61,8 +62,8 @@ export interface JobStore {
   /** Append atomically at revision; competing writers cannot overwrite a deadline or delivery identity. */
   saveWait(state: WaitState): Effect.Effect<boolean, Unavailable>;
   reserve(intent: Intent): Effect.Effect<boolean, Unavailable>;
-  /** First binding per stage/run ordinal wins atomically and survives reopen. Repeating that
-   * binding returns true; any replacement returns false. Records retain the
+  /** Run observations are keyed by exact provider ID and survive reopen. Repeating that
+   * observation returns true; another provider turn has its own record. Records retain the
    * stage/thread/accepted commit and predecessor association for reconciliation. */
   bindRun(
     request: StageRequest,
@@ -276,9 +277,9 @@ export interface Job {
 export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
-/** Immutable stage association, written before any delivery. Ordinal pins single-turn stages. Babysitting watcher turns also require the
- * exact stage delivery identity in their current-run receipt. */
+/** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
+  readonly receiptProtocol?: 'delivery-v1';
   /** Original verified recovery stage authorizing this manually started continuation. */
   readonly repairOrigin?: number;
   readonly comparison?: {
@@ -288,12 +289,15 @@ export interface StageRequest {
     readonly owningHeads?: readonly string[];
   };
   readonly index: number;
+  /** Earliest successor ordinal, or actual observed ordinal for adopted/CI stages.
+   * This retained ordering boundary is never an exact completion target. */
   readonly ordinal?: number;
   readonly continuation?: boolean;
   readonly resume?: boolean;
   readonly observedRunId?: string;
   /** Question already observed on this adopted run, retained atomically with its association. */
   readonly question?: { readonly id: string; readonly text: string };
+  /** Logical delivery within this attempt; adopted continuations retain it. */
   readonly deliveryIndex?: number;
   readonly stage: Stage;
   readonly threadId: string;

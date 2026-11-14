@@ -345,6 +345,7 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
+          delivery: `${saved.operation}:resolve`,
           operation: saved.operation,
           commit: saved.head,
           outcome: '<RESTACK>COMPLEX</RESTACK>',
@@ -2086,6 +2087,7 @@ it.each(['C', 'B'])(
               role: 'assistant',
               runId,
               text: JSON.stringify({
+                delivery: `${intent.id}:${index}`,
                 jobId: intent.id,
                 stage,
                 base: start.parent,
@@ -2199,8 +2201,6 @@ it.each(['C', 'B'])(
             { ...evidence, accepted: true },
             { ...evidence, worktreeClean: false },
             { ...evidence, commit: h1 },
-            { ...evidence, ordinal: evidence.ordinal + 1 },
-            { ...evidence, runId: required(publication.previousRunId) },
             { ...evidence, stageIndex: publication.index + 1 },
           ])
             expect(await Effect.runPromise(retryPort(intent, publication, invalid))).toBe(false);
@@ -2246,7 +2246,7 @@ it.each(['C', 'B'])(
         await Effect.runPromise(
           required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
-            evidence: { ...reviewed.evidence, ordinal: reviewed.evidence.ordinal + 1 },
+            evidence: { ...reviewed.evidence, stageIndex: reviewed.request.index + 1 },
           })
         )
       ).toBe(false);
@@ -2254,7 +2254,7 @@ it.each(['C', 'B'])(
         await Effect.runPromise(
           required(f.reopen().repairReplay)(intent, h1, h2, {
             ...reviewed,
-            evidence: { ...reviewed.evidence, runId: required(reviewed.request.previousRunId) },
+            evidence: { ...reviewed.evidence, commit: h1 },
           })
         )
       ).toBe(false);
@@ -2284,7 +2284,12 @@ it.each(['C', 'B'])(
       ).toBe(false);
       await f.host.save(oldConfig);
       expect(
-        await Effect.runPromise(required(f.reopen().repairReplay)(intent, h1, h2, reviewed))
+        await Effect.runPromise(
+          required(f.reopen().repairReplay)(intent, h1, h2, {
+            ...reviewed,
+            evidence: { ...reviewed.evidence, ordinal: 1, runId: 'later-review-notification' },
+          })
+        )
       ).toBe(true);
       expect(
         await Effect.runPromise(
@@ -2655,6 +2660,7 @@ process.exit(result.status ?? 1);
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
+          delivery: `${saved.operation}:resolve`,
           operation: saved.operation,
           commit: saved.head,
           outcome: '<RESTACK>COMPLEX</RESTACK>',

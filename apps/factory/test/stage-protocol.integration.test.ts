@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Execution } from '../src/adapters/t3/index.js';
+import { fileStore } from '../src/adapters/store/index.js';
+import { initializeState } from '../src/platform/index.js';
 import type { Intent, StageRequest } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
 type Fixture = {
@@ -13,6 +15,62 @@ type Fixture = {
   request: StageRequest;
   review: StageRequest;
 };
+it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
+  'accepts later-turn %s by delivery and rejects a different delivery regardless of turn',
+  (stage) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const current = {
+        ...request,
+        stage,
+        index: 11,
+        ordinal: 12,
+        previousRunId: 'accepted-predecessor',
+      };
+      const receipt = {
+        delivery: '1:11',
+        jobId: '1',
+        stage,
+        base: host.base,
+        commit: host.base,
+        outcome: {
+          implementation: '<TASK>COMPLETE</TASK>',
+          review: '<REVIEW>COMPLETE</REVIEW>',
+          publication: '<PR>CREATED</PR>',
+          babysitting: '<PR>READY</PR>',
+        }[stage],
+        tests: true,
+        coverage: true,
+        crap: true,
+        reviews: stage !== 'implementation',
+      };
+      for (const runCount of [14, 27, 500]) {
+        await host.save({
+          overrides: { status: 'completed', runCount, latestRunId: 'notification-wake' },
+          messages: [
+            { role: 'assistant', runId: 'notification-wake', text: JSON.stringify(receipt) },
+            { role: 'system', text: 'Delegated reviewer completed in another turn.' },
+          ],
+        });
+        expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+          accepted: true,
+          stageIndex: 11,
+        });
+      }
+      await host.save({
+        overrides: { status: 'completed', runCount: 12, latestRunId: 'notification-wake' },
+        messages: [
+          {
+            role: 'assistant',
+            runId: 'notification-wake',
+            text: JSON.stringify({ ...receipt, delivery: '1:10' }),
+          },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        accepted: true,
+      });
+    })
+);
 async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
@@ -49,12 +107,231 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
     await host.cleanup();
   }
 }
+it('reconciles retained review stage 11 from its original prompt after notification wakes and restart', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const retained = {
+      ...request,
+      index: 11,
+      stage: 'review' as const,
+      ordinal: 12,
+      previousRunId: 'implementation-result',
+    };
+    const directory = join(host.directory, 'legacy-review');
+    await mkdir(directory);
+    await writeFile(join(directory, 'stage-11.json'), JSON.stringify(retained));
+    const originalAssociation = JSON.stringify({ ...retained, runId: 'run-12' });
+    await writeFile(join(directory, 'stage-11-run.json'), originalAssociation);
+    initializeState(directory);
+    const store = fileStore(directory);
+    const restored = await Effect.runPromise(store.readStage(11));
+    if (!restored) throw new Error('Missing retained review');
+    const prompt = `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job 1; expected run ordinal 12; predecessor run implementation-result; reviewed starting commit ${host.base}.`;
+    const receipt = {
+      jobId: '1',
+      stage: 'review',
+      base: host.base,
+      commit: host.base,
+      outcome: '<REVIEW>COMPLETE</REVIEW>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    const response = { role: 'assistant', runId: 'run-14', text: JSON.stringify(receipt) };
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+      messages: [
+        { role: 'user', text: prompt },
+        { role: 'assistant', text: 'Independent reviewers completed.' },
+        response,
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, retained))).toMatchObject({
+      accepted: true,
+      stageIndex: 11,
+    });
+    const reopened = t3Execution({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    const evidence = await Effect.runPromise(reopened.inspectStage(intent, restored));
+    expect(evidence).toMatchObject({
+      accepted: true,
+      stageIndex: 11,
+    });
+    if (!evidence) throw new Error('Missing review evidence');
+    expect(await Effect.runPromise(store.bindRun(restored, evidence.runId, evidence.ordinal))).toBe(
+      true
+    );
+    expect(await Effect.runPromise(fileStore(directory).bindRun(restored, evidence.runId, 1))).toBe(
+      true
+    );
+    expect(await readFile(join(directory, 'stage-11-run.json'), 'utf8')).toBe(originalAssociation);
+    expect(await Effect.runPromise(fileStore(directory).readStage(11))).toEqual(retained);
+    if (process.env.FACTORY_RECEIPT_DEMO === '1')
+      process.stdout.write(
+        JSON.stringify({
+          scenario: 'Retained review across notification wakes and restart',
+          stage: restored.index,
+          legacyOrdinal: restored.ordinal,
+          observedOrdinal: evidence.ordinal,
+          accepted: evidence.accepted,
+          receiptStage: evidence.stageIndex,
+          originalAssociationPreserved: true,
+          newDeliveries: (await host.calls()).filter((call) => call.args[1] === 'send').length,
+          protocols: 'isolated controlled T3 and production Git/SQLite adapters',
+        }) + '\n'
+      );
+    for (const messages of [
+      [response],
+      [
+        {
+          role: 'user',
+          text: `${prompt} On completion return JSON with delivery="1:11", jobId="1".`,
+        },
+        response,
+      ],
+      [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],
+      [
+        { role: 'user', text: prompt.replace('Stage 11', 'Stage 10') },
+        response,
+        { role: 'user', text: prompt },
+        response,
+      ],
+      [
+        { role: 'user', text: prompt },
+        { role: 'user', text: prompt.replace('Stage 11', 'Stage 13') },
+        response,
+      ],
+      [{ role: 'user', text: prompt.replace(intent.base, 'f'.repeat(40)) }, response],
+    ]) {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+        messages,
+      });
+      expect(await Effect.runPromise(reopened.inspectStage(intent, retained))).not.toMatchObject({
+        accepted: true,
+      });
+    }
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
+      messages: [{ role: 'user', text: prompt }, response],
+    });
+    expect(
+      await Effect.runPromise(
+        reopened.inspectStage(intent, { ...retained, receiptProtocol: 'delivery-v1' })
+      )
+    ).not.toMatchObject({ accepted: true });
+    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+  }));
+it('keeps saturated legacy history uncertain while accepting a long explicit-delivery receipt', () =>
+  stageFixture(async ({ host, adapter, intent, review }) => {
+    const request = { ...review, index: 11, ordinal: 12 };
+    const prompt = {
+      role: 'user',
+      text: `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job ${intent.id}; legacy delivery.`,
+    };
+    const receipt = {
+      jobId: intent.id,
+      stage: 'review',
+      base: intent.base,
+      commit: host.base,
+      outcome: '<REVIEW>COMPLETE</REVIEW>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    const response = { role: 'assistant', runId: 'review-wake', text: JSON.stringify(receipt) };
+    const notes = Array.from({ length: 998 }, (_, index) => ({
+      role: 'system',
+      text: `Background work ${index}`,
+    }));
+    const visible = [...notes, prompt, response];
+    const full = [
+      { ...prompt, text: prompt.text.replace('Stage 11', 'Stage 10') },
+      response,
+      ...visible,
+    ];
+    const inspect = async (messages: typeof visible, current: StageRequest = request) => {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'review-wake', runCount: 14 },
+        messages,
+      });
+      return Effect.runPromise(adapter.inspectStage(intent, current));
+    };
+    expect(await inspect(full)).not.toMatchObject({ accepted: true });
+    // The provider returns only the latest requested messages, hiding the old claim.
+    expect(await inspect(full.slice(-1000))).not.toMatchObject({ accepted: true });
+    expect(await inspect([...notes.slice(1), prompt, response])).toMatchObject({ accepted: true });
+    expect(
+      await inspect(
+        [...notes, prompt, { ...response, text: JSON.stringify({ ...receipt, delivery: '1:11' }) }],
+        { ...request, receiptProtocol: 'delivery-v1' }
+      )
+    ).toMatchObject({ accepted: true });
+  }));
+
+it('accepts a retained legacy fresh attempt without rewriting its nonzero initial stage', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const retained = { ...request, index: 3, ordinal: 1 };
+    const directory = join(host.directory, 'legacy-retry');
+    await mkdir(directory);
+    const original = JSON.stringify(retained);
+    await writeFile(join(directory, 'stage-3.json'), original);
+    initializeState(directory);
+    const store = fileStore(directory);
+    expect(await Effect.runPromise(store.saveStage({ ...retained, deliveryIndex: 0 }))).toBe(false);
+    const restored = await Effect.runPromise(fileStore(directory).readStage(3));
+    if (!restored) throw new Error('Missing retained fresh attempt');
+    const receipt = {
+      jobId: intent.id,
+      stage: 'implementation',
+      base: intent.base,
+      commit: host.base,
+      outcome: '<TASK>COMPLETE</TASK>',
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: false,
+    };
+    const messages = [
+      {
+        role: 'user',
+        text: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Legacy initial launch.`,
+      },
+      { role: 'assistant', runId: 'later-continuation', text: JSON.stringify(receipt) },
+    ];
+    await host.save({
+      overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 99 },
+      messages,
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, restored))).toMatchObject({
+      accepted: true,
+      stageIndex: 3,
+    });
+    for (const delivery of ['1:0', '1:3']) {
+      await host.save({
+        overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 1 },
+        messages: [{ role: 'assistant', text: JSON.stringify({ ...receipt, delivery }) }],
+      });
+      expect((await Effect.runPromise(adapter.inspectStage(intent, restored)))?.accepted).toBe(
+        delivery === '1:0'
+      );
+    }
+    expect(await readFile(join(directory, 'stage-3.json'), 'utf8')).toBe(original);
+    expect(await Effect.runPromise(fileStore(directory).readStage(3))).toEqual(retained);
+    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+  }));
+
 it('accepts only a structured outcome of the expected completed run at the clean current commit', () =>
   stageFixture(async ({ host, adapter, intent, request, review }) => {
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
     const receipt = {
+      delivery: '1:0',
       jobId: '1',
       stage: 'implementation',
       base: host.base,
@@ -76,23 +353,31 @@ it('accepts only a structured outcome of the expected completed run at the clean
     });
     for (const message of [
       { ...valid, role: 'user' },
-      { ...valid, runId: 'old' },
       { ...valid, text: `> ${valid.text}` },
       { ...valid, text: '<TASK>COMPLETE</TASK>' },
       { ...valid, text: JSON.stringify({ ...receipt, tests: false }) },
       { ...valid, text: JSON.stringify({ ...receipt, base: 'a'.repeat(40) }) },
+      { ...valid, text: JSON.stringify({ ...receipt, jobId: 'another-job' }) },
+      { ...valid, text: JSON.stringify({ ...receipt, outcome: '<PR>CREATED</PR>' }) },
+      { ...valid, text: JSON.stringify({ ...receipt, coverage: false }) },
+      { ...valid, text: JSON.stringify({ ...receipt, crap: false }) },
+      { ...valid, text: JSON.stringify({ ...receipt, unexpected: true }) },
     ]) {
       await host.save({ overrides: finished, messages: [message] });
       expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
         accepted: true,
       });
     }
-    await host.save({ overrides: { ...finished, runCount: 2 }, messages: [valid] });
+    await host.save({
+      overrides: { ...finished, runCount: 2 },
+      messages: [{ ...valid, text: JSON.stringify({ ...receipt, delivery: '1:99' }) }],
+    });
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
     const reviewReceipt = {
       ...receipt,
+      delivery: '1:1',
       stage: 'review',
       outcome: '<REVIEW>COMPLETE</REVIEW>',
       reviews: false,
@@ -208,7 +493,6 @@ it('recognizes only the current expected assistant waiting receipt, without acce
     });
     for (const invalid of [
       { ...message, role: 'user' },
-      { ...message, runId: 'old' },
       { ...message, text: `> ${message.text}` },
       { ...message, text: '<PR>READY</PR>' },
     ]) {
@@ -382,13 +666,14 @@ it('retries a failed implementation with its existing thread, ordinal, scope and
     expect(sends[0].args).toContain('thread-live');
     expect(sends[0].args).toContain(`${intent.id}:stage:1`);
     expect(sends[0].args[3]).toContain('Use $implement');
-    expect(sends[0].args[3]).toContain('expected run ordinal 2');
+    expect(sends[0].args[3]).toContain('delivery 1:1');
     expect(sends[0].args[3]).toContain(intent.issueUrl);
     await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
       _tag: 'Unavailable',
       operation: 'stage-binding-changed',
     });
     const receipt = {
+      delivery: '1:1',
       jobId: intent.id,
       stage: 'implementation',
       base: intent.base,
@@ -410,7 +695,13 @@ it('retries a failed implementation with its existing thread, ordinal, scope and
     });
     await host.save({
       overrides: { status: 'completed' },
-      messages: [{ role: 'assistant', runId: 'run-1', text: JSON.stringify(receipt) }],
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: JSON.stringify({ ...receipt, delivery: '1:0' }),
+        },
+      ],
     });
     expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
       accepted: false,
@@ -442,7 +733,7 @@ it.each(['publication', 'babysitting'] as const)(
       };
       await host.save({
         idempotency: true,
-        overrides: { status: 'failed', runCount: 99, latestRunId: `run-${ordinal}` },
+        overrides: { status: 'failed', runCount: 99, latestRunId: `wrong-predecessor` },
       });
       await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
         _tag: 'Unavailable',
@@ -463,7 +754,7 @@ it.each(['publication', 'babysitting'] as const)(
           : 'without starting another watcher'
       );
       const receipt = {
-        ...(stage === 'babysitting' ? { delivery: `${intent.id}:${index + 1}` } : {}),
+        delivery: `${intent.id}:${index + 1}`,
         jobId: intent.id,
         stage,
         base: intent.base,
@@ -475,15 +766,15 @@ it.each(['publication', 'babysitting'] as const)(
         reviews: true,
       };
       await host.save({
-        overrides: { status: 'completed' },
+        overrides: { status: 'completed', runCount: 99, latestRunId: 'later-turn' },
         messages: [
           { role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(receipt) },
         ],
       });
       expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
         accepted: true,
-        ordinal: ordinal + 1,
-        runId: `run-${ordinal + 1}`,
+        ordinal: 99,
+        runId: 'later-turn',
       });
       const stale =
         stage === 'babysitting'

@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import type { Control, JobStore, Observation, StageRequest } from './contract.js';
+import { stageDeliveryIndex } from './delivery.js';
 
 export function recoverManualRepair(store: JobStore) {
   return Effect.gen(function* () {
@@ -76,7 +77,7 @@ export function adoptManualRepair(
     const previous =
       stage.index === origin.index
         ? origin.run
-        : stage.observedRunId && stage.ordinal
+        : stage.observedRunId && stage.ordinal !== undefined
           ? { id: stage.observedRunId, ordinal: stage.ordinal }
           : undefined;
     if (!previous || run.id === previous.id || run.ordinal <= previous.ordinal) return undefined;
@@ -87,7 +88,7 @@ export function adoptManualRepair(
       previousRunId: previous.id,
       observedRunId: run.id,
       question: observed.question,
-      deliveryIndex: stage.deliveryIndex ?? stage.index,
+      deliveryIndex: stageDeliveryIndex(stage),
       resume: false,
       repairOrigin: origin.index,
     };
@@ -105,7 +106,6 @@ export function adoptManualRepair(
     const saved = yield* store.readStage(request.index);
     return saved?.stage === request.stage &&
       saved.threadId === request.threadId &&
-      saved.ordinal === run.ordinal &&
       saved.observedRunId === run.id &&
       saved.repairOrigin === origin.index
       ? saved

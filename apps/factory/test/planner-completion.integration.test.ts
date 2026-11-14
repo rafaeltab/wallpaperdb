@@ -5,42 +5,45 @@ import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
 import type { AutomaticDeadlineFailure } from '../src/capabilities/plan/index.js';
 
-it('settles its completed model thread without treating cleanup as another plan', async () => {
-  const host = await protocol();
-  const previous = process.env.FACTORY_FIXTURE;
-  process.env.FACTORY_FIXTURE = host.configFile;
-  try {
-    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
-    const planner = t3Planner({
-      ...host.mcp,
-      binary: host.binary,
-      project: host.repository,
-      projectId: 'project-id',
-      stateDirectory: `${host.directory}/planner-state`,
-    });
-    await expect(
-      Effect.runPromise(
-        planner.propose({
-          issues: [],
-          job: { kind: 'empty' },
-          capacity: { concurrency: 1, admission: 2 },
-        })
-      )
-    ).resolves.toEqual({ selected: [], deferred: [] });
-    const cleanups = (await host.calls()).filter(
-      (call) => call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_organize'
-    );
-    expect(cleanups).toHaveLength(1);
-    expect(JSON.parse(cleanups[0].args[2])).toEqual({
-      action: 'settle',
-      threadId: 'planner-thread',
-    });
-  } finally {
-    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = previous;
-    await host.cleanup();
+it.each(['planner-run', 'background-completion-turn', 'maintainer-continuation'])(
+  'settles a completed logical planning response from %s without another plan',
+  async (runId) => {
+    const host = await protocol();
+    const previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    try {
+      await host.save({ planner: { runId, proposal: { selected: [], deferred: [] } } });
+      const planner = t3Planner({
+        ...host.mcp,
+        binary: host.binary,
+        project: host.repository,
+        projectId: 'project-id',
+        stateDirectory: `${host.directory}/planner-state`,
+      });
+      await expect(
+        Effect.runPromise(
+          planner.propose({
+            issues: [],
+            job: { kind: 'empty' },
+            capacity: { concurrency: 1, admission: 2 },
+          })
+        )
+      ).resolves.toEqual({ selected: [], deferred: [] });
+      const cleanups = (await host.calls()).filter(
+        (call) => call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_organize'
+      );
+      expect(cleanups).toHaveLength(1);
+      expect(JSON.parse(cleanups[0].args[2])).toEqual({
+        action: 'settle',
+        threadId: 'planner-thread',
+      });
+    } finally {
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
   }
-});
+);
 
 it.each(['settleFails', 'settleUnconfirmed'])(
   'retains a timely model result across %s, reopen and an expired model deadline',

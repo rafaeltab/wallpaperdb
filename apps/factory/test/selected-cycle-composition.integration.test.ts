@@ -73,7 +73,6 @@ it('composes capacity, explicit code inclusion, base verification and automatic 
     running = await startFactory({
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
-      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

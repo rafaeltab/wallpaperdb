@@ -141,6 +141,14 @@ function githubFixture(directory: string) {
               blockedBy: value.blockedBy,
               timelineItems: value.timelineItems,
               closedByPullRequestsReferences: value.closedByPullRequestsReferences,
+              ...(query.includes('projectItems(')
+                ? {
+                    author: value.author,
+                    labels: value.labels,
+                    assignees: value.assignees,
+                    projectItems: value.projectItems,
+                  }
+                : {}),
             },
           ]);
         } else
@@ -191,6 +199,48 @@ it('rejects an unknown project content state instead of silently removing an iss
   await withSource(async (fixture) => {
     fixture.members[0].content.state = 'UNRECOGNIZED';
     await expect(fixture.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+  });
+});
+
+it('refreshes markerless shared presentation changes for cached closed dependency context after reopen', async () => {
+  await withSource(async (fixture) => {
+    fixture.issues.set(1, {
+      ...issueFixture(),
+      blockedBy: connection([{ number: 2, url: issueUrl(2) }]),
+    });
+    const closed = {
+      ...issueFixture(2),
+      state: 'CLOSED',
+      labels: connection([{ id: 'L2', name: 'original-label', color: 'aaaaaa' }]),
+      projectItems: connection([
+        {
+          project: { id: 'P7', title: 'WallpaperDB', number: 7, owner: { login: 'rafaeltab' } },
+          priority: { name: 'P1', optionId: 'priority-1' },
+          size: null,
+          fieldValueByName: null,
+        },
+      ]),
+    };
+    fixture.issues.set(2, closed);
+    fixture.members.push(projectMember(closed));
+    expect((await fixture.sync()).issues.find((value) => value.number === 2)).toMatchObject({
+      open: false,
+      labelDetails: [{ name: 'original-label', color: 'aaaaaa' }],
+      projectPriority: 'P1',
+    });
+    fixture.issues.set(2, {
+      ...closed,
+      labels: connection([{ id: 'L2', name: 'renamed-label', color: 'bbbbbb' }]),
+      projectItems: connection([
+        { ...closed.projectItems.nodes[0], priority: { name: 'P2', optionId: 'priority-1' } },
+      ]),
+    });
+    fixture.now += 300_001;
+    expect((await fixture.sync()).issues.find((value) => value.number === 2)).toMatchObject({
+      open: false,
+      labelDetails: [{ name: 'renamed-label', color: 'bbbbbb' }],
+      projectPriority: 'P2',
+    });
   });
 });
 

@@ -313,7 +313,7 @@ export function githubObservations(
               (item) => item.__typename === 'Issue' && item.state === 'OPEN'
             );
             if (issuePointers.length > 1000) throw new Error('Issue index exceeds supported bound');
-            const issueFieldsWithContext = `number url parent { number url } comments { totalCount } blockedBy(first:100) { nodes { number url } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } }`;
+            const issueFieldsWithContext = `number url ${issuePresentationFields} blockedBy(first:100) { nodes { number url } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } }`;
             const rawIssues = await snapshot.hydrate(
               'Issue',
               issuePointers.map((item) => item.number),

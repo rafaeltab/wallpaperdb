@@ -878,39 +878,19 @@ it('reports actual clean/head proof for conclusively terminal babysitting withou
   }));
 
 it('resolves omitted publication enrichment through the exact owning thread association', () =>
-  stageFixture(async ({ host, intent, request }) => {
-    const adapter = t3Execution({
-      binary: host.binary,
-      project: host.repository,
-      projectId: 'project-id',
-      ...host.mcp,
-    });
-    const publication = { ...request, stage: 'publication' as const, index: 2 };
+  publicationFixture(async ({ host, adapter, intent, request, complete }) => {
     const url = 'https://github.com/rafaeltab/wallpaperdb/pull/999';
-    const complete = {
-      overrides: { status: 'completed', latestRunId: 'run-1', runCount: 1 },
-      messages: [
-        {
-          role: 'assistant',
-          runId: 'run-1',
-          text: JSON.stringify({
-            delivery: '1:2',
-            jobId: '1',
-            stage: 'publication',
-            base: host.base,
-            commit: host.base,
-            outcome: '<PR>CREATED</PR>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: true,
-          }),
-        },
-      ],
-    };
     // Complete enrichment remains a valid control and needs no extra metadata read.
-    await host.save({ ...complete, overrides: { ...complete.overrides, pullRequests: [{ url }] } });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, publication))).toMatchObject({
+    await host.save({
+      ...complete,
+      overrides: {
+        status: 'completed',
+        latestRunId: 'run-1',
+        runCount: 1,
+        pullRequests: [{ url }],
+      },
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
       accepted: true,
       linked: [url],
     });
@@ -922,7 +902,7 @@ it('resolves omitted publication enrichment through the exact owning thread asso
       omitTranscriptPullRequests: true,
       associationReply: { structuredContent: { pullRequests: [{ url, source: 'agent' }] } },
     });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, publication))).toMatchObject({
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
       accepted: true,
       linked: [url],
     });

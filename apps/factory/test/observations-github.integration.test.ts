@@ -1,5 +1,5 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { githubObservations, githubPlanning } from '../src/adapters/github/index.js';
 import {
   LocalSnapshot,
@@ -624,3 +624,50 @@ it.each(['issue', 'pull'] as const)(
     );
   }
 );
+
+it('publishes a consistently associated issue while related PR runtime hydration remains blocked', async () => {
+  const transport = incrementalTransport({ issueState: 'CLOSED' });
+  let release!: () => void, entered!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+  const source = githubObservations(
+    '/tmp',
+    () => Effect.succeed([]),
+    undefined,
+    async (args) => {
+      if (args.join(' ').includes('reviewDecision')) {
+        entered();
+        await gate;
+      }
+      return transport(args);
+    }
+  );
+  const pending = Effect.runPromise(
+    source.read((item) =>
+      Effect.sync(() => {
+        events.push(item);
+      })
+    )
+  );
+  try {
+    await blocked;
+    await vi.waitFor(
+      () =>
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            kind: 'issue',
+            value: expect.objectContaining({ number: 1, pullRequests: [42] }),
+          })
+        ),
+      { timeout: 1000, interval: 10 }
+    );
+  } finally {
+    release();
+    await pending;
+  }
+});

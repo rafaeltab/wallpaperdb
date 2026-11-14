@@ -400,7 +400,7 @@ export function githubObservations(
             { concurrency: 4 }
           )
         );
-        const facts: Facts = yield* Effect.tryPromise({
+        const collected: { facts: Facts; commit(): void } = yield* Effect.tryPromise({
           try: async (signal) => {
             const lifetime = new AbortController();
             signal = AbortSignal.any([signal, lifetime.signal]);
@@ -545,39 +545,76 @@ export function githubObservations(
                     return [];
                   }
                 });
-                await collectPulls(
-                  [
-                    ...new Set(
-                      values.flatMap((value) => value.pullRequests.map((pr) => pr.number))
-                    ),
-                  ].filter((n) => !pulls.has(n))
-                );
+                const completeValues: typeof values = [];
                 for (const value of values) {
-                  try {
-                    for (const pr of value.pullRequests) {
-                      const previous = pulls.get(pr.number);
-                      if (!previous || previous.state !== pr.state)
-                        throw new Error('Inconsistent related PR observation');
-                      pulls.set(pr.number, {
-                        ...previous,
-                        linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
-                        crossReferencedIssues: [
-                          ...new Set([
-                            ...(previous?.crossReferencedIssues ?? []),
-                            ...pr.crossReferencedIssues,
-                          ]),
-                        ],
+                  const states = new Map<number, z.infer<typeof associationPull>>();
+                  for (const pr of value.pullRequests) {
+                    const observed = pulls.get(pr.number);
+                    if (observed)
+                      states.set(pr.number, {
+                        __typename: 'PullRequest',
+                        number: observed.number,
+                        url: observed.url,
+                        state: observed.state,
                       });
+                  }
+                  const missing = value.pullRequests
+                    .filter((pr) => !states.has(pr.number))
+                    .map((pr) => pr.number);
+                  try {
+                    const raw = await snapshot
+                      .hydrate('PullRequest', missing, associationFields, true)
+                      .catch((cause) => {
+                        for (const n of missing) failed(`pull:${n}`, cause);
+                        throw cause;
+                      });
+                    for (const [n, item] of raw) {
+                      const related = associationPull.parse(item);
+                      if (
+                        related.number !== n ||
+                        related.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
+                      )
+                        throw new Error('Invalid related PR identity');
+                      states.set(n, related);
                     }
+                    for (const pr of value.pullRequests)
+                      if (states.get(pr.number)?.state !== pr.state)
+                        throw new Error('Inconsistent related PR observation');
                   } catch (cause) {
                     failed(`issue:${value.metadata.number}`, cause);
                     continue;
                   }
+                  completeValues.push(value);
                   const existing = issues.findIndex((i) => i.number === value.metadata.number);
                   if (existing >= 0) issues.splice(existing, 1);
                   issues.push(value.metadata);
                   Queue.offerUnsafe(queue, { kind: 'issue', value: value.metadata });
                   pendingIssues.push(...value.metadata.blockers, ...value.metadata.parents);
+                }
+                await collectPulls(
+                  [
+                    ...new Set(
+                      completeValues.flatMap((value) => value.pullRequests.map((pr) => pr.number))
+                    ),
+                  ].filter((n) => !pulls.has(n))
+                );
+                for (const value of completeValues) {
+                  for (const pr of value.pullRequests) {
+                    const previous = pulls.get(pr.number);
+                    // The issue's association was validated independently. Failed PR
+                    // runtime collection retains its previous complete observation.
+                    if (!previous) continue;
+                    pulls.set(pr.number, {
+                      ...previous,
+                      linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
+                      crossReferencedIssues: [
+                        ...new Set([
+                          ...previous.crossReferencedIssues,
+                          ...pr.crossReferencedIssues,
+                        ]),
+                      ],
+                    });
+                  }
                 }
               }
               await initialPulls;
@@ -586,8 +623,7 @@ export function githubObservations(
                 pullRequests: [...pulls.values()],
                 verifiedPrBases: await verifiedBases(gh, [...pulls.values()], signal),
               };
-              snapshot.commit();
-              return facts;
+              return { facts, commit: snapshot.commit };
             } finally {
               lifetime.abort();
               await initialPulls?.catch(() => undefined);
@@ -609,6 +645,11 @@ export function githubObservations(
           return yield* Effect.fail(
             new Unavailable({ operation: 'github-observations', cause: null })
           );
+        yield* Effect.try({
+          try: collected.commit,
+          catch: (cause) => new Unavailable({ operation: 'github-observations', cause }),
+        }).pipe(Effect.tapError(Effect.logError));
+        const facts = collected.facts;
         return {
           ...facts,
           issues: facts.issues.map((issue) => completed.get(issue.number) ?? issue),

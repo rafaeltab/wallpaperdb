@@ -64,7 +64,13 @@ export function controlledObservations(
           };
           if (item.kind === 'issue') issues.set(item.value.number, item.value);
           if (item.kind === 'pull') pulls.set(item.value.number, item.value);
-          if (item.kind === 'job') jobs.set(item.value.intent.id, item.value);
+          if (item.kind === 'job') {
+            const previousJob = jobs.get(item.value.intent.id);
+            jobs.set(item.value.intent.id, {
+              ...item.value,
+              acknowledgement: item.value.acknowledgement ?? previousJob?.acknowledgement,
+            });
+          }
         }
         value = {
           ...value,

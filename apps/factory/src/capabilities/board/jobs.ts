@@ -10,6 +10,11 @@ export function populateJobs(context: ProjectionContext) {
       control = work?.control;
     const current = status?.kind === 'job' ? status : undefined;
     const delivery = current?.delivery;
+    const observation = current
+      ? input.observations.items?.[`job:${current.intent.id}`]
+      : undefined;
+    const observedAt =
+      timestamp(observation?.observedAt) ?? timestamp(input.observations.jobsObservedAt) ?? at;
     const iid = ensureIssue(admission.issue),
       id = jobId(admission.issue);
     const boundPr = delivery?.pr?.kind === 'found' ? delivery.pr : current?.prerequisite;
@@ -41,14 +46,7 @@ export function populateJobs(context: ProjectionContext) {
           readiness: {
             state: delivery?.landed ? ('landed' as const) : ('ready' as const),
             comparison: pr.metadata.value.comparison,
-            verifiedAt:
-              timestamp(
-                current?.intent.id
-                  ? input.observations.items?.[`job:${current.intent.id}`]?.observedAt
-                  : undefined
-              ) ??
-              timestamp(input.observations.jobsObservedAt) ??
-              at,
+            verifiedAt: observedAt,
             sourceIds: [local, gh],
           },
         });
@@ -62,9 +60,7 @@ export function populateJobs(context: ProjectionContext) {
     const resuming = (input.state.resuming ?? []).some((r) => r.issue === admission.issue);
     tables.jobs[id] = entity({
       id,
-      observation: current?.intent.id
-        ? input.observations.items?.[`job:${current.intent.id}`]
-        : undefined,
+      observation,
       issueId: iid,
       pullRequestId: pid,
       threadId: safeTid,
@@ -92,13 +88,7 @@ export function populateJobs(context: ProjectionContext) {
                         : ('unknown' as const),
               },
               local,
-              timestamp(
-                current?.intent.id
-                  ? input.observations.items?.[`job:${current.intent.id}`]?.observedAt
-                  : undefined
-              ) ??
-                timestamp(input.observations.jobsObservedAt) ??
-                at
+              observedAt
             )
           : unknown(local, 'Owning execution not observed. Do not relaunch.'),
       occupiesCapacity: holdsSlot(status ?? { kind: 'empty' }, resuming),

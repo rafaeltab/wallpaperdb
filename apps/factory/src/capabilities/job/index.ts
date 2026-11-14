@@ -20,6 +20,7 @@ export type {
 } from './contract.js';
 export { JobLive } from './implementation.js';
 export { attemptIntent } from './restart.js';
+export { stageDeliveryIndex } from './delivery.js';
 
 export type {
   RecoveryStatus,

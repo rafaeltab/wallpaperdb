@@ -14,6 +14,7 @@ import {
   type ContinuationAdmission,
 } from './contract.js';
 import { watchdog } from './watchdog.js';
+import { stageDeliveryIndex } from './delivery.js';
 import { adoptManualRepair, recoverManualRepair, retainManualRepair } from './manual-repair.js';
 
 export function reconcileStages(
@@ -104,10 +105,23 @@ function advance(
 export function currentStage(store: JobStore) {
   return Effect.gen(function* () {
     let latest: StageRequest | null = null;
+    const stages = new Map<number, StageRequest>();
     for (let index = 0; ; index++) {
       const saved = yield* store.readStage(index);
       if (!saved) return latest;
-      latest = saved;
+      stages.set(index, saved);
+      const source = stages.get(saved.deliveryIndex ?? saved.index);
+      // Pre-upgrade adoptions copied the initial journal position as an alias.
+      // Resolve only a proven same-thread initial implementation; preserve the
+      // immutable records and every explicitly delivered successor's identity.
+      latest =
+        !saved.receiptProtocol &&
+        saved.stage === 'implementation' &&
+        source?.stage === 'implementation' &&
+        source.threadId === saved.threadId &&
+        source.previousRunId === null
+          ? { ...saved, deliveryIndex: stageDeliveryIndex(source) }
+          : saved;
     }
   });
 }
@@ -411,7 +425,7 @@ function adoptAnswer(
         previousRunId: parkedRun.id,
         observedRunId: run.id,
         question: observation.question,
-        deliveryIndex: waiting.deliveryIndex ?? waiting.index,
+        deliveryIndex: stageDeliveryIndex(waiting),
         resume: false,
       };
       yield* store.saveStage(request);

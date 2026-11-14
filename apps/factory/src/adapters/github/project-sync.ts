@@ -7,13 +7,19 @@ export interface ProjectSynchronizationOptions {
   directory?: string;
   now?: () => number;
 }
-const content = z.object({
-  __typename: z.enum(['Issue', 'PullRequest']),
+const contentFields = {
   number: z.number().int().positive(),
   url: z.string().url(),
-  state: z.string(),
   updatedAt: z.string().datetime(),
-});
+};
+const content = z.discriminatedUnion('__typename', [
+  z.object({ ...contentFields, __typename: z.literal('Issue'), state: z.enum(['OPEN', 'CLOSED']) }),
+  z.object({
+    ...contentFields,
+    __typename: z.literal('PullRequest'),
+    state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+  }),
+]);
 const member = z.object({
   id: z.string().min(1),
   updatedAt: z.string().datetime(),

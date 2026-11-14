@@ -82,19 +82,20 @@ export function stageExecution(
             )
               throw new Error('Accepted commit changed before stage delivery');
             if (sendMcp) {
-              await sendMcp(
+              const response = await sendMcp(
                 intent,
                 request,
                 stagePrompt(intent, request, publicationBase(intent, prBase)),
                 signal
               );
+              z.object({ threadId: z.literal(request.threadId) }).parse(response);
               return;
             }
             const help = await sendHelp(signal);
             const key = help.includes('--client-request-id')
               ? ['--client-request-id', `${intent.id}:stage:${request.index}`]
               : [];
-            await call(
+            const response = await call(
               [
                 'send',
                 request.threadId,
@@ -103,6 +104,7 @@ export function stageExecution(
               ],
               signal
             );
+            z.object({ threadId: z.literal(request.threadId) }).parse(response);
           },
           catch: (cause) => new Unavailable({ operation: 'deliver-stage-uncertain', cause }),
         });

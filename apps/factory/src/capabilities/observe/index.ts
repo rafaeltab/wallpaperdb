@@ -17,3 +17,11 @@ export { observationRefreshIntervalMs, observationStaleAfterMs } from './contrac
 export { Threads, ThreadSource, ThreadStore } from './contract.js';
 export { ThreadsLive } from './threads.js';
 export type { ThreadMetadata, ThreadFacts, ThreadState, ThreadSnapshot } from './contract.js';
+
+export { ReportingStore } from './contract.js';
+export type { ItemFreshness, ItemObservation, ReportingState } from './contract.js';
+export { Reporting } from './contract.js';
+export { ReportingLive } from './publication.js';
+export { JobReportingLive } from './jobs.js';
+
+export type { CollectedObservation } from './contract.js';

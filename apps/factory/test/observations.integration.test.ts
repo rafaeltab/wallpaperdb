@@ -1,4 +1,7 @@
-import { observationStoreContract } from './fixtures/observation-contract.js';
+import {
+  observationStoreContract,
+  reportingStoreContract,
+} from './fixtures/observation-contract.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -140,6 +143,45 @@ it('publishes completed scheduler facts at their observation time without refres
       jobsObservedAt: 30,
       recoveries: [{ issue: 4, question: 'Approved scope?', active: false }],
     });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+reportingStoreContract('SQLite observations', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-observe-contract-'));
+  initializeState(directory);
+  return {
+    store: sqliteObservations(directory),
+    close: () => rm(directory, { recursive: true, force: true }),
+  };
+});
+
+it('retains item versions across reopen and rejects an older outstanding collection', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-item-restart-'));
+  try {
+    initializeState(directory);
+    const first = sqliteObservations(directory);
+    const older = await Effect.runPromise(first.begin());
+    const newer = await Effect.runPromise(first.begin());
+    await Effect.runPromise(
+      first.publish(newer, [
+        { kind: 'failure', key: 'issue:1', sequence: 1, at: 40, error: 'offline' },
+      ])
+    );
+    const reopened = sqliteObservations(directory);
+    expect(await Effect.runPromise(reopened.begin())).toBeGreaterThan(newer);
+    await Effect.runPromise(
+      reopened.publish(older, [
+        { kind: 'failure', key: 'issue:1', sequence: 9, at: 50, error: 'old' },
+      ])
+    );
+    expect(await Effect.runPromise(reopened.read())).toMatchObject({
+      items: { 'issue:1': { generation: newer, error: 'offline', failedAt: 40 } },
+    });
+    expect(
+      (await Effect.runPromise(reopened.read())).items?.['issue:1']?.observedAt
+    ).toBeUndefined();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

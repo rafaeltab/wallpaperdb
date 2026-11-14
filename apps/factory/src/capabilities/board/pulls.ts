@@ -2,9 +2,10 @@ import { type ProjectionContext, gh, local, reason, repositoryId } from './conte
 import type { Readiness } from './model.js';
 import { entity, pullId, unknown } from './values.js';
 export function populatePulls(context: ProjectionContext) {
-  const { tables, fact, addUser, addLabel, ensureIssue, facts } = context;
+  const { tables, addUser, addLabel, ensureIssue, facts } = context;
   for (const p of facts?.pullRequests ?? []) {
     const id = pullId(p.number);
+    const fact = context.itemFact(`pull:${p.number}`);
     const comparison = { headOid: p.head, baseOid: p.base, baseRef: p.baseBranch };
     const evidence = { headOid: p.evidenceHead, baseOid: null, baseRef: null };
     const readiness: Readiness = {
@@ -16,6 +17,7 @@ export function populatePulls(context: ProjectionContext) {
       id,
       repositoryId,
       number: p.number,
+      observation: context.input.observations.items?.[`pull:${p.number}`],
       metadata:
         p.title !== undefined && p.draft !== undefined && p.updatedAt && p.labelDetails
           ? fact({

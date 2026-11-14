@@ -1,5 +1,8 @@
 import { controlledObservations } from './fixtures/observations.js';
-import { observationStoreContract } from './fixtures/observation-contract.js';
+import {
+  observationStoreContract,
+  reportingStoreContract,
+} from './fixtures/observation-contract.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { Time, Unavailable } from '../src/capabilities/job/index.js';
@@ -405,3 +408,8 @@ it.each(resumeCases)(
     }
   }
 );
+
+reportingStoreContract('controlled observations', async () => ({
+  store: controlledObservations(),
+  close: async () => undefined,
+}));

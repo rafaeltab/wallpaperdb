@@ -1,4 +1,8 @@
 import {
+  Reporting,
+  ReportingStore,
+  ReportingLive,
+  JobReportingLive,
   Threads,
   ThreadsLive,
   ThreadSource,
@@ -14,6 +18,7 @@ import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
 import {
+  JobReporting,
   Execution,
   ContinuationAdmission,
   Issues,
@@ -187,9 +192,21 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
     },
   });
+  const observationStore = sqliteObservations(configuration.FACTORY_STATE);
+  const reportingRuntime = ManagedRuntime.make(
+    JobReportingLive.pipe(
+      Layer.provideMerge(
+        ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, observationStore)))
+      ),
+      Layer.provide(Layer.succeed(Time, systemTime))
+    )
+  );
+  const reporting = await reportingRuntime.runPromise(Reporting);
+  const jobReporting = await reportingRuntime.runPromise(JobReporting);
   const jobDeps = (directory: string) =>
     Layer.mergeAll(
       Layer.succeed(Time, systemTime),
+      Layer.succeed(JobReporting, jobReporting),
       Layer.succeed(JobStore, fileStore(directory)),
       Layer.succeed(Issues, githubIssues(githubConfig())),
       Layer.succeed(ContinuationAdmission, {
@@ -323,11 +340,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     ),
     Layer.succeed(IPlanner, planner)
   ).pipe(Layer.provideMerge(jobLayer));
-  const observationStore = sqliteObservations(configuration.FACTORY_STATE);
   const observationLayer = ObservationsLive.pipe(
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Time, systemTime),
+        Layer.succeed(Reporting, reporting),
         Layer.succeed(ObservationStore, observationStore),
         Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
         Layer.succeed(
@@ -361,6 +378,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Layer.mergeAll(
         Layer.succeed(Time, systemTime),
         Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
+        Layer.succeed(Reporting, reporting),
         Layer.succeed(ObservationStore, observationStore),
         Layer.succeed(ThreadStore, sqliteThreads(configuration.FACTORY_STATE)),
         Layer.succeed(
@@ -463,6 +481,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       runtime.dispose(),
       ...[...workers.values()].map((worker) => worker.dispose()),
     ]);
+    await reportingRuntime.dispose();
     throw cause;
   });
   const app = operationsServer({
@@ -496,6 +515,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       await github.drain();
       await runtime.dispose();
       await Promise.all([...workers.values()].map((worker) => worker.dispose()));
+      await reportingRuntime.dispose();
     }
     throw cause;
   }
@@ -568,6 +588,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             runtime.dispose(),
             ...[...workers.values()].map((worker) => worker.dispose()),
           ]);
+          await reportingRuntime.dispose();
         }
       }
     })());

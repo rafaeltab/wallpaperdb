@@ -253,3 +253,57 @@ it('keeps metadata demand for an open event stream and releases it after disconn
     await host.cleanup();
   }
 });
+
+it('exposes acknowledged delivery through local HTTP while the provider observation remains blocked', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  let pending: Promise<unknown> | undefined;
+  try {
+    await host.save({ lost: false, delayObserve: true, base: host.base });
+    const service = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: `${host.directory}/state`,
+      FACTORY_PORT: '0',
+    });
+    running = service;
+    pending = service.app
+      .inject({ method: 'POST', url: '/api/job', payload: { issue: 577 } })
+      .then((response) => response.statusCode);
+    await vi.waitFor(
+      async () => {
+        expect((await service.app.inject('/api/job')).json()).toMatchObject({
+          acknowledgement: { stage: 'implementation' },
+          execution: { kind: 'ambiguous' },
+          delivery: { stage: 'implementation', ready: false },
+        });
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    const { readFile } = await import('node:fs/promises');
+    await vi.waitFor(
+      async () => {
+        expect(await readFile(`${host.directory}/observing.pid`, 'utf8')).toMatch(/^[0-9]+$/);
+      },
+      { timeout: 3000, interval: 20 }
+    );
+    expect((await service.app.inject('/health')).statusCode).toBe(200);
+    expect(
+      (await host.calls()).filter(
+        (call) => call.binary === 't3' && call.args[1] === 'start' && !call.args.includes('--help')
+      )
+    ).toHaveLength(1);
+  } finally {
+    await running?.close();
+    await pending;
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

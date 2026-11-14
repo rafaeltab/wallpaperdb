@@ -36,3 +36,4 @@ export type {
 } from './contract.js';
 
 export { eligible, trustedAuthor } from './implementation.js';
+export { JobReporting } from './contract.js';

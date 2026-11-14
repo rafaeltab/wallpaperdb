@@ -1,6 +1,10 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { ObservationStore, Facts } from '../../src/capabilities/observe/index.js';
+import type {
+  ObservationStore,
+  ReportingStore,
+  Facts,
+} from '../../src/capabilities/observe/index.js';
 const facts: Facts = {
   issues: [
     {
@@ -76,6 +80,91 @@ export function observationStoreContract(
         recoveries: [],
         facts,
       });
+    } finally {
+      await close();
+    }
+  });
+}
+
+export function reportingStoreContract(
+  name: string,
+  open: () => Promise<{ store: ObservationStore & ReportingStore; close(): Promise<void> }>
+) {
+  it(`${name} commits complete items independently, rejects delayed versions and retains success dates on failure`, async () => {
+    const { store, close } = await open();
+    try {
+      const older = await Effect.runPromise(store.begin());
+      const newer = await Effect.runPromise(store.begin());
+      const issue = facts.issues[0];
+      if (!issue) throw new Error('Missing issue fixture');
+      await Effect.runPromise(
+        store.publish(newer, [
+          { kind: 'issue', value: { ...issue, title: 'New title' }, sequence: 1, at: 20 },
+        ])
+      );
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        facts: { issues: [{ title: 'New title' }] },
+        items: { 'issue:1': { observedAt: 20 } },
+      });
+      await Effect.runPromise(
+        store.publish(older, [{ kind: 'issue', value: issue, sequence: 99, at: 30 }])
+      );
+      await Effect.runPromise(
+        store.publish(newer, [
+          { kind: 'issue', value: { ...issue, number: 2 }, sequence: 2, at: 30 },
+          { kind: 'failure', key: 'issue:1', error: 'offline', sequence: 2, at: 40 },
+        ])
+      );
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        facts: { issues: [{ title: 'New title' }, { number: 2 }] },
+        items: {
+          'issue:1': { observedAt: 20, failedAt: 40, error: 'offline' },
+          'issue:2': { observedAt: 30 },
+        },
+      });
+      await Effect.runPromise(
+        store.publish(newer, [{ kind: 'issue', value: issue, sequence: 1, at: 50 }])
+      );
+      expect((await Effect.runPromise(store.read())).facts?.issues[0]?.title).toBe('New title');
+    } finally {
+      await close();
+    }
+  });
+  it(`${name} requires authoritative completion for removal and rejects late items after membership replacement`, async () => {
+    const { store, close } = await open();
+    try {
+      const older = await Effect.runPromise(store.begin());
+      const newer = await Effect.runPromise(store.begin());
+      const issue = facts.issues[0];
+      if (!issue) throw new Error('Missing fixture');
+      await Effect.runPromise(
+        store.publish(newer, [
+          { kind: 'issue', value: { ...issue, title: 'New' }, sequence: 1, at: 20 },
+        ])
+      );
+      await Effect.runPromise(
+        store.refresh({
+          generation: older,
+          observedAt: 30,
+          facts: { issues: [], pullRequests: [] },
+        })
+      );
+      expect((await Effect.runPromise(store.read())).facts?.issues).toMatchObject([
+        { title: 'New' },
+      ]);
+      const latest = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.refresh({
+          generation: latest,
+          observedAt: 40,
+          facts: { issues: [], pullRequests: [] },
+        })
+      );
+      await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(newer, [{ kind: 'issue', value: issue, sequence: 3, at: 50 }])
+      );
+      expect((await Effect.runPromise(store.read())).facts?.issues).toEqual([]);
     } finally {
       await close();
     }

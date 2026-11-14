@@ -2951,3 +2951,54 @@ it('exposes job freshness and retained failures on jobs without a PR relationshi
     await app.close();
   }
 });
+
+it.each([
+  { itemAt: 2000, collectionAt: undefined, expected: '1970-01-01T00:00:02.000Z' },
+  { itemAt: 2000, collectionAt: 1000, expected: '1970-01-01T00:00:02.000Z' },
+  { itemAt: undefined, collectionAt: 1000, expected: '1970-01-01T00:00:01.000Z' },
+])(
+  'dates relationship evidence from its owning issue with collection fallback: $itemAt/$collectionAt',
+  async ({ itemAt, collectionAt, expected }) => {
+    const { issueObservation } = await import('./fixtures/v2.js');
+    const input: ScheduleSnapshot = {
+      ...initial,
+      observations: {
+        state: 'error',
+        stale: false,
+        error: 'other-item-offline',
+        observedAt: collectionAt,
+        facts: {
+          issues: [
+            issueObservation(1, {
+              parents: [2],
+              nativeParent: 2,
+              blockers: [3],
+              nativeBlockers: [3],
+            }),
+          ],
+          pullRequests: [],
+        },
+        items:
+          itemAt === undefined
+            ? {}
+            : {
+                'issue:1': { generation: 1, sequence: 1, attemptedAt: itemAt, observedAt: itemAt },
+              },
+      },
+    };
+    const board = await liveBoard({ scopeId: 'issue-relationship-dates', initial: input });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(snapshot.entities.relationships['relationship:parent/2/1']).toMatchObject({
+        evidence: { state: 'known', value: 'github-native', observedAt: expected },
+      });
+      expect(snapshot.entities.relationships['relationship:prerequisite/3/1']).toMatchObject({
+        evidence: { state: 'known', value: 'github-native', observedAt: expected },
+        satisfaction: { state: 'unknown' },
+      });
+    } finally {
+      await app.close();
+    }
+  }
+);

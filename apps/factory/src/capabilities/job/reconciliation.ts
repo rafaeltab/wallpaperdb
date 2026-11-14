@@ -14,11 +14,13 @@ export function requestReconciliation(
   store: JobStore,
   waiting: StageRequest,
   evidence: StageEvidence | null,
-  limit: number
+  limit: number,
+  expectedRevision?: number
 ): Effect.Effect<Delivery | null, Unavailable> {
   return Effect.gen(function* () {
     if (!evidence?.idle) return null;
     const control = yield* store.readControl();
+    if (expectedRevision !== undefined && control.revision !== expectedRevision) return null;
     if (control.cancelled || control.released || control.parked?.index === waiting.index)
       return null;
     const state = control.reconciliation ?? { attempts: 0, migrated: false };

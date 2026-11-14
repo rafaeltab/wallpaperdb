@@ -68,7 +68,7 @@ export const JobLive = Layer.effect(
             observation,
             time,
             continuation,
-            before.restart?.index ?? 0,
+            before,
             policy?.limit ?? defaultAgentReconciliationLimit
           );
           yield* retainPrerequisite(store, delivery);

@@ -75,7 +75,9 @@ export const SchedulerLive = Layer.effect(
           jobs.push(yield* job.status());
         }
         const abandoned = jobs.flatMap((job, index) =>
-          job.kind === 'job' && job.delivery?.activity === 'dependency-handback'
+          job.kind === 'job' &&
+          job.controlRevision !== undefined &&
+          job.delivery?.activity === 'dependency-handback'
             ? [{ jobId: job.intent.id, admission: state.admissions[index] ?? job.intent }]
             : []
         );
@@ -89,7 +91,21 @@ export const SchedulerLive = Layer.effect(
             resuming: state.resuming?.filter((item) => !removed.has(item.issue)),
             cycle: undefined,
           };
-          if (yield* store.save(next)) return yield* observe(next);
+          const guards = jobs.flatMap((job) =>
+            job.kind === 'job' &&
+            job.delivery?.activity === 'dependency-handback' &&
+            job.controlRevision !== undefined
+              ? [
+                  {
+                    issue: job.intent.issue,
+                    generation: job.intent.generation,
+                    jobId: job.intent.id,
+                    controlRevision: job.controlRevision,
+                  },
+                ]
+              : []
+          );
+          if (yield* store.save(next, guards)) return yield* observe(next);
           return yield* observe(yield* store.read());
         }
         const remaining = (state.resuming ?? []).filter((claim) => !recoveredResume(claim, jobs));

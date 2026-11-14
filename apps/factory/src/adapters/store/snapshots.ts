@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { jobStateDirectory } from './namespace.js';
 import { Effect } from 'effect';
 import type { LocalSnapshot } from '../../capabilities/observe/index.js';
 import { fileStore, fileScheduleStore } from './implementation.js';
@@ -13,17 +13,14 @@ export function sqliteLocalSnapshot(directory: string): LocalSnapshot {
         const rootIntent = yield* root.read();
         const entries = [];
         for (const admission of state.admissions) {
-          const store =
-            !admission.generation && rootIntent?.issue === admission.issue
-              ? root
-              : fileStore(
-                  resolve(
-                    directory,
-                    admission.generation
-                      ? `issue-${admission.issue}-generation-${admission.generation}`
-                      : `issue-${admission.issue}`
-                  )
-                );
+          const store = fileStore(
+            jobStateDirectory(
+              directory,
+              admission.issue,
+              admission.generation ?? 0,
+              rootIntent?.issue
+            )
+          );
           entries.push({ intent: yield* store.read(), control: yield* store.readControl() });
         }
         return { state, entries };

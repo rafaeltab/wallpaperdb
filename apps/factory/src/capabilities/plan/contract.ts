@@ -156,17 +156,27 @@ export interface ScheduleState {
   /** Durable active-slot claims for resumption or completed-stage continuation,
    * including uncertain sends, without another distinct admission. */
   readonly resuming?: readonly ResumeClaim[];
-  /** Distinct reservations are permanent, including uncertain starts. */
+  /** Reservations survive uncertain starts; only verified dependency handback releases them. */
   readonly admissions: readonly import('../job/index.js').Start[];
 }
 /** Atomic revision compare-and-set of controls and all admission reservations.
  * A successful save is durable before any job launch. */
+export interface HandbackGuard {
+  readonly issue: number;
+  readonly generation?: number;
+  readonly jobId: string;
+  readonly controlRevision: number;
+}
 export interface ScheduleStore {
   /** Exclusive process-independent execution-cycle ownership. Busy returns None, never
    * waits recursively. Release on interruption/process exit; retained batch state survives. */
   withCycle<A>(work: Effect.Effect<A, Unavailable>): Effect.Effect<Option.Option<A>, Unavailable>;
   read(): Effect.Effect<ScheduleState, Unavailable>;
-  save(state: ScheduleState): Effect.Effect<boolean, Unavailable>;
+  /** Guarded saves atomically verify exact job identity and uncancelled control revision with the schedule CAS. */
+  save(
+    state: ScheduleState,
+    handbacks?: readonly HandbackGuard[]
+  ): Effect.Effect<boolean, Unavailable>;
 }
 export const initialScheduleState: ScheduleState = {
   revision: -1,
@@ -176,7 +186,7 @@ export const initialScheduleState: ScheduleState = {
   admissions: [],
 };
 export const ScheduleStore = Context.Service<ScheduleStore>('wallpaperdb.factory.ScheduleStore');
-/** Stable isolated lifecycle per issue, including after reopening the runtime. */
+/** Isolated current-generation lifecycle per issue, including after reopening the runtime. */
 export interface JobPool {
   job(issue: number): Effect.Effect<import('../job/index.js').Job, Unavailable>;
 }

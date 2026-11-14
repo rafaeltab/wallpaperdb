@@ -37,6 +37,7 @@ import { systemTime } from '../adapters/clock/index.js';
 import {
   fileStore,
   fileScheduleStore,
+  jobStateDirectory,
   sqliteAttemptStore,
   sqliteThreads,
   sqliteObservations,
@@ -279,14 +280,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
                   ),
                   Layer.provide(
                     jobDeps(
-                      generation === 0 && rootIssue === issue
-                        ? configuration.FACTORY_STATE
-                        : resolve(
-                            configuration.FACTORY_STATE,
-                            generation
-                              ? `issue-${issue}-generation-${generation}`
-                              : `issue-${issue}`
-                          )
+                      jobStateDirectory(configuration.FACTORY_STATE, issue, generation, rootIssue)
                     )
                   )
                 )

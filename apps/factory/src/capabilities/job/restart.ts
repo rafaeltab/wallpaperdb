@@ -46,6 +46,7 @@ export function restartAction(
     if (
       !evidence ||
       evidence.accepted ||
+      evidence.idle === false ||
       evidence.runId !== observed.run.id ||
       evidence.stageIndex !== stage.index
     )

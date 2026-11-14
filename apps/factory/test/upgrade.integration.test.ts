@@ -15,6 +15,7 @@ it.each(['{"format":2}', 'null', '{broken'])(
       await expect(
         startFactory({
           FACTORY_PROJECT: host.repository,
+          ...host.mcpEnvironment,
           FACTORY_T3_PROJECT_ID: 'project-id',
           FACTORY_BASE: host.base,
           FACTORY_T3_BINARY: '/missing/t3',
@@ -48,6 +49,7 @@ it('adopts pre-manifest state without discarding controls or reservations', asyn
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

@@ -74,6 +74,7 @@ it('exports actual scheduler failure while liveness succeeds, then recovers thro
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -167,6 +168,7 @@ it('keeps telemetry disabled despite an ambient OTLP endpoint', async () => {
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

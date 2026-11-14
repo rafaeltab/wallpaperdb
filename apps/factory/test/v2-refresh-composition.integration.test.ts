@@ -27,6 +27,7 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
     );
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -106,6 +107,7 @@ it('coalesces empty automatic discovery while continuing scheduler reconciliatio
     await host.save({ planning: { candidates: [], issues: [], openPulls: [] } });
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -180,6 +182,7 @@ it('keeps metadata demand for an open event stream and releases it after disconn
     });
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -265,6 +268,7 @@ it('exposes acknowledged delivery through local HTTP while the provider observat
     await host.save({ lost: false, delayObserve: true, base: host.base });
     const service = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

@@ -16,6 +16,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -172,7 +173,7 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         (await host.calls()).filter(
           (call) =>
             call.binary === 't3' &&
-            ((call.args[1] === 'send' && !call.args.includes('--help')) ||
+            ((['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')) ||
               (call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send'))
         )
       ).toHaveLength(3);
@@ -205,6 +206,7 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -317,6 +319,7 @@ it('previews automatically discovered work without starting an implementation wo
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -372,6 +375,7 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -442,6 +446,7 @@ it('shows conflict classification and pending questions with a recovery-thread l
     await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
     running = await startFactory({
       FACTORY_PROJECT: f.host.repository,
+      ...f.host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: f.host.base,
       FACTORY_T3_BINARY: f.host.binary,
@@ -511,6 +516,7 @@ it.each(['implementation', 'publication'] as const)(
     try {
       const running = await startFactory({
         FACTORY_PROJECT: host.repository,
+        ...host.mcpEnvironment,
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: host.base,
         FACTORY_T3_BINARY: host.binary,

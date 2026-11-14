@@ -51,6 +51,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
     running = await startFactory({
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -115,6 +116,7 @@ it('keeps discovery and freshness outside the bound model deadline across restar
   const configuration = {
     ...host.mcpEnvironment,
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,

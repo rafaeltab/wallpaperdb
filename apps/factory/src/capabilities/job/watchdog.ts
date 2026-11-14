@@ -39,6 +39,8 @@ export function watchdog(
     const saved = yield* store.readWait();
     if (!saved || saved.progress !== progress)
       return yield* recordProgress(store, saved, progress, now, delivery);
+    if (evidence.idle === false)
+      return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };
     if (saved.nudged) return yield* recoverContinuation(store, request, saved, delivery, send);
     if (now < saved.deadline)
       return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };

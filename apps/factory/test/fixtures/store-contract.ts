@@ -5,6 +5,50 @@ export function storeContract(
   name: string,
   setup: () => Promise<{ store: JobStore; reopen: () => JobStore; close: () => Promise<void> }>
 ) {
+  it(`${name}: retains reconciliation budget, migration and exact instruction across reopen and send claims`, async () => {
+    const fixture = await setup();
+    try {
+      const current = await Effect.runPromise(fixture.store.readControl());
+      const pending = {
+        index: 7,
+        stage: 'publication' as const,
+        threadId: 'owner',
+        commit: 'a'.repeat(40),
+        previousRunId: 'run-12',
+        ordinal: 13,
+        reconciliation: 'state' as const,
+      };
+      const reconciliation = { attempts: 3, migrated: true, pending };
+      expect(
+        await Effect.runPromise(
+          fixture.store.saveControl({ ...current, revision: current.revision + 1, reconciliation })
+        )
+      ).toBe(true);
+      const reopened = fixture.reopen();
+      expect((await Effect.runPromise(reopened.readControl())).reconciliation).toEqual(
+        reconciliation
+      );
+      expect(await Effect.runPromise(reopened.saveStage(pending))).toBe(true);
+      expect(await Effect.runPromise(reopened.claimStage(7))).toBe(true);
+      const restarted = fixture.reopen();
+      expect(await Effect.runPromise(restarted.claimStage(7))).toBe(false);
+      expect(await Effect.runPromise(restarted.readStage(7))).toEqual(pending);
+      expect((await Effect.runPromise(restarted.readControl())).reconciliation).toEqual(
+        reconciliation
+      );
+      expect(
+        await Effect.runPromise(
+          restarted.saveControl({
+            ...current,
+            revision: current.revision + 1,
+            reconciliation: { attempts: 0, migrated: false },
+          })
+        )
+      ).toBe(false);
+    } finally {
+      await fixture.close();
+    }
+  });
   it(`${name}: retains verified prerequisite identity across reopen and competing control updates`, async () => {
     const fixture = await setup();
     try {

@@ -219,6 +219,7 @@ it.each([false, true])(
                 Layer.succeed(
                   Execution,
                   t3Execution({
+                    ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
                     binary: f.host.binary,
@@ -633,9 +634,9 @@ it.each([
       expect(prompt).toContain(f.base);
       expect(prompt).toContain(f.landed);
       expect(prompt).toContain(f.original);
-      expect(calls.filter((call) => call.args[1] === 'send')).toHaveLength(
-        recovery.outcome === 'COMPLEX' ? 1 : 0
-      );
+      expect(
+        calls.filter((call) => ['send', 't3_thread_send'].includes(call.args[1]))
+      ).toHaveLength(recovery.outcome === 'COMPLEX' ? 1 : 0);
       if (!recovery.accepted) return;
       const head = ready.prerequisite?.base;
       if (!head) throw new Error('Missing recovered join head');

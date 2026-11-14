@@ -139,7 +139,20 @@ export async function runProtocol(
       process.exit(0);
     }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_list') {
-      console.log(JSON.stringify({ structuredContent: { threads: [], nextCursor: null } }));
+      const resources = readdirSync(config.directory)
+        .filter((name) => /^resource(?:-.*)?\.json$/.test(name))
+        .map((name) => ({
+          ...JSON.parse(readFileSync(join(config.directory, name), 'utf8')),
+          parentThreadId: null,
+        }));
+      console.log(
+        JSON.stringify({
+          structuredContent: {
+            threads: [...resources, ...(config.descendants ?? [])],
+            nextCursor: config.lineageTruncated ? 1 : null,
+          },
+        })
+      );
       process.exit(0);
     }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_organize') {
@@ -995,6 +1008,33 @@ export async function runProtocol(
         reply({
           structuredContent: {
             thread: {
+              activeRunId: null,
+              pendingRequestCount: 0,
+              blockedOnThreadWait: false,
+              pendingBackgroundTasks: [],
+              status: 'completed',
+              ...(() => {
+                const input = JSON.parse(args[2]);
+                const path = join(
+                  config.directory,
+                  config.parallel
+                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
+                    : 'resource.json'
+                );
+                const resource = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+                return {
+                  ...resource,
+                  blockedOnThreadWait:
+                    config.waitingForGithub === true && resource.stage === 'babysitting',
+                };
+              })(),
+              ...config.overrides,
+              pullRequests: (config.overrides?.pullRequests ?? []).map((pr: object) => ({
+                watching: false,
+                ...pr,
+              })),
+              ...(config.descendantSnapshots?.[JSON.parse(args[2]).threadId] ?? {}),
+              threadId: JSON.parse(args[2]).threadId,
               latestRunId: (() => {
                 const input = JSON.parse(args[2]);
                 const path = join(
@@ -1003,7 +1043,10 @@ export async function runProtocol(
                     ? `resource-${input.threadId.replaceAll('/', '-')}.json`
                     : 'resource.json'
                 );
-                return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).latestRunId : null;
+                return (
+                  config.overrides?.latestRunId ??
+                  (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).latestRunId : null)
+                );
               })(),
             },
             items: config.activity ?? [],
@@ -1041,6 +1084,8 @@ export async function runProtocol(
             : 'resource.json'
         ),
         JSON.stringify({
+          instructions: [{ role: 'user', text: args[3] }],
+          issue: args[3].match(/issues\/(\d+)/)?.[1],
           threadId: config.parallel ? flag('--branch') : 'thread-live',
           projectId: 'project-id',
           title: flag('--title'),
@@ -1065,6 +1110,7 @@ export async function runProtocol(
       const resource = JSON.parse(readFileSync(path, 'utf8'));
       const index = Number(args[3].match(/Stage (\d+) of factory/)![1]);
       resource.runCount = Math.max(resource.runCount, config.overrides?.runCount ?? 0) + 1;
+      resource.instructions = [...(resource.instructions ?? []), { role: 'user', text: args[3] }];
       resource.stageIndex = index;
       resource.stage = args[3].includes('$babysit-pr')
         ? 'babysitting'
@@ -1134,61 +1180,46 @@ export async function runProtocol(
                 ...(config.omitTranscriptPullRequests ? { pullRequests: undefined } : {}),
               }
             : null,
-          messages:
-            config.waitingForGithub && resource?.stage === 'babysitting'
-              ? [
-                  {
-                    role: 'assistant',
-                    runId: resource.latestRunId,
-                    text: JSON.stringify({
-                      delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex ?? 0}`,
-                      jobId:
-                        resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8),
-                      stage: 'babysitting',
-                      base: config.base,
-                      outcome: 'WAITING_FOR_GITHUB',
-                    }),
-                  },
-                ]
-              : (((config.holdPublication && resource?.stage === 'publication') ||
-                (config.holdReview && resource?.stage === 'review')
-                  ? []
-                  : config.messages) ??
-                (config.complete && resource
-                  ? [
-                      {
-                        role: 'assistant',
-                        runId: resource.latestRunId,
-                        text: JSON.stringify({
-                          delivery: `${resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8)}:${resource.stageIndex ?? 0}`,
-                          jobId:
-                            resource.title.match(/\[factory:(.*)\]$/)?.[1] ??
-                            resource.title.slice(8),
-                          stage:
-                            resource.stage ??
-                            ['implementation', 'review', 'publication'][resource.runCount - 1],
-                          base: config.base,
-                          commit: config.base,
-                          outcome: {
-                            implementation: '<TASK>COMPLETE</TASK>',
-                            review: '<REVIEW>COMPLETE</REVIEW>',
-                            publication: '<PR>CREATED</PR>',
-                            babysitting: '<PR>READY</PR>',
-                          }[
-                            (resource.stage ?? 'implementation') as
-                              | 'implementation'
-                              | 'review'
-                              | 'publication'
-                              | 'babysitting'
-                          ],
+          messages: config.messages
+            ? [
+                ...(config.omitInstructionHistory ? [] : (resource?.instructions ?? [])),
+                ...config.messages,
+              ]
+            : (((config.holdPublication && resource?.stage === 'publication') ||
+              (config.holdReview && resource?.stage === 'review')
+                ? []
+                : config.messages) ??
+              (config.complete && resource
+                ? [
+                    ...(resource.instructions ?? []),
+                    {
+                      role: 'assistant',
+                      runId: resource.latestRunId,
+                      text: JSON.stringify({
+                        version: 1,
+                        kind: 'state',
+                        jobId:
+                          resource.title.match(/\[factory:(.*)\]$/)?.[1] ?? resource.title.slice(8),
+                        implemented: resource.issue ?? '577',
+                        base: config.base,
+                        checked: config.base,
+                        ...(resource.stage !== 'implementation' && resource.stage
+                          ? { reviewed: config.base }
+                          : {}),
+                        ...(['publication', 'babysitting'].includes(resource.stage)
+                          ? { published: config.base }
+                          : {}),
+                        checks: {
+                          format: true,
+                          lint: true,
                           tests: true,
                           coverage: true,
                           crap: true,
-                          reviews: resource.runCount > 1,
-                        }),
-                      },
-                    ]
-                  : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }]),
+                        },
+                      }),
+                    },
+                  ]
+                : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }]),
         });
     }
     return 0;

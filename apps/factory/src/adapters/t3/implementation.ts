@@ -1,3 +1,4 @@
+import { inactiveLineage } from './inactivity.js';
 import { mcpCall, pendingQuestion } from './questions.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
@@ -183,6 +184,13 @@ ${receiptInstructions(intent, 'implementation')}`,
           .map((pr) => pr.url);
       },
       (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
+      (threadId, runId, signal) =>
+        inactiveLineage(
+          (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
+          threadId,
+          runId,
+          signal
+        ),
       config.mcpEndpoint && config.mcpAuthorizationFile
         ? (intent, request, prompt, signal) =>
             mcpCall(

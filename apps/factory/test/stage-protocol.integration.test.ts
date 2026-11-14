@@ -1,11 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Execution } from '../src/adapters/t3/index.js';
-import { fileStore } from '../src/adapters/store/index.js';
-import { initializeState } from '../src/platform/index.js';
 import type { Intent, StageRequest } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
 type Fixture = {
@@ -15,62 +13,28 @@ type Fixture = {
   request: StageRequest;
   review: StageRequest;
 };
-it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
-  'accepts later-turn %s by delivery and rejects a different delivery regardless of turn',
-  (stage) =>
-    stageFixture(async ({ host, adapter, intent, request }) => {
-      const current = {
-        ...request,
-        stage,
-        index: 11,
-        ordinal: 12,
-        previousRunId: 'accepted-predecessor',
-      };
-      const receipt = {
-        delivery: '1:11',
-        jobId: '1',
-        stage,
-        base: host.base,
-        commit: host.base,
-        outcome: {
-          implementation: '<TASK>COMPLETE</TASK>',
-          review: '<REVIEW>COMPLETE</REVIEW>',
-          publication: '<PR>CREATED</PR>',
-          babysitting: '<PR>READY</PR>',
-        }[stage],
-        tests: true,
-        coverage: true,
-        crap: true,
-        reviews: stage !== 'implementation',
-      };
-      for (const runCount of [14, 27, 500]) {
-        await host.save({
-          overrides: { status: 'completed', runCount, latestRunId: 'notification-wake' },
-          messages: [
-            { role: 'assistant', runId: 'notification-wake', text: JSON.stringify(receipt) },
-            { role: 'system', text: 'Delegated reviewer completed in another turn.' },
-          ],
-        });
-        expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
-          accepted: true,
-          stageIndex: 11,
-        });
-      }
-      await host.save({
-        overrides: { status: 'completed', runCount: 12, latestRunId: 'notification-wake' },
-        messages: [
-          {
-            role: 'assistant',
-            runId: 'notification-wake',
-            text: JSON.stringify({ ...receipt, delivery: '1:10' }),
-          },
-        ],
-      });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
-        accepted: true,
-      });
-    })
-);
+function instruction(intent: Intent, request: StageRequest) {
+  return {
+    role: 'user',
+    text: `Factory instruction ${intent.id}:${request.deliveryIndex ?? request.index}.`,
+  };
+}
+function state(intent: Intent, head: string) {
+  return {
+    version: 1,
+    kind: 'state',
+    jobId: intent.id,
+    implemented: String(intent.issue),
+    base: intent.base,
+    checked: head,
+    reviewed: head,
+    published: head,
+    checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+  };
+}
+function response(intent: Intent, head: string) {
+  return { role: 'assistant', runId: 'run-1', text: JSON.stringify(state(intent, head)) };
+}
 async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
@@ -80,6 +44,7 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
+      ...host.mcp,
     });
     const intent: Intent = {
       id: '1',
@@ -107,709 +72,113 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
     await host.cleanup();
   }
 }
-it('reconciles retained review stage 11 from its original prompt after notification wakes and restart', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    const retained = {
-      ...request,
-      index: 11,
-      stage: 'review' as const,
-      ordinal: 12,
-      previousRunId: 'implementation-result',
-    };
-    const directory = join(host.directory, 'legacy-review');
-    await mkdir(directory);
-    await writeFile(join(directory, 'stage-11.json'), JSON.stringify(retained));
-    const originalAssociation = JSON.stringify({ ...retained, runId: 'run-12' });
-    await writeFile(join(directory, 'stage-11-run.json'), originalAssociation);
-    initializeState(directory);
-    const store = fileStore(directory);
-    const restored = await Effect.runPromise(store.readStage(11));
-    if (!restored) throw new Error('Missing retained review');
-    const prompt = `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job 1; expected run ordinal 12; predecessor run implementation-result; reviewed starting commit ${host.base}.`;
-    const receipt = {
-      jobId: '1',
-      stage: 'review',
-      base: host.base,
-      commit: host.base,
-      outcome: '<REVIEW>COMPLETE</REVIEW>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: true,
-    };
-    const response = { role: 'assistant', runId: 'run-14', text: JSON.stringify(receipt) };
-    await host.save({
-      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
-      messages: [
-        { role: 'user', text: prompt },
-        { role: 'assistant', text: 'Independent reviewers completed.' },
-        response,
-      ],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, retained))).toMatchObject({
-      accepted: true,
-      stageIndex: 11,
-    });
-    const reopened = t3Execution({
-      binary: host.binary,
-      project: host.repository,
-      projectId: 'project-id',
-    });
-    const evidence = await Effect.runPromise(reopened.inspectStage(intent, restored));
-    expect(evidence).toMatchObject({
-      accepted: true,
-      stageIndex: 11,
-    });
-    if (!evidence) throw new Error('Missing review evidence');
-    expect(await Effect.runPromise(store.bindRun(restored, evidence.runId, evidence.ordinal))).toBe(
-      true
-    );
-    expect(await Effect.runPromise(fileStore(directory).bindRun(restored, evidence.runId, 1))).toBe(
-      true
-    );
-    expect(await readFile(join(directory, 'stage-11-run.json'), 'utf8')).toBe(originalAssociation);
-    expect(await Effect.runPromise(fileStore(directory).readStage(11))).toEqual(retained);
-    if (process.env.FACTORY_RECEIPT_DEMO === '1')
-      process.stdout.write(
-        JSON.stringify({
-          scenario: 'Retained review across notification wakes and restart',
-          stage: restored.index,
-          legacyOrdinal: restored.ordinal,
-          observedOrdinal: evidence.ordinal,
-          accepted: evidence.accepted,
-          receiptStage: evidence.stageIndex,
-          originalAssociationPreserved: true,
-          newDeliveries: (await host.calls()).filter((call) => call.args[1] === 'send').length,
-          protocols: 'isolated controlled T3 and production Git/SQLite adapters',
-        }) + '\n'
-      );
-    for (const messages of [
-      [response],
-      [
-        {
-          role: 'user',
-          text: `${prompt} On completion return JSON with delivery="1:11", jobId="1".`,
-        },
-        response,
-      ],
-      [{ role: 'user', text: prompt.replace('Stage 11', 'Stage 10') }, response],
-      [
-        { role: 'user', text: prompt.replace('Stage 11', 'Stage 10') },
-        response,
-        { role: 'user', text: prompt },
-        response,
-      ],
-      [
-        { role: 'user', text: prompt },
-        { role: 'user', text: prompt.replace('Stage 11', 'Stage 13') },
-        response,
-      ],
-      [{ role: 'user', text: prompt.replace(intent.base, 'f'.repeat(40)) }, response],
-    ]) {
-      await host.save({
-        overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
-        messages,
-      });
-      expect(await Effect.runPromise(reopened.inspectStage(intent, retained))).not.toMatchObject({
-        accepted: true,
-      });
-    }
-    await host.save({
-      overrides: { status: 'completed', latestRunId: 'run-14', runCount: 14 },
-      messages: [{ role: 'user', text: prompt }, response],
-    });
-    expect(
-      await Effect.runPromise(
-        reopened.inspectStage(intent, { ...retained, receiptProtocol: 'delivery-v1' })
-      )
-    ).not.toMatchObject({ accepted: true });
-    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
-  }));
-it('keeps saturated legacy history uncertain while accepting a long explicit-delivery receipt', () =>
-  stageFixture(async ({ host, adapter, intent, review }) => {
-    const request = { ...review, index: 11, ordinal: 12 };
-    const prompt = {
-      role: 'user',
-      text: `Use $review-loop for ${intent.issueUrl} against PR target main, pinned comparison ${intent.base}, in this existing bound checkout. Stage 11 of factory job ${intent.id}; legacy delivery.`,
-    };
-    const receipt = {
-      jobId: intent.id,
-      stage: 'review',
-      base: intent.base,
-      commit: host.base,
-      outcome: '<REVIEW>COMPLETE</REVIEW>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: true,
-    };
-    const response = { role: 'assistant', runId: 'review-wake', text: JSON.stringify(receipt) };
-    const notes = Array.from({ length: 998 }, (_, index) => ({
-      role: 'system',
-      text: `Background work ${index}`,
-    }));
-    const visible = [...notes, prompt, response];
-    const full = [
-      { ...prompt, text: prompt.text.replace('Stage 11', 'Stage 10') },
-      response,
-      ...visible,
-    ];
-    const inspect = async (messages: typeof visible, current: StageRequest = request) => {
-      await host.save({
-        overrides: { status: 'completed', latestRunId: 'review-wake', runCount: 14 },
-        messages,
-      });
-      return Effect.runPromise(adapter.inspectStage(intent, current));
-    };
-    expect(await inspect(full)).not.toMatchObject({ accepted: true });
-    // The provider returns only the latest requested messages, hiding the old claim.
-    expect(await inspect(full.slice(-1000))).not.toMatchObject({ accepted: true });
-    expect(await inspect([...notes.slice(1), prompt, response])).toMatchObject({ accepted: true });
-    expect(
-      await inspect(
-        [...notes, prompt, { ...response, text: JSON.stringify({ ...receipt, delivery: '1:11' }) }],
-        { ...request, receiptProtocol: 'delivery-v1' }
-      )
-    ).toMatchObject({ accepted: true });
-  }));
 
-it('accepts a retained legacy fresh attempt without rewriting its nonzero initial stage', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    const retained = { ...request, index: 3, ordinal: 1 };
-    const directory = join(host.directory, 'legacy-retry');
-    await mkdir(directory);
-    const original = JSON.stringify(retained);
-    await writeFile(join(directory, 'stage-3.json'), original);
-    initializeState(directory);
-    const store = fileStore(directory);
-    expect(await Effect.runPromise(store.saveStage({ ...retained, deliveryIndex: 0 }))).toBe(false);
-    const restored = await Effect.runPromise(fileStore(directory).readStage(3));
-    if (!restored) throw new Error('Missing retained fresh attempt');
-    const receipt = {
-      jobId: intent.id,
-      stage: 'implementation',
-      base: intent.base,
-      commit: host.base,
-      outcome: '<TASK>COMPLETE</TASK>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: false,
-    };
-    const messages = [
-      {
-        role: 'user',
-        text: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Legacy initial launch.`,
-      },
-      { role: 'assistant', runId: 'later-continuation', text: JSON.stringify(receipt) },
-    ];
-    await host.save({
-      overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 99 },
-      messages,
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, restored))).toMatchObject({
-      accepted: true,
-      stageIndex: 3,
-    });
-    for (const delivery of ['1:0', '1:3']) {
-      await host.save({
-        overrides: { status: 'completed', latestRunId: 'later-continuation', runCount: 1 },
-        messages: [{ role: 'assistant', text: JSON.stringify({ ...receipt, delivery }) }],
-      });
-      expect((await Effect.runPromise(adapter.inspectStage(intent, restored)))?.accepted).toBe(
-        delivery === '1:0'
-      );
-    }
-    expect(await readFile(join(directory, 'stage-3.json'), 'utf8')).toBe(original);
-    expect(await Effect.runPromise(fileStore(directory).readStage(3))).toEqual(retained);
-    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
-  }));
-
-it('accepts only a structured outcome of the expected completed run at the clean current commit', () =>
-  stageFixture(async ({ host, adapter, intent, request, review }) => {
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
-      accepted: true,
-    });
-    const receipt = {
-      delivery: '1:0',
-      jobId: '1',
-      stage: 'implementation',
-      base: host.base,
-      commit: host.base,
-      outcome: '<TASK>COMPLETE</TASK>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: false,
-    };
-    const valid = { role: 'assistant', runId: 'run-1', text: JSON.stringify(receipt) };
-    const finished = { latestRunId: 'run-1', runCount: 1, status: 'completed' };
-    await host.save({ overrides: finished, messages: [valid] });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
-      accepted: true,
-      commit: host.base,
-      runId: 'run-1',
-      ordinal: 1,
-    });
-    for (const message of [
-      { ...valid, role: 'user' },
-      { ...valid, text: `> ${valid.text}` },
-      { ...valid, text: '<TASK>COMPLETE</TASK>' },
-      { ...valid, text: JSON.stringify({ ...receipt, tests: false }) },
-      { ...valid, text: JSON.stringify({ ...receipt, base: 'a'.repeat(40) }) },
-      { ...valid, text: JSON.stringify({ ...receipt, jobId: 'another-job' }) },
-      { ...valid, text: JSON.stringify({ ...receipt, outcome: '<PR>CREATED</PR>' }) },
-      { ...valid, text: JSON.stringify({ ...receipt, coverage: false }) },
-      { ...valid, text: JSON.stringify({ ...receipt, crap: false }) },
-      { ...valid, text: JSON.stringify({ ...receipt, unexpected: true }) },
-    ]) {
-      await host.save({ overrides: finished, messages: [message] });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
-        accepted: true,
-      });
-    }
-    await host.save({
-      overrides: { ...finished, runCount: 2 },
-      messages: [{ ...valid, text: JSON.stringify({ ...receipt, delivery: '1:99' }) }],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
-      accepted: true,
-    });
-    const reviewReceipt = {
-      ...receipt,
-      delivery: '1:1',
-      stage: 'review',
-      outcome: '<REVIEW>COMPLETE</REVIEW>',
-      reviews: false,
-    };
-    await host.save({
-      overrides: { ...finished, latestRunId: 'run-2', runCount: 2 },
-      messages: [{ ...valid, runId: 'run-2', text: JSON.stringify(reviewReceipt) }],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, review))).not.toMatchObject({
-      accepted: true,
-    });
-    await host.save({
-      overrides: { ...finished, latestRunId: 'run-2', runCount: 2 },
-      messages: [
-        { ...valid, runId: 'run-2', text: JSON.stringify({ ...reviewReceipt, reviews: true }) },
-      ],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, review))).toMatchObject({
-      accepted: true,
-      runId: 'run-2',
-    });
-  }));
-it('refuses stage delivery and acceptance while the worktree has unreviewed changes', () =>
-  stageFixture(async ({ host, adapter, intent, request, review }) => {
-    await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
-      accepted: true,
-    });
-    await writeFile(join(host.directory, 'worker', 'unreviewed.txt'), 'unreviewed change');
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
-      accepted: true,
-    });
-    await expect(Effect.runPromise(adapter.sendStage(intent, review))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-    });
-    expect(
-      (await host.calls()).filter(
-        (call) => call.args[1] === 'send' && !call.args.includes('--help')
-      )
-    ).toHaveLength(0);
-  }));
-it('reconciles the fresh stage outcome after a send response is lost', () =>
-  stageFixture(async ({ host, adapter, intent, review }) => {
-    await host.save({
-      complete: true,
-      base: host.base,
-      lostSend: true,
-      overrides: { status: 'completed' },
-    });
-    await expect(Effect.runPromise(adapter.sendStage(intent, review))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-    });
-    expect(
-      (await host.calls()).filter(
-        (call) => call.args[1] === 'send' && !call.args.includes('--help')
-      )
-    ).toHaveLength(1);
-    expect(await Effect.runPromise(adapter.inspectStage(intent, review))).toMatchObject({
-      accepted: true,
-      runId: 'run-2',
-    });
-  }));
-
-it.each([false, true])(
-  'preserves continuation delivery identity with advertised idempotency=%s',
-  (supported) =>
-    stageFixture(async ({ host, adapter, intent, request }) => {
-      await host.save({
-        idempotency: supported,
-        lostSend: true,
-        overrides: { status: 'completed' },
-      });
-      const continuation = {
-        ...request,
-        stage: 'babysitting' as const,
-        index: 4,
-        ordinal: 4,
-        continuation: true,
-      };
-      await expect(
-        Effect.runPromise(adapter.sendStage(intent, continuation))
-      ).rejects.toMatchObject({ _tag: 'Unavailable' });
-      const sends = (await host.calls()).filter(
-        (call) => call.args[1] === 'send' && !call.args.includes('--help')
-      );
-      expect(sends).toHaveLength(1);
-      expect(sends[0].args[3]).toContain('continue. Use $babysit-pr');
-      expect(sends[0].args[3]).toContain('delivery 1:4');
-      expect(sends[0].args.includes('--client-request-id')).toBe(supported);
-      if (supported) expect(sends[0].args).toContain('1:stage:4');
-    })
-);
-it('recognizes only the current expected assistant waiting receipt, without accepting it as readiness', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    const babysit = { ...request, stage: 'babysitting' as const, index: 4, ordinal: 4 };
-    const overrides = { status: 'completed', runCount: 4, latestRunId: 'repair-4' };
-    const message = {
-      role: 'assistant',
-      runId: 'repair-4',
-      text: JSON.stringify({
-        delivery: `${intent.id}:4`,
-        jobId: intent.id,
-        stage: 'babysitting',
-        base: host.base,
-        outcome: 'WAITING_FOR_GITHUB',
-      }),
-    };
-    await host.save({ overrides, messages: [message] });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
-      accepted: false,
-      waitingForGitHub: true,
-      commit: host.base,
-    });
-    for (const invalid of [
-      { ...message, role: 'user' },
-      { ...message, text: `> ${message.text}` },
-      { ...message, text: '<PR>READY</PR>' },
-    ]) {
-      await host.save({ overrides, messages: [invalid] });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
-        waitingForGitHub: true,
-      });
-    }
-  }));
-it('accepts a latest watcher receipt only with the owning delivery identity and current commit', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    const babysit = { ...request, stage: 'babysitting' as const, index: 4, ordinal: 4 };
-    const overrides = { status: 'completed', runCount: 5, latestRunId: 'watcher-5' };
-    const waiting = {
-      delivery: `${intent.id}:4`,
-      jobId: intent.id,
-      stage: 'babysitting',
-      base: host.base,
-      outcome: 'WAITING_FOR_GITHUB',
-    };
-    const message = { role: 'assistant', runId: 'watcher-5', text: JSON.stringify(waiting) };
-    await host.save({ overrides, messages: [message] });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
-      accepted: false,
-      waitingForGitHub: true,
-      ordinal: 5,
-      stageIndex: 4,
-    });
-    const success = {
-      ...waiting,
-      outcome: '<PR>READY</PR>',
-      commit: host.base,
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: true,
-    };
-    await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(success) }] });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
-      accepted: true,
-      ordinal: 5,
-      stageIndex: 4,
-      runId: 'watcher-5',
-    });
-    for (const invalid of [
-      { ...success, delivery: `${intent.id}:3` },
-      { ...success, commit: 'f'.repeat(40) },
-    ]) {
-      await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(invalid) }] });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
-        accepted: true,
-      });
-    }
-  }));
-
-it('delivers the durable per-job PR target instead of the configured default', () =>
-  stageFixture(async ({ host, adapter, intent, review }) => {
-    await host.save({ lost: false, idempotency: true });
-    await Effect.runPromise(adapter.sendStage({ ...intent, prBase: 'factory/A' }, review));
-    const sends = (await host.calls()).filter(
-      (call) => call.args[1] === 'send' && !call.args.includes('--help')
-    );
-    expect(sends).toHaveLength(1);
-    expect(sends[0].args[3]).toContain(
-      `against PR target factory/A, pinned comparison ${host.base}`
-    );
-  }));
-
-it('delivers owned replay repair against the actual comparison and accepts only its current clean receipt', () =>
-  stageFixture(async ({ host, adapter, intent }) => {
-    const binding = await Effect.runPromise(adapter.observe(intent));
-    if (binding.kind !== 'found') throw new Error('Missing owner');
-    const git = (cwd: string, ...args: string[]) =>
-      execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' }).trim();
-    git(
-      host.repository,
-      '-c',
-      'user.name=Test',
-      '-c',
-      'user.email=test@example.invalid',
-      'commit',
-      '--allow-empty',
-      '-m',
-      'new replay parent'
-    );
-    const parent = git(host.repository, 'rev-parse', 'HEAD');
-    git(
-      host.repository,
-      '-c',
-      'user.name=Test',
-      '-c',
-      'user.email=test@example.invalid',
-      'commit',
-      '--allow-empty',
-      '-m',
-      'replayed issue'
-    );
-    const head = git(host.repository, 'rev-parse', 'HEAD');
-    const request: StageRequest = {
-      index: 3,
-      stage: 'babysitting',
-      threadId: 'thread-live',
-      commit: head,
-      previousRunId: 'published',
-      ordinal: 4,
-      comparison: { base: parent, prBase: 'D', previousHead: host.base },
-    };
-    await host.save({ overrides: { status: 'running' } });
-    await expect(Effect.runPromise(adapter.sendStage(intent, request))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-    });
-    await host.save({ overrides: { status: 'completed' } });
-    await Effect.runPromise(adapter.sendStage(intent, request));
-    const sent = (await host.calls()).filter(
-      (c) => c.args[1] === 'send' && !c.args.includes('--help')
-    );
-    expect(sent).toHaveLength(1);
-    expect(JSON.stringify(sent[0])).toContain(head);
-    expect(JSON.stringify(sent[0])).toContain(parent);
-    expect(JSON.stringify(sent[0])).toContain('actual comparison');
-    git(binding.worktree, 'reset', '--hard', head);
-    const receipt = {
-      delivery: '1:3',
-      jobId: '1',
-      stage: 'babysitting',
-      base: parent,
-      commit: head,
-      outcome: '<PR>READY</PR>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: true,
-    };
-    await host.save({
-      overrides: { status: 'completed', latestRunId: 'fixed', runCount: 4 },
-      messages: [{ role: 'assistant', runId: 'fixed', text: JSON.stringify(receipt) }],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
-      accepted: true,
-      commit: head,
-    });
-    await host.save({
-      overrides: { status: 'completed', latestRunId: 'fixed', runCount: 4 },
-      messages: [
-        {
-          role: 'assistant',
-          runId: 'fixed',
-          text: JSON.stringify({ ...receipt, base: host.base }),
-        },
-      ],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
-      accepted: true,
-    });
-  }));
-
-it('retries a failed implementation with its existing thread, ordinal, scope and receipt association', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    await host.save({ idempotency: true, overrides: { status: 'failed' } });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
-      runId: 'run-1',
-      ordinal: 1,
-      accepted: false,
-    });
-    const retry = { ...request, index: 1, ordinal: 2, previousRunId: 'run-1', resume: true };
-    await Effect.runPromise(adapter.sendStage(intent, retry));
-    const sends = (await host.calls()).filter(
-      (call) => call.args[1] === 'send' && !call.args.includes('--help')
-    );
-    expect(sends).toHaveLength(1);
-    expect(sends[0].args).toContain('thread-live');
-    expect(sends[0].args).toContain(`${intent.id}:stage:1`);
-    expect(sends[0].args[3]).toContain('Use $implement');
-    expect(sends[0].args[3]).toContain('delivery 1:1');
-    expect(sends[0].args[3]).toContain(intent.issueUrl);
-    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-      operation: 'stage-binding-changed',
-    });
-    const receipt = {
-      delivery: '1:1',
-      jobId: intent.id,
-      stage: 'implementation',
-      base: intent.base,
-      commit: host.base,
-      outcome: '<TASK>COMPLETE</TASK>',
-      tests: true,
-      coverage: true,
-      crap: true,
-      reviews: false,
-    };
-    await host.save({
-      overrides: { status: 'completed' },
-      messages: [{ role: 'assistant', runId: 'run-2', text: JSON.stringify(receipt) }],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
-      runId: 'run-2',
-      ordinal: 2,
-      accepted: true,
-    });
-    await host.save({
-      overrides: { status: 'completed' },
-      messages: [
-        {
-          role: 'assistant',
-          runId: 'run-1',
-          text: JSON.stringify({ ...receipt, delivery: '1:0' }),
-        },
-      ],
-    });
-    expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
-      accepted: false,
-    });
-  }));
-
-it.each(['publication', 'babysitting'] as const)(
-  'continues terminal %s with reconciliatory instructions and the exact new receipt identity',
+it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
+  'accepts %s state after its instruction despite later turns',
   (stage) =>
     stageFixture(async ({ host, adapter, intent, request }) => {
-      const ordinal = stage === 'publication' ? 3 : 4;
-      const index = stage === 'publication' ? 2 : 4;
+      const current = { ...request, stage, index: 11, ordinal: 12, previousRunId: 'predecessor' };
+      const success = response(intent, host.base);
       await host.save({
-        idempotency: true,
-        overrides: { status: 'failed', runCount: ordinal, latestRunId: `run-${ordinal}` },
+        overrides: { status: 'completed', latestRunId: 'wake', runCount: 500 },
+        messages: [
+          instruction(intent, current),
+          success,
+          { role: 'assistant', text: 'Delayed command completed.' },
+        ],
       });
-      const pending = { ...request, stage, index, ordinal, previousRunId: `run-${ordinal - 1}` };
-      expect(await Effect.runPromise(adapter.inspectStage(intent, pending))).toMatchObject({
-        accepted: false,
-        runId: `run-${ordinal}`,
-        ordinal,
-      });
-      const retry = {
-        ...pending,
-        index: index + 1,
-        ordinal: ordinal + 1,
-        previousRunId: `run-${ordinal}`,
-        resume: true,
-      };
-      await host.save({
-        idempotency: true,
-        overrides: { status: 'failed', runCount: 99, latestRunId: `wrong-predecessor` },
-      });
-      await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
-        _tag: 'Unavailable',
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+        accepted: true,
+        ordinal: 500,
+        stageIndex: 11,
       });
       await host.save({
-        idempotency: true,
-        overrides: { status: 'failed', runCount: ordinal, latestRunId: `run-${ordinal}` },
+        overrides: { status: 'completed' },
+        messages: [success, instruction(intent, current)],
       });
-      await Effect.runPromise(adapter.sendStage(intent, retry));
-      const sends = (await host.calls()).filter(
-        (c) => c.args[1] === 'send' && !c.args.includes('--help')
-      );
-      expect(sends).toHaveLength(1);
-      expect(sends[0].args).toContain(`${intent.id}:stage:${index + 1}`);
-      expect(sends[0].args[3]).toContain(
-        stage === 'publication'
-          ? 'inspect and reuse the existing PR'
-          : 'without starting another watcher'
-      );
-      const receipt = {
-        delivery: `${intent.id}:${index + 1}`,
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        accepted: true,
+      });
+    })
+);
+it.each([
+  { version: 2 },
+  { version: undefined },
+  { jobId: 'other' },
+  { implemented: '999' },
+  { base: 'f'.repeat(40) },
+  { checked: 'f'.repeat(40) },
+  { reviewed: 'f'.repeat(40) },
+  { published: 'f'.repeat(40) },
+  { checks: { format: true, lint: true, tests: true, coverage: true } },
+  ...['format', 'lint', 'tests', 'coverage', 'crap'].map((check) => ({
+    checks: { format: true, lint: true, tests: true, coverage: true, crap: true, [check]: false },
+  })),
+])(
+  'rejects a newer incompatible publication response rather than restoring older success: %j',
+  (change) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const current = { ...request, stage: 'publication' as const };
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          instruction(intent, current),
+          response(intent, host.base),
+          { role: 'assistant', text: JSON.stringify({ ...state(intent, host.base), ...change }) },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        accepted: true,
+      });
+    })
+);
+it('does not accept legacy success or a dependency response as completed implementation', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    for (const value of [
+      {
         jobId: intent.id,
-        stage,
-        base: intent.base,
+        stage: 'implementation',
         commit: host.base,
-        outcome: stage === 'publication' ? '<PR>CREATED</PR>' : '<PR>READY</PR>',
+        outcome: '<TASK>COMPLETE</TASK>',
         tests: true,
         coverage: true,
         crap: true,
         reviews: true,
-      };
-      await host.save({
-        overrides: { status: 'completed', runCount: 99, latestRunId: 'later-turn' },
-        messages: [
-          { role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(receipt) },
-        ],
-      });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).toMatchObject({
-        accepted: true,
-        ordinal: 99,
-        runId: 'later-turn',
-      });
-      const stale =
-        stage === 'babysitting'
-          ? { ...receipt, delivery: `${intent.id}:${index}` }
-          : { ...receipt, stage: 'review' };
+      },
+      { version: 1, kind: 'dependencies', jobId: intent.id, requireUnimplementedIssues: ['758'] },
+    ]) {
       await host.save({
         overrides: { status: 'completed' },
-        messages: [{ role: 'assistant', runId: `run-${ordinal + 1}`, text: JSON.stringify(stale) }],
+        messages: [
+          instruction(intent, request),
+          { role: 'assistant', text: JSON.stringify(value) },
+        ],
       });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, retry))).not.toMatchObject({
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
         accepted: true,
       });
-    })
-);
-
-it('refuses publication retry for a dirty or changed reviewed head while preserving the clean valid case', () =>
+    }
+  }));
+it('requires clean matching Git state and allows fresh review after a publication commit while preserving unrelated commits', () =>
   stageFixture(async ({ host, adapter, intent, request }) => {
-    await host.save({ idempotency: true, overrides: { status: 'failed' } });
+    const current = { ...request, stage: 'publication' as const };
     const binding = await Effect.runPromise(adapter.observe(intent));
-    if (binding.kind !== 'found') throw new Error('Expected worker');
-    const retry = {
-      ...request,
-      stage: 'publication' as const,
-      index: 1,
-      ordinal: 2,
-      previousRunId: 'run-1',
-      resume: true,
-    };
-    const path = join(binding.worktree, 'unreviewed.txt');
-    await writeFile(path, 'unfinished publication edits');
-    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
-      _tag: 'Unavailable',
-    });
+    if (binding.kind !== 'found') throw new Error('Missing owner');
     const git = (...args: string[]) =>
-      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' });
+      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' }).trim();
+    const save = (head: string) =>
+      host.save({
+        overrides: { status: 'completed' },
+        messages: [instruction(intent, current), response(intent, head)],
+      });
+    await save(host.base);
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+      accepted: true,
+    });
+    await writeFile(join(binding.worktree, 'publication.txt'), 'necessary publication correction');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+      accepted: true,
+    });
     git('add', '.');
     git(
       '-c',
@@ -818,65 +187,39 @@ it('refuses publication retry for a dirty or changed reviewed head while preserv
       'user.email=test@example.invalid',
       'commit',
       '-m',
-      'Unreviewed commit'
+      'publication correction'
     );
-    await expect(Effect.runPromise(adapter.sendStage(intent, retry))).rejects.toMatchObject({
-      _tag: 'Unavailable',
+    const published = git('rev-parse', 'HEAD');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+      accepted: true,
     });
-    expect(
-      (await host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
-    ).toHaveLength(0);
-    git('reset', '--hard', host.base);
-    await Effect.runPromise(adapter.sendStage(intent, retry));
-    expect(
-      (await host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
-    ).toHaveLength(1);
-  }));
-
-it('reports actual clean/head proof for conclusively terminal babysitting without inventing acceptance', () =>
-  stageFixture(async ({ host, adapter, intent, request }) => {
-    await host.save({ overrides: { status: 'failed', latestRunId: 'run-4', runCount: 4 } });
-    const stage = {
-      ...request,
-      stage: 'babysitting' as const,
-      index: 4,
-      ordinal: 4,
-      previousRunId: 'run-3',
-    };
-    const binding = await Effect.runPromise(adapter.observe(intent));
-    if (binding.kind !== 'found') throw new Error('Expected worker');
-    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
-      accepted: false,
-      worktreeClean: true,
-      commit: host.base,
+    await save(published);
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+      accepted: true,
+      commit: published,
     });
-    await writeFile(join(binding.worktree, 'unfinished.txt'), 'unfinished');
-    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
-      accepted: false,
-      worktreeClean: false,
-      commit: host.base,
-    });
-    const git = (...args: string[]) =>
-      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' });
-    git('add', '.');
     git(
       '-c',
       'user.name=Test',
       '-c',
       'user.email=test@example.invalid',
       'commit',
+      '--allow-empty',
       '-m',
-      'Unreviewed work'
+      'unrelated tooling'
     );
-    const head = git('rev-parse', 'HEAD').trim();
-    expect(head).not.toBe(host.base);
-    expect(await Effect.runPromise(adapter.inspectStage(intent, stage))).toMatchObject({
-      accepted: false,
-      worktreeClean: true,
-      commit: head,
+    const extra = git('rev-parse', 'HEAD');
+    git('branch', 'preserved-extra', extra);
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+      accepted: true,
     });
+    git('reset', '--hard', published);
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+      accepted: true,
+      commit: published,
+    });
+    expect(git('rev-parse', 'preserved-extra')).toBe(extra);
   }));
-
 it('resolves omitted publication enrichment through the exact owning thread association', () =>
   publicationFixture(async ({ host, adapter, intent, request, complete }) => {
     const url = 'https://github.com/rafaeltab/wallpaperdb/pull/999';
@@ -987,24 +330,7 @@ function publicationFixture(check: (fixture: Fixture & { complete: object }) => 
     });
     const complete = {
       overrides: { status: 'completed', latestRunId: 'run-1', runCount: 1 },
-      messages: [
-        {
-          role: 'assistant',
-          runId: 'run-1',
-          text: JSON.stringify({
-            delivery: '1:2',
-            jobId: intent.id,
-            stage: 'publication',
-            base: host.base,
-            commit: host.base,
-            outcome: '<PR>CREATED</PR>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: true,
-          }),
-        },
-      ],
+      messages: [instruction(intent, request), response(intent, host.base)],
     };
     await check({ ...fixture, adapter, request, complete });
   });
@@ -1050,6 +376,147 @@ it('retains a state response after delayed assistant prose without accepting a l
       ],
     });
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
+  }));
+
+it.each([
+  { activeRunId: 'active' },
+  { status: 'running' },
+  { status: 'queued' },
+  { pendingRequestCount: 1 },
+  { blockedOnThreadWait: true },
+  { pendingBackgroundTasks: [{ taskId: 'command', kind: 'command' }] },
+  { pullRequests: [{ url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', watching: true }] },
+])('requires idle owning activity before accepting state: %j', (overrides) =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const messages = [
+      { role: 'user', text: `Factory instruction ${intent.id}:0.` },
+      {
+        role: 'assistant',
+        text: JSON.stringify({
+          version: 1,
+          kind: 'state',
+          jobId: intent.id,
+          implemented: String(intent.issue),
+          base: host.base,
+          checked: host.base,
+          checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+        }),
+      },
+    ];
+    await host.save({ overrides: { status: 'completed' }, messages });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+    await host.save({ overrides: { status: 'completed', ...overrides }, messages });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
+    expect(
+      (await host.calls()).filter((c) => ['send', 't3_thread_send'].includes(c.args[1]))
+    ).toHaveLength(0);
+  })
+);
+
+it('traverses a completed child to reject an active grandchild and rejects missing inactivity evidence', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const messages = [
+      { role: 'user', text: `Factory instruction ${intent.id}:0.` },
+      {
+        role: 'assistant',
+        text: JSON.stringify({
+          version: 1,
+          kind: 'state',
+          jobId: intent.id,
+          implemented: String(intent.issue),
+          base: host.base,
+          checked: host.base,
+          checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+        }),
+      },
+    ];
+    const descendants = [
+      { threadId: 'child', parentThreadId: 'thread-live' },
+      { threadId: 'grandchild', parentThreadId: 'child' },
+    ];
+    await host.save({ overrides: { status: 'completed' }, messages, descendants });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+    await host.save({
+      overrides: { status: 'completed' },
+      messages,
+      descendants,
+      descendantSnapshots: { grandchild: { status: 'running' } },
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toBeNull();
+    await host.save({
+      overrides: { status: 'completed' },
+      messages,
+      mcpReply: {
+        structuredContent: {
+          thread: { latestRunId: 'run-1' },
+          items: [],
+          hasMore: false,
+          nextPosition: null,
+        },
+      },
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toBeNull();
+  }));
+it.each(['message', 'user_input_request'])(
+  'keeps pending %s activity busy even without an active run',
+  (type) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const messages = [instruction(intent, request), response(intent, host.base)];
+      await host.save({ overrides: { status: 'completed' }, messages });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+        accepted: true,
+      });
+      await host.save({
+        overrides: { status: 'completed' },
+        messages,
+        activity: [
+          {
+            itemId: 'pending',
+            runId: 'earlier-run',
+            type,
+            status: 'pending',
+            sourceThreadId: 'thread-live',
+            visibility: 'local',
+            text: 'Queued work or question',
+          },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toBeNull();
+      expect(
+        (await host.calls()).filter((c) => ['send', 't3_thread_send'].includes(c.args[1]))
+      ).toHaveLength(0);
+    })
+);
+it('cannot accept a response when the actual instruction has fallen out of retained history', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({
+      overrides: { status: 'completed' },
+      omitInstructionHistory: true,
+      messages: [response(intent, host.base)],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
+  }));
+it('ignores unrelated structured command output after a coherent response', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(intent, request),
+        response(intent, host.base),
+        { role: 'assistant', text: JSON.stringify({ command: 'completed' }) },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
       accepted: true,
     });
   }));

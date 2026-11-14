@@ -59,6 +59,7 @@ it('runs B and C concurrently from ready A with meaningful linear fork compariso
               Layer.succeed(
                 Execution,
                 t3Execution({
+                  ...host.mcp,
                   project: host.repository,
                   projectId: 'project-id',
                   binary: host.binary,

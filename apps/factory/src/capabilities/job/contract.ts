@@ -88,6 +88,11 @@ export interface AcceptedPublication {
 export interface Control {
   /** A verified unsuccessful implementation opens same-thread manual repair.
    * Successor associations are immutable stage records, never another launch. */
+  readonly reconciliation?: {
+    readonly attempts: number;
+    readonly migrated: boolean;
+    readonly pending?: StageRequest;
+  };
   readonly manualRepair?: {
     readonly index: number;
     readonly threadId: string;
@@ -242,7 +247,7 @@ export interface Start {
 }
 export type ResumeAction =
   | { index: number; questionId: string }
-  | { index: number; runId: string; revision: number };
+  | { index: number; runId: string; revision: number; resetReconciliation?: boolean };
 export type Resume = ResumeAction & { jobId: string };
 export interface RetryAction {
   readonly index: number;
@@ -258,6 +263,12 @@ export type Status =
   | {
       kind: 'job';
       stageIndex?: number;
+      reconciliation?: {
+        readonly attempts: number;
+        readonly limit: number;
+        readonly migrated: boolean;
+        readonly revision: number;
+      };
       acknowledgement?: { stage: Stage; index: number; acceptedAt: number };
       /** Admission identity and original base remain stable; branch describes the current attempt. */
       intent: Intent;
@@ -281,6 +292,7 @@ export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
 /** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
+  readonly reconciliation?: 'state' | 'migration';
   readonly receiptProtocol?: 'delivery-v1';
   /** Original verified recovery stage authorizing this manually started continuation. */
   readonly repairOrigin?: number;
@@ -307,6 +319,9 @@ export interface StageRequest {
   readonly previousRunId: string | null;
 }
 export interface StageEvidence {
+  readonly idle?: boolean;
+  readonly migrationRequired?: boolean;
+  readonly dependencies?: readonly string[];
   readonly runId: string;
   readonly ordinal: number;
   readonly commit: string;
@@ -410,3 +425,12 @@ export type AgentResponse =
       readonly jobId: string;
       readonly requireUnimplementedIssues: readonly string[];
     };
+
+export interface AgentReconciliationPolicy {
+  readonly limit: number;
+}
+export const AgentReconciliationPolicy = Context.Service<AgentReconciliationPolicy>(
+  'wallpaperdb.factory.AgentReconciliationPolicy'
+);
+
+export const defaultAgentReconciliationLimit = 3;

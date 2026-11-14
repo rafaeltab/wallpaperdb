@@ -12,6 +12,7 @@ it('bounds HTTP draining and cancels the underlying observer process while prese
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

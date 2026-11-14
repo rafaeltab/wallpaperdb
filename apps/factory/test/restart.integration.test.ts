@@ -24,6 +24,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     PATH: `${host.directory}:${process.env.PATH}`,
     FACTORY_FIXTURE: host.configFile,
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -108,7 +109,8 @@ it('a fresh process reconciles publication after a lost response without repeati
         await fetch(`${origin}/api/job`);
         expect(
           (await host.calls()).filter(
-            (call) => call.args[1] === 'send' && !call.args.includes('--help')
+            (call) =>
+              ['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')
           )
         ).toHaveLength(1);
       },
@@ -137,7 +139,9 @@ it('a fresh process reconciles publication after a lost response without repeati
         expect(
           (await host.calls()).filter(
             (call) =>
-              call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+              call.binary === 't3' &&
+              ['send', 't3_thread_send'].includes(call.args[1]) &&
+              !call.args.includes('--help')
           )
         ).toHaveLength(2);
       },
@@ -182,7 +186,10 @@ it('a fresh process reconciles publication after a lost response without repeati
     const calls = await host.calls();
     expect(
       calls.filter(
-        (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+        (call) =>
+          call.binary === 't3' &&
+          ['send', 't3_thread_send'].includes(call.args[1]) &&
+          !call.args.includes('--help')
       )
     ).toHaveLength(2);
     const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
@@ -230,43 +237,30 @@ it('a fresh process reconciles publication after a lost response without repeati
         store.saveWait({ ...retained, revision: retained.revision + 1, deadline: 0 })
       )
     ).toBe(true);
-    await host.save({ ...watcher, lostSend: true });
+    await host.save(watcher);
     child = launch();
     await ready();
     await vi.waitFor(
       async () => {
-        await fetch(`${origin}/api/job`);
-        expect(
-          (await host.calls()).filter(
-            (call) => call.args[1] === 'send' && !call.args.includes('--help')
-          )
-        ).toHaveLength(4);
-      },
-      { timeout: 10000, interval: 30 }
-    );
-    await stop(child);
-    expect(
-      await Effect.runPromise(fileStore(join(host.directory, 'state')).readWait())
-    ).toMatchObject({
-      deadline: 0,
-      nudged: true,
-      continuation: { stage: 'babysitting', continuation: true, threadId: 'thread-live' },
-    });
-    await host.save(waiting);
-    child = launch();
-    await ready();
-    await vi.waitFor(
-      async () =>
         expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
-          delivery: { stage: 'babysitting', activity: 'continuation-pending', ready: false },
-        }),
+          delivery: {
+            stage: 'babysitting',
+            activity: 'waiting-for-github',
+            ready: false,
+            deadline: 0,
+          },
+        });
+      },
       { timeout: 10000, interval: 30 }
     );
     expect(
       (await host.calls()).filter(
-        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+        (call) => ['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')
       )
-    ).toHaveLength(4);
+    ).toHaveLength(3);
+    expect(
+      await Effect.runPromise(fileStore(join(host.directory, 'state')).readWait())
+    ).toMatchObject({ deadline: 0, nudged: false });
     const demonstrated = await (await fetch(`${origin}/api/job`)).json();
     process.stdout.write(`Factory composition demonstration: ${JSON.stringify(demonstrated)}\n`);
   } finally {

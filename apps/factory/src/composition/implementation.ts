@@ -18,6 +18,8 @@ import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
 import {
+  AgentReconciliationPolicy,
+  defaultAgentReconciliationLimit,
   JobReporting,
   Execution,
   ContinuationAdmission,
@@ -79,6 +81,12 @@ import { availabilityObservation, retainedWorkAvailable } from './availability.j
 export async function startFactory(environment: NodeJS.ProcessEnv) {
   const configuration = z
     .object({
+      FACTORY_AGENT_RECONCILIATION_LIMIT: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .default(defaultAgentReconciliationLimit),
       FACTORY_PROJECT: z.string().min(1),
       FACTORY_OTEL_ENDPOINT: z
         .string()
@@ -229,7 +237,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         )
       );
     const deps = jobDeps(configuration.FACTORY_STATE);
-    const jobLayer = JobLive.pipe(Layer.provide(deps));
+    const jobLayer = JobLive.pipe(
+      Layer.provide(
+        Layer.succeed(AgentReconciliationPolicy, {
+          limit: configuration.FACTORY_AGENT_RECONCILIATION_LIMIT,
+        })
+      ),
+      Layer.provide(deps)
+    );
     const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
     const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
     startupCleanup.push(async () => {
@@ -252,6 +267,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               rootIssue ??= issue;
               worker = ManagedRuntime.make(
                 JobLive.pipe(
+                  Layer.provide(
+                    Layer.succeed(AgentReconciliationPolicy, {
+                      limit: configuration.FACTORY_AGENT_RECONCILIATION_LIMIT,
+                    })
+                  ),
                   Layer.provide(
                     jobDeps(
                       rootIssue === issue

@@ -39,3 +39,5 @@ export { eligible, trustedAuthor } from './implementation.js';
 export { JobReporting } from './contract.js';
 
 export type { AgentResponse } from './contract.js';
+
+export { AgentReconciliationPolicy, defaultAgentReconciliationLimit } from './contract.js';

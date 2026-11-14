@@ -73,6 +73,7 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
             Layer.succeed(
               Execution,
               t3Execution({
+                ...host.mcp,
                 project: host.repository,
                 projectId: 'project-id',
                 binary: host.binary,
@@ -635,6 +636,7 @@ it.each([
                 Layer.succeed(
                   Execution,
                   t3Execution({
+                    ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
                     binary: f.host.binary,

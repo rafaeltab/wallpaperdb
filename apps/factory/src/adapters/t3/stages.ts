@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import {
+  type AgentResponse,
   type Execution,
   type Intent,
   type StageRequest,
@@ -56,7 +57,7 @@ const receiptSchema = z.discriminatedUnion('kind', [
       requireUnimplementedIssues: z.array(z.string()),
     })
     .strict(),
-]);
+]) satisfies z.ZodType<AgentResponse>;
 const stageDetail = z.object({
   thread: z.object({
     threadId: z.string(),
@@ -74,6 +75,11 @@ export function stageExecution(
   prBase: string,
   linkedPullRequests: (threadId: string, signal?: AbortSignal) => Promise<string[]>,
   sendHelp: (signal?: AbortSignal) => Promise<string>,
+  inactive: (
+    threadId: string,
+    runId: string | null,
+    signal?: AbortSignal
+  ) => Promise<'idle' | 'waiting' | 'busy'>,
   sendMcp?: (
     intent: Intent,
     request: StageRequest,
@@ -92,10 +98,13 @@ export function stageExecution(
           );
         yield* Effect.tryPromise({
           try: async (signal) => {
+            if ((await inactive(request.threadId, binding.run?.id ?? null, signal)) !== 'idle')
+              throw new Error('Owning agent or descendant is not verified idle');
             const head = (
               await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
             ).trim();
             if (
+              !request.reconciliation &&
               (!request.resume || request.stage === 'publication') &&
               (!deliveryHead(head, request) ||
                 (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim())
@@ -143,10 +152,21 @@ export function stageExecution(
               ['show', request.threadId, '--messages', String(historyWindow)],
               signal
             );
+            const detail = stageDetail.parse(raw);
+            const activity = await inactive(request.threadId, detail.thread.latestRunId, signal);
+            if (activity !== 'idle') {
+              if (activity !== 'waiting') return null;
+              const pending = pendingRun(raw, request, intent);
+              return pendingWorktree(
+                pending ? { ...pending, idle: false, waitingForGitHub: true } : null,
+                binding,
+                signal
+              );
+            }
             const observed = outcome(raw, intent, request);
             if (!observed) {
-              const pending = pendingRun(raw, request);
-              return pendingWorktree(pending, request, binding, signal);
+              const pending = pendingRun(raw, request, intent);
+              return pendingWorktree(pending, binding, signal);
             }
             const { thread, result } = observed;
             const commit = (
@@ -156,9 +176,8 @@ export function stageExecution(
               await command('git', ['status', '--porcelain'], binding.worktree, signal)
             ).trim();
             if (result.kind !== 'state' || result.checked !== commit || dirty) {
-              if (request.stage !== 'implementation') return null;
               // Rejecting success must not erase the exact owning run's evidence.
-              const pending = pendingRun(raw, request);
+              const pending = pendingRun(raw, request, intent);
               return pending ? { ...pending, commit, worktreeClean: !dirty } : null;
             }
             return {
@@ -166,6 +185,8 @@ export function stageExecution(
               ordinal: thread.runCount,
               commit,
               accepted: true,
+              idle: true,
+              worktreeClean: true,
               stageIndex: request.index,
               linked:
                 thread.pullRequests?.map((pr) => pr.url) ??
@@ -187,6 +208,7 @@ function comparisonIntent(intent: Intent, request: StageRequest): Intent {
 }
 function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   const scope = `Only ${intent.issueUrl} is authorized. Preserve retained scope and decisions. Only rafaeltab and zero-two-rafaeltab may expand scope. Retained context: ${intent.context}`;
+  if (request.reconciliation) return reconciliationPrompt(intent, request, scope);
   if (request.resume && request.stage !== 'babysitting')
     return resumePrompt(intent, request, scope);
   if (request.stage === 'babysitting')
@@ -197,7 +219,7 @@ function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
 function completed(thread: z.infer<typeof stageDetail>['thread'], request: StageRequest) {
   return (
     thread.threadId === request.threadId &&
-    thread.status === 'completed' &&
+    ['completed', 'idle'].includes(thread.status) &&
     thread.pendingRequestCount === 0 &&
     Boolean(thread.latestRunId)
   );
@@ -238,25 +260,13 @@ function outcome(raw: unknown, intent: Intent, request: StageRequest) {
     );
   const boundary = instruction ? messages.indexOf(instruction) : -1;
   if (boundary < 0) return null;
-  // A newer malformed or negative structured state supersedes success as a whole.
-  const latest = messages
-    .slice(boundary + 1)
-    .reverse()
-    .filter((m) => m.role === 'assistant')
-    .find((m) => {
-      try {
-        const value = JSON.parse(m.text);
-        return value !== null && typeof value === 'object' && !Array.isArray(value);
-      } catch {
-        return false;
-      }
-    });
+  const latest = latestStructured(messages.slice(boundary + 1));
   const result = latest ? parseReceipt(latest.text) : null;
   if (!result || !matchesReceipt(result, intent, request)) return null;
   return { thread: { ...thread, latestRunId: thread.latestRunId ?? '' }, result };
 }
 
-function pendingRun(raw: unknown, request: StageRequest) {
+function pendingRun(raw: unknown, request: StageRequest, intent: Intent) {
   const detail = stageDetail.safeParse(raw);
   if (!detail.success) return null;
   const { thread } = detail.data;
@@ -274,6 +284,8 @@ function pendingRun(raw: unknown, request: StageRequest) {
     accepted: false,
     waitingForGitHub,
     stageIndex: request.index,
+    idle: true,
+    ...pendingResponse(detail.data.messages, intent, request),
   };
 }
 
@@ -339,28 +351,67 @@ function knownOwningHead(head: string, comparison: StageRequest['comparison']) {
 
 async function pendingWorktree(
   pending: ReturnType<typeof pendingRun>,
-  request: StageRequest,
   binding: Extract<import('../../capabilities/job/index.js').Observation, { kind: 'found' }>,
   signal: AbortSignal
 ) {
-  if (!pending || !needsWorktree(pending, request, binding.status)) return pending;
+  if (!pending) return null;
   const commit = (await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)).trim();
   const dirty = (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim();
-  return {
-    ...pending,
-    commit,
-    worktreeClean: !dirty,
-    waitingForGitHub: pending.waitingForGitHub && !dirty,
-  };
+  return { ...pending, commit, worktreeClean: !dirty };
 }
-function needsWorktree(
-  pending: NonNullable<ReturnType<typeof pendingRun>>,
-  request: StageRequest,
-  status: string
+function reconciliationPrompt(intent: Intent, request: StageRequest, scope: string) {
+  return `Stage ${request.index} of factory job ${intent.id}; reconcile the existing ${request.stage} stage in this owning agent and checkout. ${request.reconciliation === 'migration' ? 'Your response format is obsolete or unsupported. Migrate once to version 1 and verify the current state.' : 'The reported state, required local checks, independent review, local Git or intended PR do not agree. Reconcile them before reporting completion.'} ${scope}. Do not launch another worker or create a duplicate PR. Inspect and reuse the intended linked PR. Decide which authorized changes belong in it; never blindly publish local HEAD. Preserve unrelated extra commits on another branch if necessary and restore the correct owning checkout. Necessary publication commits are allowed, but rerun applicable local checks and fresh independent Standards, Spec and Defects reviews at the final checked commit. Preserve the expected comparison and existing cancellation and uncertain-effect safeguards. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
+}
+
+function latestStructured(messages: z.infer<typeof stageDetail>['messages']) {
+  return [...messages].reverse().find((m) => {
+    if (m.role !== 'assistant') return false;
+    try {
+      const value = JSON.parse(m.text);
+      return (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        ('jobId' in value ||
+          'version' in value ||
+          value.kind === 'state' ||
+          value.kind === 'dependencies')
+      );
+    } catch {
+      return false;
+    }
+  });
+}
+function pendingResponse(
+  messages: z.infer<typeof stageDetail>['messages'],
+  intent: Intent,
+  request: StageRequest
 ) {
-  return (
-    pending.waitingForGitHub ||
-    (['publication', 'babysitting'].includes(request.stage) &&
-      ['failed', 'interrupted'].includes(status))
+  const boundary = [...messages]
+    .reverse()
+    .find(
+      (m) =>
+        m.role === 'user' &&
+        m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
+    );
+  const message = latestStructured(
+    boundary ? messages.slice(messages.indexOf(boundary) + 1) : messages
   );
+  if (!message) return {};
+  const value = JSON.parse(message.text);
+  const parsed = receiptSchema.safeParse(value);
+  return {
+    migrationRequired: value.version !== 1,
+    dependencies:
+      messages.some(
+        (m) =>
+          m.role === 'user' &&
+          m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
+      ) &&
+      parsed.success &&
+      parsed.data.jobId === intent.id &&
+      parsed.data.kind === 'dependencies'
+        ? parsed.data.requireUnimplementedIssues
+        : undefined,
+  };
 }

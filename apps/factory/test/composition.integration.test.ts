@@ -10,6 +10,7 @@ it('validates host configuration before serving and composes the real driving an
   const host = await protocol({ origin: true });
   const configuration = {
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -55,6 +56,7 @@ it('continues admitted work through publication without an operations-page obser
   await host.save({ complete: true, base: host.base });
   const running = await startFactory({
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -78,7 +80,9 @@ it('continues admitted work through publication without an operations-page obser
         expect(
           (await host.calls()).filter(
             (call) =>
-              call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+              call.binary === 't3' &&
+              ['send', 't3_thread_send'].includes(call.args[1]) &&
+              !call.args.includes('--help')
           )
         ).toHaveLength(2);
       },
@@ -161,7 +165,7 @@ it('continues admitted work through publication without an operations-page obser
     );
     expect(
       (await host.calls()).filter(
-        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+        (call) => ['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')
       )
     ).toHaveLength(5);
   } finally {
@@ -200,6 +204,7 @@ it('continuously admits a validated semantic plan through production adapters wi
   try {
     const running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -276,6 +281,7 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   const running = await startFactory({
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -328,6 +334,7 @@ it('serves the live v2 producer and executes durable control commands on the exi
   try {
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -402,6 +409,7 @@ it.each(['accept', 'accept-committed', 'claim', 'claim-committed', 'finish'] as 
     try {
       running = await startFactory({
         FACTORY_PROJECT: host.repository,
+        ...host.mcpEnvironment,
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: host.base,
         FACTORY_T3_BINARY: host.binary,
@@ -526,6 +534,7 @@ it.each([false, true])(
             PATH: `${host.directory}:${process.env.PATH}`,
             FACTORY_FIXTURE: host.configFile,
             FACTORY_PROJECT: host.repository,
+            ...host.mcpEnvironment,
             FACTORY_T3_PROJECT_ID: 'project-id',
             FACTORY_BASE: host.base,
             FACTORY_T3_BINARY: host.binary,

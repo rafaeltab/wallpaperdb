@@ -119,6 +119,7 @@ export function projectSynchronization(options: ProjectSynchronizationOptions = 
         for (const raw of items.nodes) {
           if (seen.has(raw.id)) throw new Error('Duplicate project item during pagination');
           seen.add(raw.id);
+          if (raw.content === null) throw new Error('Project item content is unavailable');
           const linked =
             raw.content && ['Issue', 'PullRequest'].includes(raw.content.__typename)
               ? content.parse(raw.content)

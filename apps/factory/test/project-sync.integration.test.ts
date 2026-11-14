@@ -89,11 +89,16 @@ function githubFixture(directory: string) {
   const first = issueFixture();
   const filters: string[] = [];
   const delta: { members?: ReturnType<typeof projectMember>[] } = {};
+  const projectPages: { nodes?: unknown[][] } = {};
+  const projectReadGate: { entered?: () => void; wait?: Promise<void> } = {};
   const fixture = {
+    directory,
     issues: new Map([[first.number, first]]),
     pulls: new Map<number, ReturnType<typeof pullFixture>>(),
     members: [projectMember(first)],
     delta,
+    projectPages,
+    projectReadGate,
     filters,
     now: Date.parse('2026-11-13T12:01:00Z'),
     details: 0,
@@ -110,13 +115,25 @@ function githubFixture(directory: string) {
       const decoded: string = JSON.parse(filter);
       filters.push(decoded);
       const nodes = decoded ? (delta.members ?? fixture.members) : fixture.members;
-      const page = (hasNextPage: boolean, endCursor: string | null) => ({
+      projectReadGate.entered?.();
+      if (projectReadGate.wait) await projectReadGate.wait;
+      const page = (hasNextPage: boolean, endCursor: string | null, items: unknown[] = nodes) => ({
         data: {
-          user: { projectV2: { id: 'P7', items: { nodes, pageInfo: { hasNextPage, endCursor } } } },
+          user: {
+            projectV2: { id: 'P7', items: { nodes: items, pageInfo: { hasNextPage, endCursor } } },
+          },
         },
       });
       if (fixture.pagination === 'truncated') return [page(true, 'next')];
       if (fixture.pagination === 'broken-chain') return [page(false, null), page(false, null)];
+      if (projectPages.nodes)
+        return projectPages.nodes.map((items, index, pages) =>
+          page(
+            index < pages.length - 1,
+            index < pages.length - 1 ? `page-${index + 1}` : null,
+            items
+          )
+        );
       return [page(false, null)];
     }
     const entries: [string, unknown][] = [];
@@ -194,6 +211,125 @@ function githubFixture(directory: string) {
     });
   return fixture;
 }
+
+function gate() {
+  let release = () => {};
+  const wait = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { wait, release: () => release() };
+}
+
+it('collects distinct issues and PRs from multiple nonempty project pages', async () => {
+  await withSource(async (fixture) => {
+    const laterIssue = { ...issueFixture(2), title: 'Issue on the second page' };
+    const laterPull = pullFixture();
+    fixture.issues.set(2, laterIssue);
+    fixture.pulls.set(3, laterPull);
+    fixture.projectPages.nodes = [
+      [projectMember(issueFixture())],
+      [projectMember(laterIssue), projectMember(laterPull)],
+    ];
+    const facts = await fixture.sync();
+    expect(facts.issues.map(({ number, title }) => ({ number, title }))).toEqual([
+      { number: 1, title: 'First requirements' },
+      { number: 2, title: 'Issue on the second page' },
+    ]);
+    expect(facts.pullRequests.map(({ number, title }) => ({ number, title }))).toEqual([
+      { number: 3, title: 'Published work' },
+    ]);
+  });
+});
+
+it('rejects a stale overlapping SQLite publication and preserves the newer details and checkpoint across reopen', async () => {
+  await withSource(async (stale) => {
+    stale.now = Date.parse('2026-11-13T23:58:00Z');
+    await stale.sync();
+    stale.now = Date.parse('2026-11-13T23:59:00Z');
+    const staleIssue = {
+      ...issueFixture(),
+      title: 'Stale collector details',
+      updatedAt: '2026-11-13T12:00:05Z',
+    };
+    stale.issues.set(1, staleIssue);
+    stale.members = [projectMember(staleIssue)];
+    const entered = gate();
+    const resume = gate();
+    stale.projectReadGate.entered = entered.release;
+    stale.projectReadGate.wait = resume.wait;
+    const rejected = expect(stale.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+    try {
+      await entered.wait;
+      const winner = githubFixture(stale.directory);
+      winner.now = Date.parse('2026-11-14T00:01:00Z');
+      const winnerIssue = {
+        ...issueFixture(),
+        title: 'Newer collector details',
+        updatedAt: '2026-11-13T12:00:10Z',
+      };
+      winner.issues.set(1, winnerIssue);
+      winner.members = [projectMember(winnerIssue)];
+      expect((await winner.sync()).issues[0]?.title).toBe('Newer collector details');
+      resume.release();
+      await rejected;
+
+      const reopened = githubFixture(stale.directory);
+      reopened.now = Date.parse('2026-11-14T00:02:00Z');
+      reopened.members = [projectMember(winnerIssue)];
+      reopened.issues.set(1, { ...winnerIssue, title: 'Unadvertised provider value' });
+      expect((await reopened.sync()).issues[0]?.title).toBe('Newer collector details');
+      expect(reopened.details).toBe(0);
+      expect(reopened.filters).toEqual(['updated:>=2026-11-13']);
+    } finally {
+      resume.release();
+      await rejected;
+    }
+  });
+});
+
+it('fails on previously readable project content becoming null without replacing its successful checkpoint or cache', async () => {
+  await withSource(async (fixture) => {
+    fixture.now = Date.parse('2026-11-13T23:59:00Z');
+    await fixture.sync();
+    fixture.now = Date.parse('2026-11-14T00:01:00Z');
+    fixture.projectPages.nodes = [[{ ...projectMember(issueFixture()), content: null }]];
+    await expect(fixture.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+    fixture.projectPages.nodes = undefined;
+    fixture.now = Date.parse('2026-11-14T00:02:00Z');
+    expect((await fixture.sync()).issues[0]?.title).toBe('First requirements');
+    expect(fixture.details).toBe(1);
+    expect(fixture.filters).toEqual(['', 'updated:>=2026-11-12', 'updated:>=2026-11-12']);
+  });
+});
+
+it('fails on a new unreadable project item instead of claiming complete discovery', async () => {
+  await withSource(async (fixture) => {
+    fixture.projectPages.nodes = [
+      [
+        projectMember(issueFixture()),
+        { id: 'unreadable-item', updatedAt: timestamp, isArchived: false, content: null },
+      ],
+    ];
+    await expect(fixture.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+  });
+});
+
+it('ignores a readable draft item while preserving local issue discovery', async () => {
+  await withSource(async (fixture) => {
+    fixture.projectPages.nodes = [
+      [
+        projectMember(issueFixture()),
+        {
+          id: 'draft-item',
+          updatedAt: timestamp,
+          isArchived: false,
+          content: { __typename: 'DraftIssue' },
+        },
+      ],
+    ];
+    expect((await fixture.sync()).issues.map((item) => item.number)).toEqual([1]);
+  });
+});
 
 it('rejects an unknown project content state instead of silently removing an issue from discovery', async () => {
   await withSource(async (fixture) => {

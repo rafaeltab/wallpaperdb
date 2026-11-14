@@ -46,9 +46,12 @@ export async function runProtocol(
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
-    const stageHeld = (resource: { stage?: string } | null) =>
-      (resource?.stage === 'review' && config.holdReview) ||
-      (resource?.stage === 'publication' && config.holdPublication);
+    const stageHeld = (resource: { stage?: string; status?: string } | null) =>
+      !['failed', 'interrupted', 'cancelled'].includes(
+        config.overrides?.status ?? resource?.status
+      ) &&
+      ((resource?.stage === 'review' && config.holdReview) ||
+        (resource?.stage === 'publication' && config.holdPublication));
     const hold = async (boundary: string) => {
       const separate = config.holds?.includes(boundary);
       if (!separate && config.hold !== boundary) return;

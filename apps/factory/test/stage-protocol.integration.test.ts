@@ -520,3 +520,19 @@ it('ignores unrelated structured command output after a coherent response', () =
       accepted: true,
     });
   }));
+it('leaves a running-to-idle snapshot transition unverified until its completed history is read', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({
+      overrides: { status: 'running' },
+      descendantSnapshots: { 'thread-live': { status: 'completed' } },
+      messages: [],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toBeNull();
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [instruction(intent, request), response(intent, host.base)],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+  }));

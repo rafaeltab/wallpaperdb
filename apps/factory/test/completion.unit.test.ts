@@ -174,3 +174,15 @@ it('honors cancellation after authorizing reconciliation and before its send', a
     await f.close();
   }
 });
+it('uses fresh completed stage evidence instead of reconciling an earlier running observation', async () => {
+  const f = await fixture();
+  try {
+    f.state({ idle: true, accepted: true, observationStatus: 'running' });
+    expect(await f.status()).toMatchObject({ delivery: { stage: 'review' } });
+    expect(f.sends).toHaveLength(1);
+    expect(f.sends[0]?.reconciliation).toBeUndefined();
+    expect((await Effect.runPromise(f.store.readControl())).reconciliation).toBeUndefined();
+  } finally {
+    await f.close();
+  }
+});

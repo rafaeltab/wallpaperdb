@@ -16,6 +16,7 @@ import { controlledStore } from './store.js';
 export async function completionFixture(limit = 3, store: JobStore = controlledStore()) {
   let accepted = false;
   let idle = false;
+  let observationStatus: string | undefined;
   let migrationRequired = false;
   let clean = true;
   let run = 1;
@@ -57,7 +58,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
               Effect.succeed({
                 kind: 'found' as const,
                 threadId: 'owner',
-                status: idle ? 'completed' : 'running',
+                status: observationStatus ?? (idle ? 'completed' : 'running'),
                 run: { id: `run-${run}`, ordinal: run },
                 worktree: '/owner',
                 branch: intent.branch,
@@ -120,6 +121,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
       clean?: boolean;
       lost?: boolean;
       run?: number;
+      observationStatus?: string;
     }) => {
       accepted = change.accepted ?? accepted;
       idle = change.idle ?? idle;
@@ -130,6 +132,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;
       run = change.run ?? run;
+      observationStatus = change.observationStatus ?? observationStatus;
     },
   };
 }

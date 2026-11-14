@@ -62,10 +62,13 @@ export function sqliteObservations(directory: string): ObservationStore & Report
             );
             let jobsObservedAt = row?.jobsObservedAt;
             for (const item of items) {
+              const itemGeneration = item.generation ?? generation;
+              if (itemGeneration > prior.reporting.generation)
+                throw new Error('Unknown item generation');
               if (
                 item.kind !== 'job' &&
                 !(item.kind === 'failure' && item.key.startsWith('job:')) &&
-                generation < (prior.reporting.completedGeneration ?? 0)
+                itemGeneration < (prior.reporting.completedGeneration ?? 0)
               )
                 continue;
               const key =
@@ -86,19 +89,18 @@ export function sqliteObservations(directory: string): ObservationStore & Report
                   after.kind === 'found' &&
                   before.run &&
                   after.run &&
-                  (before.run.ordinal > after.run.ordinal ||
-                    (before.run.ordinal === after.run.ordinal && before.run.id !== after.run.id))
+                  before.run.ordinal > after.run.ordinal
                 )
                   continue;
               }
               if (
                 previous &&
-                (previous.generation > generation ||
-                  (previous.generation === generation && previous.sequence >= item.sequence))
+                (previous.generation > itemGeneration ||
+                  (previous.generation === itemGeneration && previous.sequence >= item.sequence))
               )
                 continue;
               freshness[key] = {
-                generation,
+                generation: itemGeneration,
                 sequence: item.sequence,
                 attemptedAt: item.at,
                 ...(item.kind === 'failure'
@@ -236,13 +238,21 @@ export function sqliteObservations(directory: string): ObservationStore & Report
                   };
                 return [...accepted, ...newer];
               };
+              const mergedPulls = merge(
+                'pull',
+                value.facts.pullRequests,
+                prior?.facts.pullRequests ?? []
+              );
               const facts = {
                 ...value.facts,
                 issues: merge('issue', value.facts.issues, prior?.facts.issues ?? []),
-                pullRequests: merge(
-                  'pull',
-                  value.facts.pullRequests,
-                  prior?.facts.pullRequests ?? []
+                pullRequests: mergedPulls,
+                verifiedPrBases: value.facts.verifiedPrBases?.filter((edge) =>
+                  [edge.base, edge.tip].every((n) => {
+                    const collected = value.facts?.pullRequests.find((pr) => pr.number === n);
+                    const accepted = mergedPulls.find((pr) => pr.number === n);
+                    return collected?.head === accepted?.head && collected?.base === accepted?.base;
+                  })
                 ),
               };
               const rich = {

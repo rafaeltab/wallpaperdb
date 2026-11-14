@@ -110,6 +110,8 @@ export interface ItemFreshness {
   error?: string;
 }
 export type ItemObservation = {
+  /** Buffered batches can combine independently ordered collections in one commit. */
+  generation?: number;
   sequence: number;
   at: number;
 } & (

@@ -10,19 +10,15 @@ export const ReportingLive = Layer.effect(
     const pending = new Map<string, { generation: number; item: ItemObservation }>();
     const flush = () =>
       Effect.gen(function* () {
-        const groups = new Map<number, ItemObservation[]>();
-        for (const { generation, item } of pending.values()) {
-          const group = groups.get(generation) ?? [];
-          group.push(item);
-          groups.set(generation, group);
-        }
-        for (const [generation, items] of groups) {
-          yield* store.publish(
-            generation,
-            items.sort((a, b) => a.sequence - b.sequence)
-          );
-          for (const item of items) pending.delete(key(item));
-        }
+        const batch = [...pending.values()];
+        if (!batch.length) return;
+        yield* store.publish(
+          Math.max(...batch.map((entry) => entry.generation)),
+          batch
+            .sort((a, b) => a.generation - b.generation || a.item.sequence - b.item.sequence)
+            .map(({ generation, item }) => ({ ...item, generation }))
+        );
+        for (const { item } of batch) pending.delete(key(item));
       });
     const flushLocked = () => flush().pipe(lock.withPermits(1));
     yield* Effect.forkScoped(

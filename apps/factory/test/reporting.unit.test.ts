@@ -296,3 +296,43 @@ it('keeps the buffer bounded while persistence is unavailable and retains the ad
     await runtime.dispose();
   }
 });
+
+it('commits observations from independent collections in one bounded batch without replacing their ordering', async () => {
+  const store = controlledObservations();
+  let committed = 0;
+  const runtime = ManagedRuntime.make(
+    ReportingLive.pipe(
+      Layer.provide(
+        Layer.succeed(ReportingStore, {
+          begin: store.begin,
+          publish: (generation, items) =>
+            Effect.gen(function* () {
+              committed++;
+              yield* store.publish(generation, items);
+            }),
+        })
+      )
+    )
+  );
+  try {
+    const reporting = await runtime.runPromise(Reporting);
+    const first = await runtime.runPromise(reporting.begin());
+    const second = await runtime.runPromise(reporting.begin());
+    await runtime.runPromise(
+      reporting.enqueue(first, [{ kind: 'issue', value: issue, sequence: 1, at: 10 }])
+    );
+    await runtime.runPromise(
+      reporting.enqueue(second, [
+        { kind: 'issue', value: { ...issue, number: 2 }, sequence: 1, at: 20 },
+      ])
+    );
+    await runtime.runPromise(reporting.flush());
+    expect(committed).toBe(1);
+    expect((await Effect.runPromise(store.read())).items).toMatchObject({
+      'issue:1': { generation: first },
+      'issue:2': { generation: second },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});

@@ -111,6 +111,11 @@ export function reportingStoreContract(
       );
       await Effect.runPromise(
         store.publish(newer, [
+          { kind: 'issue', value: issue, generation: older, sequence: 100, at: 31 },
+        ])
+      );
+      await Effect.runPromise(
+        store.publish(newer, [
           { kind: 'issue', value: { ...issue, number: 2 }, sequence: 2, at: 30 },
           { kind: 'failure', key: 'issue:1', error: 'offline', sequence: 2, at: 40 },
         ])
@@ -223,10 +228,7 @@ export function reportingStoreContract(
         store.publish(later, [{ kind: 'job', value: { ...job, execution }, sequence: 2, at: 30 }])
       );
       const latest = await Effect.runPromise(store.begin());
-      for (const run of [
-        { id: 'run-7', ordinal: 7 },
-        { id: 'other-8', ordinal: 8 },
-      ]) {
+      for (const run of [{ id: 'run-7', ordinal: 7 }]) {
         await Effect.runPromise(
           store.publish(latest, [
             {
@@ -241,10 +243,70 @@ export function reportingStoreContract(
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { execution: { run: { id: 'run-8', ordinal: 8 } } },
       ]);
+      await Effect.runPromise(
+        store.publish(latest, [
+          {
+            kind: 'job',
+            value: {
+              ...job,
+              execution: { ...execution, run: { id: 'replacement-8', ordinal: 8 } },
+            },
+            sequence: 2,
+            at: 45,
+          },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { run: { id: 'replacement-8', ordinal: 8 } }, delivery: { ready: false } },
+      ]);
       await Effect.runPromise(store.jobs([], 50));
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { intent: { id: 'job-one' } },
       ]);
+    } finally {
+      await close();
+    }
+  });
+  it(`${name} does not restore ancestry verified against an older PR comparison`, async () => {
+    const { store, close } = await open();
+    const pull = (
+      number: number,
+      head: string,
+      base: string
+    ): import('../../src/capabilities/observe/index.js').PullObservation => ({
+      number,
+      url: `https://github.com/rafaeltab/wallpaperdb/pull/${number}`,
+      state: 'OPEN',
+      head,
+      base,
+      headBranch: `branch-${number}`,
+      baseBranch: 'main',
+      linkedIssues: [],
+      crossReferencedIssues: [],
+      review: 'UNKNOWN',
+      ci: 'UNKNOWN',
+      evidenceHead: head,
+    });
+    try {
+      const older = await Effect.runPromise(store.begin());
+      const newer = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(newer, [
+          { kind: 'pull', value: pull(2, 'c', 'different-base'), sequence: 1, at: 20 },
+        ])
+      );
+      await Effect.runPromise(
+        store.refresh({
+          generation: older,
+          observedAt: 30,
+          facts: {
+            issues: [],
+            pullRequests: [pull(1, 'a', 'main'), pull(2, 'b', 'a')],
+            verifiedPrBases: [{ base: 1, tip: 2 }],
+          },
+        })
+      );
+      expect((await Effect.runPromise(store.read())).facts?.verifiedPrBases).toEqual([]);
     } finally {
       await close();
     }

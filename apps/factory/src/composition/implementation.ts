@@ -246,7 +246,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Layer.provide(deps)
     );
     const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
-    const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
+    const workers = new Map<string, ManagedRuntime.ManagedRuntime<Job, never>>();
     startupCleanup.push(async () => {
       const outcomes = await Promise.allSettled(
         [...workers.values()].map((worker) => worker.dispose())
@@ -262,7 +262,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       job: (issue) =>
         Effect.tryPromise({
           try: async () => {
-            let worker = workers.get(issue);
+            const admission = (await Effect.runPromise(scheduleStore.read())).admissions.find(
+              (item) => item.issue === issue
+            );
+            const generation = admission?.generation ?? 0;
+            const key = `${issue}:${generation}`;
+            let worker = workers.get(key);
             if (!worker) {
               rootIssue ??= issue;
               worker = ManagedRuntime.make(
@@ -274,14 +279,19 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
                   ),
                   Layer.provide(
                     jobDeps(
-                      rootIssue === issue
+                      generation === 0 && rootIssue === issue
                         ? configuration.FACTORY_STATE
-                        : resolve(configuration.FACTORY_STATE, `issue-${issue}`)
+                        : resolve(
+                            configuration.FACTORY_STATE,
+                            generation
+                              ? `issue-${issue}-generation-${generation}`
+                              : `issue-${issue}`
+                          )
                     )
                   )
                 )
               );
-              workers.set(issue, worker);
+              workers.set(key, worker);
             }
             return worker.runPromise(Job);
           },

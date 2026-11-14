@@ -14,9 +14,16 @@ export function sqliteLocalSnapshot(directory: string): LocalSnapshot {
         const entries = [];
         for (const admission of state.admissions) {
           const store =
-            rootIntent?.issue === admission.issue
+            !admission.generation && rootIntent?.issue === admission.issue
               ? root
-              : fileStore(resolve(directory, `issue-${admission.issue}`));
+              : fileStore(
+                  resolve(
+                    directory,
+                    admission.generation
+                      ? `issue-${admission.issue}-generation-${admission.generation}`
+                      : `issue-${admission.issue}`
+                  )
+                );
           entries.push({ intent: yield* store.read(), control: yield* store.readControl() });
         }
         return { state, entries };

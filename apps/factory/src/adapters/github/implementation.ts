@@ -5,6 +5,7 @@ import { contextualPromise as githubPromise, runInContext } from './context.js';
 import { command } from '../../platform/index.js';
 import { type JoinConfiguration, prerequisiteJoin } from './joins.js';
 import { prerequisiteReadiness, type VerifiedPrerequisite } from './prerequisites.js';
+import { dependencyHandback } from './handback.js';
 import { publication } from './publication.js';
 
 const issueSchema = z.object({
@@ -303,6 +304,7 @@ export function githubIssues(
     };
   }
   return {
+    ...dependencyHandback(gh, blockerNumbers),
     claimPublicationRetry: (intent, request, evidence) =>
       contextualPromise({
         try: (signal) =>

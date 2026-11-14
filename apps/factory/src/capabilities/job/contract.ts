@@ -146,6 +146,16 @@ export type RecoveryAdmission = (
   continuation?: ContinuationReceipt
 ) => Effect.Effect<boolean, Unavailable>;
 export interface Issues {
+  /** Read-only existence, repository, self-reference and graph validation. */
+  validateDependencies?(
+    intent: Intent,
+    dependencies: readonly string[]
+  ): Effect.Effect<'valid' | 'invalid' | 'cycle', Unavailable>;
+  /** Authoritative reread of edges, owning PR closure and open Planned issue. */
+  verifyHandback?(
+    intent: Intent,
+    dependencies: readonly string[]
+  ): Effect.Effect<boolean, Unavailable>;
   /** Verify a terminal publication against its retained reviewed correction and
    * reacquire that generation's writer claim. Never publishes or grants readiness. */
   claimPublicationRetry?(
@@ -240,6 +250,7 @@ export interface Execution {
 }
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
+  readonly generation?: number;
   readonly includeCodeFromIssues?: readonly number[];
   readonly selectionBase?: string;
   readonly issue: number;
@@ -295,6 +306,7 @@ export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
 /** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
+  readonly handback?: readonly string[];
   readonly reconciliation?: 'state' | 'migration';
   readonly receiptProtocol?: 'delivery-v1';
   /** Original verified recovery stage authorizing this manually started continuation. */
@@ -367,6 +379,7 @@ export interface Delivery {
   readonly stage: Stage | 'ci';
   readonly progress?: string;
   readonly activity?:
+    | 'dependency-handback'
     | 'repairing'
     | 'waiting-for-github'
     | 'continuation-pending'

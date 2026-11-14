@@ -139,6 +139,11 @@ export interface ExecutionCycle {
   readonly allowance: number;
 }
 export interface ScheduleState {
+  /** Abandoned dependency attempts remain audit records, outside current allowance. */
+  readonly released?: readonly {
+    readonly admission: import('../job/index.js').Start;
+    readonly jobId: string;
+  }[];
   /** Stable across internal cycle bookkeeping; changes with configured controls. */
   readonly controlsRevision?: number;
   readonly cycle?: ExecutionCycle;

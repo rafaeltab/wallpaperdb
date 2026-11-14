@@ -24,6 +24,8 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
   let commit = 'b'.repeat(40);
   let prCommit = commit;
   let ready = false;
+  let dependencyResult: 'valid' | 'invalid' | 'cycle' = 'valid';
+  let handbackVerified = false;
   let lost = false;
   const sends: StageRequest[] = [];
   const runtime = ManagedRuntime.make(
@@ -34,6 +36,8 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
           Layer.succeed(Time, { now: () => Effect.succeed(100) }),
           Layer.succeed(AgentReconciliationPolicy, { limit }),
           Layer.succeed(Issues, {
+            validateDependencies: () => Effect.succeed(dependencyResult),
+            verifyHandback: () => Effect.succeed(handbackVerified),
             inspect: () =>
               Effect.succeed({
                 open: true,
@@ -125,7 +129,11 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
       lost?: boolean;
       run?: number;
       observationStatus?: string;
+      dependencyResult?: 'valid' | 'invalid' | 'cycle';
+      handbackVerified?: boolean;
     }) => {
+      dependencyResult = change.dependencyResult ?? dependencyResult;
+      handbackVerified = change.handbackVerified ?? handbackVerified;
       accepted = change.accepted ?? accepted;
       idle = change.idle ?? idle;
       if ('migrationRequired' in change) migrationRequired = change.migrationRequired;

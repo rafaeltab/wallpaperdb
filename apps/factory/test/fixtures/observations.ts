@@ -24,7 +24,8 @@ export function controlledObservations(
           )
         );
         for (const item of updates) {
-          if (item.kind !== 'job' && current < completedGeneration) continue;
+          const itemGeneration = item.generation ?? current;
+          if (item.kind !== 'job' && itemGeneration < completedGeneration) continue;
           const key =
             item.kind === 'failure'
               ? item.key
@@ -43,19 +44,18 @@ export function controlledObservations(
               after.kind === 'found' &&
               before.run &&
               after.run &&
-              (before.run.ordinal > after.run.ordinal ||
-                (before.run.ordinal === after.run.ordinal && before.run.id !== after.run.id))
+              before.run.ordinal > after.run.ordinal
             )
               continue;
           }
           if (
             previous &&
-            (previous.generation > current ||
-              (previous.generation === current && previous.sequence >= item.sequence))
+            (previous.generation > itemGeneration ||
+              (previous.generation === itemGeneration && previous.sequence >= item.sequence))
           )
             continue;
           items[key] = {
-            generation: current,
+            generation: itemGeneration,
             sequence: item.sequence,
             attemptedAt: item.at,
             ...(item.kind === 'failure'
@@ -107,6 +107,17 @@ export function controlledObservations(
               ),
               ...newerPulls,
             ],
+          };
+          const acceptedPulls = facts.pullRequests;
+          facts = {
+            ...facts,
+            verifiedPrBases: incoming.verifiedPrBases?.filter((edge) =>
+              [edge.base, edge.tip].every((n) => {
+                const collected = incoming.pullRequests.find((pr) => pr.number === n);
+                const accepted = acceptedPulls.find((pr) => pr.number === n);
+                return collected?.head === accepted?.head && collected?.base === accepted?.base;
+              })
+            ),
           };
           completedGeneration = current;
         }

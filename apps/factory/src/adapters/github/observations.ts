@@ -353,11 +353,18 @@ export function githubObservations(
                   ),
                   Effect.tapError(Effect.logError)
                 );
-        const queue = yield* Queue.make<CollectedObservation | null>();
+        const queue = yield* Queue.make<
+          (CollectedObservation & { diagnosticCause?: unknown }) | null
+        >();
         let incomplete = false;
-        const failed = (key: string) => {
+        const failed = (key: string, diagnosticCause: unknown) => {
           incomplete = true;
-          Queue.offerUnsafe(queue, { kind: 'failure', key, error: 'github-observations' });
+          Queue.offerUnsafe(queue, {
+            kind: 'failure',
+            key,
+            error: 'github-observations',
+            diagnosticCause,
+          });
         };
         const completed = new Map<number, IssueObservation>();
         const consumer = yield* Effect.forkChild(
@@ -367,6 +374,7 @@ export function githubObservations(
                 for (;;) {
                   const item = yield* Queue.take(queue);
                   if (item === null) return;
+                  if (item.kind === 'failure') yield* Effect.logError(item.diagnosticCause);
                   const complete: CollectedObservation =
                     item.kind === 'issue'
                       ? yield* decorate(item.value).pipe(
@@ -380,7 +388,9 @@ export function githubObservations(
                             });
                           })
                         )
-                      : item;
+                      : item.kind === 'failure'
+                        ? { kind: 'failure', key: item.key, error: item.error }
+                        : item;
                   if (complete.kind === 'issue')
                     completed.set(complete.value.number, complete.value);
                   if (publish) yield* publish(complete);
@@ -460,14 +470,12 @@ export function githubObservations(
                       parsed.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
                     )
                       throw new Error('Invalid related PR identity');
-                    if (parsed.commits.nodes.some(({ commit }) => commit.oid !== parsed.headRefOid))
-                      throw new Error('Inconsistent PR head');
                     const [complete] = await checkRequirements(gh, [translatePull(parsed)], signal);
                     if (!complete) throw new Error('Missing complete pull');
                     pulls.set(n, complete);
                     Queue.offerUnsafe(queue, { kind: 'pull', value: complete });
-                  } catch {
-                    failed(`pull:${n}`);
+                  } catch (cause) {
+                    failed(`pull:${n}`, cause);
                   }
                 }
               };
@@ -516,8 +524,8 @@ export function githubObservations(
                 const values = batch.flatMap((n) => {
                   try {
                     return [decodeIssue(n)];
-                  } catch {
-                    failed(`issue:${n}`);
+                  } catch (cause) {
+                    failed(`issue:${n}`, cause);
                     return [];
                   }
                 });

@@ -604,7 +604,7 @@ export function githubObservations(
                     // The issue's association was validated independently. Failed PR
                     // runtime collection retains its previous complete observation.
                     if (!previous) continue;
-                    pulls.set(pr.number, {
+                    const enriched = {
                       ...previous,
                       linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
                       crossReferencedIssues: [
@@ -613,7 +613,9 @@ export function githubObservations(
                           ...pr.crossReferencedIssues,
                         ]),
                       ],
-                    });
+                    };
+                    pulls.set(pr.number, enriched);
+                    Queue.offerUnsafe(queue, { kind: 'pull', value: enriched });
                   }
                 }
               }

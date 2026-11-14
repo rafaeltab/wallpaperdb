@@ -30,19 +30,6 @@ export function dependencyHandback(
     if (!evidence?.idle) return delivery;
     const control = yield* store.readControl();
     if (control.cancelled) return null;
-    if (waiting.handback) {
-      const verified = yield* issues.verifyHandback?.(intent, waiting.handback) ??
-        Effect.succeed(false);
-      if ((yield* store.readControl()).revision !== control.revision) return delivery;
-      return verified
-        ? {
-            ...delivery,
-            activity: 'dependency-handback' as const,
-            active: false,
-            progress: 'Dependencies recorded; attempt abandoned for ordinary scheduling.',
-          }
-        : delivery;
-    }
     const dependencies = [...new Set(evidence.dependencies)];
     const result =
       dependencies.length &&
@@ -64,6 +51,28 @@ export function dependencyHandback(
         progress: 'Dependency cycle requires maintainer recovery.',
       };
     if (result === 'invalid') return yield* requestReconciliation(store, waiting, evidence, limit);
+    if (waiting.handback) {
+      const same =
+        dependencies.length === waiting.handback.length &&
+        dependencies.every((value) => waiting.handback?.includes(value));
+      if (!same)
+        return yield* requestReconciliation(
+          store,
+          { ...waiting, handback: dependencies },
+          evidence,
+          limit
+        );
+      const verified = yield* issues.verifyHandback?.(intent, dependencies) ??
+        Effect.succeed(false);
+      if ((yield* store.readControl()).revision !== control.revision) return delivery;
+      if (!verified) return yield* requestReconciliation(store, waiting, evidence, limit);
+      return {
+        ...delivery,
+        activity: 'dependency-handback' as const,
+        active: false,
+        progress: 'Dependencies recorded; attempt abandoned for ordinary scheduling.',
+      };
+    }
     const request: StageRequest = {
       ...waiting,
       index: waiting.index + 1,

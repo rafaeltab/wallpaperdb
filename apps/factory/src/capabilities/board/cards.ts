@@ -3,7 +3,7 @@ import type { WorkItem } from './model.js';
 import { attention, factoryStatus, providerStatus } from './status.js';
 import { entity, issueId, pullId, unknown } from './values.js';
 export function populateCards(context: ProjectionContext) {
-  const { tables, details, input, at, fact, facts } = context;
+  const { tables, details, input, at, itemFact, facts } = context;
   function card(
     subject: WorkItem['subject'],
     section: WorkItem['section'],
@@ -78,7 +78,7 @@ export function populateCards(context: ProjectionContext) {
         return w?.control.parked ? [{ jobId: j.id, ...w.control.parked.question }] : [];
       }),
       checkRuns: p?.checkRuns
-        ? fact(
+        ? itemFact(`pull:${p.number}`)(
             p.checkRuns.map((c) => ({
               id: c.id,
               groupId: c.id,

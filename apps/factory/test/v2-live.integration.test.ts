@@ -2927,6 +2927,82 @@ it('dates incremental issue facts independently and exposes retained item failur
   }
 });
 
+it.each([
+  { itemAt: 2000, collectionAt: undefined },
+  { itemAt: 2000, collectionAt: 1000 },
+  { itemAt: undefined, collectionAt: 2000 },
+])(
+  'dates PR check summaries and details from the same item evidence: $itemAt/$collectionAt',
+  async ({ itemAt, collectionAt }) => {
+    const { pullObservation } = await import('./fixtures/v2.js');
+    const input: ScheduleSnapshot = {
+      ...initial,
+      observations: {
+        state: 'error',
+        stale: false,
+        error: 'other-item-offline',
+        observedAt: collectionAt,
+        facts: {
+          issues: [],
+          pullRequests: [
+            pullObservation(42, {
+              checkRuns: [
+                {
+                  id: 'C1',
+                  name: 'build',
+                  state: 'passed',
+                  requirement: 'required',
+                  head: 'a'.repeat(40),
+                  url: null,
+                  startedAt: null,
+                  completedAt: null,
+                },
+              ],
+            }),
+          ],
+        },
+        items:
+          itemAt === undefined
+            ? {}
+            : {
+                'pull:42': {
+                  generation: 1,
+                  sequence: 2,
+                  attemptedAt: 3000,
+                  observedAt: itemAt,
+                  failedAt: 3000,
+                  error: 'github-observations',
+                },
+              },
+      },
+    };
+    const board = await liveBoard({ scopeId: 'pr-check-details', initial: input });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      const card = snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/42'];
+      expect(snapshot.entities.pullRequests['pr:rafaeltab/wallpaperdb/42'].checks).toMatchObject({
+        state: 'known',
+        observedAt: '1970-01-01T00:00:02.000Z',
+      });
+      const detail = await app.inject({
+        url: `/api/v2/items/${encodeURIComponent(card.id)}`,
+        headers: { 'if-match': `"${card.version}"` },
+      });
+      expect(detail.statusCode).toBe(200);
+      expect(detail.json()).toMatchObject({
+        checkRuns: {
+          state: 'known',
+          observedAt: '1970-01-01T00:00:02.000Z',
+          value: [{ id: 'C1', name: 'build', state: 'passed' }],
+        },
+      });
+    } finally {
+      await app.close();
+    }
+  }
+);
+
 it('exposes job freshness and retained failures on jobs without a PR relationship', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const input = parkedSnapshot(pullObservation(42), false);

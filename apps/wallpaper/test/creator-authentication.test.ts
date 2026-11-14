@@ -27,7 +27,7 @@ it('verifies the configured session profile with real signatures and remote keys
   };
   const runtime = ManagedRuntime.make(creatorAuthenticationLayer([provider]));
   const token = (claims: Record<string, unknown> = {}) =>
-    new SignJWT({ azp: 'https://web.example', ...claims })
+    new SignJWT({ sid: 'sess_selected_profile', azp: 'https://web.example', ...claims })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
       .setIssuer(provider.issuer)
       .setSubject('user_selected_profile')
@@ -42,9 +42,13 @@ it('verifies the configured session profile with real signatures and remote keys
       namespace: 'configured-namespace',
       subject: 'user_selected_profile',
     });
+    // A template has the same general claims and signing key, but no session binding.
+    expect(await verify(await token({ sid: undefined }))).toBeNull();
+    expect(await verify(await token({ sid: '' }))).toBeNull();
+    expect(await verify(await token({ sid: 42 }))).toBeNull();
     expect(await verify(await token({ azp: 'https://other.example' }))).toBeNull();
     expect(await verify(await token({ azp: undefined }))).toBeNull();
-    const expired = await new SignJWT({ azp: 'https://web.example' })
+    const expired = await new SignJWT({ sid: 'sess_selected_profile', azp: 'https://web.example' })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
       .setIssuer(provider.issuer)
       .setSubject('user_selected_profile')
@@ -53,7 +57,10 @@ it('verifies the configured session profile with real signatures and remote keys
       .setExpirationTime(2)
       .sign(key.privateKey);
     expect(await verify(expired)).toBeNull();
-    const wrongAudience = await new SignJWT({ azp: 'https://web.example' })
+    const wrongAudience = await new SignJWT({
+      sid: 'sess_selected_profile',
+      azp: 'https://web.example',
+    })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
       .setIssuer(provider.issuer)
       .setSubject('user_selected_profile')
@@ -64,7 +71,7 @@ it('verifies the configured session profile with real signatures and remote keys
     expect(await verify(wrongAudience)).toBeNull();
     expect(await verify('malformed-token')).toBeNull();
     const wrongSigner = await generateKeyPair('RS256');
-    const forged = await new SignJWT({ azp: 'https://web.example' })
+    const forged = await new SignJWT({ sid: 'sess_selected_profile', azp: 'https://web.example' })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
       .setIssuer(provider.issuer)
       .setSubject('other-creator')
@@ -97,7 +104,7 @@ it('returns a typed retryable failure when configured keys cannot be retrieved',
     ])
   );
   const key = await generateKeyPair('RS256');
-  const token = await new SignJWT({})
+  const token = await new SignJWT({ sid: 'sess_dependency_health' })
     .setProtectedHeader({ alg: 'RS256', kid: 'unknown-key' })
     .setIssuer('https://selected.clerk.accounts.dev')
     .setSubject('creator')

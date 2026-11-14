@@ -69,6 +69,8 @@ export function clerkAuthorLayer(providers: readonly IdentityProvider[]) {
                 requiredClaims: ['sub', 'exp', 'iat'],
                 ...(provider.audience.length ? { audience: provider.audience } : {}),
               });
+              // Clerk JWT templates cannot carry the session-bound sid claim.
+              if (typeof payload.sid !== 'string' || !payload.sid.length) return null;
               if (!provider.audience.length && payload.aud !== undefined) return null;
               if (
                 payload.azp === undefined

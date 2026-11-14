@@ -1,7 +1,7 @@
 import { retryAction, retryStage } from './retry.js';
 import { attemptIntent, matchesRestart, restartAction } from './restart.js';
 import { Effect, Layer, Random, Option } from 'effect';
-import { reconcileStages, currentStage, hasAnsweredQuestion } from './stages.js';
+import { reconcileStages, currentStage, hasAnsweredQuestion, stageRunOrder } from './stages.js';
 import {
   Execution,
   Issues,
@@ -83,7 +83,7 @@ export const JobLive = Layer.effect(
         const observed = yield* execution.observe(activeIntent, waiting);
         if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
         if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
-        const evidence = yield* resumeEvidence(execution, activeIntent, waiting, observed);
+        const evidence = yield* resumeEvidence(store, execution, activeIntent, waiting, observed);
         if (!evidence) return { kind: 'rejected' as const };
         const request: import('./contract.js').StageRequest = {
           ...waiting,
@@ -266,14 +266,24 @@ function resumeCommand(
 }
 
 function resumeEvidence(
+  store: import('./contract.js').JobStore,
   execution: import('./contract.js').Execution,
   intent: Intent,
   waiting: import('./contract.js').StageRequest,
   observed: Extract<import('./contract.js').Observation, { kind: 'found' }>
 ) {
-  if (observed.run)
-    return Effect.succeed({ runId: observed.run.id, ordinal: observed.run.ordinal });
-  return execution.inspectStage(intent, waiting);
+  return Effect.gen(function* () {
+    const evidence = observed.run
+      ? { runId: observed.run.id, ordinal: observed.run.ordinal }
+      : yield* execution.inspectStage(intent, waiting);
+    if (!evidence) return null;
+    return stageRunOrder(waiting, yield* store.readControl(), {
+      id: evidence.runId,
+      ordinal: evidence.ordinal,
+    })
+      ? evidence
+      : null;
+  });
 }
 
 function matchesPrerequisite(command: Start, prerequisite?: { base: string }) {

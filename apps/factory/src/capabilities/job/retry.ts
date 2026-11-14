@@ -15,7 +15,7 @@ import type {
   Status,
   Unavailable,
 } from './contract.js';
-import { currentStage } from './stages.js';
+import { associateStage, currentStage } from './stages.js';
 function retryableStage(control: Control, stage: StageRequest | null): stage is StageRequest {
   return (
     !control.cancelled &&
@@ -53,7 +53,7 @@ export function retryAction(
     const evidence = yield* execution.inspectStage(intent, stage);
     if (!matchingEvidence(evidence, stage, observation.run)) return undefined;
     if (!retryWorktree(stage, evidence)) return undefined;
-    if (!(yield* store.bindRun(stage, evidence.runId, evidence.ordinal))) return undefined;
+    if (!(yield* associateStage(store, evidence, stage))) return undefined;
     if (!(yield* reconcilePublication(issues, intent, stage, evidence))) return undefined;
     return { index: stage.index, runId: evidence.runId, revision: control.revision };
   });
@@ -70,6 +70,8 @@ export function retryStage(
     const action = latest.resume;
     if (intent.id !== command.jobId || !matchesRetry(action, command))
       return { kind: 'rejected' as const };
+    const run = latest.execution.kind === 'found' ? latest.execution.run : undefined;
+    if (!run || run.id !== command.runId) return { kind: 'rejected' as const };
     const waiting = yield* currentStage(store);
     const control = yield* store.readControl();
     if (!currentRetry(waiting, control, command)) return { kind: 'rejected' as const };
@@ -78,7 +80,7 @@ export function retryStage(
     yield* store.saveStage({
       ...waiting,
       index: waiting.index + 1,
-      ordinal: (waiting.ordinal ?? waiting.index + 1) + 1,
+      ordinal: run.ordinal + 1,
       previousRunId: command.runId,
       resume: true,
       receiptProtocol: 'delivery-v1',

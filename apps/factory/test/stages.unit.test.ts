@@ -809,6 +809,126 @@ it('offers Retry for the observed failed repair without exposing older recovery 
   expect(job.sends()).toBe(0);
 });
 
+it.each([
+  { mode: 'manual', status: 'failed' },
+  { mode: 'manual', status: 'interrupted' },
+  { mode: 'review', status: 'failed' },
+  { mode: 'review', status: 'interrupted' },
+])(
+  'rejects stale $status Resume authority for $mode and accepts later recovery',
+  async ({ mode, status }) => {
+    const job = await stagesFixture();
+    job.change({
+      accepted: mode === 'review',
+      ordinal: mode === 'review' ? 30 : 4,
+      runId: 'initial',
+    });
+    await job.start();
+    if (mode === 'manual') {
+      job.change({ status: 'running', runId: 'repair-11', ordinal: 11 });
+      await job.status();
+    }
+    const sends = job.sends();
+    job.change({ status, accepted: false, runId: 'stale-9', ordinal: 9 });
+    expect(await job.status()).toMatchObject({ resume: undefined });
+    job.change({ status: 'completed', accepted: true });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: mode === 'manual' ? 'implementation' : 'review' },
+    });
+    expect(job.sends()).toBe(sends);
+    job.change({ status, accepted: false, runId: 'current-41', ordinal: 41 });
+    const current = await job.status();
+    if (current.kind !== 'job' || !current.resume || !('runId' in current.resume))
+      throw new Error('Expected current failed continuation to be resumable');
+    expect(current.resume.runId).toBe('current-41');
+    await job.resume({ jobId: current.intent.id, ...current.resume });
+    expect(job.sends()).toBe(sends + 1);
+    job.change({ status: 'completed', accepted: true, runId: 'finished-50', ordinal: 50 });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: mode === 'manual' ? 'review' : 'publication' },
+    });
+  }
+);
+
+it.each([11, 21])(
+  'rejects conflicting equal-ordinal completion and accepts observed/later run %s',
+  async (ordinal) => {
+    const job = await stagesFixture();
+    job.change({ accepted: false, runId: 'failed-4', ordinal: 4 });
+    await job.start();
+    job.change({ status: 'running', runId: 'repair-11', ordinal: 11 });
+    await job.status();
+    job.change({ status: 'completed', accepted: true, runId: 'other-11' });
+    expect(await job.status()).toMatchObject({ delivery: { stage: 'implementation' } });
+    expect(job.sends()).toBe(0);
+    job.change({ runId: ordinal === 11 ? 'repair-11' : 'later-21', ordinal });
+    const result = await job.status();
+    expect(ordinal === 11 ? result : await job.status()).toMatchObject({
+      delivery: { stage: 'review' },
+    });
+    expect(job.sends()).toBe(1);
+  }
+);
+
+it.each([11, 21])(
+  'rejects stale explicit question Resume and permits current/later run %s',
+  async (ordinal) => {
+    const job = await stagesFixture();
+    job.change({
+      accepted: false,
+      status: 'waiting-for-input',
+      runId: 'question-11',
+      ordinal: 11,
+      question: { id: 'q11', text: 'Choose?' },
+    });
+    const initial = await job.start();
+    if (initial.kind !== 'job') throw new Error('Expected job');
+    const command = { jobId: initial.intent.id, index: 0, questionId: 'q11' };
+    job.change({ status: 'completed', runId: 'stale-9', ordinal: 9 });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    job.change({ runId: 'other-11', ordinal: 11 });
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(0);
+    job.change({ runId: ordinal === 11 ? 'question-11' : 'later-21', ordinal });
+    expect(await job.resume(command)).toMatchObject({ kind: 'job' });
+    expect(job.sends()).toBe(1);
+    expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+    expect(job.sends()).toBe(1);
+  }
+);
+
+it('ignores a stale babysitting question without postponing the current watchdog', async () => {
+  const job = await waitingJob();
+  job.change({
+    status: 'waiting-for-input',
+    waiting: false,
+    question: { id: 'q4', text: 'Choose?' },
+  });
+  await job.status();
+  job.change({
+    status: 'completed',
+    runId: 'answer-11',
+    ordinal: 11,
+    waiting: true,
+    answeredQuestions: ['q4'],
+  });
+  await job.status();
+  expect(await job.status()).toMatchObject({ delivery: { deadline: 3600100 } });
+  job.change({
+    status: 'waiting-for-input',
+    runId: 'old-9',
+    ordinal: 9,
+    waiting: false,
+    question: { id: 'old', text: 'Old?' },
+  });
+  await job.status();
+  job.change({ status: 'completed', runId: 'answer-11', ordinal: 11, waiting: true, now: 3600100 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+
 it('retains the question association while an answered async continuation is not visible yet', async () => {
   const job = await stagesFixture();
   job.change({

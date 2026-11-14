@@ -190,7 +190,7 @@ export function associateStage(
     if (
       current?.index !== request.index ||
       control.cancelled ||
-      evidence.ordinal < observedOrdinal(current, control)
+      !stageRunOrder(current, control, { id: evidence.runId, ordinal: evidence.ordinal })
     )
       return null;
     if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
@@ -238,7 +238,12 @@ function reconcileStage(
   continuation?: ContinuationAdmission
 ) {
   return Effect.gen(function* () {
-    const suspended = yield* suspension(store, waiting, observation);
+    const control = yield* controlForStage(store, waiting);
+    if (!control.cancelled && observation.run && !stageRunOrder(waiting, control, observation.run))
+      return control.parked?.index === waiting.index
+        ? parkedDelivery(waiting, control)
+        : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };
+    const suspended = yield* suspension(store, waiting, observation, control);
     if (suspended) {
       yield* questionInterruption(store, execution, issues, intent, waiting, observation, time);
       return suspended;
@@ -281,25 +286,57 @@ function associatedRun(
   evidence: StageEvidence | null,
   request: StageRequest
 ): evidence is StageEvidence {
-  return evidence !== null && evidence.stageIndex === request.index;
+  return (
+    evidence !== null &&
+    evidence.stageIndex === request.index &&
+    // Delivered ordinals encode a lower bound after the accepted predecessor,
+    // not the one turn expected to complete this delivery.
+    (request.observedRunId !== undefined ||
+      request.previousRunId === null ||
+      request.ordinal === undefined ||
+      evidence.ordinal >= request.ordinal)
+  );
 }
 
-function observedOrdinal(waiting: StageRequest, control: import('./contract.js').Control) {
-  // These ordinals describe observations already made, never a predicted next turn.
-  return Math.max(
-    waiting.observedRunId ? (waiting.ordinal ?? 0) : 0,
-    control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0,
-    control.manualRepair?.index === waiting.index ? control.manualRepair.run.ordinal : 0
+export function stageRunOrder(
+  waiting: StageRequest,
+  control: import('./contract.js').Control,
+  run: { readonly id: string; readonly ordinal: number }
+) {
+  const retained =
+    waiting.ordinal === undefined
+      ? undefined
+      : waiting.observedRunId
+        ? { id: waiting.observedRunId, ordinal: waiting.ordinal }
+        : waiting.previousRunId
+          ? {
+              id: waiting.previousRunId,
+              ordinal: waiting.ordinal - (waiting.stage === 'ci' ? 0 : 1),
+            }
+          : undefined;
+  const observations = [
+    retained,
+    control.parked?.index === waiting.index ? control.parked.run : undefined,
+    control.manualRepair?.index === waiting.index ? control.manualRepair.run : undefined,
+  ];
+  return (
+    !control.cancelled &&
+    observations.every(
+      (prior) =>
+        !prior ||
+        run.ordinal > prior.ordinal ||
+        (run.ordinal === prior.ordinal && run.id === prior.id)
+    )
   );
 }
 
 function suspension(
   store: JobStore,
   waiting: StageRequest,
-  observation: Extract<Observation, { kind: 'found' }>
+  observation: Extract<Observation, { kind: 'found' }>,
+  control: import('./contract.js').Control
 ) {
   return Effect.gen(function* () {
-    const control = yield* controlForStage(store, waiting);
     if (control.cancelled)
       return {
         stage: waiting.stage,
@@ -309,10 +346,6 @@ function suspension(
         activity: 'cancelled' as const,
         active: false,
       };
-    if (observation.run && observation.run.ordinal < observedOrdinal(waiting, control))
-      return control.parked?.index === waiting.index
-        ? parkedDelivery(waiting, control)
-        : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };
     if (answerContinuation(control, waiting, observation))
       return yield* adoptAnswer(store, waiting, observation, control);
     const repaired = yield* adoptManualRepair(store, waiting, observation, control);

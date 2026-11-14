@@ -20,25 +20,29 @@ export const JobLive = Layer.effect(
     const store = yield* JobStore;
     const time = yield* Time;
     const issues = yield* Issues;
-    const provider = yield* Execution;
+    const execution = yield* Execution;
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
-    const execution: Execution = {
-      ...provider,
-      sendStage: (intent, request) =>
-        provider
-          .sendStage(intent, request)
-          .pipe(
-            Effect.andThen(
-              () =>
-                reporting?.accepted(intent, request.stage, request.index, request.commit) ??
-                Effect.void
-            )
-          ),
-    };
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const generation = reporting ? yield* reporting.begin() : 0;
+        const reportingExecution: Execution = {
+          ...execution,
+          sendStage: (active, request) =>
+            execution
+              .sendStage(active, request)
+              .pipe(
+                Effect.andThen(
+                  () =>
+                    reporting?.accepted(
+                      { ...active, id: intent.id },
+                      request.stage,
+                      request.index,
+                      request.commit
+                    ) ?? Effect.void
+                )
+              ),
+        };
         return yield* Effect.gen(function* () {
           const before = yield* store.readControl();
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
@@ -50,7 +54,7 @@ export const JobLive = Layer.effect(
             yield* execution.interrupt(activeIntent, observation.threadId);
           const delivery: Delivery | undefined = yield* reconcileStages(
             store,
-            execution,
+            reportingExecution,
             issues,
             activeIntent,
             observation,
@@ -176,7 +180,7 @@ export const JobLive = Layer.effect(
               const active = attemptIntent(intent, index);
               const launch = yield* execution.launch(active);
               if (launch.kind === 'submitted' && reporting)
-                yield* reporting.accepted(active, 'implementation', index);
+                yield* reporting.accepted({ ...active, id: intent.id }, 'implementation', index);
             }
           }
           return yield* observe(intent);

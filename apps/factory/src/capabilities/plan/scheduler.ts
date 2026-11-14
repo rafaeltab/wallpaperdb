@@ -652,7 +652,7 @@ function recoveredResume(claim: ResumeClaim, jobs: readonly Status[]) {
 }
 function successorRun(previous: ResumeClaim['run'], current: ResumeClaim['run']) {
   if (!previous || !current) return false;
-  return current.id !== previous.id;
+  return current.id !== previous.id && current.ordinal > previous.ordinal;
 }
 
 function resolvedStart(claim: ResumeClaim, result: import('../job/index.js').StartResult) {

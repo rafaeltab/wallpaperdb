@@ -1010,68 +1010,42 @@ export async function runProtocol(
       }
       if (args[1] === 't3_thread_interrupt')
         reply({ structuredContent: { status: 'interrupt_requested', threadId: 'thread-live' } });
-      else
+      else {
+        const input = JSON.parse(args[2]);
+        const path = join(
+          config.directory,
+          config.parallel ? `resource-${input.threadId.replaceAll('/', '-')}.json` : 'resource.json'
+        );
+        const resourceExists = existsSync(path);
+        const resource = resourceExists ? JSON.parse(readFileSync(path, 'utf8')) : {};
         reply({
           structuredContent: {
             thread: {
               activeRunId: null,
               pendingRequestCount: 0,
-              blockedOnThreadWait: false,
               pendingBackgroundTasks: [],
-              ...(() => {
-                const input = JSON.parse(args[2]);
-                const path = join(
-                  config.directory,
-                  config.parallel
-                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
-                    : 'resource.json'
-                );
-                const resource = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
-                return {
-                  ...resource,
-                  blockedOnThreadWait:
-                    config.waitingForGithub === true && resource.stage === 'babysitting',
-                };
-              })(),
+              ...resource,
+              blockedOnThreadWait:
+                config.waitingForGithub === true && resource.stage === 'babysitting',
               ...config.overrides,
-              status: (() => {
-                const input = JSON.parse(args[2]);
-                const path = join(
-                  config.directory,
-                  config.parallel
-                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
-                    : 'resource.json'
-                );
-                const resource = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
-                return stageHeld(resource)
-                  ? 'running'
-                  : (config.overrides?.status ?? resource.status ?? 'completed');
-              })(),
+              status: stageHeld(resource)
+                ? 'running'
+                : (config.overrides?.status ?? resource.status ?? 'completed'),
               pullRequests: (config.overrides?.pullRequests ?? []).map((pr: object) => ({
                 watching: false,
                 ...pr,
               })),
-              ...(config.descendantSnapshots?.[JSON.parse(args[2]).threadId] ?? {}),
-              threadId: JSON.parse(args[2]).threadId,
-              latestRunId: (() => {
-                const input = JSON.parse(args[2]);
-                const path = join(
-                  config.directory,
-                  config.parallel
-                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
-                    : 'resource.json'
-                );
-                return (
-                  config.overrides?.latestRunId ??
-                  (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).latestRunId : null)
-                );
-              })(),
+              ...(config.descendantSnapshots?.[input.threadId] ?? {}),
+              threadId: input.threadId,
+              latestRunId:
+                config.overrides?.latestRunId ?? (resourceExists ? resource.latestRunId : null),
             },
             items: config.activity ?? [],
             hasMore: false,
             nextPosition: null,
           },
         });
+      }
     } else if (args.includes('--help'))
       console.log(`--worktree --model${config.idempotency ? ' --client-request-id' : ''}`);
     else if (args[1] === 'start') {

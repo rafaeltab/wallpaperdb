@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import {
   defaultAgentReconciliationLimit,
   type Delivery,
+  type Control,
   type Execution,
   type Intent,
   type Issues,
@@ -27,11 +28,12 @@ export function reconcileStages(
   intent: Intent,
   observation: Observation,
   time: Time,
-  continuation?: ContinuationAdmission,
-  initialIndex = 0,
+  continuation: ContinuationAdmission | undefined,
+  authority: Control,
   reconciliationLimit = defaultAgentReconciliationLimit
 ) {
   return Effect.gen(function* () {
+    const initialIndex = authority.restart?.index ?? 0;
     if (observation.kind !== 'found') return undefined;
     if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
     yield* store.saveStage({
@@ -56,7 +58,8 @@ export function reconcileStages(
       observation,
       time,
       continuation,
-      reconciliationLimit
+      reconciliationLimit,
+      authority
     );
   }).pipe(Effect.withSpan('factory.job.stages'));
 }
@@ -238,8 +241,9 @@ function reconcileStage(
   waiting: StageRequest,
   observation: Extract<Observation, { kind: 'found' }>,
   time: Time,
-  continuation?: ContinuationAdmission,
-  reconciliationLimit = defaultAgentReconciliationLimit
+  continuation: ContinuationAdmission | undefined,
+  reconciliationLimit: number,
+  authority: Control
 ) {
   return Effect.gen(function* () {
     const control = yield* controlForStage(store, waiting);
@@ -268,7 +272,8 @@ function reconcileStage(
       intent,
       waiting,
       evidence,
-      reconciliationLimit
+      reconciliationLimit,
+      authority
     );
     if (handback) {
       const next = yield* currentStage(store);

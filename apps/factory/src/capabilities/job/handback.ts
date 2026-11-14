@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import type {
   Delivery,
+  Control,
   Intent,
   Issues,
   JobStore,
@@ -15,7 +16,8 @@ export function dependencyHandback(
   intent: Intent,
   waiting: StageRequest,
   evidence: StageEvidence | null,
-  limit: number
+  limit: number,
+  control: Control
 ) {
   return Effect.gen(function* () {
     if (!waiting.handback && evidence?.dependencies === undefined) return null;
@@ -28,8 +30,24 @@ export function dependencyHandback(
       active: true,
     };
     if (!evidence?.idle) return delivery;
-    const control = yield* store.readControl();
-    if (control.cancelled || control.released) return null;
+    // This authority predates execution observation and evidence association.
+    // A later snapshot may invalidate it but must never relabel stale evidence.
+    const current = yield* store.readControl();
+    if (
+      control.cancelled ||
+      control.released ||
+      current.cancelled ||
+      current.released ||
+      current.revision !== control.revision ||
+      (control.reconciliation?.pending?.index ?? -1) > waiting.index ||
+      (control.manualRepair?.adoption?.index ?? -1) > waiting.index ||
+      (control.restart?.index ?? -1) > waiting.index
+    )
+      return delivery;
+    const reconcile = (request = waiting) =>
+      requestReconciliation(store, request, evidence, limit, control.revision).pipe(
+        Effect.map((result) => result ?? delivery)
+      );
     const dependencies = [...new Set(evidence.dependencies)];
     const result =
       dependencies.length &&
@@ -43,6 +61,7 @@ export function dependencyHandback(
         ? yield* issues.validateDependencies?.(intent, dependencies) ??
             Effect.succeed('invalid' as const)
         : 'invalid';
+    if ((yield* store.readControl()).revision !== control.revision) return delivery;
     if (result === 'cycle')
       return {
         ...delivery,
@@ -50,22 +69,16 @@ export function dependencyHandback(
         active: false,
         progress: 'Dependency cycle requires maintainer recovery.',
       };
-    if (result === 'invalid') return yield* requestReconciliation(store, waiting, evidence, limit);
+    if (result === 'invalid') return yield* reconcile();
     if (waiting.handback) {
       const same =
         dependencies.length === waiting.handback.length &&
         dependencies.every((value) => waiting.handback?.includes(value));
-      if (!same)
-        return yield* requestReconciliation(
-          store,
-          { ...waiting, handback: dependencies },
-          evidence,
-          limit
-        );
+      if (!same) return yield* reconcile({ ...waiting, handback: dependencies });
       const verified = yield* issues.verifyHandback?.(intent, dependencies) ??
         Effect.succeed(false);
       if ((yield* store.readControl()).revision !== control.revision) return delivery;
-      if (!verified) return yield* requestReconciliation(store, waiting, evidence, limit);
+      if (!verified) return yield* reconcile();
       return {
         ...delivery,
         activity: 'dependency-handback' as const,

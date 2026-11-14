@@ -186,3 +186,47 @@ it('retires the old Job with its refund so later observations cannot deliver ano
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('rejects old handback evidence when association completion overlaps a newer instruction', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-handback-association-'));
+  const original = fileStore(directory);
+  let armed = false;
+  let owner: Awaited<ReturnType<typeof completionFixture>> | undefined;
+  let nested:
+    | Awaited<ReturnType<Awaited<ReturnType<typeof completionFixture>>['status']>>
+    | undefined;
+  const store = {
+    ...original,
+    bindRun: (
+      request: import('../src/capabilities/job/index.js').StageRequest,
+      runId: string,
+      ordinal?: number
+    ) =>
+      Effect.gen(function* () {
+        const bound = yield* original.bindRun(request, runId, ordinal);
+        const currentOwner = owner;
+        if (bound && armed && currentOwner) {
+          armed = false;
+          currentOwner.state({ idle: true, dependencies: ['759'], handbackVerified: true });
+          nested = yield* Effect.promise(() => currentOwner.status());
+        }
+        return bound;
+      }),
+  };
+  const f = await completionFixture(3, store);
+  owner = f;
+  try {
+    f.state({ idle: true, dependencies: ['758'] });
+    await f.status();
+    await f.status();
+    f.state({ idle: true, handbackVerified: true });
+    armed = true;
+    const outer = await f.status();
+    expect(nested).toMatchObject({ delivery: { activity: 'continuation-pending', active: true } });
+    expect(f.sends.map((request) => request.handback)).toEqual([['758'], ['759']]);
+    expect(outer).not.toMatchObject({ delivery: { activity: 'dependency-handback' } });
+  } finally {
+    await f.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});

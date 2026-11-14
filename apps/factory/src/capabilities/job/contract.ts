@@ -289,6 +289,8 @@ export interface StageRequest {
     readonly owningHeads?: readonly string[];
   };
   readonly index: number;
+  /** Earliest successor ordinal, or actual observed ordinal for adopted/CI stages.
+   * This retained ordering boundary is never an exact completion target. */
   readonly ordinal?: number;
   readonly continuation?: boolean;
   readonly resume?: boolean;

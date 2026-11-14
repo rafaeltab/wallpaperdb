@@ -1,12 +1,12 @@
-import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
-import type { ObservationStore, ReportingStore } from '../../capabilities/observe/index.js';
+import { Effect } from 'effect';
 import { Unavailable } from '../../capabilities/job/index.js';
+import type { ObservationStore, ReportingStore } from '../../capabilities/observe/index.js';
 import {
-  stateConnection,
-  githubRichFacts,
   githubIssues,
   githubPulls,
+  githubRichFacts,
+  stateConnection,
   observationRefresh as table,
 } from '../../platform/index.js';
 export function sqliteObservations(directory: string): ObservationStore & ReportingStore {
@@ -112,6 +112,9 @@ export function sqliteObservations(directory: string): ObservationStore & Report
                 const before = pulls.get(item.value.number);
                 pulls.set(item.value.number, {
                   ...item.value,
+                  linkedIssues: [
+                    ...new Set([...(before?.linkedIssues ?? []), ...item.value.linkedIssues]),
+                  ],
                   crossReferencedIssues: [
                     ...new Set([
                       ...(before?.crossReferencedIssues ?? []),

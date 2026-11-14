@@ -1,11 +1,12 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import { parkedSnapshot, pullObservation } from './v2.js';
 import type {
+  Facts,
   ObservationStore,
   ReportingStore,
-  Facts,
 } from '../../src/capabilities/observe/index.js';
+import { parkedSnapshot, pullObservation } from './v2.js';
+
 const facts: Facts = {
   issues: [
     {
@@ -383,7 +384,7 @@ export function reportingStoreContract(
       await close();
     }
   });
-  it(`${name} retains cross-reference membership and invalidates ancestry when an incremental PR comparison changes`, async () => {
+  it(`${name} retains association membership until authoritative refresh and invalidates ancestry when an incremental PR comparison changes`, async () => {
     const { store, close } = await open();
     try {
       const generation = await Effect.runPromise(store.begin());
@@ -399,6 +400,7 @@ export function reportingStoreContract(
                 head: 'c'.repeat(40),
                 evidenceHead: 'c'.repeat(40),
                 base: 'a'.repeat(40),
+                linkedIssues: [1],
                 crossReferencedIssues: [1],
               }),
             ],
@@ -414,6 +416,7 @@ export function reportingStoreContract(
             value: pullObservation(2, {
               head: 'd'.repeat(40),
               evidenceHead: 'd'.repeat(40),
+              linkedIssues: [2],
               crossReferencedIssues: [2],
             }),
             sequence: 1,
@@ -425,7 +428,24 @@ export function reportingStoreContract(
       expect(
         observed.facts?.pullRequests.find((pr) => pr.number === 2)?.crossReferencedIssues
       ).toEqual(expect.arrayContaining([1, 2]));
+      expect(observed.facts?.pullRequests.find((pr) => pr.number === 2)?.linkedIssues).toEqual(
+        expect.arrayContaining([1, 2])
+      );
       expect(observed.facts?.verifiedPrBases).toEqual([]);
+      await Effect.runPromise(
+        store.refresh({
+          generation: next,
+          observedAt: 30,
+          facts: {
+            issues: [],
+            pullRequests: [pullObservation(2, { linkedIssues: [2], crossReferencedIssues: [2] })],
+            verifiedPrBases: [],
+          },
+        })
+      );
+      expect((await Effect.runPromise(store.read())).facts?.pullRequests).toMatchObject([
+        { number: 2, linkedIssues: [2], crossReferencedIssues: [2] },
+      ]);
     } finally {
       await close();
     }

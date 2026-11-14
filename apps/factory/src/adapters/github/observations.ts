@@ -1,17 +1,20 @@
-import { Effect, Semaphore, Queue, Fiber } from 'effect';
+import { Effect, Fiber, Queue, Semaphore } from 'effect';
 import { z } from 'zod';
-import type {
-  ObservationSource,
-  CollectedObservation,
-  IssueObservation,
-  PullObservation,
-  Facts,
-} from '../../capabilities/observe/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
+import type {
+  CollectedObservation,
+  Facts,
+  IssueObservation,
+  ObservationSource,
+  PullObservation,
+} from '../../capabilities/observe/index.js';
 import { command } from '../../platform/index.js';
+
 type GitHubRead = (args: string[], signal?: AbortSignal) => Promise<unknown>;
+
 import { blockerNumbers } from './implementation.js';
-import { projectSynchronization, type ProjectSynchronizationOptions } from './project-sync.js';
+import { type ProjectSynchronizationOptions, projectSynchronization } from './project-sync.js';
+
 const number = z.number().int().positive();
 const page = z.object({ hasNextPage: z.literal(false) });
 const connection = <T extends z.ZodTypeAny>(node: T) =>
@@ -446,6 +449,27 @@ export function githubObservations(
               const seen = new Set<number>();
               const issues: IssueObservation[] = [];
               const pulls = new Map<number, PullObservation>();
+              const associations = new Map<
+                number,
+                Pick<PullObservation, 'linkedIssues' | 'crossReferencedIssues'>
+              >();
+              const publishPull = (value: PullObservation) => {
+                const related = associations.get(value.number);
+                const complete = {
+                  ...value,
+                  linkedIssues: [
+                    ...new Set([...value.linkedIssues, ...(related?.linkedIssues ?? [])]),
+                  ],
+                  crossReferencedIssues: [
+                    ...new Set([
+                      ...value.crossReferencedIssues,
+                      ...(related?.crossReferencedIssues ?? []),
+                    ]),
+                  ],
+                };
+                pulls.set(value.number, complete);
+                Queue.offerUnsafe(queue, { kind: 'pull', value: complete });
+              };
               // Reviews, mergeability, heads and checks are independently mutable. Refresh
               // every relevant PR in bounded batches, regardless of project timestamps.
               const requestedPulls = new Map<number, Promise<void>>();
@@ -484,8 +508,7 @@ export function githubObservations(
                       throw new Error('Invalid related PR identity');
                     const [complete] = await checkRequirements(gh, [translatePull(parsed)], signal);
                     if (!complete) throw new Error('Missing complete pull');
-                    pulls.set(n, complete);
-                    Queue.offerUnsafe(queue, { kind: 'pull', value: complete });
+                    publishPull(complete);
                   } catch (cause) {
                     failed(`pull:${n}`, cause);
                   }
@@ -585,6 +608,22 @@ export function githubObservations(
                     continue;
                   }
                   completeValues.push(value);
+                  for (const pr of value.pullRequests) {
+                    const previous = associations.get(pr.number);
+                    associations.set(pr.number, {
+                      linkedIssues: [
+                        ...new Set([...(previous?.linkedIssues ?? []), ...pr.linkedIssues]),
+                      ],
+                      crossReferencedIssues: [
+                        ...new Set([
+                          ...(previous?.crossReferencedIssues ?? []),
+                          ...pr.crossReferencedIssues,
+                        ]),
+                      ],
+                    });
+                    const complete = pulls.get(pr.number);
+                    if (complete) publishPull(complete);
+                  }
                   const existing = issues.findIndex((i) => i.number === value.metadata.number);
                   if (existing >= 0) issues.splice(existing, 1);
                   issues.push(value.metadata);
@@ -598,26 +637,6 @@ export function githubObservations(
                     ),
                   ].filter((n) => !pulls.has(n))
                 );
-                for (const value of completeValues) {
-                  for (const pr of value.pullRequests) {
-                    const previous = pulls.get(pr.number);
-                    // The issue's association was validated independently. Failed PR
-                    // runtime collection retains its previous complete observation.
-                    if (!previous) continue;
-                    const enriched = {
-                      ...previous,
-                      linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
-                      crossReferencedIssues: [
-                        ...new Set([
-                          ...previous.crossReferencedIssues,
-                          ...pr.crossReferencedIssues,
-                        ]),
-                      ],
-                    };
-                    pulls.set(pr.number, enriched);
-                    Queue.offerUnsafe(queue, { kind: 'pull', value: enriched });
-                  }
-                }
               }
               await initialPulls;
               const facts = {

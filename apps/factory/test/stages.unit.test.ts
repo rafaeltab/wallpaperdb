@@ -378,11 +378,11 @@ it('invalidates displayed readiness if the current worktree changes after accept
   job.change({ commit: 'c'.repeat(40) });
   expect(await job.status()).toMatchObject({ delivery: { ready: false } });
 });
-it('accepts a valid delivery continued by another run at the same ordinal', async () => {
+it('accepts a valid delivery continued by a nonconsecutive later run', async () => {
   const job = await stagesFixture();
   job.change({ accepted: false });
   await job.start();
-  job.change({ runId: 'replacement-run', accepted: true });
+  job.change({ runId: 'replacement-run', ordinal: 7, accepted: true });
   await job.status();
   expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
   expect(job.sends()).toBe(1);
@@ -698,7 +698,7 @@ it('adopts the owning answered thread run and never issues a duplicate explicit 
     ordinal: 2,
   });
 });
-it('adopts an answered continuation without comparing ordinals', async () => {
+it('rejects an answered continuation that is not newer than the parked run', async () => {
   const job = await stagesFixture();
   job.change({
     accepted: false,
@@ -714,10 +714,63 @@ it('adopts an answered continuation without comparing ordinals', async () => {
     accepted: true,
   });
   expect(await job.status()).toMatchObject({
-    delivery: { activity: 'resume-pending', ready: false },
+    delivery: { activity: 'awaiting-answer', ready: false },
   });
   expect(job.sends()).toBe(0);
 });
+it.each(['manual', 'answer'])(
+  'keeps %s continuations monotonic while accepting skipped run numbers',
+  async (mode) => {
+    const job = await stagesFixture();
+    job.change({
+      accepted: false,
+      status: mode === 'manual' ? 'completed' : 'waiting-for-input',
+      ordinal: 4,
+      runId: 'initial-4',
+      ...(mode === 'answer' ? { question: { id: 'q1', text: 'First?' } } : {}),
+    });
+    await job.start();
+    job.change({ status: 'running', runId: 'continue-11', ordinal: 11, answeredQuestions: ['q1'] });
+    await job.status();
+    job.change({ status: 'completed', accepted: true, runId: 'stale-9', ordinal: 9 });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(job.sends()).toBe(0);
+    job.change({
+      status: 'running',
+      accepted: false,
+      runId: 'continue-21',
+      ordinal: 21,
+      ...(mode === 'answer' ? { question: { id: 'q2', text: 'Second?' } } : {}),
+    });
+    await job.status();
+    job.change({
+      status: 'running',
+      runId: 'continue-25',
+      ordinal: 25,
+      answeredQuestions: ['q1', 'q2'],
+    });
+    await job.status();
+    job.change({ status: 'completed', accepted: true, runId: 'stale-21', ordinal: 21 });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(job.sends()).toBe(0);
+    job.change({ runId: 'finish-30', ordinal: 30 });
+    const finished = await job.status();
+    expect(mode === 'manual' ? await job.status() : finished).toMatchObject({
+      delivery: { stage: 'review', ready: false },
+    });
+    expect(job.sends()).toBe(1);
+  }
+);
 it('retains the question association while an answered async continuation is not visible yet', async () => {
   const job = await stagesFixture();
   job.change({

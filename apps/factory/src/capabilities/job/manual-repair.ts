@@ -74,13 +74,18 @@ export function adoptManualRepair(
       (origin.index !== stage.index && stage.repairOrigin !== origin.index)
     )
       return undefined;
-    const previousId = stage.index === origin.index ? origin.run.id : stage.observedRunId;
-    if (!previousId || run.id === previousId) return undefined;
+    const previous =
+      stage.index === origin.index
+        ? origin.run
+        : stage.observedRunId && stage.ordinal !== undefined
+          ? { id: stage.observedRunId, ordinal: stage.ordinal }
+          : undefined;
+    if (!previous || run.id === previous.id || run.ordinal <= previous.ordinal) return undefined;
     const request: StageRequest = {
       ...stage,
       index: stage.index + 1,
       ordinal: run.ordinal,
-      previousRunId: previousId,
+      previousRunId: previous.id,
       observedRunId: run.id,
       question: observed.question,
       deliveryIndex: stageDeliveryIndex(stage),

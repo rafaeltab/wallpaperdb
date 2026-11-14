@@ -187,6 +187,13 @@ function githubFixture(directory: string) {
   return fixture;
 }
 
+it('rejects an unknown project content state instead of silently removing an issue from discovery', async () => {
+  await withSource(async (fixture) => {
+    fixture.members[0].content.state = 'UNRECOGNIZED';
+    await expect(fixture.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+  });
+});
+
 it('reuses unchanged details across SQLite reopen and refreshes content changes independently of the project timestamp', async () => {
   await withSource(async (fixture) => {
     expect((await fixture.sync()).issues[0]?.title).toBe('First requirements');

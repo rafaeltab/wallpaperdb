@@ -1,3 +1,6 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Checks } from '../src/canvas/presentation';
 import { expect, it } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot, type WorkItem } from '../../src/http/index.js';
 import { related } from '../src/canvas/model';
@@ -533,3 +536,85 @@ it('displays a cyclic prerequisite component beside another dependency chain', a
     graph.boxes.every((box) => [box.x, box.y, box.width, box.height].every(Number.isFinite))
   ).toBe(true);
 });
+
+it.each([
+  { baseOid: null, baseRef: null },
+  { baseOid: 'different-base', baseRef: 'different-target' },
+])('preserves same-head CI with tested base $baseOid / $baseRef', async (base) => {
+  const board = await sample(),
+    pr = board.entities.pullRequests['pr:2003'];
+  if (pr.metadata.state !== 'known' || pr.checks.state !== 'known')
+    throw new Error('Expected current PR and checks');
+  const checks: typeof pr.checks = {
+    ...pr.checks,
+    value: {
+      ...pr.checks.value,
+      state: 'passed',
+      comparison: { headOid: pr.metadata.value.comparison.headOid, ...base },
+      groups: [{ ...pr.checks.value.groups[0], state: 'passed' }],
+    },
+  };
+  for (const target of ['original-target', 'advanced-target']) {
+    const current = {
+      ...pr,
+      checks,
+      metadata: {
+        ...pr.metadata,
+        value: {
+          ...pr.metadata.value,
+          comparison: { ...pr.metadata.value.comparison, baseOid: target, baseRef: target },
+        },
+      },
+    };
+    const markup = renderToStaticMarkup(createElement(Checks, { pr: current }));
+    expect(markup).toContain('Checks: passed. Current head');
+    expect(markup).toContain('fc-check-passed');
+  }
+});
+
+it.each(['previous', 'missing-head', 'missing-metadata', 'missing-checks', 'unknown'])(
+  'does not present %s observations as current-head success',
+  async (scenario) => {
+    const board = await sample(),
+      pr = board.entities.pullRequests['pr:2003'];
+    if (pr.metadata.state !== 'known' || pr.checks.state !== 'known')
+      throw new Error('Expected current PR and checks');
+    const observed: typeof pr = {
+      ...pr,
+      metadata:
+        scenario === 'missing-metadata'
+          ? { state: 'unknown', sourceId: pr.metadata.sourceId, reason: 'Unavailable' }
+          : pr.metadata,
+      checks:
+        scenario === 'missing-checks'
+          ? { state: 'unknown', sourceId: pr.checks.sourceId, reason: 'Unavailable' }
+          : {
+              ...pr.checks,
+              value: {
+                ...pr.checks.value,
+                state: scenario === 'unknown' ? 'unknown' : 'passed',
+                comparison: {
+                  ...pr.metadata.value.comparison,
+                  headOid:
+                    scenario === 'missing-head'
+                      ? ''
+                      : scenario === 'previous'
+                        ? 'old-head'
+                        : pr.metadata.value.comparison.headOid,
+                },
+                groups: [
+                  {
+                    ...pr.checks.value.groups[0],
+                    state: scenario === 'unknown' ? 'unknown' : 'passed',
+                  },
+                ],
+              },
+            },
+    };
+    const markup = renderToStaticMarkup(createElement(Checks, { pr: observed }));
+    expect(markup).not.toContain('fc-check-passed');
+    expect(markup).not.toContain('Checks: passed. Current head"');
+    if (scenario === 'previous') expect(markup).toContain('Previous head');
+    if (scenario === 'missing-checks') expect(markup).toContain('Checks unknown');
+  }
+);

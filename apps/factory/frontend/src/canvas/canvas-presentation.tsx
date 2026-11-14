@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import type { CanvasData, CanvasItem as Item } from './view-model';
 import type { TitleMode } from './geometry-types';
 import type { Board } from './model';
-import { comparisonLabel } from './presentation';
+import { checkHeadLabel, comparisonLabel } from './presentation';
 import { pullRequestIcons } from './octicons';
 export const CanvasContext = createContext<{
   data: CanvasData;
@@ -226,14 +226,14 @@ export function CanvasEvidence({ item }: { item: Item }) {
         className="cc-checks"
         aria-label={
           checks
-            ? `Checks: ${checks.state}. ${comparisonLabel(pr, checks.comparison)}`
+            ? `Checks: ${checks.state}. ${checkHeadLabel(pr, checks.comparison)}`
             : 'Checks unknown'
         }
       >
         {checks ? (
           checks.groups.map((group) => {
-            const qualifier = comparisonLabel(pr, checks.comparison),
-              current = qualifier === 'Current comparison';
+            const qualifier = checkHeadLabel(pr, checks.comparison),
+              current = qualifier === 'Current head';
             const detail = `${group.name} · ${group.state} · ${group.completed}/${group.total} · ${group.requirement} · ${qualifier}${checks.complete ? '' : ' · Partial checks'}`;
             const mark = (
               <span

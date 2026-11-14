@@ -154,23 +154,31 @@ export function comparisonLabel(
     ? 'Head-only evidence; tested base unknown'
     : 'Current comparison';
 }
+export function checkHeadLabel(pr: PullRequest, comparison: { headOid: string }) {
+  if (pr.metadata.state !== 'known' || !pr.metadata.value.comparison.headOid)
+    return 'Current head unavailable';
+  if (!comparison.headOid) return 'Checked head unknown';
+  return pr.metadata.value.comparison.headOid === comparison.headOid
+    ? 'Current head'
+    : 'Previous head';
+}
 export function Checks({ pr }: { pr: PullRequest }) {
   if (pr.checks.state !== 'known') return <span className="fc-muted">Checks unknown</span>;
   const checks = pr.checks.value,
-    qualifier = comparisonLabel(pr, checks.comparison);
+    qualifier = checkHeadLabel(pr, checks.comparison);
   return (
     <fieldset className="fc-checks" aria-label={`Checks: ${checks.state}. ${qualifier}`}>
       {checks.groups.map((group) => (
         <External key={group.id} href={group.url}>
           <span
-            className={`fc-check fc-check-${qualifier === 'Current comparison' ? group.state : 'unknown'}`}
+            className={`fc-check fc-check-${qualifier === 'Current head' ? group.state : 'unknown'}`}
             title={`${group.name}: ${group.state}, ${group.completed}/${group.total}, ${group.requirement}. ${qualifier}`}
           >
             {group.state === 'passed' ? '✓' : group.state === 'failed' ? '×' : '◷'}
           </span>
         </External>
       ))}
-      {qualifier !== 'Current comparison' && <span className="fc-muted">{qualifier}</span>}
+      {qualifier !== 'Current head' && <span className="fc-muted">{qualifier}</span>}
       {!checks.complete && <span>Partial checks</span>}
     </fieldset>
   );

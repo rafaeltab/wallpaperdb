@@ -794,6 +794,21 @@ it.each(['manual', 'answer'])(
     expect(job.sends()).toBe(1);
   }
 );
+it('offers Retry for the observed failed repair without exposing older recovery authority', async () => {
+  const job = await stagesFixture();
+  job.change({ accepted: false, status: 'completed', runId: 'failed-4', ordinal: 4 });
+  await job.start();
+  job.change({ runId: 'stale-2', ordinal: 2 });
+  expect(await job.status()).toMatchObject({ retry: undefined });
+  job.change({ status: 'running', runId: 'repair-11', ordinal: 11 });
+  await job.status();
+  job.change({ status: 'completed', runId: 'stale-9', ordinal: 9 });
+  expect(await job.status()).toMatchObject({ retry: undefined });
+  job.change({ runId: 'repair-11', ordinal: 11 });
+  expect(await job.status()).toMatchObject({ retry: { runId: 'repair-11' } });
+  expect(job.sends()).toBe(0);
+});
+
 it('retains the question association while an answered async continuation is not visible yet', async () => {
   const job = await stagesFixture();
   job.change({

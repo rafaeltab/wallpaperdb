@@ -186,7 +186,13 @@ export function associateStage(
   return Effect.gen(function* () {
     if (!associatedRun(evidence, request)) return null;
     const current = yield* currentStage(store);
-    if (current?.index !== request.index || (yield* store.readControl()).cancelled) return null;
+    const control = yield* store.readControl();
+    if (
+      current?.index !== request.index ||
+      control.cancelled ||
+      evidence.ordinal < observedOrdinal(current, control)
+    )
+      return null;
     if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
     return evidence;
   });
@@ -275,10 +281,15 @@ function associatedRun(
   evidence: StageEvidence | null,
   request: StageRequest
 ): evidence is StageEvidence {
-  return (
-    evidence !== null &&
-    evidence.stageIndex === request.index &&
-    (!request.observedRunId || request.ordinal === undefined || evidence.ordinal >= request.ordinal)
+  return evidence !== null && evidence.stageIndex === request.index;
+}
+
+function observedOrdinal(waiting: StageRequest, control: import('./contract.js').Control) {
+  // These ordinals describe observations already made, never a predicted next turn.
+  return Math.max(
+    waiting.observedRunId ? (waiting.ordinal ?? 0) : 0,
+    control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0,
+    control.manualRepair?.index === waiting.index ? control.manualRepair.run.ordinal : 0
   );
 }
 
@@ -298,13 +309,7 @@ function suspension(
         activity: 'cancelled' as const,
         active: false,
       };
-    // These ordinals describe observations already made, never a predicted next turn.
-    const observedOrdinal = Math.max(
-      waiting.observedRunId ? (waiting.ordinal ?? 0) : 0,
-      control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0,
-      control.manualRepair?.index === waiting.index ? control.manualRepair.run.ordinal : 0
-    );
-    if (observation.run && observation.run.ordinal < observedOrdinal)
+    if (observation.run && observation.run.ordinal < observedOrdinal(waiting, control))
       return control.parked?.index === waiting.index
         ? parkedDelivery(waiting, control)
         : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };

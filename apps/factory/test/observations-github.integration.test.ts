@@ -755,139 +755,155 @@ it.each([
   }
 );
 
-it('publishes an enriched complete PR while another PR required-check observation is blocked', async () => {
-  const issueFor = (number: number, related: number) => ({
-    ...issue,
-    number,
-    url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
-    parent: null,
-    labels: connection([]),
-    assignees: connection([]),
-    comments: { totalCount: 0 },
-    projectItems: connection([]),
-    blockedBy: connection([]),
-    closedByPullRequestsReferences: connection([]),
-    timelineItems: connection([
-      {
-        source: {
-          __typename: 'PullRequest',
-          number: related,
-          url: `https://github.com/rafaeltab/wallpaperdb/pull/${related}`,
-          state: 'OPEN',
+it.each([42, 43])(
+  'publishes an enriched complete PR while PR %i required-check observation is blocked',
+  async (blockedNumber) => {
+    const readyNumber = blockedNumber === 42 ? 43 : 42;
+    const issueFor = (number: number, related: number) => ({
+      ...issue,
+      number,
+      url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+      parent: null,
+      labels: connection([]),
+      assignees: connection([]),
+      comments: { totalCount: 0 },
+      projectItems: connection([]),
+      blockedBy: connection([]),
+      closedByPullRequestsReferences: connection([]),
+      timelineItems: connection([
+        {
+          source: {
+            __typename: 'PullRequest',
+            number: related,
+            url: `https://github.com/rafaeltab/wallpaperdb/pull/${related}`,
+            state: 'OPEN',
+          },
         },
-      },
-    ]),
-  });
-  let release!: () => void, entered!: () => void;
-  const blocked = new Promise<void>((resolve) => {
-    entered = resolve;
-  });
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
-  const source = githubObservations(
-    '/tmp',
-    () => Effect.succeed([]),
-    undefined,
-    async (args) => {
-      const query = args.join(' ');
-      if (query.includes('user(login:'))
-        return [
-          {
-            data: {
-              user: {
-                projectV2: {
-                  id: 'P1',
-                  items: {
-                    nodes: [1, 2].map((number) => ({
-                      id: `I${number}`,
-                      updatedAt: '2026-11-01T00:00:00Z',
-                      isArchived: false,
-                      content: {
-                        __typename: 'Issue',
-                        number,
-                        url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
-                        state: 'OPEN',
+      ]),
+    });
+    let release!: () => void, entered!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+    const source = githubObservations(
+      '/tmp',
+      () => Effect.succeed([]),
+      undefined,
+      async (args) => {
+        const query = args.join(' ');
+        if (query.includes('user(login:'))
+          return [
+            {
+              data: {
+                user: {
+                  projectV2: {
+                    id: 'P1',
+                    items: {
+                      nodes: [1, 2].map((number) => ({
+                        id: `I${number}`,
                         updatedAt: '2026-11-01T00:00:00Z',
-                      },
-                    })),
-                    pageInfo: { hasNextPage: false, endCursor: null },
+                        isArchived: false,
+                        content: {
+                          __typename: 'Issue',
+                          number,
+                          url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+                          state: 'OPEN',
+                          updatedAt: '2026-11-01T00:00:00Z',
+                        },
+                      })),
+                      pageInfo: { hasNextPage: false, endCursor: null },
+                    },
                   },
                 },
               },
             },
-          },
-        ];
-      if (query.includes('i1:issue'))
-        return { data: { repository: { i1: issueFor(1, 42), i2: issueFor(2, 43) } } };
-      if (query.includes('p42:pullRequest') || query.includes('p43:pullRequest'))
-        return {
-          data: {
-            repository: {
-              p42: pr(42, 'OPEN'),
-              p43: {
-                ...pr(43, 'OPEN'),
-                commits: {
-                  nodes: [
-                    {
-                      commit: {
-                        oid: 'a'.repeat(40),
-                        statusCheckRollup: {
-                          state: 'SUCCESS',
-                          contexts: connection([
-                            {
-                              __typename: 'CheckRun',
-                              id: 'C43',
-                              name: 'check',
-                              status: 'COMPLETED',
-                              conclusion: 'SUCCESS',
-                            },
-                          ]),
+          ];
+        if (query.includes('i1:issue'))
+          return { data: { repository: { i1: issueFor(1, 42), i2: issueFor(2, 43) } } };
+        if (query.includes('p42:pullRequest') || query.includes('p43:pullRequest'))
+          return {
+            data: {
+              repository: {
+                ...Object.fromEntries(
+                  [42, 43].map((number) => [
+                    `p${number}`,
+                    number !== blockedNumber
+                      ? pr(number, 'OPEN')
+                      : {
+                          ...pr(number, 'OPEN'),
+                          commits: {
+                            nodes: [
+                              {
+                                commit: {
+                                  oid: 'a'.repeat(40),
+                                  statusCheckRollup: {
+                                    state: 'SUCCESS',
+                                    contexts: connection([
+                                      {
+                                        __typename: 'CheckRun',
+                                        id: `C${number}`,
+                                        name: 'check',
+                                        status: 'COMPLETED',
+                                        conclusion: 'SUCCESS',
+                                      },
+                                    ]),
+                                  },
+                                },
+                              },
+                            ],
+                          },
                         },
-                      },
-                    },
-                  ],
-                },
+                  ])
+                ),
               },
             },
-          },
-        };
-      if (query.includes('node(id:')) {
-        entered();
-        await gate;
-        return { data: { c0: { isRequired: true } } };
+          };
+        if (query.includes('node(id:')) {
+          entered();
+          await gate;
+          return { data: { c0: { isRequired: true } } };
+        }
+        throw new Error(`Unexpected controlled request ${query}`);
       }
-      throw new Error(`Unexpected controlled request ${query}`);
-    }
-  );
-  const pending = Effect.runPromise(
-    source.read((item) =>
-      Effect.sync(() => {
-        events.push(item);
-      })
-    )
-  );
-  try {
-    await blocked;
-    await vi.waitFor(
-      () =>
-        expect(events).toContainEqual(
-          expect.objectContaining({
-            kind: 'pull',
-            value: expect.objectContaining({ number: 42, crossReferencedIssues: [1] }),
-          })
-        ),
-      { timeout: 1000, interval: 10 }
     );
-  } finally {
-    release();
-    await pending;
+    const pending = Effect.runPromise(
+      source.read((item) =>
+        Effect.sync(() => {
+          events.push(item);
+        })
+      )
+    );
+    try {
+      await blocked;
+      await vi.waitFor(
+        () =>
+          expect(events).toContainEqual(
+            expect.objectContaining({
+              kind: 'pull',
+              value: expect.objectContaining({
+                number: readyNumber,
+                crossReferencedIssues: [readyNumber - 41],
+              }),
+            })
+          ),
+        { timeout: 1000, interval: 10 }
+      );
+    } finally {
+      release();
+      await pending;
+    }
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: 'pull',
+        value: expect.objectContaining({
+          number: blockedNumber,
+          crossReferencedIssues: [blockedNumber - 41],
+        }),
+      })
+    );
   }
-  expect(events).toContainEqual(
-    expect.objectContaining({
-      kind: 'pull',
-      value: expect.objectContaining({ number: 43, crossReferencedIssues: [2] }),
-    })
-  );
-});
+);

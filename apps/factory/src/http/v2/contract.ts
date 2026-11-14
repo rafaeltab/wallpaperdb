@@ -70,6 +70,7 @@ export interface Choice {
   readonly rank: number | null;
 }
 export interface Issue extends Entity<IssueId> {
+  readonly observation?: ItemObservationMetadata;
   readonly repositoryId: RepositoryId;
   readonly number: number;
   readonly metadata: Fact<{
@@ -130,6 +131,7 @@ export interface ReviewSummary {
   }[];
 }
 export interface PullRequest extends Entity<PullRequestId> {
+  readonly observation?: ItemObservationMetadata;
   readonly repositoryId: RepositoryId;
   readonly number: number;
   readonly metadata: Fact<{
@@ -237,6 +239,7 @@ export interface Thread extends Entity<ThreadId> {
     | { readonly state: 'absent' | 'ambiguous' | 'unknown'; readonly reasons: readonly Reason[] };
 }
 export interface Job extends Entity<JobId> {
+  readonly observation?: ItemObservationMetadata;
   readonly issueId: IssueId;
   readonly pullRequestId: PullRequestId | null;
   readonly threadId: ThreadId | null;
@@ -602,4 +605,11 @@ export interface FactoryV2Problem {
   readonly detail: string;
   readonly retry: 'refresh' | 'observe-command' | 'later' | 'never';
   readonly commandId: string | null;
+}
+
+export interface ItemObservationMetadata {
+  readonly attemptedAt: number;
+  readonly observedAt?: number;
+  readonly failedAt?: number;
+  readonly error?: string;
 }

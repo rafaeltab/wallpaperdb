@@ -2882,3 +2882,47 @@ it('exposes T3 metadata with evidenced issue associations without turning indepe
     await app.close();
   }
 });
+
+it('dates incremental issue facts independently and exposes retained item failures without declaring the collection fresh', async () => {
+  const { issueObservation } = await import('./fixtures/v2.js');
+  const input: ScheduleSnapshot = {
+    ...initial,
+    observations: {
+      state: 'error',
+      stale: false,
+      error: 'collection-incomplete',
+      facts: { issues: [issueObservation(577)], pullRequests: [] },
+      items: {
+        'issue:577': {
+          generation: 2,
+          sequence: 1,
+          attemptedAt: 3000,
+          observedAt: 2000,
+          failedAt: 3000,
+          error: 'github-observations',
+        },
+      },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'incremental-item', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    const snapshot = response.json<FactoryV2Snapshot>();
+    expect(snapshot.entities.issues['issue:rafaeltab/wallpaperdb/577']).toMatchObject({
+      metadata: { state: 'known', observedAt: '1970-01-01T00:00:02.000Z' },
+      observation: { observedAt: 2000, failedAt: 3000, error: 'github-observations' },
+    });
+    expect(snapshot.entities.sources['source:github'].observedAt).toBeNull();
+    expect(
+      (
+        await app.inject({
+          url: '/api/v2/board',
+          headers: { 'if-none-match': response.headers.etag },
+        })
+      ).statusCode
+    ).toBe(304);
+  } finally {
+    await app.close();
+  }
+});

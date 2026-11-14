@@ -1,6 +1,7 @@
-import { Effect, Layer, Semaphore } from 'effect';
+import { Effect, Layer, Semaphore, Option } from 'effect';
 import { Time, attemptIntent } from '../job/index.js';
 import {
+  Reporting,
   Observations,
   ObservationStore,
   ObservationSource,
@@ -14,6 +15,7 @@ export const ObservationsLive = Layer.effect(
     const source = yield* ObservationSource;
     const local = yield* LocalSnapshot;
     const time = yield* Time;
+    const reporting = Option.getOrUndefined(yield* Effect.serviceOption(Reporting));
     const lock = yield* Semaphore.make(1);
     return {
       snapshot: () =>
@@ -74,18 +76,41 @@ export const ObservationsLive = Layer.effect(
         Effect.gen(function* () {
           const startedAt = yield* time.now();
           yield* store.refresh({ startedAt });
-          yield* source.read().pipe(
-            Effect.flatMap((facts) =>
-              Effect.flatMap(time.now(), (observedAt) =>
-                store.refresh({ startedAt, observedAt, facts })
-              )
-            ),
-            Effect.catch((error) =>
-              Effect.flatMap(time.now(), (failedAt) =>
-                store.refresh({ startedAt, failedAt, error: error.operation })
-              )
+          const generation = reporting ? yield* reporting.begin() : 0;
+          let sequence = 0;
+          yield* source
+            .read(
+              reporting
+                ? (item) =>
+                    Effect.gen(function* () {
+                      const at = yield* time.now();
+                      yield* reporting.enqueue(generation, [{ ...item, sequence: ++sequence, at }]);
+                    })
+                : undefined
             )
-          );
+            .pipe(
+              Effect.flatMap((facts) =>
+                Effect.flatMap(time.now(), (observedAt) =>
+                  store.refresh({
+                    startedAt,
+                    observedAt,
+                    facts,
+                    generation: reporting ? generation : undefined,
+                  })
+                )
+              ),
+              Effect.catch((error) =>
+                Effect.flatMap(time.now(), (failedAt) =>
+                  store.refresh({
+                    startedAt,
+                    failedAt,
+                    error: error.operation,
+                    generation: reporting ? generation : undefined,
+                  })
+                )
+              )
+            );
+          if (reporting) yield* reporting.flush();
         }).pipe(lock.withPermits(1), Effect.withSpan('factory.observations.refresh')),
     } satisfies Observations;
   })

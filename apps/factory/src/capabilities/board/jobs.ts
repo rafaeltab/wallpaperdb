@@ -21,6 +21,9 @@ export function populateJobs(context: ProjectionContext) {
         id: rid,
         kind: 'issue-pr',
         issueId: iid,
+        observation: current?.intent.id
+          ? input.observations.items?.[`job:${current.intent.id}`]
+          : undefined,
         pullRequestId: pid,
         evidence: known('factory-binding' as const, local, at),
         ownership: 'confirmed' as const,

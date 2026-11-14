@@ -2,14 +2,16 @@ import { type ProjectionContext, gh, repositoryId } from './context.js';
 import { issueEligibility, relationshipEvidence, satisfaction } from './eligibility.js';
 import { entity, unknown } from './values.js';
 export function populateIssues(context: ProjectionContext) {
-  const { tables, input, observed, fact, addUser, addLabel, ensureIssue, facts } = context;
+  const { tables, input, observed, addUser, addLabel, ensureIssue, facts } = context;
   for (const i of facts?.issues ?? []) {
     const id = ensureIssue(i.number);
+    const fact = context.itemFact(`issue:${i.number}`);
     const { updatedAt, labelDetails, assigneeDetails } = i;
     tables.issues[id] = entity({
       id,
       repositoryId,
       number: i.number,
+      observation: input.observations.items?.[`issue:${i.number}`],
       metadata:
         updatedAt && labelDetails && assigneeDetails
           ? fact({

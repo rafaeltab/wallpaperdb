@@ -152,7 +152,11 @@ export const v2Commands = sqliteTable(
 export const githubRichFacts = sqliteTable('github_rich_facts', {
   id: integer('id').primaryKey(),
   value: text('value', { mode: 'json' })
-    .$type<{ observedAt: number; facts: import('../capabilities/observe/index.js').Facts }>()
+    .$type<{
+      observedAt: number;
+      facts: import('../capabilities/observe/index.js').Facts;
+      reporting?: import('../capabilities/observe/index.js').ReportingState;
+    }>()
     .notNull(),
 });
 

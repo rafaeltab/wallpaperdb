@@ -3,6 +3,7 @@ import { attemptIntent, matchesRestart, restartAction } from './restart.js';
 import { Effect, Layer, Random, Option } from 'effect';
 import { reconcileStages, currentStage, hasAnsweredQuestion, stageRunOrder } from './stages.js';
 import {
+  JobReporting,
   Execution,
   Issues,
   Job,
@@ -20,55 +21,73 @@ export const JobLive = Layer.effect(
     const time = yield* Time;
     const issues = yield* Issues;
     const execution = yield* Execution;
+    const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
-        const before = yield* store.readControl();
-        const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
-        const observation = yield* execution.observe(
-          activeIntent,
-          (yield* currentStage(store)) ?? undefined
-        );
-        if ((yield* store.readControl()).cancelled && observation.kind === 'found')
-          yield* execution.interrupt(activeIntent, observation.threadId);
-        const delivery: Delivery | undefined = yield* reconcileStages(
-          store,
-          execution,
-          issues,
-          activeIntent,
-          observation,
-          time,
-          continuation,
-          before.restart?.index ?? 0
-        );
-        yield* retainPrerequisite(store, delivery);
-        const control = yield* store.readControl();
-        const stage = yield* currentStage(store);
-        const resume =
-          resumeCommand(control, stage, observation) ??
-          (yield* retryAction(
+        const generation = reporting ? yield* reporting.begin() : 0;
+        return yield* Effect.gen(function* () {
+          const before = yield* store.readControl();
+          const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
+          const observation = yield* execution.observe(
+            activeIntent,
+            (yield* currentStage(store)) ?? undefined
+          );
+          if ((yield* store.readControl()).cancelled && observation.kind === 'found')
+            yield* execution.interrupt(activeIntent, observation.threadId);
+          const delivery: Delivery | undefined = yield* reconcileStages(
             store,
             execution,
             issues,
             activeIntent,
-            control,
-            stage,
             observation,
-            delivery
-          ));
-        const now = yield* time.now();
-        return {
-          kind: 'job' as const,
-          intent: { ...intent, branch: activeIntent.branch },
-          prerequisite: control.cancelled ? undefined : control.prerequisite,
-          resume,
-          retry: yield* restartAction(store, execution, activeIntent, control, stage, observation),
-          execution: observation,
-          delivery: delivery
-            ? { ...delivery, active: delivery.active ?? !delivery.ready }
-            : delivery,
-          elapsedMs: Math.max(0, now - intent.createdAt),
-        };
+            time,
+            continuation,
+            before.restart?.index ?? 0
+          );
+          yield* retainPrerequisite(store, delivery);
+          const control = yield* store.readControl();
+          const stage = yield* currentStage(store);
+          const resume =
+            resumeCommand(control, stage, observation) ??
+            (yield* retryAction(
+              store,
+              execution,
+              issues,
+              activeIntent,
+              control,
+              stage,
+              observation,
+              delivery
+            ));
+          const now = yield* time.now();
+          const status = {
+            kind: 'job' as const,
+            stageIndex: stage?.index,
+            intent: { ...intent, branch: activeIntent.branch },
+            prerequisite: control.cancelled ? undefined : control.prerequisite,
+            resume,
+            retry: yield* restartAction(
+              store,
+              execution,
+              activeIntent,
+              control,
+              stage,
+              observation
+            ),
+            execution: observation,
+            delivery: delivery
+              ? { ...delivery, active: delivery.active ?? !delivery.ready }
+              : delivery,
+            elapsedMs: Math.max(0, now - intent.createdAt),
+          };
+          if (reporting) yield* reporting.observed(generation, status);
+          return status;
+        }).pipe(
+          Effect.tapError(
+            (error) => reporting?.failed(generation, intent, error.operation) ?? Effect.void
+          )
+        );
       }).pipe(Effect.withSpan('factory.job.observe'));
     const resumeQuestion = (
       intent: Intent,
@@ -140,8 +159,12 @@ export const JobLive = Layer.effect(
           )
             return { kind: 'rejected' as const };
           if (yield* store.claimStage(index)) {
-            if (!(yield* store.readControl()).cancelled)
-              yield* execution.launch(attemptIntent(intent, index));
+            if (!(yield* store.readControl()).cancelled) {
+              const active = attemptIntent(intent, index);
+              const launch = yield* execution.launch(active);
+              if (launch.kind === 'submitted' && reporting)
+                yield* reporting.accepted(active, 'implementation', index);
+            }
           }
           return yield* observe(intent);
         }).pipe(Effect.withSpan('factory.job.retry-fresh')),
@@ -198,7 +221,11 @@ export const JobLive = Layer.effect(
             receiptProtocol: 'delivery-v1',
           };
           if (!(yield* store.reserve(intent))) return { kind: 'occupied' as const };
-          if (yield* store.claimLaunch()) yield* execution.launch(intent);
+          if (yield* store.claimLaunch()) {
+            const launch = yield* execution.launch(intent);
+            if (launch.kind === 'submitted' && reporting)
+              yield* reporting.accepted(intent, 'implementation', 0);
+          }
           return yield* observe(intent);
         }).pipe(Effect.withSpan('factory.job.start')),
     } satisfies Job;

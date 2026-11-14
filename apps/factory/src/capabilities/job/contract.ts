@@ -257,6 +257,8 @@ export type Status =
   | { kind: 'empty' }
   | {
       kind: 'job';
+      stageIndex?: number;
+      acknowledgement?: { stage: Stage; index: number; acceptedAt: number };
       /** Admission identity and original base remain stable; branch describes the current attempt. */
       intent: Intent;
       prerequisite?: AcceptedPublication;
@@ -368,3 +370,17 @@ export interface WaitState {
   readonly nudged: boolean;
   readonly continuation?: StageRequest;
 }
+
+/** Reporting is independent of execution authorization and receipt acceptance. */
+export interface JobReporting {
+  begin(): Effect.Effect<number, Unavailable>;
+  failed(generation: number, intent: Intent, error: string): Effect.Effect<void, Unavailable>;
+  observed(generation: number, status: Status): Effect.Effect<void, Unavailable>;
+  accepted(
+    intent: Intent,
+    stage: Stage,
+    index: number,
+    commit?: string
+  ): Effect.Effect<void, Unavailable>;
+}
+export const JobReporting = Context.Service<JobReporting>('wallpaperdb.factory.JobReporting');

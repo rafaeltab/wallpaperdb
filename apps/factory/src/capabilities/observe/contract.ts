@@ -101,7 +101,39 @@ export interface Facts {
   issues: readonly IssueObservation[];
   pullRequests: readonly PullObservation[];
 }
+export interface ItemFreshness {
+  generation: number;
+  sequence: number;
+  attemptedAt: number;
+  observedAt?: number;
+  failedAt?: number;
+  error?: string;
+}
+export type ItemObservation = {
+  sequence: number;
+  at: number;
+} & (
+  | { kind: 'issue'; value: IssueObservation }
+  | { kind: 'pull'; value: PullObservation }
+  | { kind: 'job'; value: Extract<Status, { kind: 'job' }> }
+  | { kind: 'failure'; key: string; error: string }
+);
+/** Generations survive restart. Each batch atomically accepts only newer item versions.
+ * Failures retain the previous complete value and successful observation date.
+ * Publication never grants execution authority or removes absent items.
+ */
+export interface ReportingStore {
+  begin(): Effect.Effect<number, Unavailable>;
+  publish(generation: number, items: readonly ItemObservation[]): Effect.Effect<void, Unavailable>;
+}
+export const ReportingStore = Context.Service<ReportingStore>('wallpaperdb.factory.ReportingStore');
+export interface ReportingState {
+  completedGeneration?: number;
+  generation: number;
+  items: Record<string, ItemFreshness>;
+}
 export interface ObservationState {
+  items?: Record<string, ItemFreshness>;
   startedAt?: number;
   observedAt?: number;
   failedAt?: number;
@@ -115,7 +147,9 @@ export interface ObservationState {
 export interface ObservationStore {
   read(): Effect.Effect<ObservationState, Unavailable>;
   refresh(
-    state: Pick<ObservationState, 'startedAt' | 'observedAt' | 'failedAt' | 'error' | 'facts'>
+    state: Pick<ObservationState, 'startedAt' | 'observedAt' | 'failedAt' | 'error' | 'facts'> & {
+      generation?: number;
+    }
   ): Effect.Effect<void, Unavailable>;
   jobs(
     jobs: readonly Status[],
@@ -126,8 +160,14 @@ export interface ObservationStore {
 export const ObservationStore = Context.Service<ObservationStore>(
   'wallpaperdb.factory.ObservationStore'
 );
+export type CollectedObservation =
+  | { kind: 'issue'; value: IssueObservation }
+  | { kind: 'pull'; value: PullObservation }
+  | { kind: 'failure'; key: string; error: string };
 export interface ObservationSource {
-  read(): Effect.Effect<Facts, Unavailable>;
+  read(
+    publish?: (item: CollectedObservation) => Effect.Effect<void, Unavailable>
+  ): Effect.Effect<Facts, Unavailable>;
 }
 export const ObservationSource = Context.Service<ObservationSource>(
   'wallpaperdb.factory.ObservationSource'
@@ -223,3 +263,14 @@ export interface Threads {
   refresh(): Effect.Effect<void, Unavailable>;
 }
 export const Threads = Context.Service<Threads>('wallpaperdb.factory.Threads');
+
+export interface Reporting {
+  begin(): Effect.Effect<number, Unavailable>;
+  enqueue(generation: number, items: readonly ItemObservation[]): Effect.Effect<void, Unavailable>;
+  immediate(
+    generation: number,
+    items: readonly ItemObservation[]
+  ): Effect.Effect<void, Unavailable>;
+  flush(): Effect.Effect<void, Unavailable>;
+}
+export const Reporting = Context.Service<Reporting>('wallpaperdb.factory.Reporting');

@@ -107,6 +107,12 @@ export function projectionContext(input: ScheduleSnapshot, at: string) {
     at,
     observed,
     fact,
+    itemFact:
+      (key: string) =>
+      <T>(value: T): Fact<T> => {
+        const at = timestamp(input.observations.items?.[key]?.observedAt) ?? observed;
+        return at ? known(value, gh, at) : unknown(gh);
+      },
     addUser,
     addLabel,
     ensureIssue,

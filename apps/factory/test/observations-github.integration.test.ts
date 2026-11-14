@@ -173,14 +173,30 @@ it('preserves last-known facts on partial metadata and refuses a fresh planner r
       await runtime.dispose();
     }
   }));
-it('collects all open PR pages and fails closed when the last page is incomplete', async () =>
+it('collects open PRs from every project page and fails closed when the last page is incomplete', async () =>
   withGithub(async (host) => {
     const page = (number: number, hasNextPage: boolean) => ({
       data: {
-        repository: {
-          pullRequests: {
-            nodes: [pr(number, 'OPEN')],
-            pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null },
+        user: {
+          projectV2: {
+            id: 'P7',
+            items: {
+              nodes: [
+                {
+                  id: `PR${number}`,
+                  updatedAt: '2026-11-13T00:00:00Z',
+                  isArchived: false,
+                  content: {
+                    __typename: 'PullRequest',
+                    number,
+                    url: `https://github.com/rafaeltab/wallpaperdb/pull/${number}`,
+                    state: 'OPEN',
+                    updatedAt: '2026-11-13T00:00:00Z',
+                  },
+                },
+              ],
+              pageInfo: { hasNextPage, endCursor: hasNextPage ? 'next' : null },
+            },
           },
         },
       },
@@ -188,14 +204,15 @@ it('collects all open PR pages and fails closed when the last page is incomplete
     const planning = {
       candidates: [],
       issues: [],
-      openPullPages: [page(42, true), page(43, false)],
+      openPulls: [pr(42, 'OPEN'), pr(43, 'OPEN')],
+      projectPages: [page(42, true), page(43, false)],
     };
     await host.save({ planning });
     const source = githubObservations(host.repository, () => Effect.succeed([]));
     expect((await Effect.runPromise(source.read())).pullRequests.map((p) => p.number)).toEqual([
       42, 43,
     ]);
-    await host.save({ planning: { ...planning, openPullPages: [page(42, true)] } });
+    await host.save({ planning: { ...planning, projectPages: [page(42, true)] } });
     await expect(Effect.runPromise(source.read())).rejects.toMatchObject({ _tag: 'Unavailable' });
   }));
 it.each(['parent', 'blocker'])(

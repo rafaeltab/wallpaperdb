@@ -225,7 +225,14 @@ export function reportingStoreContract(
         run: { id: 'run-8', ordinal: 8 },
       };
       await Effect.runPromise(
-        store.publish(later, [{ kind: 'job', value: { ...job, execution }, sequence: 2, at: 30 }])
+        store.publish(later, [
+          {
+            kind: 'job',
+            value: { ...job, execution, acknowledgement: undefined },
+            sequence: 2,
+            at: 30,
+          },
+        ])
       );
       const latest = await Effect.runPromise(store.begin());
       for (const run of [{ id: 'run-7', ordinal: 7 }]) {
@@ -241,7 +248,10 @@ export function reportingStoreContract(
         );
       }
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
-        { execution: { run: { id: 'run-8', ordinal: 8 } } },
+        {
+          execution: { run: { id: 'run-8', ordinal: 8 } },
+          acknowledgement: { stage: 'review', index: 1, acceptedAt: 10 },
+        },
       ]);
       await Effect.runPromise(
         store.publish(latest, [

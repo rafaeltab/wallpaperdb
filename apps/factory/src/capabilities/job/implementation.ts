@@ -20,8 +20,21 @@ export const JobLive = Layer.effect(
     const store = yield* JobStore;
     const time = yield* Time;
     const issues = yield* Issues;
-    const execution = yield* Execution;
+    const provider = yield* Execution;
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
+    const execution: Execution = {
+      ...provider,
+      sendStage: (intent, request) =>
+        provider
+          .sendStage(intent, request)
+          .pipe(
+            Effect.andThen(
+              () =>
+                reporting?.accepted(intent, request.stage, request.index, request.commit) ??
+                Effect.void
+            )
+          ),
+    };
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
       Effect.gen(function* () {

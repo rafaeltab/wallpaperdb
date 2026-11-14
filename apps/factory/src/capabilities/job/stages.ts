@@ -1,6 +1,5 @@
-import { Effect, Option } from 'effect';
+import { Effect } from 'effect';
 import {
-  JobReporting,
   type Delivery,
   type Execution,
   type Intent,
@@ -67,9 +66,6 @@ function deliver(store: JobStore, execution: Execution, intent: Intent, request:
     if (request.previousRunId === null || request.observedRunId) return;
     if (yield* store.claimStage(request.index)) {
       yield* execution.sendStage(intent, request);
-      const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
-      if (reporting)
-        yield* reporting.accepted(intent, request.stage, request.index, request.commit);
     }
   });
 }

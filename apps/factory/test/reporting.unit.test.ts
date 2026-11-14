@@ -336,3 +336,94 @@ it('commits observations from independent collections in one bounded batch witho
     await runtime.dispose();
   }
 });
+
+it.each([false, true])(
+  'captures stage reporting at construction and preserves uncertain delivery responsibility: %s',
+  async (uncertain) => {
+    const { Job, JobLive, JobStore, JobReporting, Execution, Issues, Time, Unavailable } =
+      await import('../src/capabilities/job/index.js');
+    const { controlledStore } = await import('./fixtures/store.js');
+    const accepted: string[] = [];
+    let stage = 0,
+      sends = 0;
+    const runtime = ManagedRuntime.make(
+      JobLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+            Layer.succeed(JobStore, controlledStore()),
+            Layer.succeed(JobReporting, {
+              begin: () => Effect.succeed(1),
+              observed: () => Effect.void,
+              failed: () => Effect.void,
+              accepted: (_intent, next) =>
+                Effect.sync(() => {
+                  accepted.push(next);
+                }),
+            }),
+            Layer.succeed(Issues, {
+              inspect: () =>
+                Effect.succeed({
+                  open: true,
+                  author: 'rafaeltab',
+                  labels: ['ready-for-agent'],
+                  blockers: [],
+                  blockersReady: true,
+                  url: issue.url,
+                }),
+              pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
+            }),
+            Layer.succeed(Execution, {
+              launch: () => Effect.succeed({ kind: 'submitted' as const }),
+              interrupt: () => Effect.void,
+              observe: (intent) =>
+                Effect.succeed({
+                  kind: 'found' as const,
+                  threadId: 'thread',
+                  worktree: '/worker',
+                  branch: intent.branch,
+                  model: 'gpt-6.1-sol',
+                  status: 'completed',
+                  run: { id: `run-${stage + 1}`, ordinal: stage + 1 },
+                }),
+              inspectStage: (_intent, request) =>
+                Effect.succeed({
+                  stageIndex: request.index,
+                  runId: `run-${stage + 1}`,
+                  ordinal: stage + 1,
+                  commit: 'b'.repeat(40),
+                  accepted: true,
+                }),
+              sendStage: (_intent, request) =>
+                Effect.gen(function* () {
+                  sends++;
+                  if (uncertain)
+                    return yield* Effect.fail(
+                      new Unavailable({ operation: 'delivery-uncertain', cause: null })
+                    );
+                  stage = request.index;
+                }),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const job = await runtime.runPromise(Job);
+      const start = runtime.runPromise(job.start({ issue: 1, base: 'a'.repeat(40), context: '' }));
+      if (uncertain) {
+        await expect(start).rejects.toMatchObject({ operation: 'delivery-uncertain' });
+        await runtime.runPromise(job.status());
+        expect(accepted).toEqual(['implementation']);
+        expect(sends).toBe(1);
+      } else {
+        await start;
+        expect(accepted).toEqual(['implementation', 'review']);
+        await runtime.runPromise(job.status());
+        expect(accepted).toEqual(['implementation', 'review', 'publication']);
+      }
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

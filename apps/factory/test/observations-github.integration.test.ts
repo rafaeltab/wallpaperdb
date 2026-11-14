@@ -468,6 +468,7 @@ function incrementalTransport(options: {
   issueState?: 'OPEN' | 'CLOSED';
   failure?: 'issue' | 'pull';
   includePull?: boolean;
+  crossReference?: boolean;
 }) {
   const metadata = {
     ...issue,
@@ -477,9 +478,22 @@ function incrementalTransport(options: {
     comments: { totalCount: 0 },
     projectItems: connection([]),
     blockedBy: connection([]),
-    timelineItems: connection([]),
+    timelineItems: connection(
+      options.crossReference
+        ? [
+            {
+              source: {
+                __typename: 'PullRequest',
+                number: 42,
+                url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+                state: options.issueState ?? 'CLOSED',
+              },
+            },
+          ]
+        : []
+    ),
     closedByPullRequestsReferences: connection(
-      options.issueState
+      options.issueState && !options.crossReference
         ? [
             {
               __typename: 'PullRequest',
@@ -671,3 +685,71 @@ it('publishes a consistently associated issue while related PR runtime hydration
     await pending;
   }
 });
+
+it.each([
+  { failOther: false, crossReference: true, field: 'crossReferencedIssues' },
+  { failOther: true, crossReference: true, field: 'crossReferencedIssues' },
+  { failOther: false, crossReference: false, field: 'linkedIssues' },
+  { failOther: true, crossReference: false, field: 'linkedIssues' },
+])(
+  'publishes newly evidenced PR associations independently of collection success: $field/$failOther',
+  async ({ failOther, crossReference, field }) => {
+    const transport = incrementalTransport({ issueState: 'CLOSED', crossReference });
+    const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+    const source = githubObservations(
+      '/tmp',
+      () => Effect.succeed([]),
+      undefined,
+      async (args) => {
+        const raw = await transport(args);
+        if (!failOther) return raw;
+        const query = args.join(' ');
+        if (query.includes('user(login:') && Array.isArray(raw)) {
+          const item = raw[0]?.data.user.projectV2.items.nodes[0];
+          if (!item) throw new Error('Missing index fixture');
+          raw[0]?.data.user.projectV2.items.nodes.push({
+            ...item,
+            id: 'I2',
+            content: {
+              ...item.content,
+              number: 2,
+              url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+            },
+          });
+        } else if (query.includes('i1:issue') && !Array.isArray(raw)) {
+          if ('i1' in raw.data.repository)
+            return {
+              data: {
+                repository: {
+                  ...raw.data.repository,
+                  i2: {
+                    ...raw.data.repository.i1,
+                    number: 2,
+                    url: 'https://github.com/rafaeltab/wallpaperdb/issues/2',
+                    state: 'INVALID',
+                  },
+                },
+              },
+            };
+        }
+        return raw;
+      }
+    );
+    const result = await Effect.runPromise(
+      Effect.result(
+        source.read((item) =>
+          Effect.sync(() => {
+            events.push(item);
+          })
+        )
+      )
+    );
+    expect(result._tag).toBe(failOther ? 'Failure' : 'Success');
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: 'pull',
+        value: expect.objectContaining({ number: 42, [field]: [1] }),
+      })
+    );
+  }
+);

@@ -148,451 +148,464 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   await compatibleState(configuration.FACTORY_STATE);
   const project = resolve(configuration.FACTORY_PROJECT);
   const requests = new AbortController();
-  const github = githubRequests({
-    project,
-    directory: configuration.FACTORY_STATE,
-    signal: requests.signal,
-  });
-  await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);
-  const help = await command(
-    configuration.FACTORY_T3_BINARY,
-    ['thread', 'start', '--help'],
-    project
-  );
-  if (!help.includes('--worktree') || !help.includes('--model'))
-    throw new Error('T3 installation lacks required headless thread interface');
-  const readyPrerequisites = () =>
-    Effect.gen(function* () {
-      const result: VerifiedPrerequisite[] = [];
-      for (const admission of (yield* scheduleStore.read()).admissions) {
-        const assertion = readyAssertion(yield* (yield* pool.job(admission.issue)).status());
-        if (assertion) result.push(assertion);
-      }
-      return result;
+  const startupCleanup: Array<() => Promise<unknown>> = [];
+  try {
+    const github = githubRequests({
+      project,
+      directory: configuration.FACTORY_STATE,
+      signal: requests.signal,
     });
-  let recoveryAdmission: RecoveryAdmission = () => Effect.succeed(false);
-  const metadataGithub = (args: readonly string[], signal?: AbortSignal) =>
-    github(args, signal, 'background');
-  const githubConfig = (
-    read: Parameters<typeof githubIssues>[0]['read'] = github,
-    prerequisites = readyPrerequisites
-  ): Parameters<typeof githubIssues>[0] => ({
-    project,
-    read,
-    prBase: configuration.FACTORY_PR_BASE,
-    base: configuration.FACTORY_BASE,
-    prerequisites: configuration.FACTORY_PREREQUISITES,
-    readyPrerequisites: prerequisites,
-    admitRecovery: (issue) => recoveryAdmission(issue),
-    joins: {
-      directory: resolve(configuration.FACTORY_STATE, 'joins'),
-      binary: configuration.FACTORY_T3_BINARY,
-      projectId: configuration.FACTORY_T3_PROJECT_ID,
-      mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-      mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-    },
-  });
-  const observationStore = sqliteObservations(configuration.FACTORY_STATE);
-  const reportingRuntime = ManagedRuntime.make(
-    JobReportingLive.pipe(
-      Layer.provideMerge(
-        ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, observationStore)))
-      ),
-      Layer.provide(Layer.succeed(Time, systemTime))
-    )
-  );
-  const reporting = await reportingRuntime.runPromise(Reporting);
-  const jobReporting = await reportingRuntime.runPromise(JobReporting);
-  const jobDeps = (directory: string) =>
-    Layer.mergeAll(
-      Layer.succeed(Time, systemTime),
-      Layer.succeed(JobReporting, jobReporting),
-      Layer.succeed(JobStore, fileStore(directory)),
-      Layer.succeed(Issues, githubIssues(githubConfig())),
-      Layer.succeed(ContinuationAdmission, {
-        authorize: (issue, receipt) => recoveryAdmission(issue, receipt),
-      }),
-      Layer.succeed(
-        Execution,
-        t3Execution({
-          project,
-          prBase: configuration.FACTORY_PR_BASE,
-          projectId: configuration.FACTORY_T3_PROJECT_ID,
-          mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-          mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-          binary: configuration.FACTORY_T3_BINARY,
-        })
+    startupCleanup.push(() => github.drain());
+    await command('git', ['cat-file', '-e', `${configuration.FACTORY_BASE}^{commit}`], project);
+    const help = await command(
+      configuration.FACTORY_T3_BINARY,
+      ['thread', 'start', '--help'],
+      project
+    );
+    if (!help.includes('--worktree') || !help.includes('--model'))
+      throw new Error('T3 installation lacks required headless thread interface');
+    const readyPrerequisites = () =>
+      Effect.gen(function* () {
+        const result: VerifiedPrerequisite[] = [];
+        for (const admission of (yield* scheduleStore.read()).admissions) {
+          const assertion = readyAssertion(yield* (yield* pool.job(admission.issue)).status());
+          if (assertion) result.push(assertion);
+        }
+        return result;
+      });
+    let recoveryAdmission: RecoveryAdmission = () => Effect.succeed(false);
+    const metadataGithub = (args: readonly string[], signal?: AbortSignal) =>
+      github(args, signal, 'background');
+    const githubConfig = (
+      read: Parameters<typeof githubIssues>[0]['read'] = github,
+      prerequisites = readyPrerequisites
+    ): Parameters<typeof githubIssues>[0] => ({
+      project,
+      read,
+      prBase: configuration.FACTORY_PR_BASE,
+      base: configuration.FACTORY_BASE,
+      prerequisites: configuration.FACTORY_PREREQUISITES,
+      readyPrerequisites: prerequisites,
+      admitRecovery: (issue) => recoveryAdmission(issue),
+      joins: {
+        directory: resolve(configuration.FACTORY_STATE, 'joins'),
+        binary: configuration.FACTORY_T3_BINARY,
+        projectId: configuration.FACTORY_T3_PROJECT_ID,
+        mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+        mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+      },
+    });
+    const observationStore = sqliteObservations(configuration.FACTORY_STATE);
+    const reportingRuntime = ManagedRuntime.make(
+      JobReportingLive.pipe(
+        Layer.provideMerge(
+          ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, observationStore)))
+        ),
+        Layer.provide(Layer.succeed(Time, systemTime))
       )
     );
-  const deps = jobDeps(configuration.FACTORY_STATE);
-  const jobLayer = JobLive.pipe(Layer.provide(deps));
-  const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
-  const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
-  const legacy = await adoptLegacy(configuration.FACTORY_STATE, scheduleStore);
-  let rootIssue = legacy?.issue;
-  const pool: JobPool = {
-    job: (issue) =>
-      Effect.tryPromise({
-        try: async () => {
-          let worker = workers.get(issue);
-          if (!worker) {
-            rootIssue ??= issue;
-            worker = ManagedRuntime.make(
-              JobLive.pipe(
-                Layer.provide(
-                  jobDeps(
-                    rootIssue === issue
-                      ? configuration.FACTORY_STATE
-                      : resolve(configuration.FACTORY_STATE, `issue-${issue}`)
-                  )
-                )
-              )
-            );
-            workers.set(issue, worker);
-          }
-          return worker.runPromise(Job);
-        },
-        catch: (cause) => new Unavailable({ operation: 'job-runtime', cause }),
-      }),
-  };
-
-  const schedulerDeps = Layer.mergeAll(
-    deps,
-    PlanningSafetyLive.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          Layer.succeed(PlanningSafetyStore, sqlitePlanningSafety(configuration.FACTORY_STATE)),
-          Layer.succeed(Time, systemTime)
-        )
-      )
-    ),
-    Layer.succeed(ScheduleStore, scheduleStore),
-    Layer.succeed(
-      ScheduleObservations,
-      sqliteScheduleObservations(configuration.FACTORY_STATE, systemTime)
-    ),
-    Layer.succeed(JobPool, pool)
-  );
-  let planningDemand = () => {};
-  const planner = t3Planner({
-    automaticPolicy: {
-      mayLaunch: () =>
-        runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.mayLaunch())),
-      failed: (failure) =>
-        runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.failed(failure))),
-    },
-    mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
-    mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
-    stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
-    project,
-    binary: configuration.FACTORY_T3_BINARY,
-    projectId: configuration.FACTORY_T3_PROJECT_ID,
-  });
-  const planningDeps = Layer.mergeAll(
-    Layer.succeed(ScheduleStore, scheduleStore),
-    Layer.effect(
-      PlanningSource,
-      Effect.map(Job, (job) => {
-        const source = githubPlanning(githubConfig(), job, () =>
-          Effect.map(scheduleStore.read(), (state) => state.admissions.map((item) => item.issue))
-        );
-        const issueSource = githubIssues(githubConfig());
-        let automaticAt = 0;
-        const read = () =>
-          Effect.gen(function* () {
-            automaticAt = Date.now() + observationRefreshIntervalMs;
-            yield* Effect.sync(() => planningDemand());
-            const input = yield* source.read();
-            const state = yield* scheduleStore.read();
-            const jobs = [];
-            for (const admission of state.admissions)
-              jobs.push(yield* (yield* pool.job(admission.issue)).status());
-            return {
-              ...input,
-              jobs,
-              maximumSelections: Math.max(
-                0,
-                Math.min(
-                  state.allowance === -1 ? Infinity : state.allowance - state.admissions.length,
-                  state.concurrency === -1
-                    ? Infinity
-                    : state.concurrency -
-                        capacityOccupied({
-                          state,
-                          jobs,
-                          recoveries: yield* issueSource.recoveries?.() ?? Effect.succeed([]),
-                        })
-                )
-              ),
-              scheduleRevision: state.revision,
-              admissions: state.admissions.map((a) => a.issue),
-              paused: state.paused,
-              capacity: { concurrency: state.concurrency, admission: state.allowance },
-            };
-          });
-        return {
-          verify: source.verify,
-          read,
-          poll: () =>
-            Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),
-        };
-      })
-    ),
-    Layer.succeed(IPlanner, planner)
-  ).pipe(Layer.provideMerge(jobLayer));
-  const observationLayer = ObservationsLive.pipe(
-    Layer.provide(
+    startupCleanup.push(() => reportingRuntime.dispose());
+    const reporting = await reportingRuntime.runPromise(Reporting);
+    const jobReporting = await reportingRuntime.runPromise(JobReporting);
+    const jobDeps = (directory: string) =>
       Layer.mergeAll(
         Layer.succeed(Time, systemTime),
-        Layer.succeed(Reporting, reporting),
-        Layer.succeed(ObservationStore, observationStore),
-        Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
+        Layer.succeed(JobReporting, jobReporting),
+        Layer.succeed(JobStore, fileStore(directory)),
+        Layer.succeed(Issues, githubIssues(githubConfig())),
+        Layer.succeed(ContinuationAdmission, {
+          authorize: (issue, receipt) => recoveryAdmission(issue, receipt),
+        }),
         Layer.succeed(
-          ObservationSource,
-          githubObservations(
+          Execution,
+          t3Execution({
             project,
-            () => Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
-            Effect.gen(function* () {
-              const prerequisites = yield* Effect.cached(readyPrerequisites());
-              const issues = githubIssues(githubConfig(metadataGithub, () => prerequisites));
-              return (number: number) =>
-                Effect.gen(function* () {
-                  const observed = yield* issues.inspect(number);
-                  return {
-                    allowed: eligible(observed),
-                    blockersReady: observed.blockersReady,
-                    verifiedAt: yield* systemTime.now(),
-                    evidence: observed.prerequisite?.evidence,
-                  };
-                });
-            }),
-            metadataGithub,
-            { directory: configuration.FACTORY_STATE }
-          )
-        )
-      )
-    )
-  );
-  const threadLayer = ThreadsLive.pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        Layer.succeed(Time, systemTime),
-        Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
-        Layer.succeed(Reporting, reporting),
-        Layer.succeed(ObservationStore, observationStore),
-        Layer.succeed(ThreadStore, sqliteThreads(configuration.FACTORY_STATE)),
-        Layer.succeed(
-          ThreadSource,
-          t3Metadata({
-            binary: configuration.FACTORY_T3_BINARY,
-            project,
+            prBase: configuration.FACTORY_PR_BASE,
             projectId: configuration.FACTORY_T3_PROJECT_ID,
             mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
             mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+            binary: configuration.FACTORY_T3_BINARY,
           })
         )
-      )
-    )
-  );
-  const runtime = ManagedRuntime.make(
-    SchedulerLive.pipe(
-      Layer.provideMerge(
-        AttemptsLive.pipe(
-          Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
-          Layer.provide(
-            Layer.succeed(AttemptStore, sqliteAttemptStore(configuration.FACTORY_STATE))
+      );
+    const deps = jobDeps(configuration.FACTORY_STATE);
+    const jobLayer = JobLive.pipe(Layer.provide(deps));
+    const scheduleStore = fileScheduleStore(configuration.FACTORY_STATE);
+    const workers = new Map<number, ManagedRuntime.ManagedRuntime<Job, never>>();
+    startupCleanup.push(async () => {
+      const outcomes = await Promise.allSettled(
+        [...workers.values()].map((worker) => worker.dispose())
+      );
+      const failures = outcomes.flatMap((outcome) =>
+        outcome.status === 'rejected' ? [outcome.reason] : []
+      );
+      if (failures.length) throw new AggregateError(failures, 'Factory worker cleanup failed');
+    });
+    const legacy = await adoptLegacy(configuration.FACTORY_STATE, scheduleStore);
+    let rootIssue = legacy?.issue;
+    const pool: JobPool = {
+      job: (issue) =>
+        Effect.tryPromise({
+          try: async () => {
+            let worker = workers.get(issue);
+            if (!worker) {
+              rootIssue ??= issue;
+              worker = ManagedRuntime.make(
+                JobLive.pipe(
+                  Layer.provide(
+                    jobDeps(
+                      rootIssue === issue
+                        ? configuration.FACTORY_STATE
+                        : resolve(configuration.FACTORY_STATE, `issue-${issue}`)
+                    )
+                  )
+                )
+              );
+              workers.set(issue, worker);
+            }
+            return worker.runPromise(Job);
+          },
+          catch: (cause) => new Unavailable({ operation: 'job-runtime', cause }),
+        }),
+    };
+
+    const schedulerDeps = Layer.mergeAll(
+      deps,
+      PlanningSafetyLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSafetyStore, sqlitePlanningSafety(configuration.FACTORY_STATE)),
+            Layer.succeed(Time, systemTime)
           )
         )
       ),
-      Layer.provideMerge(schedulerDeps),
-      Layer.provideMerge(observationLayer),
-      Layer.provideMerge(threadLayer),
-      Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
-    )
-  );
-  const scheduler = await runtime.runPromise(Scheduler);
-  const planningSafety = await runtime.runPromise(PlanningSafety);
-  recoveryAdmission = scheduler.authorizeRecovery;
-  const job: Job = {
-    retry: (command) =>
-      Effect.flatMap(scheduler.status(), (snapshot) =>
-        scheduler.retry(command, snapshot.state.revision)
+      Layer.succeed(ScheduleStore, scheduleStore),
+      Layer.succeed(
+        ScheduleObservations,
+        sqliteScheduleObservations(configuration.FACTORY_STATE, systemTime)
       ),
-    status: () =>
-      Effect.map(scheduler.status(), (value) => value.jobs[0] ?? { kind: 'empty' as const }),
-    start: (command) => scheduler.start(command),
-    resume: (command) => scheduler.resume(command),
-    cancel: (id) => scheduler.cancel(id),
-  };
-  const observations = await runtime.runPromise(Observations);
-  const threadService = await runtime.runPromise(Threads);
-  const threads = {
-    ...threadService,
-    snapshot: () =>
-      Effect.map(threadService.snapshot(), (value) => ({
-        ...value,
-        browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
-      })),
-  };
-  const refreshes = observationWorker(() =>
-    runtime.runPromise(
-      Effect.all([observations.refresh(), threads.refresh()], { concurrency: 2 }).pipe(
-        Effect.asVoid,
-        Effect.catch(Effect.logError)
+      Layer.succeed(JobPool, pool)
+    );
+    let planningDemand = () => {};
+    const planner = t3Planner({
+      automaticPolicy: {
+        mayLaunch: () =>
+          runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.mayLaunch())),
+        failed: (failure) =>
+          runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.failed(failure))),
+      },
+      mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+      mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+      stateDirectory: resolve(configuration.FACTORY_STATE, 'planner'),
+      project,
+      binary: configuration.FACTORY_T3_BINARY,
+      projectId: configuration.FACTORY_T3_PROJECT_ID,
+    });
+    const planningDeps = Layer.mergeAll(
+      Layer.succeed(ScheduleStore, scheduleStore),
+      Layer.effect(
+        PlanningSource,
+        Effect.map(Job, (job) => {
+          const source = githubPlanning(githubConfig(), job, () =>
+            Effect.map(scheduleStore.read(), (state) => state.admissions.map((item) => item.issue))
+          );
+          const issueSource = githubIssues(githubConfig());
+          let automaticAt = 0;
+          const read = () =>
+            Effect.gen(function* () {
+              automaticAt = Date.now() + observationRefreshIntervalMs;
+              yield* Effect.sync(() => planningDemand());
+              const input = yield* source.read();
+              const state = yield* scheduleStore.read();
+              const jobs = [];
+              for (const admission of state.admissions)
+                jobs.push(yield* (yield* pool.job(admission.issue)).status());
+              return {
+                ...input,
+                jobs,
+                maximumSelections: Math.max(
+                  0,
+                  Math.min(
+                    state.allowance === -1 ? Infinity : state.allowance - state.admissions.length,
+                    state.concurrency === -1
+                      ? Infinity
+                      : state.concurrency -
+                          capacityOccupied({
+                            state,
+                            jobs,
+                            recoveries: yield* issueSource.recoveries?.() ?? Effect.succeed([]),
+                          })
+                  )
+                ),
+                scheduleRevision: state.revision,
+                admissions: state.admissions.map((a) => a.issue),
+                paused: state.paused,
+                capacity: { concurrency: state.concurrency, admission: state.allowance },
+              };
+            });
+          return {
+            verify: source.verify,
+            read,
+            poll: () =>
+              Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),
+          };
+        })
       ),
-      { signal: requests.signal }
-    )
-  );
-  planningDemand = refreshes.demand;
-  const attempts = await planningWorker({
-    attempts: await runtime.runPromise(Attempts),
-    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
-  });
-  const v2 = await v2Producer({
-    runSync: (effect) => runtime.runSync(effect),
-    planner: await runtime.runPromise(IPlanner),
-    directory: configuration.FACTORY_STATE,
-    scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,
-    base: configuration.FACTORY_BASE,
-    scheduler,
-    planningSafety,
-    read: () =>
-      Effect.all({
-        schedule: observations.schedule(),
-        threads: threads.snapshot(),
-        safety: planningSafety.status(),
-      }).pipe(
-        Effect.map(({ schedule, threads, safety }) => ({
-          ...schedule,
-          state: safety.schedule,
-          planningSafety: safety.planning,
-          threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
-        }))
-      ),
-    submitPlan: (parent) => attempts.submit(parent),
-    observePlan: async (id) => (await attempts.observe(id))?.launch,
-    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
-  }).catch(async (cause) => {
-    requests.abort();
-    await Promise.allSettled([
-      attempts.close(),
-      refreshes.close(),
-      github.drain(),
-      runtime.dispose(),
-      ...[...workers.values()].map((worker) => worker.dispose()),
-    ]);
-    await reportingRuntime.dispose();
-    throw cause;
-  });
-  const app = operationsServer({
-    clientActivity: refreshes.client,
-    v2: v2.data,
-    threads: threads.snapshot,
-    base: configuration.FACTORY_BASE,
-    job,
-    scheduler,
-    snapshot: () =>
-      Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
-        Effect.map(({ schedule, threads }) => ({ ...schedule, threads }))
-      ),
-    attempts,
-    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
-  });
-  try {
+      Layer.succeed(IPlanner, planner)
+    ).pipe(Layer.provideMerge(jobLayer));
+    const observationLayer = ObservationsLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, systemTime),
+          Layer.succeed(Reporting, reporting),
+          Layer.succeed(ObservationStore, observationStore),
+          Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
+          Layer.succeed(
+            ObservationSource,
+            githubObservations(
+              project,
+              () =>
+                Effect.map(scheduleStore.read(), (state) => state.admissions.map((a) => a.issue)),
+              Effect.gen(function* () {
+                const prerequisites = yield* Effect.cached(readyPrerequisites());
+                const issues = githubIssues(githubConfig(metadataGithub, () => prerequisites));
+                return (number: number) =>
+                  Effect.gen(function* () {
+                    const observed = yield* issues.inspect(number);
+                    return {
+                      allowed: eligible(observed),
+                      blockersReady: observed.blockersReady,
+                      verifiedAt: yield* systemTime.now(),
+                      evidence: observed.prerequisite?.evidence,
+                    };
+                  });
+              }),
+              metadataGithub,
+              { directory: configuration.FACTORY_STATE }
+            )
+          )
+        )
+      )
+    );
+    const threadLayer = ThreadsLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, systemTime),
+          Layer.succeed(LocalSnapshot, sqliteLocalSnapshot(configuration.FACTORY_STATE)),
+          Layer.succeed(Reporting, reporting),
+          Layer.succeed(ObservationStore, observationStore),
+          Layer.succeed(ThreadStore, sqliteThreads(configuration.FACTORY_STATE)),
+          Layer.succeed(
+            ThreadSource,
+            t3Metadata({
+              binary: configuration.FACTORY_T3_BINARY,
+              project,
+              projectId: configuration.FACTORY_T3_PROJECT_ID,
+              mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+              mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+            })
+          )
+        )
+      )
+    );
+    const runtime = ManagedRuntime.make(
+      SchedulerLive.pipe(
+        Layer.provideMerge(
+          AttemptsLive.pipe(
+            Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
+            Layer.provide(
+              Layer.succeed(AttemptStore, sqliteAttemptStore(configuration.FACTORY_STATE))
+            )
+          )
+        ),
+        Layer.provideMerge(schedulerDeps),
+        Layer.provideMerge(observationLayer),
+        Layer.provideMerge(threadLayer),
+        Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
+      )
+    );
+    startupCleanup.push(() => runtime.dispose());
+    const scheduler = await runtime.runPromise(Scheduler);
+    const planningSafety = await runtime.runPromise(PlanningSafety);
+    recoveryAdmission = scheduler.authorizeRecovery;
+    const job: Job = {
+      retry: (command) =>
+        Effect.flatMap(scheduler.status(), (snapshot) =>
+          scheduler.retry(command, snapshot.state.revision)
+        ),
+      status: () =>
+        Effect.map(scheduler.status(), (value) => value.jobs[0] ?? { kind: 'empty' as const }),
+      start: (command) => scheduler.start(command),
+      resume: (command) => scheduler.resume(command),
+      cancel: (id) => scheduler.cancel(id),
+    };
+    const observations = await runtime.runPromise(Observations);
+    const threadService = await runtime.runPromise(Threads);
+    const threads = {
+      ...threadService,
+      snapshot: () =>
+        Effect.map(threadService.snapshot(), (value) => ({
+          ...value,
+          browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
+        })),
+    };
+    const refreshes = observationWorker(() =>
+      runtime.runPromise(
+        Effect.all([observations.refresh(), threads.refresh()], { concurrency: 2 }).pipe(
+          Effect.asVoid,
+          Effect.catch(Effect.logError)
+        ),
+        { signal: requests.signal }
+      )
+    );
+    startupCleanup.push(() => refreshes.close());
+    planningDemand = refreshes.demand;
+    const attempts = await planningWorker({
+      attempts: await runtime.runPromise(Attempts),
+      run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+    });
+    startupCleanup.push(() => attempts.close());
+    const v2 = await v2Producer({
+      runSync: (effect) => runtime.runSync(effect),
+      planner: await runtime.runPromise(IPlanner),
+      directory: configuration.FACTORY_STATE,
+      scopeId: 'rafaeltab/wallpaperdb:' + configuration.FACTORY_T3_PROJECT_ID,
+      base: configuration.FACTORY_BASE,
+      scheduler,
+      planningSafety,
+      read: () =>
+        Effect.all({
+          schedule: observations.schedule(),
+          threads: threads.snapshot(),
+          safety: planningSafety.status(),
+        }).pipe(
+          Effect.map(({ schedule, threads, safety }) => ({
+            ...schedule,
+            state: safety.schedule,
+            planningSafety: safety.planning,
+            threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
+          }))
+        ),
+      submitPlan: (parent) => attempts.submit(parent),
+      observePlan: async (id) => (await attempts.observe(id))?.launch,
+      run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+    });
+    startupCleanup.push(() => v2.close());
+    const app = operationsServer({
+      clientActivity: refreshes.client,
+      v2: v2.data,
+      threads: threads.snapshot,
+      base: configuration.FACTORY_BASE,
+      job,
+      scheduler,
+      snapshot: () =>
+        Effect.all({ schedule: observations.schedule(), threads: threads.snapshot() }).pipe(
+          Effect.map(({ schedule, threads }) => ({ ...schedule, threads }))
+        ),
+      attempts,
+      run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
+    });
+    startupCleanup.push(() => app.close());
     await runtime.runPromise(
       Effect.tryPromise(() =>
         app.listen({ host: configuration.FACTORY_HOST, port: configuration.FACTORY_PORT })
       ).pipe(Effect.withSpan('factory.startup'))
     );
+
+    let observing: Promise<unknown> | undefined;
+    let recoveringPlanner: Promise<unknown> | undefined;
+    // Owned model deadlines and terminal cleanup continue independently of admissions
+    // and quota-paced GitHub discovery. This worker can only reconcile an existing run.
+    const plannerTimer = setInterval(() => {
+      if (recoveringPlanner) return;
+      recoveringPlanner = runtime
+        .runPromise(planner.reconcile(), { signal: requests.signal })
+        .finally(() => {
+          recoveringPlanner = undefined;
+        });
+      void recoveringPlanner.catch(() => undefined);
+    }, 1000);
+    startupCleanup.push(async () => {
+      clearInterval(plannerTimer);
+    });
+    const observationTimer = setInterval(() => {
+      if (observing) return;
+      observing = runtime
+        .runPromise(
+          scheduler.tick(configuration.FACTORY_BASE).pipe(
+            Effect.tap((snapshot) =>
+              configuration.FACTORY_OTEL_ENDPOINT
+                ? availabilityObservation(retainedWorkAvailable(snapshot))
+                : Effect.void
+            ),
+            Effect.catch((error) =>
+              (configuration.FACTORY_OTEL_ENDPOINT
+                ? availabilityObservation(false)
+                : Effect.void
+              ).pipe(Effect.andThen(Effect.logError(error)))
+            )
+          ),
+          {
+            signal: requests.signal,
+          }
+        )
+        .finally(() => {
+          observing = undefined;
+        });
+      void observing.catch(() => undefined);
+    }, 1000);
+    startupCleanup.push(async () => {
+      clearInterval(observationTimer);
+    });
+    let closing: Promise<void> | undefined;
+    const close = () =>
+      (closing ??= (async () => {
+        clearInterval(observationTimer);
+        clearInterval(plannerTimer);
+        // Reserve the remaining shutdown budget for bounded exporter disposal.
+        const deadline = setTimeout(() => {
+          requests.abort();
+          app.server.closeAllConnections();
+        }, 3000);
+        try {
+          await app.close();
+        } finally {
+          try {
+            await Promise.allSettled([
+              v2.close(),
+              attempts.close(),
+              observing,
+              recoveringPlanner,
+              refreshes.close(),
+            ]);
+          } finally {
+            clearTimeout(deadline);
+            requests.abort();
+            await Promise.allSettled([
+              github.drain(),
+              runtime.dispose(),
+              ...[...workers.values()].map((worker) => worker.dispose()),
+            ]);
+            await reportingRuntime.dispose();
+          }
+        }
+      })());
+    startupCleanup.length = 0;
+    return { app, close };
   } catch (cause) {
-    try {
-      await app.close();
-    } finally {
-      requests.abort();
-      await v2.close();
-      await attempts.close();
-      await refreshes.close();
-      await github.drain();
-      await runtime.dispose();
-      await Promise.all([...workers.values()].map((worker) => worker.dispose()));
-      await reportingRuntime.dispose();
+    requests.abort();
+    const failures: unknown[] = [];
+    for (const release of startupCleanup.reverse()) {
+      try {
+        await release();
+      } catch (error) {
+        failures.push(error);
+      }
     }
+    if (failures.length)
+      throw new AggregateError([cause, ...failures], 'Factory startup and resource cleanup failed');
     throw cause;
   }
-
-  let observing: Promise<unknown> | undefined;
-  let recoveringPlanner: Promise<unknown> | undefined;
-  // Owned model deadlines and terminal cleanup continue independently of admissions
-  // and quota-paced GitHub discovery. This worker can only reconcile an existing run.
-  const plannerTimer = setInterval(() => {
-    if (recoveringPlanner) return;
-    recoveringPlanner = runtime
-      .runPromise(planner.reconcile(), { signal: requests.signal })
-      .finally(() => {
-        recoveringPlanner = undefined;
-      });
-    void recoveringPlanner.catch(() => undefined);
-  }, 1000);
-  const observationTimer = setInterval(() => {
-    if (observing) return;
-    observing = runtime
-      .runPromise(
-        scheduler.tick(configuration.FACTORY_BASE).pipe(
-          Effect.tap((snapshot) =>
-            configuration.FACTORY_OTEL_ENDPOINT
-              ? availabilityObservation(retainedWorkAvailable(snapshot))
-              : Effect.void
-          ),
-          Effect.catch((error) =>
-            (configuration.FACTORY_OTEL_ENDPOINT
-              ? availabilityObservation(false)
-              : Effect.void
-            ).pipe(Effect.andThen(Effect.logError(error)))
-          )
-        ),
-        {
-          signal: requests.signal,
-        }
-      )
-      .finally(() => {
-        observing = undefined;
-      });
-    void observing.catch(() => undefined);
-  }, 1000);
-  let closing: Promise<void> | undefined;
-  const close = () =>
-    (closing ??= (async () => {
-      clearInterval(observationTimer);
-      clearInterval(plannerTimer);
-      // Reserve the remaining shutdown budget for bounded exporter disposal.
-      const deadline = setTimeout(() => {
-        requests.abort();
-        app.server.closeAllConnections();
-      }, 3000);
-      try {
-        await app.close();
-      } finally {
-        try {
-          await Promise.allSettled([
-            v2.close(),
-            attempts.close(),
-            observing,
-            recoveringPlanner,
-            refreshes.close(),
-          ]);
-        } finally {
-          clearTimeout(deadline);
-          requests.abort();
-          await Promise.allSettled([
-            github.drain(),
-            runtime.dispose(),
-            ...[...workers.values()].map((worker) => worker.dispose()),
-          ]);
-          await reportingRuntime.dispose();
-        }
-      }
-    })());
-  return { app, close };
 }
 
 function readyAssertion(status: Status): VerifiedPrerequisite | null {

@@ -498,3 +498,48 @@ it.each(['accept', 'accept-committed', 'claim', 'claim-committed', 'finish'] as 
     }
   }
 );
+
+it.each([false, true])(
+  'releases owned workers on startup rejection and normal close: invalid=%s',
+  async (invalid) => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { fileURLToPath } = await import('node:url');
+    const { initializeState, publisher } = await import('../src/platform/index.js');
+    const host = await protocol();
+    try {
+      const state = join(host.directory, 'state');
+      initializeState(state);
+      if (invalid) await publisher(state)('intent.json', {});
+      await host.save({ planning: { candidates: [], issues: [], openPulls: [] } });
+      const result = await promisify(execFile)(
+        process.execPath,
+        [
+          '--import',
+          fileURLToPath(new URL('../node_modules/tsx/dist/loader.mjs', import.meta.url)),
+          fileURLToPath(new URL('./fixtures/startup-lifetime.ts', import.meta.url)),
+        ],
+        {
+          timeout: 10000,
+          env: {
+            ...process.env,
+            PATH: `${host.directory}:${process.env.PATH}`,
+            FACTORY_FIXTURE: host.configFile,
+            FACTORY_PROJECT: host.repository,
+            FACTORY_T3_PROJECT_ID: 'project-id',
+            FACTORY_BASE: host.base,
+            FACTORY_T3_BINARY: host.binary,
+            FACTORY_STATE: state,
+            FACTORY_PORT: '0',
+            FACTORY_EXPECT_INVALID: invalid ? '1' : '0',
+          },
+        }
+      );
+      expect(result.stdout).toContain(
+        invalid ? 'Controlled retained intent rejected' : 'Controlled service closed'
+      );
+    } finally {
+      await host.cleanup();
+    }
+  }
+);

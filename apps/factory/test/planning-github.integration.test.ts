@@ -179,7 +179,9 @@ process.exit(result.status ?? 1);
         580,
       ]);
       const sends = (await f.host.calls()).filter(
-        (call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation)
+        (call) =>
+          ['send', 't3_thread_send'].includes(call.args[1]) &&
+          call.args[3]?.includes(saved.operation)
       );
       expect(sends).toHaveLength(policy === true ? 1 : 0);
     } finally {

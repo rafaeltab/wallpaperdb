@@ -352,6 +352,7 @@ export function operationsServer(config: {
         jobId: z.string().min(1),
         index: z.number().int().nonnegative(),
         runId: z.string().min(1),
+        resetReconciliation: z.boolean().optional(),
         revision: z.number().int().min(-1),
       })
       .strict(),

@@ -3,6 +3,8 @@ import { attemptIntent, matchesRestart, restartAction } from './restart.js';
 import { Effect, Layer, Random, Option } from 'effect';
 import { reconcileStages, currentStage, hasAnsweredQuestion, stageRunOrder } from './stages.js';
 import {
+  AgentReconciliationPolicy,
+  defaultAgentReconciliationLimit,
   JobReporting,
   Execution,
   Issues,
@@ -21,6 +23,7 @@ export const JobLive = Layer.effect(
     const time = yield* Time;
     const issues = yield* Issues;
     const execution = yield* Execution;
+    const policy = Option.getOrUndefined(yield* Effect.serviceOption(AgentReconciliationPolicy));
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const observe = (intent: Intent) =>
@@ -60,7 +63,8 @@ export const JobLive = Layer.effect(
             observation,
             time,
             continuation,
-            before.restart?.index ?? 0
+            before.restart?.index ?? 0,
+            policy?.limit ?? defaultAgentReconciliationLimit
           );
           yield* retainPrerequisite(store, delivery);
           const control = yield* store.readControl();
@@ -81,6 +85,14 @@ export const JobLive = Layer.effect(
           const status = {
             kind: 'job' as const,
             stageIndex: stage?.index,
+            reconciliation: control.reconciliation
+              ? {
+                  attempts: control.reconciliation.attempts,
+                  migrated: control.reconciliation.migrated,
+                  limit: policy?.limit ?? defaultAgentReconciliationLimit,
+                  revision: control.revision,
+                }
+              : undefined,
             intent: { ...intent, branch: activeIntent.branch },
             prerequisite: control.cancelled ? undefined : control.prerequisite,
             resume,
@@ -194,6 +206,32 @@ export const JobLive = Layer.effect(
         Effect.gen(function* () {
           const intent = yield* store.read();
           if (!intent) return { kind: 'rejected' as const };
+          if ('runId' in command && command.resetReconciliation) {
+            const control = yield* store.readControl();
+            const stage = yield* currentStage(store);
+            if (
+              intent.id !== command.jobId ||
+              control.cancelled ||
+              control.revision !== command.revision ||
+              stage?.index !== command.index
+            )
+              return { kind: 'rejected' as const };
+            const owner = yield* execution.observe(
+              attemptIntent(intent, control.restart?.index ?? 0),
+              stage ?? undefined
+            );
+            if (owner.kind !== 'found' || owner.run?.id !== command.runId)
+              return { kind: 'rejected' as const };
+            if (
+              !(yield* store.saveControl({
+                ...control,
+                revision: control.revision + 1,
+                reconciliation: { attempts: 0, migrated: false },
+              }))
+            )
+              return { kind: 'rejected' as const };
+            return yield* observe(intent);
+          }
           if ('runId' in command) return yield* retryStage(store, intent, command, observe);
           return yield* resumeQuestion(intent, command);
         }).pipe(Effect.withSpan('factory.job.resume')),

@@ -16,6 +16,7 @@ import { readFile, writeFile, readdir, rename, unlink } from './fixtures/durable
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import {
+  AgentReconciliationPolicy,
   Job,
   JobLive,
   JobStore,
@@ -354,7 +355,9 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
     ];
     await writeFile(path, JSON.stringify(saved));
     await runtime.runPromise(scheduler.tick(f.host.base));
-    expect((await f.host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+    expect(
+      (await f.host.calls()).filter((call) => ['send', 't3_thread_send'].includes(call.args[1]))
+    ).toHaveLength(0);
     const root = join(f.host.directory, 'joins');
     const operation = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
     if (!operation) throw new Error('Missing operation');
@@ -373,7 +376,9 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
       delivery: { stage: 'publication', commit: f.host.base, ready: true, landed: false },
     };
     await runtime.runPromise(scheduler.tick(f.host.base));
-    expect((await f.host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(1);
+    expect(
+      (await f.host.calls()).filter((call) => ['send', 't3_thread_send'].includes(call.args[1]))
+    ).toHaveLength(1);
     expect(JSON.parse(await readFile(reviewClaim, 'utf8')).commit).toBe(saved.head);
     expect(
       JSON.parse(await readFile(join(f.host.directory, 'review-capacity-observed.json'), 'utf8'))
@@ -594,6 +599,7 @@ it.each([false, true])(
           throw new Error('Missing current comparison');
         expect(await Effect.runPromise(required(current.repairReplay)(command, head))).toBe(true);
         const execution = t3Execution({
+          ...f.host.mcp,
           project: f.host.repository,
           projectId: 'project-id',
           binary: f.host.binary,
@@ -676,7 +682,9 @@ it.each([false, true])(
           if (dirty) await unlink(join(owning, 'dirty.txt'));
         }
         expect(
-          (await f.host.calls()).filter((c) => c.args[1] === 'send' && !c.args.includes('--help'))
+          (await f.host.calls()).filter(
+            (c) => ['send', 't3_thread_send'].includes(c.args[1]) && !c.args.includes('--help')
+          )
         ).toHaveLength(2);
       }
 
@@ -1770,6 +1778,7 @@ it.each(['review', 'publication', 'ci'] as const)(
         })
       );
       const execution = t3Execution({
+        ...f.host.mcp,
         project: f.host.repository,
         projectId: 'project-id',
         binary: f.host.binary,
@@ -1797,7 +1806,8 @@ it.each(['review', 'publication', 'ci'] as const)(
         await Effect.runPromise(execution.sendStage(intent, request));
         expect(
           (await f.host.calls()).filter(
-            (call) => call.args[1] === 'send' && !call.args.includes('--help')
+            (call) =>
+              ['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')
           )
         ).toHaveLength(1);
       }
@@ -2054,6 +2064,7 @@ it.each(['C', 'B'])(
       f.git('worktree', 'add', owning, branch);
       execFileSync('git', ['-C', owning, 'reset', '--hard', h2]);
       const execution = t3Execution({
+        ...f.host.mcp,
         binary: f.host.binary,
         project: f.host.repository,
         projectId: 'project-id',
@@ -2083,20 +2094,20 @@ it.each(['C', 'B'])(
           ...config,
           joinWriter: false,
           messages: [
+            { role: 'user', text: `Factory instruction ${intent.id}:${index}.` },
             {
               role: 'assistant',
               runId,
               text: JSON.stringify({
-                delivery: `${intent.id}:${index}`,
+                version: 1,
+                kind: 'state',
                 jobId: intent.id,
-                stage,
+                implemented: String(intent.issue),
                 base: start.parent,
-                commit,
-                outcome: stage === 'review' ? '<REVIEW>COMPLETE</REVIEW>' : '<PR>CREATED</PR>',
-                tests: true,
-                coverage: true,
-                crap: true,
-                reviews: true,
+                checked: commit,
+                reviewed: commit,
+                ...(stage === 'publication' ? { published: commit } : {}),
+                checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
               }),
             },
           ],
@@ -2164,6 +2175,7 @@ it.each(['C', 'B'])(
             Layer.provide(
               Layer.mergeAll(
                 Layer.succeed(JobStore, store),
+                Layer.succeed(AgentReconciliationPolicy, { limit: 0 }),
                 Layer.succeed(Issues, f.reopen()),
                 Layer.succeed(Execution, execution),
                 Layer.succeed(Time, { now: () => Effect.succeed(0) })
@@ -2223,7 +2235,11 @@ it.each(['C', 'B'])(
             f.host
               .calls()
               .then((calls) =>
-                calls.filter((call) => call.args[1] === 'send' && !call.args.includes('--help'))
+                calls.filter(
+                  (call) =>
+                    ['send', 't3_thread_send'].includes(call.args[1]) &&
+                    !call.args.includes('--help')
+                )
               );
           const calls = (await deliveries()).length;
           expect(await runtime.runPromise(job.resume(command))).toMatchObject({
@@ -2487,20 +2503,20 @@ it('finishes scheduler admission when an admitted repair waits for COMPLEX desce
       joinWriter: false,
       restack: { outcome: 'COMPLEX', review: true, question: 'Wait' },
       messages: [
+        { role: 'user', text: `Factory instruction ${intent.id}:4.` },
         {
           role: 'assistant',
           runId: 'repair-run',
           text: JSON.stringify({
-            delivery: `${intent.id}:4`,
             jobId: intent.id,
-            stage: 'babysitting',
             base: pr.parent,
-            commit: repaired,
-            outcome: '<PR>READY</PR>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: true,
+            version: 1,
+            kind: 'state',
+            implemented: String(intent.issue),
+            checked: repaired,
+            reviewed: repaired,
+            published: repaired,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ],
@@ -2536,6 +2552,7 @@ process.exit(result.status ?? 1);
 `
     );
     const execution = t3Execution({
+      ...f.host.mcp,
       project: f.host.repository,
       projectId: 'project-id',
       binary: parentBinary,
@@ -2682,7 +2699,9 @@ process.exit(result.status ?? 1);
     await schedulerRuntime.runPromise(scheduler.status());
     expect(
       (await f.host.calls()).filter(
-        (call) => call.args[1] === 'send' && call.args[3]?.includes(saved.operation)
+        (call) =>
+          ['send', 't3_thread_send'].includes(call.args[1]) &&
+          call.args[3]?.includes(saved.operation)
       )
     ).toHaveLength(0);
     expect(await Effect.runPromise(required(issues.recoveries)())).toContainEqual(
@@ -2696,7 +2715,7 @@ process.exit(result.status ?? 1);
     await schedulerRuntime.runPromise(scheduler.status());
     const sends = (await f.host.calls()).filter(
       (call) =>
-        call.args[1] === 'send' &&
+        ['send', 't3_thread_send'].includes(call.args[1]) &&
         call.args[2] === saved.thread.threadId &&
         call.args[3]?.includes(saved.operation)
     );

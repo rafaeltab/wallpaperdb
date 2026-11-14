@@ -122,7 +122,12 @@ function matchingEvidence(
   stage: StageRequest,
   run: { id: string; ordinal: number }
 ): evidence is StageEvidence {
-  return evidence !== null && evidence.runId === run.id && evidence.stageIndex === stage.index;
+  return (
+    evidence !== null &&
+    evidence.idle !== false &&
+    evidence.runId === run.id &&
+    evidence.stageIndex === stage.index
+  );
 }
 
 function retryWorktree(stage: StageRequest, evidence: StageEvidence) {

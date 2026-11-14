@@ -31,6 +31,7 @@ it('pauses after three distinct automatic model deadlines and retains their dura
   const configuration = {
     ...host.mcpEnvironment,
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -402,6 +403,7 @@ it('keeps a nonexhausted streak through manual previews, pause/resume and empty 
   const configuration = {
     ...host.mcpEnvironment,
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,

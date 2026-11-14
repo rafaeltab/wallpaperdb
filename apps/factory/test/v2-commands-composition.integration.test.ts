@@ -70,7 +70,9 @@ async function composed(
     }
     const open = () =>
       startFactory({
+        FACTORY_AGENT_RECONCILIATION_LIMIT: '0',
         FACTORY_PROJECT: host.repository,
+        ...host.mcpEnvironment,
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: host.base,
         FACTORY_T3_BINARY: host.binary,
@@ -147,7 +149,9 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
       if (typeof message !== 'string') throw new Error('Missing stage message');
       return [message];
     }
-    return call.args[1] === 'send' && !call.args.includes('--help') ? [String(call.args[3])] : [];
+    return ['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')
+      ? [String(call.args[3])]
+      : [];
   });
 }
 
@@ -162,16 +166,13 @@ it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
         if (cause === 'dirty checkout')
           await writeFile(`${prior.worktreePath}/unfinished.txt`, 'Preserve unfinished work');
         text = JSON.stringify({
-          delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
           jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-          stage: 'implementation',
           base: host.base,
-          commit: cause === 'mismatched receipt commit' ? 'f'.repeat(40) : host.base,
-          outcome: '<TASK>COMPLETE</TASK>',
-          tests: true,
-          coverage: true,
-          crap: true,
-          reviews: false,
+          version: 1,
+          kind: 'state',
+          implemented: '577',
+          checked: cause === 'mismatched receipt commit' ? 'f'.repeat(40) : host.base,
+          checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
         });
       }
       await save({
@@ -259,16 +260,13 @@ it('continues an implementation repaired by an ordinary message in its existing 
           role: 'assistant',
           runId: 'manual-repair-2',
           text: JSON.stringify({
-            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-            stage: 'implementation',
             base: host.base,
-            commit,
-            outcome: '<TASK>COMPLETE</TASK>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: false,
+            version: 1,
+            kind: 'state',
+            implemented: '577',
+            checked: commit,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ],
@@ -315,14 +313,14 @@ it('continues an implementation repaired by an ordinary message in its existing 
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
     expect(sends[0]).toContain('Use $review-loop');
-    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).toContain('Factory instruction ');
     expect(sends[0]).not.toContain('expected run ordinal');
     expect(await readFile(`${prior.worktreePath}/repaired.txt`, 'utf8')).toBe(
       'Manually repaired in the existing session'
     );
   }));
 
-it('retains manual repair across restart and rejects invalid and stale follow-up receipts', () =>
+it('retains manual repair across restart and rejects incompatible follow-up state', () =>
   composed(async ({ running, host, save, reopen }) => {
     await start(running);
     const resourcePath = `${host.directory}/resource.json`;
@@ -331,16 +329,13 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
     let active = running;
     const result = (commit = host.base) =>
       JSON.stringify({
-        delivery: `${jobId}:0`,
         jobId,
-        stage: 'implementation',
         base: host.base,
-        commit,
-        outcome: '<TASK>COMPLETE</TASK>',
-        tests: true,
-        coverage: true,
-        crap: true,
-        reviews: false,
+        version: 1,
+        kind: 'state',
+        implemented: '577',
+        checked: commit,
+        checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
       });
     const turn = async (
       id: string,
@@ -354,7 +349,7 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
           {
             role: 'assistant',
             runId: messageRun,
-            text: messageRun === id ? text : text.replace(`${jobId}:0`, `${jobId}:stale`),
+            text: messageRun === id ? text : text.replace(host.base, 'f'.repeat(40)),
           },
         ],
       });
@@ -419,7 +414,7 @@ it('retains manual repair across restart and rejects invalid and stale follow-up
     ).toHaveLength(1);
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
-    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).toContain('Factory instruction ');
     expect(sends[0]).not.toContain('expected run ordinal');
     await save({ complete: true, overrides: { status: 'completed' } });
     await vi.waitFor(
@@ -482,16 +477,13 @@ it('retains a question first observed on a manual repair run across restart', ()
           role: 'assistant',
           runId: 'answer-3',
           text: JSON.stringify({
-            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-            stage: 'implementation',
             base: host.base,
-            commit: host.base,
-            outcome: '<TASK>COMPLETE</TASK>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: false,
+            version: 1,
+            kind: 'state',
+            implemented: '577',
+            checked: host.base,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ],
@@ -512,7 +504,7 @@ it('retains a question first observed on a manual repair run across restart', ()
     );
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
-    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).toContain('Factory instruction ');
     expect(sends[0]).not.toContain('expected run ordinal');
   }));
 
@@ -547,16 +539,13 @@ it.each(['unobserved failure', 'cancelled job'])(
             role: 'assistant',
             runId: 'unadopted-2',
             text: JSON.stringify({
-              delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
               jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-              stage: 'implementation',
               base: host.base,
-              commit: host.base,
-              outcome: '<TASK>COMPLETE</TASK>',
-              tests: true,
-              coverage: true,
-              crap: true,
-              reviews: false,
+              version: 1,
+              kind: 'state',
+              implemented: '577',
+              checked: host.base,
+              checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
             }),
           },
         ],
@@ -629,16 +618,13 @@ it('recovers a durable manual adoption before observing a later follow-up', () =
           role: 'assistant',
           runId: 'repair-3',
           text: JSON.stringify({
-            delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
             jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-            stage: 'implementation',
             base: host.base,
-            commit: host.base,
-            outcome: '<TASK>COMPLETE</TASK>',
-            tests: true,
-            coverage: true,
-            crap: true,
-            reviews: false,
+            version: 1,
+            kind: 'state',
+            implemented: '577',
+            checked: host.base,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ],
@@ -660,7 +646,7 @@ it('recovers a durable manual adoption before observing a later follow-up', () =
     const sends = await stageMessages(host);
     expect(sends).toHaveLength(1);
     expect(sends[0]).toContain('Stage 3 of factory job');
-    expect(sends[0]).toContain('delivery=');
+    expect(sends[0]).toContain('Factory instruction ');
     expect(sends[0]).not.toContain('expected run ordinal');
   }));
 
@@ -927,16 +913,13 @@ it('manually retries incomplete implementation in a fresh original-base worktree
             role: 'assistant',
             runId: 'run-1',
             text: JSON.stringify({
-              delivery: `${prior.title.match(/\[factory:(.*)\]$/)[1]}:0`,
               jobId: prior.title.match(/\[factory:(.*)\]$/)[1],
-              stage: 'implementation',
               base: host.base,
-              commit: oldHead,
-              outcome: '<TASK>COMPLETE</TASK>',
-              tests: true,
-              coverage: true,
-              crap: true,
-              reviews: false,
+              version: 1,
+              kind: 'state',
+              implemented: '577',
+              checked: oldHead,
+              checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
             }),
           },
         ],

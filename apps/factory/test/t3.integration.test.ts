@@ -9,6 +9,7 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const adapter = t3Execution({
+      ...host.mcp,
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
@@ -80,6 +81,7 @@ it('reads current structured questions, excluding historical and inherited quest
     const authorizationFile = `${host.directory}/authorization`;
     await writeFile(authorizationFile, 'Bearer controlled-protocol');
     const adapter = t3Execution({
+      ...host.mcp,
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
@@ -137,6 +139,7 @@ it('accepts only the new completed run after resuming the implementation stage',
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
     const adapter = t3Execution({
+      ...host.mcp,
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',
@@ -191,6 +194,7 @@ async function questionProtocol(
     const authorization = `${host.directory}/authorization`;
     await writeFile(authorization, 'Bearer controlled-protocol');
     const adapter = t3Execution({
+      ...host.mcp,
       binary: host.binary,
       project: host.repository,
       projectId: 'project-id',

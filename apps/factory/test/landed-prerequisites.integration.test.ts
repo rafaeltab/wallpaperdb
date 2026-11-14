@@ -93,6 +93,7 @@ it('launches a new dependent with remotely landed code after the configured base
           Layer.succeed(
             Execution,
             t3Execution({
+              ...f.host.mcp,
               project: f.host.repository,
               projectId: 'project-id',
               binary: f.host.binary,
@@ -480,6 +481,7 @@ async function reservedRuntime(
           Layer.succeed(
             Execution,
             t3Execution({
+              ...f.host.mcp,
               project: f.host.repository,
               projectId: 'project-id',
               binary: f.host.binary,

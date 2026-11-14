@@ -368,7 +368,7 @@ it.each([
   await job.status();
   job.change(change);
   expect(await job.status()).toMatchObject({
-    delivery: { stage: 'ci', ready: false, landed: false },
+    delivery: { stage: 'publication', ready: false, landed: false },
   });
   expect(job.sends()).toBe(2);
 });
@@ -1788,7 +1788,7 @@ it('does not reconcile successful CI over unfinished or unreviewed babysitter wo
   expect(await job.status()).toMatchObject({ delivery: { ready: true } });
 });
 
-it('does not use an older publication acceptance to declare replayed babysitter code ready', async () => {
+it('does not accept publication against a different authoritative replayed head', async () => {
   const job = await stagesFixture();
   await job.start();
   await job.status();
@@ -1796,7 +1796,6 @@ it('does not use an older publication acceptance to declare replayed babysitter 
   await job.status();
   job.change({ accepted: false, status: 'failed', failed: false, commit: 'd'.repeat(40) });
   expect(await job.status()).toMatchObject({
-    delivery: { stage: 'babysitting', ready: false },
-    resume: { runId: 'run-4' },
+    delivery: { stage: 'publication', ready: false },
   });
 });

@@ -1,5 +1,7 @@
+import { recoverReconciliation, requestReconciliation } from './reconciliation.js';
 import { Effect } from 'effect';
 import {
+  defaultAgentReconciliationLimit,
   type Delivery,
   type Execution,
   type Intent,
@@ -25,7 +27,8 @@ export function reconcileStages(
   observation: Observation,
   time: Time,
   continuation?: ContinuationAdmission,
-  initialIndex = 0
+  initialIndex = 0,
+  reconciliationLimit = defaultAgentReconciliationLimit
 ) {
   return Effect.gen(function* () {
     if (observation.kind !== 'found') return undefined;
@@ -40,6 +43,7 @@ export function reconcileStages(
       previousRunId: null,
     });
     yield* recoverManualRepair(store);
+    yield* recoverReconciliation(store);
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
     return yield* reconcileStage(
@@ -50,22 +54,16 @@ export function reconcileStages(
       waiting,
       observation,
       time,
-      continuation
+      continuation,
+      reconciliationLimit
     );
   }).pipe(Effect.withSpan('factory.job.stages'));
-}
-function accepted(
-  evidence: StageEvidence | null,
-  request: StageRequest
-): evidence is StageEvidence {
-  if (!evidence?.accepted) return false;
-  return request.stage !== 'publication' || evidence.commit === request.commit;
 }
 function deliver(store: JobStore, execution: Execution, intent: Intent, request: StageRequest) {
   return Effect.gen(function* () {
     if (request.previousRunId === null || request.observedRunId) return;
     if (yield* store.claimStage(request.index)) {
-      yield* execution.sendStage(intent, request);
+      if (!(yield* store.readControl()).cancelled) yield* execution.sendStage(intent, request);
     }
   });
 }
@@ -237,7 +235,8 @@ function reconcileStage(
   waiting: StageRequest,
   observation: Extract<Observation, { kind: 'found' }>,
   time: Time,
-  continuation?: ContinuationAdmission
+  continuation?: ContinuationAdmission,
+  reconciliationLimit = defaultAgentReconciliationLimit
 ) {
   return Effect.gen(function* () {
     const control = yield* controlForStage(store, waiting);
@@ -261,8 +260,24 @@ function reconcileStage(
       ready: false,
       landed: false,
     };
-    const verified = completedEvidence(observation, evidence, waiting) ? evidence : null;
-    if (!verified)
+    const verified = completedEvidence(observation, evidence) ? evidence : null;
+    const publication =
+      verified && ['publication', 'babysitting'].includes(waiting.stage)
+        ? yield* issues.pullRequest(intent)
+        : null;
+    const publicationValid =
+      !publication ||
+      (publication.kind === 'found' &&
+        publication.commit === verified?.commit &&
+        Boolean(verified?.linked?.includes(publication.url)));
+    if (!verified || !publicationValid) {
+      const reconciliation = yield* requestReconciliation(
+        store,
+        waiting,
+        evidence,
+        reconciliationLimit
+      );
+      if (reconciliation) return reconciliation;
       return yield* pendingDelivery(
         store,
         execution,
@@ -274,6 +289,7 @@ function reconcileStage(
         evidence,
         delivery
       );
+    }
     // This run has conclusively finished. A pending journal or descendant
     // recovery keeps the receipt unaccepted, without occupying another worker slot.
     if (!(yield* acceptReplayRepair(issues, intent, waiting, verified)))
@@ -387,10 +403,11 @@ function suspension(
 }
 function completedEvidence(
   observation: Extract<Observation, { kind: 'found' }>,
-  evidence: StageEvidence | null,
-  waiting: StageRequest
+  evidence: StageEvidence | null
 ): evidence is StageEvidence {
-  return observation.status === 'completed' && evidence !== null && accepted(evidence, waiting);
+  return (
+    ['completed', 'idle'].includes(observation.status) && evidence !== null && evidence.accepted
+  );
 }
 function questionInterruption(
   store: JobStore,
@@ -420,6 +437,8 @@ function pendingDelivery(
   delivery: Delivery
 ) {
   const run = observation.run;
+  if (evidence?.idle === false && waiting.stage !== 'babysitting')
+    return Effect.succeed({ ...delivery, active: true });
   if (
     waiting.stage === 'implementation' &&
     ['completed', 'failed', 'interrupted', 'cancelled'].includes(observation.status) &&
@@ -787,7 +806,8 @@ function terminalEvidence(
     evidence !== null &&
     observation.run?.id === evidence.runId &&
     evidence.commit === commit &&
-    evidence.worktreeClean === true
+    evidence.worktreeClean === true &&
+    evidence.idle !== false
   );
 }
 

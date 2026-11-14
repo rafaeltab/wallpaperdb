@@ -22,6 +22,7 @@ it('reattaches a durable planner run after process death without launching anoth
     PATH: `${host.directory}:${process.env.PATH}`,
     FACTORY_FIXTURE: host.configFile,
     FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,

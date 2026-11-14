@@ -23,6 +23,7 @@ export const intentSchema = z
 const stageSchema = z
   .object({
     receiptProtocol: z.literal('delivery-v1').optional(),
+    reconciliation: z.enum(['state', 'migration']).optional(),
     repairOrigin: z.number().int().nonnegative().optional(),
     ordinal: z.number().int().positive().optional(),
     comparison: z
@@ -57,6 +58,14 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    reconciliation: z
+      .object({
+        attempts: z.number().int().nonnegative(),
+        migrated: z.boolean(),
+        pending: stageSchema.optional(),
+      })
+      .strict()
+      .optional(),
     manualRepair: z
       .object({
         index: z.number().int().nonnegative(),

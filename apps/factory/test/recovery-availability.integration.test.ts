@@ -198,7 +198,9 @@ it.each(['absent', 'ambiguous'] as const)(
         expect(
           (await f.host.calls()).filter(
             (call) =>
-              call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+              call.binary === 't3' &&
+              ['send', 't3_thread_send'].includes(call.args[1]) &&
+              !call.args.includes('--help')
           )
         ).toEqual([]);
         expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
@@ -310,7 +312,10 @@ it('keeps a capacity-deferred COMPLEX review binding available without deliverin
     expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
     expect(
       (await f.host.calls()).filter(
-        (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+        (call) =>
+          call.binary === 't3' &&
+          ['send', 't3_thread_send'].includes(call.args[1]) &&
+          !call.args.includes('--help')
       )
     ).toEqual([]);
   } finally {

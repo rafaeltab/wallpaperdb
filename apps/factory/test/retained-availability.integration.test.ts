@@ -115,7 +115,9 @@ it.each(['absent', 'ambiguous'] as const)(
         await writeFile(`${host.directory}/resource.json`, JSON.stringify(resource));
       await host.save({ duplicate: kind === 'ambiguous', planning: { issues: [] } });
       const running = await startFactory({
+        FACTORY_AGENT_RECONCILIATION_LIMIT: '0',
         FACTORY_PROJECT: host.repository,
+        ...host.mcpEnvironment,
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: host.base,
         FACTORY_T3_BINARY: host.binary,

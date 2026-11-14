@@ -19,6 +19,8 @@ export async function joinFixture(
       mcp?: boolean;
       outcome?: 'SIMPLE' | 'COMPLEX';
       review?: boolean;
+      resolveOrdinal?: number;
+      reviewOrdinal?: number;
       stale?: boolean;
       question?: string;
     };

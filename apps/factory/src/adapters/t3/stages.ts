@@ -9,6 +9,7 @@ import {
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 
+const historyWindow = 1000;
 const markers = {
   implementation: '<TASK>COMPLETE</TASK>',
   review: '<REVIEW>COMPLETE</REVIEW>',
@@ -116,7 +117,10 @@ export function stageExecution(
         if (binding.kind !== 'found' || binding.threadId !== request.threadId) return null;
         return yield* Effect.tryPromise({
           try: async (signal) => {
-            const raw = await call(['show', request.threadId, '--messages', '1000'], signal);
+            const raw = await call(
+              ['show', request.threadId, '--messages', String(historyWindow)],
+              signal
+            );
             const observed = outcome(raw, intent, request);
             if (!observed) {
               const pending = pendingRun(raw, request, intent);
@@ -266,6 +270,9 @@ function deliveryMatches(
 ) {
   if (result.delivery !== undefined) return result.delivery === deliveryIdentity(intent, request);
   if (request.receiptProtocol || request.stage === 'babysitting') return false;
+  // The CLI returns a latest-message window with no completeness flag. A full
+  // window may hide an identical claim from an earlier delivery.
+  if (detail.messages.length >= historyWindow) return false;
   const instructions = detail.messages.filter(
     (m) =>
       m.role === 'user' &&

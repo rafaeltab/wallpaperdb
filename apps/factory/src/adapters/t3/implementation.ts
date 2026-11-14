@@ -10,6 +10,9 @@ import {
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 import { receiptInstructions, stageExecution } from './stages.js';
+const associations = z.object({
+  pullRequests: z.array(z.object({ url: z.string().url(), source: z.string() })),
+});
 const listing = z.array(z.object({ threadId: z.string().min(1), title: z.string() }));
 const detail = z.object({
   thread: z.object({
@@ -171,6 +174,14 @@ ${receiptInstructions(intent, 'implementation')}`,
       call,
       execution.observe,
       config.prBase ?? 'main',
+      async (threadId, signal) => {
+        const result = associations.parse(
+          await mcpCall(config, 'list_thread_pull_requests', { threadId }, signal)
+        );
+        return result.pullRequests
+          .filter((pr) => pr.source !== 'stack-dismissed')
+          .map((pr) => pr.url);
+      },
       (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
       config.mcpEndpoint && config.mcpAuthorizationFile
         ? (intent, request, prompt, signal) =>

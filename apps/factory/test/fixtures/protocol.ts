@@ -957,6 +957,10 @@ export async function runProtocol(
           labels: [{ name: 'ready-for-agent' }],
         });
     } else if (args[0] === 'acp-mcp-call') {
+      if (args[1] === 'list_thread_pull_requests') {
+        reply(config.associationReply ?? { structuredContent: { pullRequests: [] } });
+        process.exit(0);
+      }
       if (args[1] === 't3_thread_read' && JSON.parse(args[2]).threadId === 'planner-thread') {
         reply({
           structuredContent: {
@@ -1048,6 +1052,7 @@ export async function runProtocol(
           latestRunId: 'run-1',
           runCount: 1,
           pendingRequestCount: 0,
+          pullRequests: [],
         })
       );
       if (config.lost) process.exit(1);
@@ -1122,7 +1127,13 @@ export async function runProtocol(
         );
       else if (args[1] === 'show')
         reply({
-          thread: resource ? { ...resource, ...config.overrides } : null,
+          thread: resource
+            ? {
+                ...resource,
+                ...config.overrides,
+                ...(config.omitTranscriptPullRequests ? { pullRequests: undefined } : {}),
+              }
+            : null,
           messages:
             config.waitingForGithub && resource?.stage === 'babysitting'
               ? [

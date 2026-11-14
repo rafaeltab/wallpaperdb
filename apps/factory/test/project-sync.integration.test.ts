@@ -257,7 +257,8 @@ it('rejects a stale overlapping SQLite publication and preserves the newer detai
     const resume = gate();
     stale.projectReadGate.entered = entered.release;
     stale.projectReadGate.wait = resume.wait;
-    const rejected = expect(stale.sync()).rejects.toMatchObject({ _tag: 'Unavailable' });
+    const staleRead = stale.sync();
+    void staleRead.catch(() => undefined);
     try {
       await entered.wait;
       const winner = githubFixture(stale.directory);
@@ -271,7 +272,7 @@ it('rejects a stale overlapping SQLite publication and preserves the newer detai
       winner.members = [projectMember(winnerIssue)];
       expect((await winner.sync()).issues[0]?.title).toBe('Newer collector details');
       resume.release();
-      await rejected;
+      await expect(staleRead).rejects.toMatchObject({ _tag: 'Unavailable' });
 
       const reopened = githubFixture(stale.directory);
       reopened.now = Date.parse('2026-11-14T00:02:00Z');
@@ -282,7 +283,7 @@ it('rejects a stale overlapping SQLite publication and preserves the newer detai
       expect(reopened.filters).toEqual(['updated:>=2026-11-13']);
     } finally {
       resume.release();
-      await rejected;
+      await staleRead.catch(() => undefined);
     }
   });
 });

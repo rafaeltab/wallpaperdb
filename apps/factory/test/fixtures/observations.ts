@@ -23,9 +23,15 @@ export function controlledObservations(
             item.kind === 'job' ? [[item.intent.id, item] as const] : []
           )
         );
+        let jobsObservedAt = value.jobsObservedAt;
         for (const item of updates) {
           const itemGeneration = item.generation ?? current;
-          if (item.kind !== 'job' && itemGeneration < completedGeneration) continue;
+          if (
+            item.kind !== 'job' &&
+            !(item.kind === 'failure' && item.key.startsWith('job:')) &&
+            itemGeneration < completedGeneration
+          )
+            continue;
           const key =
             item.kind === 'failure'
               ? item.key
@@ -63,8 +69,20 @@ export function controlledObservations(
               : { observedAt: item.at }),
           };
           if (item.kind === 'issue') issues.set(item.value.number, item.value);
-          if (item.kind === 'pull') pulls.set(item.value.number, item.value);
+          if (item.kind === 'pull') {
+            const previousPull = pulls.get(item.value.number);
+            pulls.set(item.value.number, {
+              ...item.value,
+              crossReferencedIssues: [
+                ...new Set([
+                  ...(previousPull?.crossReferencedIssues ?? []),
+                  ...item.value.crossReferencedIssues,
+                ]),
+              ],
+            });
+          }
           if (item.kind === 'job') {
+            jobsObservedAt = Math.max(jobsObservedAt ?? 0, item.at);
             const previousJob = jobs.get(item.value.intent.id);
             jobs.set(item.value.intent.id, {
               ...item.value,
@@ -75,8 +93,16 @@ export function controlledObservations(
         value = {
           ...value,
           items,
+          jobsObservedAt,
           facts: {
             ...value.facts,
+            verifiedPrBases: value.facts?.verifiedPrBases?.filter((edge) =>
+              [edge.base, edge.tip].every((n) => {
+                const before = value.facts?.pullRequests.find((pr) => pr.number === n);
+                const after = pulls.get(n);
+                return before?.head === after?.head && before?.base === after?.base;
+              })
+            ),
             issues: [...issues.values()],
             pullRequests: [...pulls.values()],
           },
@@ -125,11 +151,30 @@ export function controlledObservations(
               })
             ),
           };
+          const items = { ...value.items };
+          for (const [kind, observations] of [
+            ['issue', facts.issues],
+            ['pull', facts.pullRequests],
+          ] as const) {
+            for (const item of observations) {
+              const key = `${kind}:${item.number}`;
+              if ((items[key]?.generation ?? 0) > current) continue;
+              items[key] = {
+                generation: current,
+                sequence: Number.MAX_SAFE_INTEGER,
+                attemptedAt: update.observedAt ?? 0,
+                observedAt: update.observedAt,
+              };
+            }
+          }
+          value = { ...value, items };
           completedGeneration = current;
         }
+        const metadata = { ...update };
+        delete metadata.generation;
         value = {
           ...value,
-          ...update,
+          ...metadata,
           ...(facts ? { facts } : {}),
           ...(update.observedAt !== undefined ? { error: undefined, failedAt: undefined } : {}),
         };

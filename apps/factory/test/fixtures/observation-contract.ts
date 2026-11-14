@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
+import { parkedSnapshot, pullObservation } from './v2.js';
 import type {
   ObservationStore,
   ReportingStore,
@@ -317,6 +318,114 @@ export function reportingStoreContract(
         })
       );
       expect((await Effect.runPromise(store.read())).facts?.verifiedPrBases).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+  it(`${name} retains an overlapping job failure after metadata collection completes`, async () => {
+    const { store, close } = await open();
+    try {
+      const job = parkedSnapshot(pullObservation(42), false).jobs[0];
+      if (!job || job.kind !== 'job') throw new Error('Missing job fixture');
+      const jobGeneration = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(jobGeneration, [{ kind: 'job', value: job, sequence: 1, at: 10 }])
+      );
+      const metadataGeneration = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.refresh({
+          generation: metadataGeneration,
+          observedAt: 20,
+          facts: { issues: [], pullRequests: [] },
+        })
+      );
+      await Effect.runPromise(
+        store.publish(jobGeneration, [
+          { kind: 'failure', key: 'job:parked-owner', sequence: 2, at: 30, error: 'offline' },
+        ])
+      );
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        jobsObservedAt: 10,
+        jobs: [{ intent: { id: 'parked-owner' } }],
+        items: { 'job:parked-owner': { observedAt: 10, failedAt: 30, error: 'offline' } },
+      });
+    } finally {
+      await close();
+    }
+  });
+  it(`${name} rejects buffered observations behind authoritative completion but accepts the next collection`, async () => {
+    const { store, close } = await open();
+    try {
+      const issue = facts.issues[0];
+      if (!issue) throw new Error('Missing fixture');
+      const generation = await Effect.runPromise(store.begin());
+      await Effect.runPromise(store.refresh({ generation, observedAt: 50, facts }));
+      await Effect.runPromise(
+        store.publish(generation, [
+          { kind: 'issue', value: { ...issue, title: 'Late buffered' }, sequence: 2, at: 45 },
+        ])
+      );
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        facts: { issues: [{ title: 'Complete issue' }] },
+        items: { 'issue:1': { observedAt: 50 } },
+      });
+      const next = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(next, [
+          { kind: 'issue', value: { ...issue, title: 'Next collection' }, sequence: 1, at: 60 },
+        ])
+      );
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        facts: { issues: [{ title: 'Next collection' }] },
+        items: { 'issue:1': { observedAt: 60 } },
+      });
+    } finally {
+      await close();
+    }
+  });
+  it(`${name} retains cross-reference membership and invalidates ancestry when an incremental PR comparison changes`, async () => {
+    const { store, close } = await open();
+    try {
+      const generation = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.refresh({
+          generation,
+          observedAt: 10,
+          facts: {
+            issues: [],
+            pullRequests: [
+              pullObservation(1),
+              pullObservation(2, {
+                head: 'c'.repeat(40),
+                evidenceHead: 'c'.repeat(40),
+                base: 'a'.repeat(40),
+                crossReferencedIssues: [1],
+              }),
+            ],
+            verifiedPrBases: [{ base: 1, tip: 2 }],
+          },
+        })
+      );
+      const next = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(next, [
+          {
+            kind: 'pull',
+            value: pullObservation(2, {
+              head: 'd'.repeat(40),
+              evidenceHead: 'd'.repeat(40),
+              crossReferencedIssues: [2],
+            }),
+            sequence: 1,
+            at: 20,
+          },
+        ])
+      );
+      const observed = await Effect.runPromise(store.read());
+      expect(
+        observed.facts?.pullRequests.find((pr) => pr.number === 2)?.crossReferencedIssues
+      ).toEqual(expect.arrayContaining([1, 2]));
+      expect(observed.facts?.verifiedPrBases).toEqual([]);
     } finally {
       await close();
     }

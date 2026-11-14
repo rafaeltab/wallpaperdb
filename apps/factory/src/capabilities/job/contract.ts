@@ -384,3 +384,29 @@ export interface JobReporting {
   ): Effect.Effect<void, Unavailable>;
 }
 export const JobReporting = Context.Service<JobReporting>('wallpaperdb.factory.JobReporting');
+
+/** Versioned agent state shared by stage completion and dependency handback. */
+export type AgentResponse =
+  | {
+      readonly version: 1;
+      readonly kind: 'state';
+      readonly jobId: string;
+      readonly checks: {
+        readonly format: boolean;
+        readonly lint: boolean;
+        readonly tests: boolean;
+        readonly crap: boolean;
+        readonly coverage: boolean;
+      };
+      readonly base: string;
+      readonly implemented: string;
+      readonly checked: string;
+      readonly reviewed?: string;
+      readonly published?: string;
+    }
+  | {
+      readonly version: 1;
+      readonly kind: 'dependencies';
+      readonly jobId: string;
+      readonly requireUnimplementedIssues: readonly string[];
+    };

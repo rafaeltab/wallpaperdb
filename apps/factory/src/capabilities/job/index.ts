@@ -37,3 +37,5 @@ export type {
 
 export { eligible, trustedAuthor } from './implementation.js';
 export { JobReporting } from './contract.js';
+
+export type { AgentResponse } from './contract.js';

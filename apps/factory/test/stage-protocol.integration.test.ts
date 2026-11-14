@@ -1009,3 +1009,47 @@ function publicationFixture(check: (fixture: Fixture & { complete: object }) => 
     await check({ ...fixture, adapter, request, complete });
   });
 }
+
+it('retains a state response after delayed assistant prose without accepting a later negative state', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const instruction = {
+      role: 'user',
+      text: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Factory instruction ${intent.id}:0.`,
+    };
+    const state = {
+      version: 1,
+      kind: 'state',
+      jobId: intent.id,
+      base: intent.base,
+      implemented: String(intent.issue),
+      checked: host.base,
+      checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+    };
+    const success = { role: 'assistant', runId: 'run-1', text: JSON.stringify(state) };
+    const prose = {
+      role: 'assistant',
+      runId: 'notification',
+      text: 'The delayed command has finished.',
+    };
+    const overrides = { status: 'completed', latestRunId: 'notification', runCount: 2 };
+    await host.save({ overrides, messages: [instruction, success, prose] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+      commit: host.base,
+    });
+    await host.save({
+      overrides,
+      messages: [
+        instruction,
+        success,
+        {
+          ...success,
+          text: JSON.stringify({ ...state, checks: { ...state.checks, lint: false } }),
+        },
+        prose,
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
+  }));

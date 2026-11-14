@@ -16,7 +16,7 @@ export function controlledStore(): JobStore {
     readControl: () => Effect.sync(() => control),
     saveControl: (state, stage) =>
       Effect.sync(() => {
-        if (state.revision !== control.revision + 1) return false;
+        if (control.released || state.revision !== control.revision + 1) return false;
         if (
           stage &&
           (stages.has(stage.index) ||
@@ -51,7 +51,7 @@ export function controlledStore(): JobStore {
       }),
     claimStage: (index) =>
       Effect.sync(() => {
-        if (control.cancelled || claims.has(index)) return false;
+        if (control.cancelled || control.released || claims.has(index)) return false;
         claims.add(index);
         control = {
           ...control,

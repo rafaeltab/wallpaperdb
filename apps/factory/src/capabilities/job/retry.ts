@@ -19,6 +19,7 @@ import { associateStage, currentStage } from './stages.js';
 function retryableStage(control: Control, stage: StageRequest | null): stage is StageRequest {
   return (
     !control.cancelled &&
+    !control.released &&
     stage !== null &&
     stage.stage !== 'ci' &&
     control.parked?.index !== stage.index

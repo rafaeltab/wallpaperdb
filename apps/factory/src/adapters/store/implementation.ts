@@ -59,7 +59,8 @@ export function fileStore(directory: string): JobStore {
     state: import('../../capabilities/job/index.js').Control,
     stage?: StageRequest
   ) => {
-    if (state.revision !== (await readControl()).revision + 1) return false;
+    const current = await readControl();
+    if (current.released || state.revision !== current.revision + 1) return false;
     return stage
       ? saveStageControl(directory, state, stage)
       : publish(`control-${state.revision}.json`, controlSchema.parse(state));
@@ -108,7 +109,7 @@ export function fileStore(directory: string): JobStore {
         }
         for (;;) {
           const state = await readControl();
-          if (state.cancelled || state.claimed.includes(index)) return false;
+          if (state.cancelled || state.released || state.claimed.includes(index)) return false;
           if (
             await saveControl({
               ...state,

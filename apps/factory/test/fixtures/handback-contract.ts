@@ -36,6 +36,7 @@ export async function handbackContract(
     released: [{ admission, jobId: 'owned' }],
   };
   const guard = { issue: 758, generation: 1, jobId: 'owned', controlRevision: 0 };
+  expect(await Effect.runPromise(schedule.save(released, [guard, guard]))).toBe(false);
   expect(await Effect.runPromise(schedule.save(released, [{ ...guard, jobId: 'unrelated' }]))).toBe(
     false
   );
@@ -50,4 +51,18 @@ export async function handbackContract(
   );
   expect(await Effect.runPromise(reopen().read())).toEqual(cancelled ? initial : released);
   expect(await Effect.runPromise(reopen().save(released, [guard]))).toBe(false);
+  if (!cancelled) {
+    const terminal = await Effect.runPromise(job.readControl());
+    expect(terminal.released).toBe(true);
+    expect(
+      await Effect.runPromise(
+        job.saveControl({
+          ...terminal,
+          revision: terminal.revision + 1,
+          reconciliation: { attempts: 0, migrated: false },
+        })
+      )
+    ).toBe(false);
+    expect(await Effect.runPromise(job.claimStage(20))).toBe(false);
+  }
 }

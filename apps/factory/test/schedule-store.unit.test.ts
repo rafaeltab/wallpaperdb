@@ -17,7 +17,17 @@ it.each([false, true])(
       const intent = Effect.runSync(job.read());
       const control = Effect.runSync(job.readControl());
       return intent && intent.issue === issue && (intent.generation ?? 0) === generation
-        ? { jobId: intent.id, revision: control.revision, cancelled: control.cancelled }
+        ? {
+            jobId: intent.id,
+            revision: control.revision,
+            cancelled: control.cancelled,
+            released: control.released,
+            release: () => {
+              Effect.runSync(
+                job.saveControl({ ...control, revision: control.revision + 1, released: true })
+              );
+            },
+          }
         : undefined;
     });
     await handbackContract(schedule, job, () => schedule, cancelled);

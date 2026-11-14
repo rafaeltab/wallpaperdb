@@ -76,7 +76,7 @@ export const SchedulerLive = Layer.effect(
         }
         const abandoned = jobs.flatMap((job, index) =>
           job.kind === 'job' &&
-          job.controlRevision !== undefined &&
+          job.delivery?.handbackRevision !== undefined &&
           job.delivery?.activity === 'dependency-handback'
             ? [{ jobId: job.intent.id, admission: state.admissions[index] ?? job.intent }]
             : []
@@ -94,13 +94,13 @@ export const SchedulerLive = Layer.effect(
           const guards = jobs.flatMap((job) =>
             job.kind === 'job' &&
             job.delivery?.activity === 'dependency-handback' &&
-            job.controlRevision !== undefined
+            job.delivery?.handbackRevision !== undefined
               ? [
                   {
                     issue: job.intent.issue,
                     generation: job.intent.generation,
                     jobId: job.intent.id,
-                    controlRevision: job.controlRevision,
+                    controlRevision: job.delivery.handbackRevision,
                   },
                 ]
               : []

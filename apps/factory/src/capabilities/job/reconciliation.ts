@@ -19,7 +19,8 @@ export function requestReconciliation(
   return Effect.gen(function* () {
     if (!evidence?.idle) return null;
     const control = yield* store.readControl();
-    if (control.cancelled || control.parked?.index === waiting.index) return null;
+    if (control.cancelled || control.released || control.parked?.index === waiting.index)
+      return null;
     const state = control.reconciliation ?? { attempts: 0, migrated: false };
     // The pending instruction is also the authorization high-water mark. Read
     // it from the same revision used below so overlapping observations cannot

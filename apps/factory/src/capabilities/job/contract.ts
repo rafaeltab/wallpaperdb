@@ -90,6 +90,8 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** Terminal ownership fence, committed atomically with dependency-admission release. */
+  readonly released?: boolean;
   /** A verified unsuccessful implementation opens same-thread manual repair.
    * Successor associations are immutable stage records, never another launch. */
   readonly reconciliation?: {
@@ -378,6 +380,9 @@ export type PullRequestObservation =
       readonly maintenancePending?: boolean;
     };
 export interface Delivery {
+  /** Exact uncancelled control revision under which handback was verified.
+   * Informational status rereads must never replace this release authority. */
+  readonly handbackRevision?: number;
   readonly stage: Stage | 'ci';
   readonly progress?: string;
   readonly activity?:

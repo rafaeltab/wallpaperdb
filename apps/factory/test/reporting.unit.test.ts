@@ -179,6 +179,164 @@ it.each(['submitted', 'uncertain'] as const)(
   }
 );
 
+it.each(['submitted', 'uncertain'] as const)(
+  'keeps %s fresh retry and later stage acceptance on the retained job identity',
+  async (outcome) => {
+    const { Job, JobLive, JobStore, Execution, Issues, Time } = await import(
+      '../src/capabilities/job/index.js'
+    );
+    const { JobReportingLive } = await import('../src/capabilities/observe/index.js');
+    const { controlledStore } = await import('./fixtures/store.js');
+    const jobs = controlledStore();
+    const store = controlledObservations();
+    const intent = {
+      id: 'retained-job',
+      issue: 1,
+      issueUrl: issue.url,
+      base: 'a'.repeat(40),
+      branch: 'worker',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+      receiptProtocol: 'delivery-v1' as const,
+    };
+    await Effect.runPromise(jobs.reserve(intent));
+    await Effect.runPromise(
+      jobs.saveStage({
+        index: 0,
+        stage: 'implementation',
+        threadId: 'original',
+        commit: intent.base,
+        previousRunId: null,
+        receiptProtocol: 'delivery-v1',
+      })
+    );
+    let retried = false;
+    let successful = false;
+    let run = 0;
+    let release!: () => void;
+    let entered!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const providerIds: string[] = [];
+    const time = Layer.succeed(Time, { now: () => Effect.succeed(100) });
+    const reporting = ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, store)));
+    const runtime = ManagedRuntime.make(
+      JobLive.pipe(
+        Layer.provideMerge(
+          Layer.mergeAll(
+            reporting,
+            JobReportingLive.pipe(Layer.provide(reporting), Layer.provide(time)),
+            time,
+            Layer.succeed(JobStore, jobs),
+            Layer.succeed(Issues, {
+              inspect: () =>
+                Effect.succeed({
+                  open: true,
+                  author: 'rafaeltab',
+                  labels: ['ready-for-agent'],
+                  blockers: [],
+                  blockersReady: true,
+                  url: issue.url,
+                }),
+              pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
+            }),
+            Layer.succeed(Execution, {
+              launch: (active) =>
+                Effect.sync(() => {
+                  providerIds.push(active.id);
+                  retried = true;
+                  return { kind: outcome };
+                }),
+              interrupt: () => Effect.void,
+              sendStage: (active) =>
+                Effect.sync(() => {
+                  providerIds.push(active.id);
+                  run++;
+                }),
+              observe: (active) =>
+                Effect.promise(async () => {
+                  if (retried) {
+                    entered();
+                    await gate;
+                  }
+                  return {
+                    kind: 'found' as const,
+                    threadId: retried ? 'retry' : 'original',
+                    worktree: '/controlled',
+                    branch: active.branch,
+                    model: 'gpt-6.1-sol',
+                    status: successful ? ('completed' as const) : ('failed' as const),
+                    run: { id: `run-${run}`, ordinal: run + 1 },
+                  };
+                }),
+              inspectStage: (_active, request) =>
+                Effect.succeed({
+                  stageIndex: request.index,
+                  runId: `run-${run}`,
+                  ordinal: run + 1,
+                  commit: 'b'.repeat(40),
+                  accepted: successful,
+                }),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const job = await runtime.runPromise(Job);
+      const publication = await runtime.runPromise(Reporting);
+      const before = await runtime.runPromise(job.status());
+      if (before.kind !== 'job' || !before.retry) throw new Error('Missing supported retry');
+      await runtime.runPromise(publication.flush());
+      const pending = runtime.runPromise(job.retry({ ...before.retry, jobId: intent.id }));
+      try {
+        await blocked;
+        const retained = await Effect.runPromise(store.read());
+        expect(retained.jobs).toHaveLength(1);
+        expect(retained.jobs?.[0]).toMatchObject({ intent: { id: intent.id } });
+        if (outcome === 'submitted') {
+          expect(retained.jobs?.[0]).toMatchObject({
+            intent: { branch: 'worker-retry-1' },
+            acknowledgement: { stage: 'implementation', index: 1, acceptedAt: 100 },
+            execution: { kind: 'ambiguous' },
+            delivery: { active: true, ready: false, landed: false },
+          });
+        } else {
+          expect(
+            retained.jobs?.[0]?.kind === 'job' && retained.jobs[0].acknowledgement
+          ).toBeUndefined();
+        }
+        expect(providerIds).toEqual(['retained-job:retry-1']);
+      } finally {
+        release();
+        await pending;
+      }
+      successful = true;
+      for (const [stage, index] of [
+        ['review', 2],
+        ['publication', 3],
+      ] as const) {
+        await runtime.runPromise(job.status());
+        const retained = await Effect.runPromise(store.read());
+        expect(retained.jobs).toHaveLength(1);
+        expect(retained.jobs?.[0]).toMatchObject({
+          intent: { id: intent.id, branch: 'worker-retry-1' },
+          acknowledgement: { stage, index, acceptedAt: 100 },
+          delivery: { stage, ready: false, landed: false },
+        });
+      }
+      expect(providerIds).toEqual(Array(3).fill('retained-job:retry-1'));
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
+
 it('publishes a complete issue while another observation is blocked and preserves it when the collection fails', async () => {
   const { Observations, ObservationsLive, ObservationStore, ObservationSource, LocalSnapshot } =
     await import('../src/capabilities/observe/index.js');

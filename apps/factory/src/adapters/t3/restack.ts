@@ -126,6 +126,12 @@ export function t3Restacker(
       })
       .safeParse(thread);
     if (!terminal.success) return null;
+    if (phase === 'review') {
+      const resolution = z
+        .object({ ordinal: z.number().int().positive() })
+        .safeParse(await journal.read('resolution.json'));
+      if (resolution.success && thread.runCount <= resolution.data.ordinal) return null;
+    }
     const current = z
       .object({
         role: z.literal('assistant'),

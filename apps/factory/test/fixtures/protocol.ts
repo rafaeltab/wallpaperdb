@@ -289,7 +289,7 @@ export async function runProtocol(
             status: config.restack.question ? 'waiting' : 'completed',
             pendingRequestCount: config.restack.question ? 1 : 0,
             latestRunId: 'resolve-run',
-            runCount: 1,
+            runCount: config.restack.resolveOrdinal ?? 1,
           },
           operation,
           head,
@@ -346,7 +346,7 @@ export async function runProtocol(
           git(state.thread.worktreePath, 'commit', '-m', 'Repair C conflict after review');
           state.head = git(state.thread.worktreePath, 'rev-parse', 'HEAD');
         }
-        state.thread.runCount = 2;
+        state.thread.runCount = config.restack.reviewOrdinal ?? 2;
         state.thread.latestRunId = 'review-run';
         state.messages = [
           {

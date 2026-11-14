@@ -16,7 +16,7 @@ import {
   External,
   Reviews,
   Threads,
-  comparisonLabel,
+  checkHeadLabel,
   actionLabel,
   retryExplanation,
   ThreadLink,
@@ -524,7 +524,7 @@ export function Details({
                 <li key={run.id}>
                   <External href={run.url}>{run.name}</External> · {run.state} ·{' '}
                   {pr
-                    ? comparisonLabel(pr, run.comparison)
+                    ? checkHeadLabel(pr, run.comparison)
                     : `Head ${run.comparison.headOid.slice(0, 7)} · base ${run.comparison.baseOid?.slice(0, 7) ?? 'unknown'}`}
                 </li>
               ))}

@@ -626,6 +626,43 @@ it('keeps a valid later-page Start selection when an index change resets paginat
   );
 });
 
+it.each(['passed', 'running', 'queued', 'failed', 'skipped', 'neutral', 'unknown'] as const)(
+  'displays current-head %s checks without tested-base metadata',
+  async (state) => {
+    const board = await sample();
+    const pr = board.entities.pullRequests['pr:2003'];
+    if (pr.checks.state !== 'known') throw new Error('Expected known checks');
+    const aggregate =
+      state === 'passed' || state === 'failed' || state === 'unknown' ? state : 'pending';
+    const observed: FactoryV2Snapshot = {
+      ...board,
+      entities: {
+        ...board.entities,
+        pullRequests: {
+          ...board.entities.pullRequests,
+          [pr.id]: {
+            ...pr,
+            checks: {
+              ...pr.checks,
+              value: {
+                ...pr.checks.value,
+                state: aggregate,
+                comparison: { ...pr.checks.value.comparison, baseOid: null, baseRef: null },
+                groups: [{ ...pr.checks.value.groups[0], state, url: null }],
+              },
+            },
+          },
+        },
+      },
+    };
+    render(<FactoryApp client={new FactoryClient(async () => json(observed))} />);
+    const card = await screen.findByRole('group', { name: 'Select Expose observation metadata' });
+    const checks = within(card).getByLabelText(`Checks: ${aggregate}. Current head`);
+    expect(checks.querySelector(`.cc-check.${state} svg`)).toBeTruthy();
+    expect(within(checks).getByRole('img').getAttribute('aria-label')).toContain(`${state} ·`);
+  }
+);
+
 it('keeps failed checks and detail check names visible without URLs', async () => {
   let board = await sample();
   const pr = board.entities.pullRequests['pr:2003'];
@@ -680,7 +717,7 @@ it('keeps failed checks and detail check names visible without URLs', async () =
   );
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
-  const checks = await screen.findByLabelText('Checks: failed. Current comparison');
+  const checks = await screen.findByLabelText('Checks: failed. Current head');
   expect(checks.querySelector('.cc-check.failed svg')).toBeTruthy();
   await user.click(screen.getByRole('group', { name: 'Select Expose observation metadata' }));
   await user.click(screen.getByRole('button', { name: 'Details' }));

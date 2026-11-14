@@ -200,7 +200,7 @@ async function uncertainResume(f: ReturnType<typeof setup>) {
   ).rejects.toMatchObject({ _tag: 'Unavailable' });
   return first;
 }
-it.each([2, 3])(
+it.each([2, 8, 21])(
   'reconciles an uncertain resumed continuation at ordinal %s across restart and releases its slot for a new question',
   async (ordinal) => {
     const f = setup();
@@ -227,6 +227,30 @@ it.each([2, 3])(
     }
   }
 );
+it('keeps uncertain resume ownership when a different provider run is not newer', async () => {
+  const f = setup();
+  try {
+    await uncertainResume(f);
+    await f.restart();
+    f.observations.set(1, {
+      status: 'waiting-for-input',
+      run: { id: 'old-observation', ordinal: 1 },
+      question: { id: 'q2', text: 'Old question?' },
+    });
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1]);
+    f.observations.set(1, {
+      status: 'waiting-for-input',
+      run: { id: 'continuation-8', ordinal: 8 },
+      question: { id: 'q2', text: 'New question?' },
+    });
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1, 2]);
+    expect(f.sends()).toBe(1);
+  } finally {
+    await f.close();
+  }
+});
 it('keeps an unresolved send pending when the original run remains parked', async () => {
   const f = setup();
   try {

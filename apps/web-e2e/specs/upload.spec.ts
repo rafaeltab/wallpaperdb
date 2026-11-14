@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
@@ -9,9 +9,12 @@ const uploadFixturePaths = [
   fileURLToPath(new URL("../fixtures/fixture-b.jpg", import.meta.url)),
 ];
 
-test("seeded base user can create and replace a Source through the browser UI", async ({
+test.use({ video: "on" });
+
+test("owner can recover older work and replace a Source after more than 100 creations", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(180000);
   const uuidErrors: string[] = [];
   page.on("pageerror", (error) => {
     if (error.message.includes("randomUUID")) uuidErrors.push(error.message);
@@ -96,7 +99,75 @@ test("seeded base user can create and replace a Source through the browser UI", 
   await expect(page.getByTestId("upload-file-item")).toHaveCount(1);
   await expect(page.getByTestId("upload-failed-count")).toHaveCount(0);
   await expect(page.getByTestId("retry-failed-button")).toHaveCount(0);
+  // Arrange older pending work and 100 newer durable creations through the
+  // authenticated public API. All recovery and management uses the real UI.
+  const pendingId = await page.evaluate(
+    async (creationKeys) => {
+      const clerk: unknown = Reflect.get(window, "Clerk");
+      if (typeof clerk !== "object" || clerk === null || !("session" in clerk))
+        throw new Error("Missing Owner");
+      const session = clerk.session;
+      if (
+        typeof session !== "object" ||
+        session === null ||
+        !("getToken" in session) ||
+        typeof session.getToken !== "function"
+      )
+        throw new Error("Missing session");
+      let pending: string | undefined;
+      for (const [i, key] of creationKeys.entries()) {
+        const token: unknown = await session.getToken();
+        if (typeof token !== "string") throw new Error("Missing token");
+        const response = await fetch("/wallpaper/wallpapers", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
+          body: "{}",
+          signal: AbortSignal.timeout(30000),
+        });
+        if (response.status !== 202)
+          throw new Error(`Creation fixture HTTP ${response.status}`);
+        const receipt: unknown = await response.json();
+        if (
+          typeof receipt !== "object" ||
+          receipt === null ||
+          !("wallpaperId" in receipt) ||
+          typeof receipt.wallpaperId !== "string"
+        )
+          throw new Error("Missing Wallpaper receipt");
+        if (i === 0) pending = receipt.wallpaperId;
+      }
+      if (!pending) throw new Error("Missing pending creation");
+      return pending;
+    },
+    Array.from({ length: 101 }, () => randomUUID()),
+  );
   await page.reload();
+  await expect(
+    page.getByTestId("wallpaper-creation").filter({ hasText: id }),
+  ).toHaveCount(0);
+  const openOlderWork = async () => {
+    const older = page.getByRole("button", {
+      name: "Older creations",
+      exact: true,
+    });
+    await expect(older).toBeVisible();
+    await older.click();
+  };
+  await openOlderWork();
+  const pending = page
+    .getByTestId("wallpaper-creation")
+    .filter({ hasText: pendingId });
+  await expect(pending).toContainText("Asset ready");
+  await pending
+    .getByLabel("Add Sources to this Wallpaper", { exact: true })
+    .setInputFiles(uploadFixturePaths[0]);
+  await expect(pending).toContainText("Wallpaper created", { timeout: 60000 });
+  await page.reload();
+  await openOlderWork();
   const creation = page
     .getByTestId("wallpaper-creation")
     .filter({ hasText: id });
@@ -144,6 +215,7 @@ test("seeded base user can create and replace a Source through the browser UI", 
     "Source accepted",
   );
   await page.reload();
+  await openOlderWork();
   await expect(creation).toContainText("Wallpaper created");
   await expect(
     creation.getByLabel(`Replace Source ${predecessor}`, { exact: true }),

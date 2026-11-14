@@ -59,6 +59,130 @@ it('coalesces an item without postponing the fixed publication deadline under co
     await runtime.dispose();
   }
 });
+it.each([
+  {
+    scenario: 'stale run',
+    firstStage: 1,
+    firstRun: 8,
+    nextStage: 1,
+    nextRun: 7,
+    expectedStage: 1,
+    expectedRun: 8,
+    expectedId: 'first',
+    expectedAt: 10,
+  },
+  {
+    scenario: 'increasing run',
+    firstStage: 1,
+    firstRun: 7,
+    nextStage: 1,
+    nextRun: 8,
+    expectedStage: 1,
+    expectedRun: 8,
+    expectedId: 'next',
+    expectedAt: 20,
+  },
+  {
+    scenario: 'same ordinal replacement',
+    firstStage: 1,
+    firstRun: 8,
+    nextStage: 1,
+    nextRun: 8,
+    expectedStage: 1,
+    expectedRun: 8,
+    expectedId: 'next',
+    expectedAt: 20,
+  },
+  {
+    scenario: 'stale stage',
+    firstStage: 2,
+    firstRun: 1,
+    nextStage: 1,
+    nextRun: 8,
+    expectedStage: 2,
+    expectedRun: 1,
+    expectedId: 'first',
+    expectedAt: 10,
+  },
+  {
+    scenario: 'later stage',
+    firstStage: 1,
+    firstRun: 8,
+    nextStage: 2,
+    nextRun: 1,
+    expectedStage: 2,
+    expectedRun: 1,
+    expectedId: 'next',
+    expectedAt: 20,
+  },
+])(
+  'coalesces the newest eligible buffered job for $scenario',
+  async ({
+    firstStage,
+    firstRun,
+    nextStage,
+    nextRun,
+    expectedStage,
+    expectedRun,
+    expectedId,
+    expectedAt,
+  }) => {
+    const { store, runtime } = setup();
+    const intent = {
+      id: 'job-one',
+      issue: 1,
+      issueUrl: issue.url,
+      base: 'a'.repeat(40),
+      branch: 'worker',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const job = (stageIndex: number, ordinal: number, id: string) => ({
+      kind: 'job' as const,
+      intent,
+      stageIndex,
+      elapsedMs: 0,
+      execution: {
+        kind: 'found' as const,
+        threadId: 'thread',
+        status: 'running',
+        worktree: '/worker',
+        branch: intent.branch,
+        model: 'gpt-6.1-sol',
+        run: { id, ordinal },
+      },
+    });
+    try {
+      const reporting = await runtime.runPromise(Reporting);
+      const first = await runtime.runPromise(reporting.begin());
+      await runtime.runPromise(
+        reporting.enqueue(first, [
+          { kind: 'job', value: job(firstStage, firstRun, 'first'), sequence: 1, at: 10 },
+        ])
+      );
+      const next = await runtime.runPromise(reporting.begin());
+      await runtime.runPromise(
+        reporting.enqueue(next, [
+          { kind: 'job', value: job(nextStage, nextRun, 'next'), sequence: 1, at: 20 },
+        ])
+      );
+      await runtime.runPromise(TestClock.adjust(1000));
+      expect(await Effect.runPromise(store.read())).toMatchObject({
+        jobs: [
+          {
+            stageIndex: expectedStage,
+            execution: { run: { id: expectedId, ordinal: expectedRun } },
+          },
+        ],
+        items: { 'job:job-one': { observedAt: expectedAt } },
+      });
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
+
 it('bypasses buffering for acknowledgements and flushes completed pending observations at shutdown', async () => {
   const { store, runtime } = setup();
   const reporting = await runtime.runPromise(Reporting);

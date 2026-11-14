@@ -1,7 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { Unavailable } from '../../capabilities/job/index.js';
-import type { ObservationStore, ReportingStore } from '../../capabilities/observe/index.js';
+import {
+  jobObservationIsOlder,
+  type ObservationStore,
+  type ReportingStore,
+} from '../../capabilities/observe/index.js';
 import {
   githubIssues,
   githubPulls,
@@ -80,18 +84,7 @@ export function sqliteObservations(directory: string): ObservationStore & Report
               const previous = freshness[key];
               if (item.kind === 'job') {
                 const priorJob = jobs.get(item.value.intent.id);
-                if ((priorJob?.stageIndex ?? -1) > (item.value.stageIndex ?? -1)) continue;
-                const before = priorJob?.execution;
-                const after = item.value.execution;
-                if (
-                  priorJob?.stageIndex === item.value.stageIndex &&
-                  before?.kind === 'found' &&
-                  after.kind === 'found' &&
-                  before.run &&
-                  after.run &&
-                  before.run.ordinal > after.run.ordinal
-                )
-                  continue;
+                if (jobObservationIsOlder(priorJob, item.value)) continue;
               }
               if (
                 previous &&

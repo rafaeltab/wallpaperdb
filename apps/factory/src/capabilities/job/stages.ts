@@ -802,7 +802,8 @@ function terminalEvidence(
     observation.run?.id === evidence.runId &&
     evidence.commit === commit &&
     evidence.worktreeClean === true &&
-    evidence.idle !== false
+    evidence.idle !== false &&
+    evidence.dependencies === undefined
   );
 }
 

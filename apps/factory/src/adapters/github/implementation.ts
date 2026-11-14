@@ -5,7 +5,7 @@ import { contextualPromise as githubPromise, runInContext } from './context.js';
 import { command } from '../../platform/index.js';
 import { type JoinConfiguration, prerequisiteJoin } from './joins.js';
 import { prerequisiteReadiness, type VerifiedPrerequisite } from './prerequisites.js';
-import { dependencyHandback } from './handback.js';
+import { dependencyHandback, readNativeBlockers } from './handback.js';
 import { publication } from './publication.js';
 
 const issueSchema = z.object({
@@ -17,9 +17,6 @@ const issueSchema = z.object({
   title: z.string().optional(),
   labels: z.array(z.object({ name: z.string() })),
 });
-const blockersSchema = z.array(
-  z.object({ number: z.number().int(), state: z.enum(['open', 'closed']) })
-);
 /** Verified prerequisites are operator assertions of acceptance/review/CI readiness
  * at a pinned commit. Live PR head and ancestry are checked before using them. */
 export function githubIssues(
@@ -219,20 +216,7 @@ export function githubIssues(
       issue.url !== `https://github.com/rafaeltab/wallpaperdb/issues/${number}`
     )
       throw new Error('Mismatched issue');
-    const native = z
-      .array(blockersSchema)
-      .parse(
-        await gh(
-          [
-            'api',
-            `repos/rafaeltab/wallpaperdb/issues/${number}/dependencies/blocked_by`,
-            '--paginate',
-            '--slurp',
-          ],
-          signal
-        )
-      )
-      .flat();
+    const native = await readNativeBlockers(gh, number, signal);
     const numbers = blockerNumbers(native, issue.body);
     let readiness: Pick<
       Effect.Success<ReturnType<Issues['inspect']>>,

@@ -21,6 +21,7 @@ export const ContinuationAdmission = Context.Service<ContinuationAdmission>(
   'wallpaperdb.factory.ContinuationAdmission'
 );
 export interface Intent {
+  readonly generation?: number;
   readonly receiptProtocol?: 'delivery-v1';
   readonly includeCodeFromIssues?: readonly number[];
   readonly selectionBase?: string;

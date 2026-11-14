@@ -67,13 +67,18 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
             status: () => Effect.sync(() => statuses.get(number) ?? { kind: 'empty' }),
             start: (command) =>
               Effect.sync(() => {
-                if (statuses.has(number)) return { kind: 'occupied' as const };
+                const prior = statuses.get(number);
+                if (
+                  prior?.kind === 'job' &&
+                  (prior.intent.generation ?? 0) === (command.generation ?? 0)
+                )
+                  return { kind: 'occupied' as const };
                 launches.push(number);
                 const status: Status = {
                   kind: 'job',
                   intent: {
                     ...command,
-                    id: String(number),
+                    id: command.generation ? `${number}:${command.generation}` : String(number),
                     issueUrl: issue(number).url,
                     branch: `factory/${number}`,
                     createdAt: 0,
@@ -1278,6 +1283,39 @@ it('refunds a one-admission allowance once and retains abandoned attempt evidenc
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([1, 2]);
     expect(f.snapshot().admissions.map((item) => item.issue)).toEqual([2]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('blocks ordinary pickup on the discovered prerequisite then admits a fresh generation with retained scope', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.start({ issue: 1, base, context: 'Only agreed scope' }));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing job');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        commit: base,
+        ready: false,
+        landed: false,
+        active: false,
+        activity: 'dependency-handback',
+      },
+    });
+    await f.run((s) => s.status());
+    f.setIssues([{ ...issue(1), blockers: [9], blockersReady: false }]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1]);
+    f.setIssues([issue(1)]);
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1, 1]);
+    expect(f.statuses.get(1)).toMatchObject({
+      intent: { id: '1:1', generation: 1, context: 'Only agreed scope' },
+    });
+    expect(f.snapshot().released).toHaveLength(1);
   } finally {
     await f.runtime.dispose();
   }

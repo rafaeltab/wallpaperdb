@@ -105,6 +105,7 @@ export function stageExecution(
             ).trim();
             if (
               !request.reconciliation &&
+              !request.handback &&
               (!request.resume || request.stage === 'publication') &&
               (!deliveryHead(head, request) ||
                 (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim())

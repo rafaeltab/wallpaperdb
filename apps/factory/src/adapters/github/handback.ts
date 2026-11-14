@@ -26,27 +26,7 @@ export function dependencyHandback(
     return issue;
   };
   const edges = async (issue: z.infer<typeof issueSchema>, signal: AbortSignal) => {
-    let native: { number: number }[];
-    try {
-      native = z
-        .array(z.array(z.object({ number: z.number().int().positive() })))
-        .parse(
-          await gh(
-            [
-              'api',
-              `repos/${repo}/issues/${issue.number}/dependencies/blocked_by`,
-              '--paginate',
-              '--slurp',
-            ],
-            signal
-          )
-        )
-        .flat();
-    } catch (cause) {
-      if (!(cause instanceof Error) || !/HTTP (404|410|422)|not supported/i.test(cause.message))
-        throw cause;
-      native = [];
-    }
+    const native = await readNativeBlockers(gh, issue.number, signal);
     return blockers(native, issue.body);
   };
   const effect = <A>(operation: string, work: (signal: AbortSignal) => Promise<A>) =>
@@ -152,4 +132,27 @@ export function dependencyHandback(
         );
       }),
   };
+}
+
+export async function readNativeBlockers(gh: Read, number: number, signal: AbortSignal) {
+  try {
+    return z
+      .array(z.array(z.object({ number: z.number().int().positive() })))
+      .parse(
+        await gh(
+          [
+            'api',
+            `repos/${repo}/issues/${number}/dependencies/blocked_by`,
+            '--paginate',
+            '--slurp',
+          ],
+          signal
+        )
+      )
+      .flat();
+  } catch (cause) {
+    if (!(cause instanceof Error) || !/HTTP (404|410|422)|not supported/i.test(cause.message))
+      throw cause;
+    return [];
+  }
 }

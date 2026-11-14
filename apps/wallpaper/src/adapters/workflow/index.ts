@@ -163,7 +163,7 @@ export function workflowPostgresLayer(options: Options) {
               )
               .orderBy(
                 sql`${wallpaperIntents.state}->>'createdAt' desc`,
-                sql`${wallpaperIntents.id} desc`
+                sql`${wallpaperIntents.id} desc nulls last`
               )
               .limit(100);
             return rows.map((row) => row.state);

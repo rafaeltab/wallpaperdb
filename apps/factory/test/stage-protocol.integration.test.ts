@@ -876,3 +876,156 @@ it('reports actual clean/head proof for conclusively terminal babysitting withou
       commit: head,
     });
   }));
+
+it('resolves omitted publication enrichment through the exact owning thread association', () =>
+  stageFixture(async ({ host, intent, request }) => {
+    const adapter = t3Execution({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      ...host.mcp,
+    });
+    const publication = { ...request, stage: 'publication' as const, index: 2 };
+    const url = 'https://github.com/rafaeltab/wallpaperdb/pull/999';
+    const complete = {
+      overrides: { status: 'completed', latestRunId: 'run-1', runCount: 1 },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: JSON.stringify({
+            delivery: '1:2',
+            jobId: '1',
+            stage: 'publication',
+            base: host.base,
+            commit: host.base,
+            outcome: '<PR>CREATED</PR>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: true,
+          }),
+        },
+      ],
+    };
+    // Complete enrichment remains a valid control and needs no extra metadata read.
+    await host.save({ ...complete, overrides: { ...complete.overrides, pullRequests: [{ url }] } });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, publication))).toMatchObject({
+      accepted: true,
+      linked: [url],
+    });
+    expect(
+      (await host.calls()).filter((c) => c.args[1] === 'list_thread_pull_requests')
+    ).toHaveLength(0);
+    await host.save({
+      ...complete,
+      omitTranscriptPullRequests: true,
+      associationReply: { structuredContent: { pullRequests: [{ url, source: 'agent' }] } },
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, publication))).toMatchObject({
+      accepted: true,
+      linked: [url],
+    });
+    const reads = (await host.calls()).filter((c) => c.args[1] === 'list_thread_pull_requests');
+    expect(reads).toHaveLength(1);
+    expect(JSON.parse(reads[0].args[2])).toEqual({ threadId: 'thread-live' });
+    expect((await host.calls()).filter((c) => ['start', 'send'].includes(c.args[1]))).toHaveLength(
+      1
+    );
+  }));
+
+it.each([
+  { name: 'empty', pulls: [], linked: [] },
+  {
+    name: 'unrelated',
+    pulls: [{ url: 'https://github.com/other/repo/pull/1', source: 'manual' }],
+    linked: ['https://github.com/other/repo/pull/1'],
+  },
+  {
+    name: 'conflicting',
+    pulls: [
+      { url: 'https://github.com/rafaeltab/wallpaperdb/pull/998', source: 'agent' },
+      { url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', source: 'agent' },
+    ],
+    linked: [
+      'https://github.com/rafaeltab/wallpaperdb/pull/998',
+      'https://github.com/rafaeltab/wallpaperdb/pull/999',
+    ],
+  },
+  {
+    name: 'dismissed stack',
+    pulls: [
+      { url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', source: 'stack-dismissed' },
+    ],
+    linked: [],
+  },
+])(
+  'preserves $name authoritative association evidence without inventing ownership',
+  ({ pulls, linked }) =>
+    publicationFixture(async ({ host, adapter, intent, request, complete }) => {
+      await host.save({
+        ...complete,
+        omitTranscriptPullRequests: true,
+        associationReply: { structuredContent: { pullRequests: pulls } },
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+        accepted: true,
+        linked,
+      });
+      expect(
+        (await host.calls()).filter((c) => ['start', 'send'].includes(c.args[1]))
+      ).toHaveLength(1);
+    })
+);
+
+it.each([
+  { isError: true },
+  { structuredContent: {} },
+  { structuredContent: { pullRequests: null } },
+])('keeps unavailable or malformed association metadata unverified: %j', (associationReply) =>
+  publicationFixture(async ({ host, adapter, intent, request, complete }) => {
+    await host.save({ ...complete, omitTranscriptPullRequests: true, associationReply });
+    await expect(Effect.runPromise(adapter.inspectStage(intent, request))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+      operation: 'inspect-stage',
+    });
+    expect((await host.calls()).filter((c) => ['start', 'send'].includes(c.args[1]))).toHaveLength(
+      1
+    );
+  })
+);
+
+function publicationFixture(check: (fixture: Fixture & { complete: object }) => Promise<void>) {
+  return stageFixture(async (fixture) => {
+    const { host, intent } = fixture;
+    const request = { ...fixture.request, stage: 'publication' as const, index: 2 };
+    const adapter = t3Execution({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      ...host.mcp,
+    });
+    const complete = {
+      overrides: { status: 'completed', latestRunId: 'run-1', runCount: 1 },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: JSON.stringify({
+            delivery: '1:2',
+            jobId: intent.id,
+            stage: 'publication',
+            base: host.base,
+            commit: host.base,
+            outcome: '<PR>CREATED</PR>',
+            tests: true,
+            coverage: true,
+            crap: true,
+            reviews: true,
+          }),
+        },
+      ],
+    };
+    await check({ ...fixture, adapter, request, complete });
+  });
+}

@@ -53,6 +53,7 @@ export function stageExecution(
   call: (args: string[], signal?: AbortSignal) => Promise<unknown>,
   observe: Execution['observe'],
   prBase: string,
+  linkedPullRequests: (threadId: string, signal?: AbortSignal) => Promise<string[]>,
   sendHelp: (signal?: AbortSignal) => Promise<string>,
   sendMcp?: (
     intent: Intent,
@@ -147,7 +148,11 @@ export function stageExecution(
               commit,
               accepted: true,
               stageIndex: request.index,
-              linked: thread.pullRequests?.map((pr) => pr.url) ?? [],
+              linked:
+                thread.pullRequests?.map((pr) => pr.url) ??
+                (request.stage === 'publication' || request.stage === 'babysitting'
+                  ? await linkedPullRequests(request.threadId, signal)
+                  : []),
             };
           },
           catch: (cause) => new Unavailable({ operation: 'inspect-stage', cause }),

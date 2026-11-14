@@ -105,7 +105,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   });
   ci = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
-    delivery: { stage: 'ci', ready: true, landed: false },
+    delivery: { stage: 'ci', ready: true, landed: false, active: false },
   });
   publicationAvailable = false;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
@@ -357,6 +357,8 @@ it('does not accept publication that changed the reviewed commit', async () => {
 });
 it.each([
   { links: [] },
+  { links: ['https://github.com/other/repo/pull/999'] },
+  { links: ['https://github.com/rafaeltab/wallpaperdb/pull/998'] },
   { prCommit: 'c'.repeat(40) },
   { prKind: 'absent' as const },
   { prKind: 'ambiguous' as const },
@@ -393,7 +395,9 @@ it('sends a failed current check to the same issue agent and requires review of 
   await job.start();
   await job.status();
   job.change({ failed: true });
-  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'babysitting', ready: false, active: true },
+  });
   expect(job.sends()).toBe(3);
   job.change({ commit: 'c'.repeat(40), prCommit: 'c'.repeat(40), failed: false });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });

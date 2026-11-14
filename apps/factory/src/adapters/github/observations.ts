@@ -495,24 +495,32 @@ export function githubObservations(
                 });
                 if (!payload) return;
                 const { metadata, values } = payload;
-                for (const [n, raw] of values) {
-                  try {
-                    const parsed = pull.parse({
-                      ...z.record(z.unknown()).parse(metadata.get(n)),
-                      ...z.record(z.unknown()).parse(raw),
-                    });
-                    if (
-                      parsed.number !== n ||
-                      parsed.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
-                    )
-                      throw new Error('Invalid related PR identity');
-                    const [complete] = await checkRequirements(gh, [translatePull(parsed)], signal);
-                    if (!complete) throw new Error('Missing complete pull');
-                    publishPull(complete);
-                  } catch (cause) {
-                    failed(`pull:${n}`, cause);
-                  }
-                }
+                // The hydration batch is bounded to 20 PRs. Complete each item
+                // independently; all requests still use the shared GitHub budget.
+                await Promise.all(
+                  [...values].map(async ([n, raw]) => {
+                    try {
+                      const parsed = pull.parse({
+                        ...z.record(z.unknown()).parse(metadata.get(n)),
+                        ...z.record(z.unknown()).parse(raw),
+                      });
+                      if (
+                        parsed.number !== n ||
+                        parsed.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
+                      )
+                        throw new Error('Invalid related PR identity');
+                      const [complete] = await checkRequirements(
+                        gh,
+                        [translatePull(parsed)],
+                        signal
+                      );
+                      if (!complete) throw new Error('Missing complete pull');
+                      publishPull(complete);
+                    } catch (cause) {
+                      failed(`pull:${n}`, cause);
+                    }
+                  })
+                );
               };
               const collectPulls = async (numbers: readonly number[]): Promise<void> => {
                 const fresh = [...new Set(numbers)].filter((n) => !requestedPulls.has(n));

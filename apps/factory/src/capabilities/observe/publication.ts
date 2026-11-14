@@ -1,5 +1,6 @@
 import { Effect, Layer, Semaphore } from 'effect';
 import { Reporting, ReportingStore, type ItemObservation } from './contract.js';
+import { jobObservationIsOlder } from './ordering.js';
 
 /** Fixed one-second cadence, bounded to 100 distinct pending items. */
 export const ReportingLive = Layer.effect(
@@ -37,6 +38,12 @@ export const ReportingLive = Layer.effect(
             const id = key(item);
             if (!pending.has(id) && pending.size >= 100) yield* flush();
             const previous = pending.get(id);
+            if (
+              previous?.item.kind === 'job' &&
+              item.kind === 'job' &&
+              jobObservationIsOlder(previous.item.value, item.value)
+            )
+              continue;
             if (
               !previous ||
               previous.generation < generation ||

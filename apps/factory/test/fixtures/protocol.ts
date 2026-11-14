@@ -46,6 +46,9 @@ export async function runProtocol(
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
+    const stageHeld = (resource: { stage?: string } | null) =>
+      (resource?.stage === 'review' && config.holdReview) ||
+      (resource?.stage === 'publication' && config.holdPublication);
     const hold = async (boundary: string) => {
       const separate = config.holds?.includes(boundary);
       if (!separate && config.hold !== boundary) return;
@@ -1012,7 +1015,6 @@ export async function runProtocol(
               pendingRequestCount: 0,
               blockedOnThreadWait: false,
               pendingBackgroundTasks: [],
-              status: 'completed',
               ...(() => {
                 const input = JSON.parse(args[2]);
                 const path = join(
@@ -1029,6 +1031,19 @@ export async function runProtocol(
                 };
               })(),
               ...config.overrides,
+              status: (() => {
+                const input = JSON.parse(args[2]);
+                const path = join(
+                  config.directory,
+                  config.parallel
+                    ? `resource-${input.threadId.replaceAll('/', '-')}.json`
+                    : 'resource.json'
+                );
+                const resource = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {};
+                return stageHeld(resource)
+                  ? 'running'
+                  : (config.overrides?.status ?? resource.status ?? 'completed');
+              })(),
               pullRequests: (config.overrides?.pullRequests ?? []).map((pr: object) => ({
                 watching: false,
                 ...pr,
@@ -1177,6 +1192,7 @@ export async function runProtocol(
             ? {
                 ...resource,
                 ...config.overrides,
+                ...(stageHeld(resource) ? { status: 'running' } : {}),
                 ...(config.omitTranscriptPullRequests ? { pullRequests: undefined } : {}),
               }
             : null,

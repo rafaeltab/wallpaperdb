@@ -301,7 +301,8 @@ function suspension(
     // These ordinals describe observations already made, never a predicted next turn.
     const observedOrdinal = Math.max(
       waiting.observedRunId ? (waiting.ordinal ?? 0) : 0,
-      control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0
+      control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0,
+      control.manualRepair?.index === waiting.index ? control.manualRepair.run.ordinal : 0
     );
     if (observation.run && observation.run.ordinal < observedOrdinal)
       return control.parked?.index === waiting.index

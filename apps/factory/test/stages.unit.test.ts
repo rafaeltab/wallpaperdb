@@ -730,7 +730,24 @@ it.each(['manual', 'answer'])(
       ...(mode === 'answer' ? { question: { id: 'q1', text: 'First?' } } : {}),
     });
     await job.start();
-    job.change({ status: 'running', runId: 'continue-11', ordinal: 11, answeredQuestions: ['q1'] });
+    job.change({
+      status: 'completed',
+      accepted: true,
+      runId: 'stale-2',
+      ordinal: 2,
+      answeredQuestions: ['q1'],
+    });
+    expect(await job.status()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(job.sends()).toBe(0);
+    job.change({
+      status: 'running',
+      accepted: false,
+      runId: 'continue-11',
+      ordinal: 11,
+      answeredQuestions: ['q1'],
+    });
     await job.status();
     job.change({ status: 'completed', accepted: true, runId: 'stale-9', ordinal: 9 });
     expect(await job.status()).toMatchObject({
@@ -748,6 +765,12 @@ it.each(['manual', 'answer'])(
       ...(mode === 'answer' ? { question: { id: 'q2', text: 'Second?' } } : {}),
     });
     await job.status();
+    if (mode === 'answer') {
+      job.change({ runId: 'stale-question-9', ordinal: 9, question: { id: 'old', text: 'Old?' } });
+      expect(await job.status()).toMatchObject({
+        delivery: { question: { id: 'q2' }, activity: 'awaiting-answer' },
+      });
+    }
     job.change({
       status: 'running',
       runId: 'continue-25',

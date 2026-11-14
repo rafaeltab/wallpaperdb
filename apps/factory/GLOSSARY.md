@@ -64,7 +64,7 @@ _Avoid_: New job, new admission
 A manually requested new attempt of a conclusively stopped, unsuccessful implementation. It uses fresh agent context and a new isolated worktree at the retained original base, preserving the previous attempt and consuming no additional admission. It is distinct from continuing an existing worker or resending an uncertain command.
 
 **Manual session repair**:
-A maintainer continues an implementation in its existing owning thread and worktree after the factory has recorded unsuccessful completion. The factory retains the same job, admission and logical delivery, observes the continuation and advances only after validating its successful receipt. Provider run numbers do not establish order. It does not send a repair prompt or create a worker.
+A maintainer continues an implementation in its existing owning thread and worktree after the factory has recorded unsuccessful completion. The factory retains the same job, admission and logical delivery, observes the continuation and advances only after validating its successful receipt. Provider run numbers may reject older continuations; completion never requires one predicted run number. It does not send a repair prompt or create a worker.
 
 **Ready for merge**:
 The current PR comparison has satisfied its applicable acceptance, review and CI requirements. This is a delivery handoff, not proof that the issue has landed.

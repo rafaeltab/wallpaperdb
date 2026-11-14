@@ -19,7 +19,6 @@ it.each([false, true])(
     const configuration = {
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
-      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

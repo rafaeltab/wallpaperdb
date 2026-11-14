@@ -22,7 +22,6 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
     const configuration = {
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
-      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
@@ -169,7 +168,6 @@ it('allows supported terminal cleanup latency when submitting a preview after pr
   const configuration = {
     ...host.mcpEnvironment,
     FACTORY_PROJECT: host.repository,
-    ...host.mcpEnvironment,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
@@ -246,7 +244,6 @@ it.each(['foreground-first', 'cleanup-first', 'changed-input'])(
     const configuration = {
       ...host.mcpEnvironment,
       FACTORY_PROJECT: host.repository,
-      ...host.mcpEnvironment,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,

@@ -536,3 +536,23 @@ it('leaves a running-to-idle snapshot transition unverified until its completed 
       accepted: true,
     });
   }));
+it.each(['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'])(
+  'delivers reconciliation from a verified %s owning predecessor',
+  (status) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({ overrides: { status } });
+      await Effect.runPromise(
+        adapter.sendStage(intent, {
+          ...request,
+          index: 1,
+          previousRunId: 'run-1',
+          ordinal: 2,
+          resume: true,
+          reconciliation: 'state',
+        })
+      );
+      const sends = (await host.calls()).filter((call) => call.args[1] === 't3_thread_send');
+      expect(sends).toHaveLength(1);
+      expect(JSON.parse(sends[0].args[2]).threadId).toBe('thread-live');
+    })
+);

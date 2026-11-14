@@ -258,14 +258,7 @@ function outcome(raw: unknown, intent: Intent, request: StageRequest) {
   const detail = stageDetail.safeParse(raw);
   if (!detail.success || !completed(detail.data.thread, request)) return null;
   const { thread, messages } = detail.data;
-  const instruction = [...messages]
-    .reverse()
-    .find(
-      (m) =>
-        m.role === 'user' &&
-        m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
-    );
-  const boundary = instruction ? messages.indexOf(instruction) : -1;
+  const boundary = instructionBoundary(messages, intent, request);
   if (boundary < 0) return null;
   const latest = latestStructured(messages.slice(boundary + 1));
   const result = latest ? parseReceipt(latest.text) : null;
@@ -304,7 +297,9 @@ function sendBinding(
     binding.kind !== 'found' ||
     binding.threadId !== request.threadId ||
     (request.comparison &&
-      !['completed', 'idle', 'failed', 'interrupted'].includes(binding.status)) ||
+      !['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+        binding.status
+      )) ||
     binding.question ||
     binding.status === 'waiting-for-input'
   )
@@ -329,7 +324,9 @@ function currentResume(
 ) {
   return (
     binding.run?.id === request.previousRunId &&
-    ['completed', 'interrupted', 'failed', 'cancelled'].includes(binding.status)
+    ['completed', 'idle', 'interrupted', 'failed', 'cancelled', 'rolled_back'].includes(
+      binding.status
+    )
   );
 }
 
@@ -394,31 +391,34 @@ function pendingResponse(
   intent: Intent,
   request: StageRequest
 ) {
-  const boundary = [...messages]
-    .reverse()
-    .find(
-      (m) =>
-        m.role === 'user' &&
-        m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
-    );
-  const message = latestStructured(
-    boundary ? messages.slice(messages.indexOf(boundary) + 1) : messages
-  );
+  const boundary = instructionBoundary(messages, intent, request);
+  const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return {};
   const value = JSON.parse(message.text);
   const parsed = receiptSchema.safeParse(value);
   return {
     migrationRequired: value.version !== 1,
     dependencies:
-      messages.some(
-        (m) =>
-          m.role === 'user' &&
-          m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
-      ) &&
+      boundary >= 0 &&
       parsed.success &&
       parsed.data.jobId === intent.id &&
       parsed.data.kind === 'dependencies'
         ? parsed.data.requireUnimplementedIssues
         : undefined,
   };
+}
+
+function instructionBoundary(
+  messages: z.infer<typeof stageDetail>['messages'],
+  intent: Intent,
+  request: StageRequest
+) {
+  const instruction = [...messages]
+    .reverse()
+    .find(
+      (m) =>
+        m.role === 'user' &&
+        m.text.includes(`Factory instruction ${deliveryIdentity(intent, request)}.`)
+    );
+  return instruction ? messages.indexOf(instruction) : -1;
 }

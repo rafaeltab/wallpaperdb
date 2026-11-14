@@ -32,6 +32,22 @@ export function controlledObservations(
                 ? `job:${item.value.intent.id}`
                 : `${item.kind}:${item.value.number}`;
           const previous = items[key];
+          if (item.kind === 'job') {
+            const priorJob = jobs.get(item.value.intent.id);
+            if ((priorJob?.stageIndex ?? -1) > (item.value.stageIndex ?? -1)) continue;
+            const before = priorJob?.execution;
+            const after = item.value.execution;
+            if (
+              priorJob?.stageIndex === item.value.stageIndex &&
+              before?.kind === 'found' &&
+              after.kind === 'found' &&
+              before.run &&
+              after.run &&
+              (before.run.ordinal > after.run.ordinal ||
+                (before.run.ordinal === after.run.ordinal && before.run.id !== after.run.id))
+            )
+              continue;
+          }
           if (
             previous &&
             (previous.generation > current ||
@@ -103,7 +119,21 @@ export function controlledObservations(
       }),
     jobs: (jobs, jobsObservedAt, recoveries) =>
       Effect.sync(() => {
-        value = { ...value, jobs, jobsObservedAt, ...(recoveries ? { recoveries } : {}) };
+        const current = new Map(
+          value.jobs?.flatMap((job) => (job.kind === 'job' ? [[job.intent.id, job] as const] : []))
+        );
+        const incoming = jobs.map((job) =>
+          job.kind === 'job' && value.items?.[`job:${job.intent.id}`]
+            ? (current.get(job.intent.id) ?? job)
+            : job
+        );
+        const present = new Set(
+          incoming.flatMap((job) => (job.kind === 'job' ? [job.intent.id] : []))
+        );
+        for (const job of current.values())
+          if (!present.has(job.intent.id) && value.items?.[`job:${job.intent.id}`])
+            incoming.push(job);
+        value = { ...value, jobs: incoming, jobsObservedAt, ...(recoveries ? { recoveries } : {}) };
       }),
   };
 }

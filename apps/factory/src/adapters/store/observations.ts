@@ -86,7 +86,8 @@ export function sqliteObservations(directory: string): ObservationStore & Report
                   after.kind === 'found' &&
                   before.run &&
                   after.run &&
-                  before.run.ordinal > after.run.ordinal
+                  (before.run.ordinal > after.run.ordinal ||
+                    (before.run.ordinal === after.run.ordinal && before.run.id !== after.run.id))
                 )
                   continue;
               }
@@ -294,6 +295,13 @@ export function sqliteObservations(directory: string): ObservationStore & Report
               ? (current.get(job.intent.id) ?? job)
               : job
           );
+          const present = new Set(
+            retainedJobs.flatMap((job) => (job.kind === 'job' ? [job.intent.id] : []))
+          );
+          for (const job of current.values()) {
+            if (!present.has(job.intent.id) && rich?.reporting?.items[`job:${job.intent.id}`])
+              retainedJobs.push(job);
+          }
           db.insert(table)
             .values({ id: 1, jobs: retainedJobs, jobsObservedAt, recoveries })
             .onConflictDoUpdate({

@@ -39,6 +39,7 @@ export const ReportingLive = Layer.effect(
         Effect.gen(function* () {
           for (const item of items) {
             const id = key(item);
+            if (!pending.has(id) && pending.size >= 100) yield* flush();
             const previous = pending.get(id);
             if (
               !previous ||

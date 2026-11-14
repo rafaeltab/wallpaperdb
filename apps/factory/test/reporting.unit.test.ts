@@ -247,3 +247,52 @@ it('publishes a complete issue while another observation is blocked and preserve
     await runtime.dispose();
   }
 });
+
+it('keeps the buffer bounded while persistence is unavailable and retains the admitted complete observations', async () => {
+  const { Unavailable } = await import('../src/capabilities/job/index.js');
+  const store = controlledObservations();
+  let offline = true;
+  const runtime = ManagedRuntime.make(
+    ReportingLive.pipe(
+      Layer.provide(
+        Layer.succeed(ReportingStore, {
+          begin: store.begin,
+          publish: (generation, items) =>
+            offline
+              ? Effect.fail(new Unavailable({ operation: 'offline', cause: null }))
+              : store.publish(generation, items),
+        })
+      )
+    )
+  );
+  try {
+    const reporting = await runtime.runPromise(Reporting);
+    const generation = await runtime.runPromise(reporting.begin());
+    await expect(
+      runtime.runPromise(
+        reporting.enqueue(
+          generation,
+          Array.from({ length: 100 }, (_, index) => ({
+            kind: 'issue' as const,
+            value: { ...issue, number: index + 1 },
+            sequence: index,
+            at: 10,
+          }))
+        )
+      )
+    ).rejects.toMatchObject({ operation: 'offline' });
+    await expect(
+      runtime.runPromise(
+        reporting.enqueue(generation, [
+          { kind: 'issue', value: { ...issue, number: 101 }, sequence: 101, at: 20 },
+        ])
+      )
+    ).rejects.toMatchObject({ operation: 'offline' });
+    offline = false;
+    await runtime.runPromise(reporting.flush());
+    expect((await Effect.runPromise(store.read())).facts?.issues).toHaveLength(100);
+  } finally {
+    offline = false;
+    await runtime.dispose();
+  }
+});

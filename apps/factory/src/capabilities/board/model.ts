@@ -234,6 +234,11 @@ export interface Thread extends Entity<ThreadId> {
     | { readonly state: 'absent' | 'ambiguous' | 'unknown'; readonly reasons: readonly Reason[] };
 }
 export interface Job extends Entity<JobId> {
+  readonly lastAcceptedDelivery?: {
+    readonly stage: 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
+    readonly index: number;
+    readonly acceptedAt: number;
+  };
   readonly observation?: ItemObservationMetadata;
   readonly issueId: IssueId;
   readonly pullRequestId: PullRequestId | null;

@@ -44,7 +44,14 @@ export function populateJobs(context: ProjectionContext) {
           readiness: {
             state: delivery?.landed ? ('landed' as const) : ('ready' as const),
             comparison: pr.metadata.value.comparison,
-            verifiedAt: timestamp(input.observations.jobsObservedAt) ?? at,
+            verifiedAt:
+              timestamp(
+                current?.intent.id
+                  ? input.observations.items?.[`job:${current.intent.id}`]?.observedAt
+                  : undefined
+              ) ??
+              timestamp(input.observations.jobsObservedAt) ??
+              at,
             sourceIds: [local, gh],
           },
         });
@@ -61,6 +68,7 @@ export function populateJobs(context: ProjectionContext) {
       issueId: iid,
       pullRequestId: pid,
       threadId: safeTid,
+      lastAcceptedDelivery: current?.acknowledgement,
       startedAt: timestamp(current?.intent.createdAt),
       stage: delivery?.stage ?? 'unknown',
       activity: control?.cancelled
@@ -84,7 +92,13 @@ export function populateJobs(context: ProjectionContext) {
                         : ('unknown' as const),
               },
               local,
-              timestamp(input.observations.jobsObservedAt) ?? at
+              timestamp(
+                current?.intent.id
+                  ? input.observations.items?.[`job:${current.intent.id}`]?.observedAt
+                  : undefined
+              ) ??
+                timestamp(input.observations.jobsObservedAt) ??
+                at
             )
           : unknown(local, 'Owning execution not observed. Do not relaunch.'),
       occupiesCapacity: holdsSlot(status ?? { kind: 'empty' }, resuming),

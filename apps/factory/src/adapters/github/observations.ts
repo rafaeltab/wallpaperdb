@@ -392,158 +392,178 @@ export function githubObservations(
         );
         const facts: Facts = yield* Effect.tryPromise({
           try: async (signal) => {
-            const snapshot = await synchronizationCache.begin(gh, signal);
-            const issuePointers = snapshot.members.filter(
-              (item) => item.__typename === 'Issue' && item.state === 'OPEN'
-            );
-            if (issuePointers.length > 1000) throw new Error('Issue index exceeds supported bound');
-            const issueFieldsWithContext = `number url ${issuePresentationFields} blockedBy(first:100) { nodes { number url } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } }`;
-            const rawIssues = new Map<number, unknown>();
-            const refreshRelationships = async (numbers: readonly number[]) => {
-              const relations = await snapshot.hydrate(
-                'Issue',
-                numbers,
-                issueFieldsWithContext,
-                true
+            const lifetime = new AbortController();
+            signal = AbortSignal.any([signal, lifetime.signal]);
+            let initialPulls: Promise<void> | undefined;
+            try {
+              const snapshot = await synchronizationCache.begin(gh, signal);
+              const issuePointers = snapshot.members.filter(
+                (item) => item.__typename === 'Issue' && item.state === 'OPEN'
               );
-              for (const [n, value] of relations)
-                rawIssues.set(n, {
-                  ...z.record(z.unknown()).parse(rawIssues.get(n)),
-                  ...z.record(z.unknown()).parse(value),
+              if (issuePointers.length > 1000)
+                throw new Error('Issue index exceeds supported bound');
+              const issueFieldsWithContext = `number url ${issuePresentationFields} blockedBy(first:100) { nodes { number url } pageInfo { hasNextPage } } closedByPullRequestsReferences(first:100,includeClosedPrs:true) { nodes { ${associationFields} } pageInfo { hasNextPage } } timelineItems(first:100,itemTypes:[CROSS_REFERENCED_EVENT]) { nodes { ... on CrossReferencedEvent { source { ... on PullRequest { ${associationFields} } ... on Issue { __typename } } } } pageInfo { hasNextPage } }`;
+              const rawIssues = new Map<number, unknown>();
+              const refreshRelationships = async (numbers: readonly number[]) => {
+                const relations = await snapshot.hydrate(
+                  'Issue',
+                  numbers,
+                  issueFieldsWithContext,
+                  true
+                );
+                for (const [n, value] of relations)
+                  rawIssues.set(n, {
+                    ...z.record(z.unknown()).parse(rawIssues.get(n)),
+                    ...z.record(z.unknown()).parse(value),
+                  });
+              };
+              const decodeIssue = (n: number) => {
+                const raw = rawIssues.get(n);
+                const parsed = schema.parse({ data: { repository: { issue: raw } } }).data
+                  .repository.issue;
+                const native = z.object({ blockedBy: connection(ref) }).parse(raw).blockedBy.nodes;
+                return observedIssue(
+                  parsed,
+                  n,
+                  parsed.state === 'OPEN' &&
+                    parsed.labels.nodes.some((l) => l.name === 'ready-for-agent'),
+                  native.map((b) => ({ number: b.number, html_url: b.url }))
+                );
+              };
+              const pendingIssues = [
+                ...new Set([...issuePointers.map((i) => i.number), ...retained]),
+              ];
+              const seen = new Set<number>();
+              const issues: IssueObservation[] = [];
+              const pulls = new Map<number, PullObservation>();
+              // Reviews, mergeability, heads and checks are independently mutable. Refresh
+              // every relevant PR in bounded batches, regardless of project timestamps.
+              const requestedPulls = new Map<number, Promise<void>>();
+              const hydratePulls = async (numbers: readonly number[]): Promise<void> => {
+                if (pulls.size + numbers.length > 1000)
+                  throw new Error('Pull context exceeds supported bound');
+                const metadata = await snapshot.hydrate('PullRequest', numbers, pullMetadataFields);
+                const values = await snapshot.hydrate(
+                  'PullRequest',
+                  numbers,
+                  pullRuntimeFields,
+                  true
+                );
+                for (const [n, raw] of values) {
+                  try {
+                    const parsed = pull.parse({
+                      ...z.record(z.unknown()).parse(metadata.get(n)),
+                      ...z.record(z.unknown()).parse(raw),
+                    });
+                    if (
+                      parsed.number !== n ||
+                      parsed.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
+                    )
+                      throw new Error('Invalid related PR identity');
+                    if (parsed.commits.nodes.some(({ commit }) => commit.oid !== parsed.headRefOid))
+                      throw new Error('Inconsistent PR head');
+                    const [complete] = await checkRequirements(gh, [translatePull(parsed)], signal);
+                    if (!complete) throw new Error('Missing complete pull');
+                    pulls.set(n, complete);
+                    Queue.offerUnsafe(queue, { kind: 'pull', value: complete });
+                  } catch {
+                    failed(`pull:${n}`);
+                  }
+                }
+              };
+              const collectPulls = async (numbers: readonly number[]): Promise<void> => {
+                const fresh = [...new Set(numbers)].filter((n) => !requestedPulls.has(n));
+                let chain = Promise.resolve();
+                for (let offset = 0; offset < fresh.length; offset += 20) {
+                  const batch = fresh.slice(offset, offset + 20);
+                  chain = chain.then(() => hydratePulls(batch));
+                  for (const n of batch) requestedPulls.set(n, chain);
+                  void chain.catch(() => undefined);
+                }
+                await Promise.all([
+                  ...new Set(numbers.flatMap((n) => requestedPulls.get(n) ?? [])),
+                ]);
+              };
+              let pullsFinished = false;
+              initialPulls = collectPulls(
+                snapshot.members
+                  .filter((item) => item.__typename === 'PullRequest' && item.state === 'OPEN')
+                  .map((item) => item.number)
+              )
+                .then(() => {
+                  for (const [n, pr] of pulls) {
+                    if (pr.state !== 'OPEN') pulls.delete(n);
+                    else pendingIssues.push(...pr.linkedIssues);
+                  }
+                })
+                .finally(() => {
+                  pullsFinished = true;
                 });
-            };
-            const decodeIssue = (n: number) => {
-              const raw = rawIssues.get(n);
-              const parsed = schema.parse({ data: { repository: { issue: raw } } }).data.repository
-                .issue;
-              const native = z.object({ blockedBy: connection(ref) }).parse(raw).blockedBy.nodes;
-              return observedIssue(
-                parsed,
-                n,
-                parsed.state === 'OPEN' &&
-                  parsed.labels.nodes.some((l) => l.name === 'ready-for-agent'),
-                native.map((b) => ({ number: b.number, html_url: b.url }))
-              );
-            };
-            const pendingIssues = [
-              ...new Set([...issuePointers.map((i) => i.number), ...retained]),
-            ];
-            const seen = new Set<number>();
-            const issues: IssueObservation[] = [];
-            const pulls = new Map<number, PullObservation>();
-            // Reviews, mergeability, heads and checks are independently mutable. Refresh
-            // every relevant PR in bounded batches, regardless of project timestamps.
-            const collectPulls = async (numbers: readonly number[]): Promise<void> => {
-              if (numbers.length > 20) {
-                for (let offset = 0; offset < numbers.length; offset += 20)
-                  await collectPulls(numbers.slice(offset, offset + 20));
-                return;
-              }
-              if (pulls.size + numbers.length > 1000)
-                throw new Error('Pull context exceeds supported bound');
-              const metadata = await snapshot.hydrate('PullRequest', numbers, pullMetadataFields);
-              const values = await snapshot.hydrate(
-                'PullRequest',
-                numbers,
-                pullRuntimeFields,
-                true
-              );
-              for (const [n, raw] of values) {
-                try {
-                  const parsed = pull.parse({
-                    ...z.record(z.unknown()).parse(metadata.get(n)),
-                    ...z.record(z.unknown()).parse(raw),
-                  });
-                  if (
-                    parsed.number !== n ||
-                    parsed.url !== `https://github.com/rafaeltab/wallpaperdb/pull/${n}`
-                  )
-                    throw new Error('Invalid related PR identity');
-                  if (parsed.commits.nodes.some(({ commit }) => commit.oid !== parsed.headRefOid))
-                    throw new Error('Inconsistent PR head');
-                  const [complete] = await checkRequirements(gh, [translatePull(parsed)], signal);
-                  if (!complete) throw new Error('Missing complete pull');
-                  pulls.set(n, complete);
-                  Queue.offerUnsafe(queue, { kind: 'pull', value: complete });
-                } catch {
-                  failed(`pull:${n}`);
+              // Observe rejection immediately while independent issue requests finish.
+              void initialPulls.catch(() => undefined);
+              while (pendingIssues.length || !pullsFinished) {
+                if (!pendingIssues.length) {
+                  await initialPulls;
+                  continue;
+                }
+                const batch = [...new Set(pendingIssues.splice(0, 20))].filter((n) => !seen.has(n));
+                for (const n of batch) seen.add(n);
+                if (seen.size > 1000) throw new Error('Context exceeds supported bound');
+                const missing = batch.filter((n) => !rawIssues.has(n));
+                for (const [n, raw] of await snapshot.hydrate('Issue', missing, issueFields))
+                  rawIssues.set(n, raw);
+                await refreshRelationships(batch);
+                const values = batch.flatMap((n) => {
+                  try {
+                    return [decodeIssue(n)];
+                  } catch {
+                    failed(`issue:${n}`);
+                    return [];
+                  }
+                });
+                for (const value of values)
+                  Queue.offerUnsafe(queue, { kind: 'issue', value: value.metadata });
+                await collectPulls(
+                  [
+                    ...new Set(
+                      values.flatMap((value) => value.pullRequests.map((pr) => pr.number))
+                    ),
+                  ].filter((n) => !pulls.has(n))
+                );
+                for (const value of values) {
+                  const existing = issues.findIndex((i) => i.number === value.metadata.number);
+                  if (existing >= 0) issues.splice(existing, 1);
+                  issues.push(value.metadata);
+                  for (const pr of value.pullRequests) {
+                    const previous = pulls.get(pr.number);
+                    if (!previous || previous.state !== pr.state)
+                      throw new Error('Inconsistent related PR observation');
+                    pulls.set(pr.number, {
+                      ...previous,
+                      linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
+                      crossReferencedIssues: [
+                        ...new Set([
+                          ...(previous?.crossReferencedIssues ?? []),
+                          ...pr.crossReferencedIssues,
+                        ]),
+                      ],
+                    });
+                  }
+                  pendingIssues.push(...value.metadata.blockers, ...value.metadata.parents);
                 }
               }
-            };
-            let pullsFinished = false;
-            const initialPulls = collectPulls(
-              snapshot.members
-                .filter((item) => item.__typename === 'PullRequest' && item.state === 'OPEN')
-                .map((item) => item.number)
-            )
-              .then(() => {
-                for (const [n, pr] of pulls) {
-                  if (pr.state !== 'OPEN') pulls.delete(n);
-                  else pendingIssues.push(...pr.linkedIssues);
-                }
-              })
-              .finally(() => {
-                pullsFinished = true;
-              });
-            // Observe rejection immediately while independent issue requests finish.
-            void initialPulls.catch(() => undefined);
-            while (pendingIssues.length || !pullsFinished) {
-              if (!pendingIssues.length) {
-                await initialPulls;
-                continue;
-              }
-              const batch = [...new Set(pendingIssues.splice(0, 20))].filter((n) => !seen.has(n));
-              for (const n of batch) seen.add(n);
-              if (seen.size > 1000) throw new Error('Context exceeds supported bound');
-              const missing = batch.filter((n) => !rawIssues.has(n));
-              for (const [n, raw] of await snapshot.hydrate('Issue', missing, issueFields))
-                rawIssues.set(n, raw);
-              await refreshRelationships(batch);
-              const values = batch.flatMap((n) => {
-                try {
-                  return [decodeIssue(n)];
-                } catch {
-                  failed(`issue:${n}`);
-                  return [];
-                }
-              });
-              for (const value of values)
-                Queue.offerUnsafe(queue, { kind: 'issue', value: value.metadata });
-              await collectPulls(
-                [
-                  ...new Set(values.flatMap((value) => value.pullRequests.map((pr) => pr.number))),
-                ].filter((n) => !pulls.has(n))
-              );
-              for (const value of values) {
-                const existing = issues.findIndex((i) => i.number === value.metadata.number);
-                if (existing >= 0) issues.splice(existing, 1);
-                issues.push(value.metadata);
-                for (const pr of value.pullRequests) {
-                  const previous = pulls.get(pr.number);
-                  if (!previous || previous.state !== pr.state)
-                    throw new Error('Inconsistent related PR observation');
-                  pulls.set(pr.number, {
-                    ...previous,
-                    linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
-                    crossReferencedIssues: [
-                      ...new Set([
-                        ...(previous?.crossReferencedIssues ?? []),
-                        ...pr.crossReferencedIssues,
-                      ]),
-                    ],
-                  });
-                }
-                pendingIssues.push(...value.metadata.blockers, ...value.metadata.parents);
-              }
+              await initialPulls;
+              const facts = {
+                issues: issues.sort((a, b) => a.number - b.number),
+                pullRequests: [...pulls.values()],
+                verifiedPrBases: await verifiedBases(gh, [...pulls.values()], signal),
+              };
+              snapshot.commit();
+              return facts;
+            } finally {
+              lifetime.abort();
+              await initialPulls?.catch(() => undefined);
             }
-            await initialPulls;
-            const facts = {
-              issues: issues.sort((a, b) => a.number - b.number),
-              pullRequests: [...pulls.values()],
-              verifiedPrBases: await verifiedBases(gh, [...pulls.values()], signal),
-            };
-            snapshot.commit();
-            return facts;
           },
           catch: (cause) => new Unavailable({ operation: 'github-observations', cause }),
         }).pipe(

@@ -169,4 +169,84 @@ export function reportingStoreContract(
       await close();
     }
   });
+  it(`${name} preserves newer acknowledged stages and relative run identity independently of collection completion order`, async () => {
+    const { store, close } = await open();
+    const intent = {
+      id: 'job-one',
+      issue: 1,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/1',
+      base: 'a'.repeat(40),
+      branch: 'worker',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const job = {
+      kind: 'job' as const,
+      intent,
+      elapsedMs: 10,
+      stageIndex: 1,
+      execution: { kind: 'ambiguous' as const },
+      acknowledgement: { index: 1, stage: 'review' as const, acceptedAt: 10 },
+      delivery: { stage: 'review' as const, commit: intent.base, ready: false, landed: false },
+    };
+    try {
+      const older = await Effect.runPromise(store.begin());
+      const newer = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(newer, [{ kind: 'job', value: job, sequence: 1, at: 10 }])
+      );
+      await Effect.runPromise(
+        store.publish(older, [
+          { kind: 'job', value: { ...job, stageIndex: 0 }, sequence: 99, at: 20 },
+        ])
+      );
+      const later = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(later, [
+          { kind: 'job', value: { ...job, stageIndex: 0 }, sequence: 1, at: 20 },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { stageIndex: 1, acknowledgement: { index: 1 } },
+      ]);
+      const execution = {
+        kind: 'found' as const,
+        threadId: 'thread',
+        status: 'running',
+        worktree: '/worker',
+        branch: 'worker',
+        model: 'gpt-6.1-sol',
+        run: { id: 'run-8', ordinal: 8 },
+      };
+      await Effect.runPromise(
+        store.publish(later, [{ kind: 'job', value: { ...job, execution }, sequence: 2, at: 30 }])
+      );
+      const latest = await Effect.runPromise(store.begin());
+      for (const run of [
+        { id: 'run-7', ordinal: 7 },
+        { id: 'other-8', ordinal: 8 },
+      ]) {
+        await Effect.runPromise(
+          store.publish(latest, [
+            {
+              kind: 'job',
+              value: { ...job, execution: { ...execution, run } },
+              sequence: 1,
+              at: 40,
+            },
+          ])
+        );
+      }
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { run: { id: 'run-8', ordinal: 8 } } },
+      ]);
+      await Effect.runPromise(store.jobs([], 50));
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { intent: { id: 'job-one' } },
+      ]);
+    } finally {
+      await close();
+    }
+  });
 }

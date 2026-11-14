@@ -723,7 +723,7 @@ it('retains manual recovery for a continuation at the same ordinal', () =>
     await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577');
   }));
 
-it.each(['adopted-run pin', 'predecessor-run identity'])(
+it.each(['adopted-run ordering', 'predecessor-run identity'])(
   'preserves retained %s before a separate run binding exists',
   (association) =>
     composed(async ({ running, host, save, reopen }) => {
@@ -749,7 +749,7 @@ it.each(['adopted-run pin', 'predecessor-run identity'])(
             commit: host.base,
             ordinal: 2,
             previousRunId: 'run-1',
-            ...(association === 'adopted-run pin'
+            ...(association === 'adopted-run ordering'
               ? { observedRunId: 'answer-run', deliveryIndex: 0, resume: false }
               : { resume: true }),
           })
@@ -757,7 +757,7 @@ it.each(['adopted-run pin', 'predecessor-run identity'])(
       ).toBe(true);
       if (association === 'predecessor-run identity')
         expect(await Effect.runPromise(store.claimStage(1))).toBe(true);
-      const candidate = association === 'adopted-run pin' ? 'replacement-run' : 'run-1';
+      const candidate = association === 'adopted-run ordering' ? 'replacement-run' : 'run-1';
       await save({
         messages: [{ role: 'assistant', runId: candidate, text: 'Implementation incomplete.' }],
       });
@@ -771,17 +771,17 @@ it.each(['adopted-run pin', 'predecessor-run identity'])(
           const board = (await current.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
           expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
             execution: { state: 'known', value: { state: 'finished', runId: candidate } },
-            occupiesCapacity: association === 'predecessor-run identity',
+            occupiesCapacity: true,
           });
           expect(board.meta.factory.concurrency).toEqual({
             limit: { kind: 'limited', maximum: 2 },
-            occupied: association === 'predecessor-run identity' ? 1 : 0,
+            occupied: 1,
           });
           expect(
             board.entities.actions['action:retry/job:rafaeltab/wallpaperdb/577']
           ).toMatchObject({
             availability: {
-              state: association === 'predecessor-run identity' ? 'disabled' : 'available',
+              state: 'disabled',
             },
           });
         },

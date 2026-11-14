@@ -77,6 +77,8 @@ export function projectionContext(input: ScheduleSnapshot, at: string) {
     observedAt: input.observations.jobsObservedAt ?? Date.parse(at),
   });
   const observed = timestamp(input.observations.observedAt);
+  const itemObservedAt = (key: string) =>
+    timestamp(input.observations.items?.[key]?.observedAt) ?? observed;
   const fact = <T>(value: T): Fact<T> => (observed ? known(value, gh, observed) : unknown(gh));
   const addUser = (u: ObservedUser) => {
     const id = `user:${u.id}` as const;
@@ -107,10 +109,11 @@ export function projectionContext(input: ScheduleSnapshot, at: string) {
     at,
     observed,
     fact,
+    itemObservedAt,
     itemFact:
       (key: string) =>
       <T>(value: T): Fact<T> => {
-        const at = timestamp(input.observations.items?.[key]?.observedAt) ?? observed;
+        const at = itemObservedAt(key);
         return at ? known(value, gh, at) : unknown(gh);
       },
     addUser,

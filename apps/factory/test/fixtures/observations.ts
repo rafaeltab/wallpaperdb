@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import type {
-  ObservationStore,
   ObservationState,
+  ObservationStore,
   ReportingStore,
 } from '../../src/capabilities/observe/index.js';
 /** Stateful controlled persistence with the same replacement/retention guarantees as SQLite. */
@@ -73,6 +73,9 @@ export function controlledObservations(
             const previousPull = pulls.get(item.value.number);
             pulls.set(item.value.number, {
               ...item.value,
+              linkedIssues: [
+                ...new Set([...(previousPull?.linkedIssues ?? []), ...item.value.linkedIssues]),
+              ],
               crossReferencedIssues: [
                 ...new Set([
                   ...(previousPull?.crossReferencedIssues ?? []),

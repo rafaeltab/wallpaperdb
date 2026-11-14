@@ -84,3 +84,55 @@ it('starts a new job and worktree from a fresh journal while retaining the aband
     await host.cleanup();
   }
 });
+
+it('does not import an abandoned root job as a legacy admission after restart', async () => {
+  const host = await protocol({ origin: true });
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const directory = `${host.directory}/state`;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    const admission = { issue: 577, base: host.base, context: 'Retained scope' };
+    await Effect.runPromise(
+      fileStore(directory).reserve({
+        ...admission,
+        id: 'abandoned',
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
+        branch: 'factory/abandoned',
+        createdAt: 1,
+        expectedStage: 'implementation',
+      })
+    );
+    await Effect.runPromise(
+      fileScheduleStore(directory).save({
+        revision: 0,
+        concurrency: 1,
+        allowance: 1,
+        paused: true,
+        admissions: [],
+        released: [{ admission, jobId: 'abandoned' }],
+      })
+    );
+    running = await startFactory({
+      ...host.mcpEnvironment,
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: directory,
+      FACTORY_PORT: '0',
+    });
+    expect((await running.app.inject('/api/scheduler')).json().state.admissions).toEqual([]);
+    expect(
+      (await host.calls()).filter(
+        (call) => call.args[1] === 'start' && call.args.includes('--worktree')
+      )
+    ).toEqual([]);
+  } finally {
+    await running?.close();
+    process.env.PATH = previous.path;
+    process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});

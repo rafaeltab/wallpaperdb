@@ -32,6 +32,7 @@ export function restartAction(
   return Effect.gen(function* () {
     if (
       control.cancelled ||
+      stage?.handback !== undefined ||
       control.prerequisite ||
       control.parked?.index === stage?.index ||
       stage?.stage !== 'implementation' ||

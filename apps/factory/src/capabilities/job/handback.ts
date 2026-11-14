@@ -33,6 +33,7 @@ export function dependencyHandback(
     if (waiting.handback) {
       const verified = yield* issues.verifyHandback?.(intent, waiting.handback) ??
         Effect.succeed(false);
+      if ((yield* store.readControl()).revision !== control.revision) return delivery;
       return verified
         ? {
             ...delivery,

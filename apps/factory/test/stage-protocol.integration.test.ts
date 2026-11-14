@@ -688,3 +688,25 @@ it.each(['prose', 'malformed', 'invalid-version-one', 'legacy', 'supported-negat
       );
     })
 );
+
+it('delivers bounded abandonment instructions to the existing agent without claiming successful checks', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({ overrides: { status: 'completed' } });
+    await Effect.runPromise(
+      adapter.sendStage(intent, {
+        ...request,
+        index: 1,
+        previousRunId: 'run-1',
+        ordinal: 2,
+        resume: true,
+        handback: ['758'],
+      })
+    );
+    const sends = (await host.calls()).filter((call) => call.args[1] === 't3_thread_send');
+    expect(sends).toHaveLength(1);
+    const delivery = JSON.parse(sends[0].args[2]);
+    expect(delivery.threadId).toBe('thread-live');
+    expect(JSON.stringify(delivery)).toContain('Close only an open PR');
+    expect(JSON.stringify(delivery)).toContain('Do not relabel or admit prerequisites');
+    expect(JSON.stringify(delivery)).toContain('Planned');
+  }));

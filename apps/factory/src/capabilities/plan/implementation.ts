@@ -299,7 +299,9 @@ export function comparable(input: PlanningInput) {
 }
 
 function knownJobs(input: PlanningInput) {
-  return [input.job, ...(input.jobs ?? [])];
+  return [input.job, ...(input.jobs ?? [])].filter(
+    (job) => job.kind !== 'job' || job.delivery?.activity !== 'dependency-handback'
+  );
 }
 
 export function locallyBlocked(blockers: readonly number[], jobs: readonly Status[]) {
@@ -307,6 +309,7 @@ export function locallyBlocked(blockers: readonly number[], jobs: readonly Statu
     jobs.some(
       (job) =>
         job.kind === 'job' &&
+        job.delivery?.activity !== 'dependency-handback' &&
         job.intent.issue === number &&
         !job.delivery?.ready &&
         !job.delivery?.landed

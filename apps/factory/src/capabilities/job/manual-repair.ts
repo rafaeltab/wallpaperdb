@@ -28,6 +28,7 @@ export function retainManualRepair(
       const control = yield* store.readControl();
       if (
         control.cancelled ||
+        control.released ||
         control.prerequisite ||
         control.parked?.index === stage.index ||
         (control.restart?.index ?? 0) > stage.index ||
@@ -64,6 +65,7 @@ export function adoptManualRepair(
     const run = observed.run;
     if (
       control.cancelled ||
+      control.released ||
       control.prerequisite ||
       control.parked?.index === stage.index ||
       stage.stage !== 'implementation' ||

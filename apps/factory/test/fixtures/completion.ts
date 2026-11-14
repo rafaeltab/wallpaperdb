@@ -13,7 +13,11 @@ import {
 } from '../../src/capabilities/job/index.js';
 import { controlledStore } from './store.js';
 
-export async function completionFixture(limit = 3, store: JobStore = controlledStore()) {
+export async function completionFixture(
+  limit = 3,
+  store: JobStore = controlledStore(),
+  verified?: () => Effect.Effect<void>
+) {
   let accepted = false;
   let idle = false;
   let observationStatus: string | undefined;
@@ -37,7 +41,12 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
           Layer.succeed(AgentReconciliationPolicy, { limit }),
           Layer.succeed(Issues, {
             validateDependencies: () => Effect.succeed(dependencyResult),
-            verifyHandback: () => Effect.succeed(handbackVerified),
+            verifyHandback: () =>
+              Effect.gen(function* () {
+                const result = handbackVerified;
+                if (result && verified) yield* verified();
+                return result;
+              }),
             inspect: () =>
               Effect.succeed({
                 open: true,

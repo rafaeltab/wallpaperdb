@@ -40,6 +40,9 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
           jobId: status.intent.id,
           revision: status.controlRevision ?? 0,
           cancelled: status.delivery?.activity === 'cancelled',
+          release: () => {
+            statuses.set(issue, { ...status, controlRevision: (status.controlRevision ?? 0) + 1 });
+          },
         }
       : undefined;
   });
@@ -1288,6 +1291,7 @@ it('refunds a one-admission allowance once and retains abandoned attempt evidenc
         landed: false,
         active: false,
         activity: 'dependency-handback',
+        handbackRevision: 0,
       },
     });
     const released = await f.run((s) => s.status());
@@ -1323,6 +1327,7 @@ it('blocks ordinary pickup on the discovered prerequisite then admits a fresh ge
         landed: false,
         active: false,
         activity: 'dependency-handback',
+        handbackRevision: 0,
       },
     });
     await f.run((s) => s.status());
@@ -1356,6 +1361,7 @@ it('retains admission and allowance when cancellation wins before handback relea
         landed: false,
         active: false,
         activity: 'dependency-handback',
+        handbackRevision: 0,
       },
     });
     f.beforeRelease(() =>
@@ -1378,6 +1384,52 @@ it('retains admission and allowance when cancellation wins before handback relea
     expect(result.state.admissions.map((item) => item.issue)).toEqual([1]);
     expect(result.state.released ?? []).toEqual([]);
     expect(result.jobs[0]).toMatchObject({ delivery: { activity: 'cancelled' } });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('uses the verification revision rather than newer informational control when guarding release', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.tick(base));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing job');
+    f.statuses.set(1, {
+      ...first,
+      controlRevision: 1,
+      delivery: {
+        stage: 'implementation',
+        commit: base,
+        ready: false,
+        landed: false,
+        active: false,
+        activity: 'dependency-handback',
+        handbackRevision: 0,
+      },
+    });
+    f.beforeRelease(() =>
+      Effect.sync(() => {
+        f.statuses.set(1, {
+          ...first,
+          controlRevision: 1,
+          delivery: {
+            stage: 'implementation',
+            commit: base,
+            ready: false,
+            landed: false,
+            active: true,
+            activity: 'continuation-pending',
+          },
+        });
+      })
+    );
+    const result = await f.run((s) => s.status());
+    expect(result.state.admissions.map((item) => item.issue)).toEqual([1]);
+    expect(result.state.released ?? []).toEqual([]);
+    expect(result.jobs[0]).toMatchObject({
+      delivery: { activity: 'continuation-pending', active: true },
+    });
   } finally {
     await f.runtime.dispose();
   }

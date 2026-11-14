@@ -172,7 +172,7 @@ export interface ScheduleStore {
    * waits recursively. Release on interruption/process exit; retained batch state survives. */
   withCycle<A>(work: Effect.Effect<A, Unavailable>): Effect.Effect<Option.Option<A>, Unavailable>;
   read(): Effect.Effect<ScheduleState, Unavailable>;
-  /** Guarded saves atomically verify exact job identity and uncancelled control revision with the schedule CAS. */
+  /** Guarded saves atomically verify exact job identity and uncancelled verification revision, retire each job journal against further mutation/delivery, and commit the schedule CAS. */
   save(
     state: ScheduleState,
     handbacks?: readonly HandbackGuard[]

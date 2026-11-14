@@ -64,7 +64,8 @@ function deliver(store: JobStore, execution: Execution, intent: Intent, request:
   return Effect.gen(function* () {
     if (request.previousRunId === null || request.observedRunId) return;
     if (yield* store.claimStage(request.index)) {
-      if (!(yield* store.readControl()).cancelled) yield* execution.sendStage(intent, request);
+      const control = yield* store.readControl();
+      if (!control.cancelled && !control.released) yield* execution.sendStage(intent, request);
     }
   });
 }
@@ -191,6 +192,7 @@ export function associateStage(
     if (
       current?.index !== request.index ||
       control.cancelled ||
+      control.released ||
       !stageRunOrder(current, control, { id: evidence.runId, ordinal: evidence.ordinal })
     )
       return null;
@@ -241,7 +243,12 @@ function reconcileStage(
 ) {
   return Effect.gen(function* () {
     const control = yield* controlForStage(store, waiting);
-    if (!control.cancelled && observation.run && !stageRunOrder(waiting, control, observation.run))
+    if (
+      !control.cancelled &&
+      !control.released &&
+      observation.run &&
+      !stageRunOrder(waiting, control, observation.run)
+    )
       return control.parked?.index === waiting.index
         ? parkedDelivery(waiting, control)
         : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };
@@ -357,6 +364,7 @@ export function stageRunOrder(
   ];
   return (
     !control.cancelled &&
+    !control.released &&
     observations.every(
       (prior) =>
         !prior ||
@@ -373,6 +381,15 @@ function suspension(
   control: import('./contract.js').Control
 ) {
   return Effect.gen(function* () {
+    if (control.released)
+      return {
+        stage: waiting.stage,
+        commit: waiting.commit,
+        ready: false,
+        landed: false,
+        activity: 'dependency-handback' as const,
+        active: false,
+      };
     if (control.cancelled)
       return {
         stage: waiting.stage,

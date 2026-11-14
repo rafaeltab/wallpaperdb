@@ -29,7 +29,7 @@ export function dependencyHandback(
     };
     if (!evidence?.idle) return delivery;
     const control = yield* store.readControl();
-    if (control.cancelled) return null;
+    if (control.cancelled || control.released) return null;
     const dependencies = [...new Set(evidence.dependencies)];
     const result =
       dependencies.length &&
@@ -69,6 +69,7 @@ export function dependencyHandback(
       return {
         ...delivery,
         activity: 'dependency-handback' as const,
+        handbackRevision: control.revision,
         active: false,
         progress: 'Dependencies recorded; attempt abandoned for ordinary scheduling.',
       };

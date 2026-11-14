@@ -48,6 +48,11 @@ export const JobLive = Layer.effect(
         };
         return yield* Effect.gen(function* () {
           const before = yield* store.readControl();
+          if (before.released) {
+            const status = releasedStatus(intent, before, yield* time.now());
+            if (reporting) yield* reporting.observed(generation, status);
+            return status;
+          }
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
           const observation = yield* execution.observe(
             activeIntent,
@@ -55,7 +60,7 @@ export const JobLive = Layer.effect(
           );
           if ((yield* store.readControl()).cancelled && observation.kind === 'found')
             yield* execution.interrupt(activeIntent, observation.threadId);
-          const delivery: Delivery | undefined = yield* reconcileStages(
+          let delivery: Delivery | undefined = yield* reconcileStages(
             store,
             reportingExecution,
             issues,
@@ -68,7 +73,28 @@ export const JobLive = Layer.effect(
           );
           yield* retainPrerequisite(store, delivery);
           const control = yield* store.readControl();
+          if (control.released) {
+            const status = releasedStatus(intent, control, yield* time.now());
+            if (reporting) yield* reporting.observed(generation, status);
+            return status;
+          }
           const stage = yield* currentStage(store);
+          if (
+            delivery?.activity === 'dependency-handback' &&
+            (control.cancelled ||
+              control.released ||
+              delivery.handbackRevision !== control.revision)
+          ) {
+            delivery = {
+              ...delivery,
+              handbackRevision: undefined,
+              activity: control.cancelled ? 'cancelled' : 'continuation-pending',
+              active: !control.cancelled,
+              progress: control.cancelled
+                ? 'Attempt cancelled.'
+                : 'Handback verification superseded; retaining admission.',
+            };
+          }
           const resume =
             resumeCommand(control, stage, observation) ??
             (yield* retryAction(
@@ -189,7 +215,8 @@ export const JobLive = Layer.effect(
           )
             return { kind: 'rejected' as const };
           if (yield* store.claimStage(index)) {
-            if (!(yield* store.readControl()).cancelled) {
+            const current = yield* store.readControl();
+            if (!current.cancelled && !current.released) {
               const active = attemptIntent(intent, index);
               const launch = yield* execution.launch(active);
               if (launch.kind === 'submitted' && reporting)
@@ -213,6 +240,7 @@ export const JobLive = Layer.effect(
             if (
               intent.id !== command.jobId ||
               control.cancelled ||
+              control.released ||
               control.revision !== command.revision ||
               stage?.index !== command.index
             )
@@ -242,6 +270,7 @@ export const JobLive = Layer.effect(
           if (!intent || intent.id !== jobId) return { kind: 'rejected' as const };
           for (;;) {
             const state = yield* store.readControl();
+            if (state.released) return { kind: 'rejected' as const };
             if (state.cancelled) break;
             if (
               yield* store.saveControl({ ...state, revision: state.revision + 1, cancelled: true })
@@ -320,6 +349,7 @@ function matchesResume(
   return (
     intent.id === command.jobId &&
     !control.cancelled &&
+    !control.released &&
     waiting.index === command.index &&
     control.parked?.index === waiting.index &&
     control.parked.question.id === command.questionId
@@ -343,7 +373,8 @@ function resumeCommand(
   observation: import('./contract.js').Observation
 ) {
   const parked = control.parked;
-  if (control.cancelled || !parked || parked.index !== stage?.index) return undefined;
+  if (control.cancelled || control.released || !parked || parked.index !== stage?.index)
+    return undefined;
   if (hasAnsweredQuestion(observation, parked.question.id)) return undefined;
   return { index: parked.index, questionId: parked.question.id };
 }
@@ -395,6 +426,7 @@ function retainPrerequisite(
     };
     for (;;) {
       const current = yield* store.readControl();
+      if (current.released) return;
       if (JSON.stringify(current.prerequisite) === JSON.stringify(prerequisite)) return;
       if (yield* store.saveControl({ ...current, revision: current.revision + 1, prerequisite }))
         return;
@@ -409,4 +441,27 @@ function verifiedPublication(delivery: Delivery | undefined) {
 
 export function trustedAuthor(author: string) {
   return ['rafaeltab', 'zero-two-rafaeltab'].includes(author);
+}
+
+function releasedStatus(
+  intent: Intent,
+  control: import('./contract.js').Control,
+  now: number
+): Extract<import('./contract.js').Status, { kind: 'job' }> {
+  return {
+    kind: 'job',
+    intent,
+    controlRevision: control.revision,
+    execution: { kind: 'absent' },
+    elapsedMs: Math.max(0, now - intent.createdAt),
+    delivery: {
+      stage: control.reconciliation?.pending?.stage ?? 'implementation',
+      commit: control.reconciliation?.pending?.commit ?? intent.base,
+      activity: 'dependency-handback',
+      active: false,
+      ready: false,
+      landed: false,
+      progress: 'Attempt released; retained for history only.',
+    },
+  };
 }

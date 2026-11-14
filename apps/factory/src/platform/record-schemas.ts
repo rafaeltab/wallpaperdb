@@ -60,6 +60,7 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    released: z.boolean().optional(),
     reconciliation: z
       .object({
         attempts: z.number().int().nonnegative(),

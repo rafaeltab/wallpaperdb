@@ -32,6 +32,21 @@ export function saveHandback(
             .get()
         )
           return false;
+        if (
+          tx
+            .select()
+            .from(records)
+            .where(
+              and(
+                eq(records.namespace, namespace),
+                eq(records.name, `schedule-${state.revision}.json`)
+              )
+            )
+            .get()
+        )
+          return false;
+        const completed: { namespace: string; control: ReturnType<typeof controlSchema.parse> }[] =
+          [];
         const intents = tx.select().from(records).where(eq(records.name, 'intent.json')).all();
         for (const guard of guards) {
           const matches = intents.filter((record) => {
@@ -57,9 +72,28 @@ export function saveHandback(
             (latest, value) => (!latest || value.revision > latest.revision ? value : latest),
             undefined
           );
-          if (!current || current.cancelled || current.revision !== guard.controlRevision)
+          if (
+            !current ||
+            current.cancelled ||
+            current.released ||
+            current.revision !== guard.controlRevision
+          )
             return false;
+          if (completed.some((entry) => entry.namespace === owner.namespace)) return false;
+          completed.push({ namespace: owner.namespace, control: current });
         }
+        for (const entry of completed)
+          tx.insert(records)
+            .values({
+              namespace: entry.namespace,
+              name: `control-${entry.control.revision + 1}.json`,
+              value: controlSchema.parse({
+                ...entry.control,
+                revision: entry.control.revision + 1,
+                released: true,
+              }),
+            })
+            .run();
         return (
           tx
             .insert(records)
@@ -68,7 +102,6 @@ export function saveHandback(
               name: `schedule-${state.revision}.json`,
               value: scheduleSchema.parse(state),
             })
-            .onConflictDoNothing()
             .run().changes === 1
         );
       },

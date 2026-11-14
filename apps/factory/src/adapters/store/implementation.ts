@@ -1,4 +1,5 @@
 import { saveStageControl } from './control.js';
+import { saveHandback } from './handback.js';
 import { createHash } from 'node:crypto';
 import { publisher, requiredRecord, acquireCycle } from '../../platform/index.js';
 import { Effect, Option } from 'effect';
@@ -177,8 +178,9 @@ export function fileScheduleStore(
         Effect.withSpan('factory.store.execution-cycle')
       ),
     read: () => effect('read-schedule', read),
-    save: (state) =>
+    save: (state, guards) =>
       effect('save-schedule', async () => {
+        if (guards?.length) return saveHandback(directory, state, guards);
         if (state.revision !== (await read()).revision + 1) return false;
         return publish(`schedule-${state.revision}.json`, scheduleSchema.parse(state));
       }),

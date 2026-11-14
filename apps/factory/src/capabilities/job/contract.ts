@@ -277,6 +277,7 @@ export type Status =
   | { kind: 'empty' }
   | {
       kind: 'job';
+      readonly controlRevision?: number;
       stageIndex?: number;
       reconciliation?: {
         readonly attempts: number;

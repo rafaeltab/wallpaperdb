@@ -33,16 +33,32 @@ const issue = (number: number): PlanningIssue => ({
   prerequisiteEvidence: '',
 });
 function fixture(hooks?: { read: () => void; propose: (deadline?: number) => void }) {
-  const persisted = controlledScheduleStore();
+  const persisted = controlledScheduleStore((issue, generation) => {
+    const status = statuses.get(issue);
+    return status?.kind === 'job' && (status.intent.generation ?? 0) === generation
+      ? {
+          jobId: status.intent.id,
+          revision: status.controlRevision ?? 0,
+          cancelled: status.delivery?.activity === 'cancelled',
+        }
+      : undefined;
+  });
   let failSelection = false;
+  let beforeRelease: (() => Effect.Effect<void>) | undefined;
   const store = {
     ...persisted,
-    save: (next: import('../src/capabilities/plan/index.js').ScheduleState) =>
+    save: (
+      next: import('../src/capabilities/plan/index.js').ScheduleState,
+      guards?: Parameters<import('../src/capabilities/plan/index.js').ScheduleStore['save']>[1]
+    ) =>
       failSelection && next.cycle?.selected !== undefined
         ? Effect.fail(
             new Unavailable({ operation: 'controlled-selection-persistence', cause: null })
           )
-        : persisted.save(next),
+        : Effect.gen(function* () {
+            if (next.released?.length && beforeRelease) yield* beforeRelease();
+            return yield* persisted.save(next, guards);
+          }),
   };
   let planGate: Effect.Effect<void> = Effect.void;
   const proposals = new Map<string, import('../src/capabilities/plan/index.js').Proposal>();
@@ -76,6 +92,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
                 launches.push(number);
                 const status: Status = {
                   kind: 'job',
+                  controlRevision: 0,
                   intent: {
                     ...command,
                     id: command.generation ? `${number}:${command.generation}` : String(number),
@@ -264,6 +281,9 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
     },
     setRecoveries: (values: NonNullable<ScheduleStatus['recoveries']>) => {
       recoveries = values;
+    },
+    beforeRelease: (work: () => Effect.Effect<void>) => {
+      beforeRelease = work;
     },
     statuses,
     published,
@@ -1316,6 +1336,48 @@ it('blocks ordinary pickup on the discovered prerequisite then admits a fresh ge
       intent: { id: '1:1', generation: 1, context: 'Only agreed scope' },
     });
     expect(f.snapshot().released).toHaveLength(1);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('retains admission and allowance when cancellation wins before handback release commits', async () => {
+  const f = fixture();
+  try {
+    await f.run((s) => s.tick(base));
+    const first = f.statuses.get(1);
+    if (first?.kind !== 'job') throw new Error('Missing job');
+    f.statuses.set(1, {
+      ...first,
+      delivery: {
+        stage: 'implementation',
+        commit: base,
+        ready: false,
+        landed: false,
+        active: false,
+        activity: 'dependency-handback',
+      },
+    });
+    f.beforeRelease(() =>
+      Effect.sync(() => {
+        f.statuses.set(1, {
+          ...first,
+          controlRevision: 1,
+          delivery: {
+            stage: 'implementation',
+            commit: base,
+            ready: false,
+            landed: false,
+            active: false,
+            activity: 'cancelled',
+          },
+        });
+      })
+    );
+    const result = await f.run((s) => s.status());
+    expect(result.state.admissions.map((item) => item.issue)).toEqual([1]);
+    expect(result.state.released ?? []).toEqual([]);
+    expect(result.jobs[0]).toMatchObject({ delivery: { activity: 'cancelled' } });
   } finally {
     await f.runtime.dispose();
   }

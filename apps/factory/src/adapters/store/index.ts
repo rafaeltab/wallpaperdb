@@ -5,3 +5,5 @@ export { sqliteObservations, sqliteScheduleObservations } from './observations.j
 export { sqliteLocalSnapshot } from './snapshots.js';
 export { sqliteThreads } from './threads.js';
 export { sqliteBoard } from './board.js';
+
+export { jobStateDirectory } from './namespace.js';

@@ -84,6 +84,7 @@ export const JobLive = Layer.effect(
           const now = yield* time.now();
           const status = {
             kind: 'job' as const,
+            controlRevision: control.revision,
             stageIndex: stage?.index,
             reconciliation: control.reconciliation
               ? {

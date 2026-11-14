@@ -336,8 +336,14 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Layer.effect(
         PlanningSource,
         Effect.map(Job, (job) => {
-          const source = githubPlanning(githubConfig(), job, () =>
-            Effect.map(scheduleStore.read(), (state) => state.admissions.map((item) => item.issue))
+          // Scheduled planning observes current generations through the pool below.
+          const source = githubPlanning(
+            githubConfig(),
+            { ...job, status: () => Effect.succeed({ kind: 'empty' as const }) },
+            () =>
+              Effect.map(scheduleStore.read(), (state) =>
+                state.admissions.map((item) => item.issue)
+              )
           );
           const issueSource = githubIssues(githubConfig());
           let automaticAt = 0;
@@ -659,7 +665,10 @@ async function adoptLegacy(directory: string, scheduleStore: ScheduleStore) {
   const legacy = await Effect.runPromise(fileStore(directory).read());
   if (legacy) {
     const state = await Effect.runPromise(scheduleStore.read());
-    if (!state.admissions.some((a) => a.issue === legacy.issue))
+    if (
+      !state.admissions.some((a) => a.issue === legacy.issue) &&
+      !state.released?.some((item) => item.jobId === legacy.id)
+    )
       await Effect.runPromise(
         scheduleStore.save({
           ...state,

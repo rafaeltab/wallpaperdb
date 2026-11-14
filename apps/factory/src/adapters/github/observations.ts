@@ -511,9 +511,8 @@ export function githubObservations(
                   .map((item) => item.number)
               )
                 .then(() => {
-                  for (const [n, pr] of pulls) {
-                    if (pr.state !== 'OPEN') pulls.delete(n);
-                    else pendingIssues.push(...pr.linkedIssues);
+                  for (const pr of pulls.values()) {
+                    if (pr.state === 'OPEN') pendingIssues.push(...pr.linkedIssues);
                   }
                 })
                 .finally(() => {

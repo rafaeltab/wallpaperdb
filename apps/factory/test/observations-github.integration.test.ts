@@ -569,29 +569,32 @@ it('rejects contradictory related-PR evidence before publishing an issue as comp
   expect(events.filter((item) => item.kind === 'issue')).toEqual([]);
   expect(events).toContainEqual({ kind: 'failure', key: 'issue:1', error: 'github-observations' });
 });
-it('preserves valid associations when publishing a complete issue', async () => {
-  const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
-  const source = githubObservations(
-    '/tmp',
-    () => Effect.succeed([]),
-    undefined,
-    incrementalTransport({ issueState: 'CLOSED' })
-  );
-  await Effect.runPromise(
-    source.read((item) =>
-      Effect.sync(() => {
-        events.push(item);
+it.each([false, true])(
+  'preserves valid associations when a related PR is also indexed: %s',
+  async (includePull) => {
+    const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+    const source = githubObservations(
+      '/tmp',
+      () => Effect.succeed([]),
+      undefined,
+      incrementalTransport({ issueState: 'CLOSED', includePull })
+    );
+    await Effect.runPromise(
+      source.read((item) =>
+        Effect.sync(() => {
+          events.push(item);
+        })
+      )
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        kind: 'issue',
+        value: expect.objectContaining({ number: 1, pullRequests: [42] }),
       })
-    )
-  );
-  expect(events).toContainEqual(
-    expect.objectContaining({
-      kind: 'issue',
-      value: expect.objectContaining({ number: 1, pullRequests: [42] }),
-    })
-  );
-  expect(events.filter((item) => item.kind === 'failure')).toEqual([]);
-});
+    );
+    expect(events.filter((item) => item.kind === 'failure')).toEqual([]);
+  }
+);
 it.each(['issue', 'pull'] as const)(
   'reports failed %s hydration per item and preserves independent successes',
   async (failure) => {

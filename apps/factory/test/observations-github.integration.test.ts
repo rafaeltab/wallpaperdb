@@ -463,3 +463,161 @@ it('collects local closing issue context while ignoring foreign repository refer
     expect(calls.some((c) => c.args.join(' ').includes('issue(number:1)'))).toBe(true);
     expect(calls.some((c) => c.args.join(' ').includes('issue(number:9999)'))).toBe(false);
   }));
+
+function incrementalTransport(options: {
+  issueState?: 'OPEN' | 'CLOSED';
+  failure?: 'issue' | 'pull';
+  includePull?: boolean;
+}) {
+  const metadata = {
+    ...issue,
+    parent: null,
+    labels: connection([]),
+    assignees: connection([]),
+    comments: { totalCount: 0 },
+    projectItems: connection([]),
+    blockedBy: connection([]),
+    timelineItems: connection([]),
+    closedByPullRequestsReferences: connection(
+      options.issueState
+        ? [
+            {
+              __typename: 'PullRequest',
+              number: 42,
+              url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+              state: options.issueState,
+            },
+          ]
+        : []
+    ),
+  };
+  return async (args: string[]) => {
+    const query = args.join(' ');
+    if (query.includes('user(login:'))
+      return [
+        {
+          data: {
+            user: {
+              projectV2: {
+                id: 'P1',
+                items: {
+                  nodes: [
+                    {
+                      id: 'I1',
+                      updatedAt: '2026-11-01T00:00:00Z',
+                      isArchived: false,
+                      content: {
+                        __typename: 'Issue',
+                        number: 1,
+                        url: metadata.url,
+                        state: 'OPEN',
+                        updatedAt: '2026-11-01T00:00:00Z',
+                      },
+                    },
+                    ...(options.includePull
+                      ? [
+                          {
+                            id: 'P42',
+                            updatedAt: '2026-11-01T00:00:00Z',
+                            isArchived: false,
+                            content: {
+                              __typename: 'PullRequest',
+                              number: 42,
+                              url: 'https://github.com/rafaeltab/wallpaperdb/pull/42',
+                              state: 'OPEN',
+                              updatedAt: '2026-11-01T00:00:00Z',
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            },
+          },
+        },
+      ];
+    if (query.includes('i1:issue')) {
+      if (options.failure === 'issue') throw new Error('Issue hydration unavailable');
+      return { data: { repository: { i1: metadata } } };
+    }
+    if (query.includes('p42:pullRequest')) {
+      if (options.failure === 'pull') throw new Error('Pull hydration unavailable');
+      return { data: { repository: { p42: pr(42, 'CLOSED') } } };
+    }
+    throw new Error(`Unexpected controlled request ${query}`);
+  };
+}
+it('rejects contradictory related-PR evidence before publishing an issue as complete', async () => {
+  const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+  const source = githubObservations(
+    '/tmp',
+    () => Effect.succeed([]),
+    undefined,
+    incrementalTransport({ issueState: 'OPEN' })
+  );
+  await expect(
+    Effect.runPromise(
+      source.read((item) =>
+        Effect.sync(() => {
+          events.push(item);
+        })
+      )
+    )
+  ).rejects.toMatchObject({ operation: 'github-observations' });
+  expect(events.filter((item) => item.kind === 'issue')).toEqual([]);
+  expect(events).toContainEqual({ kind: 'failure', key: 'issue:1', error: 'github-observations' });
+});
+it('preserves valid associations when publishing a complete issue', async () => {
+  const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+  const source = githubObservations(
+    '/tmp',
+    () => Effect.succeed([]),
+    undefined,
+    incrementalTransport({ issueState: 'CLOSED' })
+  );
+  await Effect.runPromise(
+    source.read((item) =>
+      Effect.sync(() => {
+        events.push(item);
+      })
+    )
+  );
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      kind: 'issue',
+      value: expect.objectContaining({ number: 1, pullRequests: [42] }),
+    })
+  );
+  expect(events.filter((item) => item.kind === 'failure')).toEqual([]);
+});
+it.each(['issue', 'pull'] as const)(
+  'reports failed %s hydration per item and preserves independent successes',
+  async (failure) => {
+    const events: import('../src/capabilities/observe/index.js').CollectedObservation[] = [];
+    const source = githubObservations(
+      '/tmp',
+      () => Effect.succeed([]),
+      undefined,
+      incrementalTransport({ failure, includePull: true })
+    );
+    await expect(
+      Effect.runPromise(
+        source.read((item) =>
+          Effect.sync(() => {
+            events.push(item);
+          })
+        )
+      )
+    ).rejects.toMatchObject({ operation: 'github-observations' });
+    expect(events).toContainEqual({
+      kind: 'failure',
+      key: failure === 'issue' ? 'issue:1' : 'pull:42',
+      error: 'github-observations',
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({ kind: failure === 'issue' ? 'pull' : 'issue' })
+    );
+  }
+);

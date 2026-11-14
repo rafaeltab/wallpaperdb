@@ -452,13 +452,25 @@ export function githubObservations(
               const hydratePulls = async (numbers: readonly number[]): Promise<void> => {
                 if (pulls.size + numbers.length > 1000)
                   throw new Error('Pull context exceeds supported bound');
-                const metadata = await snapshot.hydrate('PullRequest', numbers, pullMetadataFields);
-                const values = await snapshot.hydrate(
-                  'PullRequest',
-                  numbers,
-                  pullRuntimeFields,
-                  true
-                );
+                const payload = await (async () => {
+                  const metadata = await snapshot.hydrate(
+                    'PullRequest',
+                    numbers,
+                    pullMetadataFields
+                  );
+                  const values = await snapshot.hydrate(
+                    'PullRequest',
+                    numbers,
+                    pullRuntimeFields,
+                    true
+                  );
+                  return { metadata, values };
+                })().catch((cause) => {
+                  for (const n of numbers) failed(`pull:${n}`, cause);
+                  return undefined;
+                });
+                if (!payload) return;
+                const { metadata, values } = payload;
                 for (const [n, raw] of values) {
                   try {
                     const parsed = pull.parse({
@@ -518,9 +530,14 @@ export function githubObservations(
                 for (const n of batch) seen.add(n);
                 if (seen.size > 1000) throw new Error('Context exceeds supported bound');
                 const missing = batch.filter((n) => !rawIssues.has(n));
-                for (const [n, raw] of await snapshot.hydrate('Issue', missing, issueFields))
-                  rawIssues.set(n, raw);
-                await refreshRelationships(batch);
+                try {
+                  for (const [n, raw] of await snapshot.hydrate('Issue', missing, issueFields))
+                    rawIssues.set(n, raw);
+                  await refreshRelationships(batch);
+                } catch (cause) {
+                  for (const n of batch) failed(`issue:${n}`, cause);
+                  continue;
+                }
                 const values = batch.flatMap((n) => {
                   try {
                     return [decodeIssue(n)];
@@ -529,8 +546,6 @@ export function githubObservations(
                     return [];
                   }
                 });
-                for (const value of values)
-                  Queue.offerUnsafe(queue, { kind: 'issue', value: value.metadata });
                 await collectPulls(
                   [
                     ...new Set(
@@ -539,24 +554,30 @@ export function githubObservations(
                   ].filter((n) => !pulls.has(n))
                 );
                 for (const value of values) {
+                  try {
+                    for (const pr of value.pullRequests) {
+                      const previous = pulls.get(pr.number);
+                      if (!previous || previous.state !== pr.state)
+                        throw new Error('Inconsistent related PR observation');
+                      pulls.set(pr.number, {
+                        ...previous,
+                        linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
+                        crossReferencedIssues: [
+                          ...new Set([
+                            ...(previous?.crossReferencedIssues ?? []),
+                            ...pr.crossReferencedIssues,
+                          ]),
+                        ],
+                      });
+                    }
+                  } catch (cause) {
+                    failed(`issue:${value.metadata.number}`, cause);
+                    continue;
+                  }
                   const existing = issues.findIndex((i) => i.number === value.metadata.number);
                   if (existing >= 0) issues.splice(existing, 1);
                   issues.push(value.metadata);
-                  for (const pr of value.pullRequests) {
-                    const previous = pulls.get(pr.number);
-                    if (!previous || previous.state !== pr.state)
-                      throw new Error('Inconsistent related PR observation');
-                    pulls.set(pr.number, {
-                      ...previous,
-                      linkedIssues: [...new Set([...previous.linkedIssues, ...pr.linkedIssues])],
-                      crossReferencedIssues: [
-                        ...new Set([
-                          ...(previous?.crossReferencedIssues ?? []),
-                          ...pr.crossReferencedIssues,
-                        ]),
-                      ],
-                    });
-                  }
+                  Queue.offerUnsafe(queue, { kind: 'issue', value: value.metadata });
                   pendingIssues.push(...value.metadata.blockers, ...value.metadata.parents);
                 }
               }

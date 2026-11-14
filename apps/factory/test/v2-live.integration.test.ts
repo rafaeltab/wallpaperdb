@@ -2926,3 +2926,28 @@ it('dates incremental issue facts independently and exposes retained item failur
     await app.close();
   }
 });
+
+it('exposes job freshness and retained failures on jobs without a PR relationship', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42), false);
+  input.observations.items = {
+    'job:parked-owner': {
+      generation: 1,
+      sequence: 1,
+      attemptedAt: 3000,
+      observedAt: 2000,
+      failedAt: 3000,
+      error: 't3-offline',
+    },
+  };
+  const board = await liveBoard({ scopeId: 'job-freshness', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const snapshot = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1']).toMatchObject({
+      observation: { attemptedAt: 3000, observedAt: 2000, failedAt: 3000, error: 't3-offline' },
+    });
+  } finally {
+    await app.close();
+  }
+});

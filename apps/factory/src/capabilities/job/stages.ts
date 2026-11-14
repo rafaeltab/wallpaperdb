@@ -275,7 +275,11 @@ function associatedRun(
   evidence: StageEvidence | null,
   request: StageRequest
 ): evidence is StageEvidence {
-  return evidence !== null && evidence.stageIndex === request.index;
+  return (
+    evidence !== null &&
+    evidence.stageIndex === request.index &&
+    (!request.observedRunId || request.ordinal === undefined || evidence.ordinal >= request.ordinal)
+  );
 }
 
 function suspension(
@@ -294,6 +298,15 @@ function suspension(
         activity: 'cancelled' as const,
         active: false,
       };
+    // These ordinals describe observations already made, never a predicted next turn.
+    const observedOrdinal = Math.max(
+      waiting.observedRunId ? (waiting.ordinal ?? 0) : 0,
+      control.parked?.index === waiting.index ? (control.parked.run?.ordinal ?? 0) : 0
+    );
+    if (observation.run && observation.run.ordinal < observedOrdinal)
+      return control.parked?.index === waiting.index
+        ? parkedDelivery(waiting, control)
+        : { stage: waiting.stage, commit: waiting.commit, ready: false, landed: false };
     if (answerContinuation(control, waiting, observation))
       return yield* adoptAnswer(store, waiting, observation, control);
     const repaired = yield* adoptManualRepair(store, waiting, observation, control);
@@ -418,6 +431,7 @@ function adoptAnswer(
     const parkedRun = control.parked?.run;
     const run = observation.run;
     if (run && parkedRun && run.id !== parkedRun.id) {
+      if (run.ordinal <= parkedRun.ordinal) return parkedDelivery(waiting, control);
       const request: StageRequest = {
         ...waiting,
         index: waiting.index + 1,
@@ -437,6 +451,18 @@ function adoptAnswer(
   });
 }
 
+function parkedDelivery(waiting: StageRequest, control: import('./contract.js').Control): Delivery {
+  return {
+    stage: waiting.stage,
+    commit: waiting.commit,
+    ready: false,
+    landed: false,
+    activity: 'awaiting-answer',
+    active: false,
+    question: control.parked?.question,
+  };
+}
+
 export function hasAnsweredQuestion(observation: Observation, questionId: string) {
   return (
     observation.kind === 'found' && observation.answeredQuestions?.includes(questionId) === true
@@ -451,7 +477,10 @@ function answerContinuation(
   if (control.parked?.index !== waiting.index) return false;
   if (!hasAnsweredQuestion(observation, control.parked.question.id)) return false;
   return Boolean(
-    observation.run && control.parked.run && observation.run.id !== control.parked.run.id
+    observation.run &&
+      control.parked.run &&
+      observation.run.id !== control.parked.run.id &&
+      observation.run.ordinal > control.parked.run.ordinal
   );
 }
 function adoptedDelivery(

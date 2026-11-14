@@ -186,3 +186,36 @@ it('uses fresh completed stage evidence instead of reconciling an earlier runnin
     await f.close();
   }
 });
+it('does not turn a dependency response into readiness through failed-babysitter recovery', async () => {
+  const f = await fixture();
+  try {
+    f.state({ accepted: true, idle: true });
+    await f.status();
+    f.state({ accepted: true, idle: true });
+    await f.status();
+    f.state({ accepted: true, idle: true });
+    await f.status();
+    await Effect.runPromise(
+      f.store.saveStage({
+        index: 4,
+        stage: 'babysitting',
+        threadId: 'owner',
+        commit: 'b'.repeat(40),
+        previousRunId: 'run-3',
+        ordinal: 4,
+      })
+    );
+    await Effect.runPromise(f.store.claimStage(4));
+    f.state({
+      accepted: false,
+      idle: true,
+      observationStatus: 'failed',
+      run: 4,
+      dependencies: ['758'],
+      ready: true,
+    });
+    expect(await f.status()).toMatchObject({ delivery: { ready: false } });
+  } finally {
+    await f.close();
+  }
+});

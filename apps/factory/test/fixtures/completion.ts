@@ -18,6 +18,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
   let idle = false;
   let observationStatus: string | undefined;
   let migrationRequired = false;
+  let dependencies: readonly string[] | undefined;
   let clean = true;
   let run = 1;
   let commit = 'b'.repeat(40);
@@ -73,6 +74,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
                 accepted,
                 idle,
                 migrationRequired,
+                dependencies,
                 worktreeClean: clean,
                 linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
               } satisfies StageEvidence),
@@ -115,6 +117,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
       accepted?: boolean;
       idle?: boolean;
       migrationRequired?: boolean;
+      dependencies?: readonly string[];
       commit?: string;
       prCommit?: string;
       ready?: boolean;
@@ -126,6 +129,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
       accepted = change.accepted ?? accepted;
       idle = change.idle ?? idle;
       migrationRequired = change.migrationRequired ?? migrationRequired;
+      dependencies = change.dependencies ?? dependencies;
       commit = change.commit ?? commit;
       prCommit = change.prCommit ?? prCommit;
       ready = change.ready ?? ready;

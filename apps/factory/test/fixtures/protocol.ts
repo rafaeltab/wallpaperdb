@@ -1059,7 +1059,7 @@ export async function runProtocol(
       );
       const resource = JSON.parse(readFileSync(path, 'utf8'));
       const index = Number(args[3].match(/Stage (\d+) of factory/)![1]);
-      resource.runCount = resource.runCount + 1;
+      resource.runCount = Math.max(resource.runCount, config.overrides?.runCount ?? 0) + 1;
       resource.stageIndex = index;
       resource.stage = args[3].includes('$babysit-pr')
         ? 'babysitting'

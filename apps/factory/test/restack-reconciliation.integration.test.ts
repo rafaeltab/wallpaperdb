@@ -56,7 +56,7 @@ async function configure(f: Awaited<ReturnType<typeof joinFixture>>, patch: obje
 }
 async function worker(f: Awaited<ReturnType<typeof joinFixture>>) {
   const name = (await readdir(f.host.directory)).find(
-    (name) => name.startsWith('restacker-') && name.endsWith('.json')
+    (name) => name.startsWith('restacker') && name.endsWith('.json')
   );
   if (!name) throw new Error('Missing recovery worker');
   const path = join(f.host.directory, name);
@@ -66,6 +66,72 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
+
+it.each(['completed', 'cancelled', 'rolled_back'])(
+  'gates the initial review effect after resolution when its worker becomes %s',
+  async (status) => {
+    const f = await joinFixture({
+      inProcess: true,
+      conflict: true,
+      restack: { outcome: 'SIMPLE', review: true },
+    });
+    try {
+      const original = `${f.host.binary}-original`;
+      await rename(f.host.binary, original);
+      await f.host.nodeCommand(
+        't3-wrapper',
+        `
+        import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+        import { join } from 'node:path';
+        import { spawnSync } from 'node:child_process';
+        import { DatabaseSync } from 'node:sqlite';
+        const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
+        const marker = join(config.directory, 'cancel-injected');
+        if (process.argv[2] === 'thread' && process.argv[3] === 'show' && !existsSync(marker)) {
+          const db = new DatabaseSync(join(config.directory, 'factory.sqlite'), { readOnly: true });
+          const resolved = db.prepare("select 1 from records where name='resolution.json' limit 1").get();
+          db.close();
+          if (resolved) {
+            const name = readdirSync(config.directory).find(n => n.startsWith('restacker') && n.endsWith('.json'));
+            const path = join(config.directory, name);
+            const state = JSON.parse(readFileSync(path, 'utf8'));
+            state.thread.status = ${JSON.stringify(status)};
+            writeFileSync(path, JSON.stringify(state));
+            writeFileSync(marker, 'true');
+          }
+        }
+        const result = spawnSync(${JSON.stringify(original)}, process.argv.slice(2), { env: process.env, stdio: 'inherit' });
+        process.exit(result.status ?? 1);
+      `,
+        { path: f.host.binary, module: true }
+      );
+      for (let n = 0; n < 4; n++) await prepare(f);
+      expect(await readFile(join(f.host.directory, 'cancel-injected'), 'utf8')).toBe('true');
+      expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(
+        status === 'completed' ? 1 : 0
+      );
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(
+        status === 'completed'
+      );
+      if (status !== 'completed') {
+        const { path, state } = await worker(f);
+        state.thread.status = 'completed';
+        await writeFile(path, JSON.stringify(state));
+        await prepare(f);
+        expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(0);
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({
+            phase: 'manual-recovery',
+            active: false,
+            progress: expect.stringContaining('cancelled'),
+          })
+        );
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);
 
 it.each([1, 2])(
   'bounds an unclaimed intent overtaken by a worker run with limit %s',

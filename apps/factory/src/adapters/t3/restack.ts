@@ -350,6 +350,16 @@ export function t3Restacker(
     });
     return result;
   };
+  const cancelled = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (await journal.read('cancelled.json')) return true;
+    if (!['cancelled', 'rolled_back'].includes(observed.thread.status)) return false;
+    await journal.write('cancelled.json', {
+      threadId: observed.thread.threadId,
+      runId: observed.thread.latestRunId,
+    });
+    return true;
+  };
   const execution = {
     resolve: async (signal?: AbortSignal) => {
       if (await journal.read('cancelled.json'))
@@ -363,15 +373,7 @@ export function t3Restacker(
         return { progress: 'Recovery launch pending reconciliation', bindingAvailable: false };
       const display = await presentation(observed, signal);
       const saved = await journal.read('resolution.json');
-      if (
-        ['cancelled', 'rolled_back'].includes(observed.thread.status) ||
-        (await journal.read('cancelled.json'))
-      ) {
-        signal?.throwIfAborted();
-        await journal.write('cancelled.json', {
-          threadId: observed.thread.threadId,
-          runId: observed.thread.latestRunId,
-        });
+      if (await cancelled(observed, signal)) {
         return {
           ...display,
           phase: 'manual-recovery' as const,
@@ -418,6 +420,7 @@ export function t3Restacker(
     },
     review: async (commit: string, signal?: AbortSignal) => {
       const observed = await observe(signal);
+      if (!observed || (await cancelled(observed, signal))) return false;
       if (operation.mode === 'review')
         return (
           !!observed &&
@@ -438,6 +441,7 @@ export function t3Restacker(
           ordinal: observed.thread.runCount,
         })
       ) {
+        if (await cancelled(observed, signal)) return false;
         await call(
           [
             'send',

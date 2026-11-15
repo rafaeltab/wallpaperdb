@@ -232,12 +232,8 @@ function completed(thread: z.infer<typeof stageDetail>['thread'], request: Stage
   );
 }
 function parseReceipt(text: string) {
-  try {
-    const parsed = receiptSchema.safeParse(JSON.parse(text));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+  const parsed = receiptSchema.safeParse(responseValue(text));
+  return parsed.success ? parsed.data : null;
 }
 function matchesReceipt(
   result: z.infer<typeof receiptSchema>,
@@ -370,24 +366,67 @@ function reconciliationPrompt(intent: Intent, request: StageRequest, scope: stri
 function latestStructured(messages: z.infer<typeof stageDetail>['messages']) {
   return [...messages].reverse().find((m) => {
     if (m.role !== 'assistant') return false;
-    try {
-      const value = JSON.parse(m.text);
-      return (
-        value !== null &&
-        typeof value === 'object' &&
-        !Array.isArray(value) &&
-        ('jobId' in value ||
-          'version' in value ||
-          value.kind === 'state' ||
-          value.kind === 'dependencies')
-      );
-    } catch {
-      return (
-        /^\s*\{/.test(m.text) &&
-        /"(?:jobId|version)"\s*:|"kind"\s*:\s*"(?:state|dependencies)"/.test(m.text)
-      );
-    }
+    const value = responseValue(m.text);
+    if (value === undefined) return malformedResponse(m.text);
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      ('jobId' in value ||
+        'version' in value ||
+        ('kind' in value && (value.kind === 'state' || value.kind === 'dependencies')))
+    );
   });
+}
+function responseValue(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+function malformedResponse(text: string) {
+  if (!text.trimStart().startsWith('{')) return false;
+  let depth = 0;
+  let key = false;
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
+    if (character === '"') {
+      const end = stringEnd(text, index);
+      if (end >= text.length) return false;
+      if (depth === 1 && key) {
+        if (responseField(responseValue(text.slice(index, end + 1)), text.slice(end + 1)))
+          return true;
+        key = false;
+      }
+      index = end;
+    } else if (character === '{' || character === '[') {
+      depth++;
+      if (depth === 1) key = true;
+    } else if (character === '}' || character === ']') {
+      depth--;
+    } else if (character === ',' && depth === 1) {
+      key = true;
+    }
+  }
+  return false;
+}
+function stringEnd(text: string, start: number) {
+  for (let index = start + 1; index < text.length; index++) {
+    if (text[index] === '\\') index++;
+    else if (text[index] === '"') return index;
+  }
+  return text.length;
+}
+function responseField(key: unknown, tail: string) {
+  if (key === 'jobId' || key === 'version') return true;
+  if (key !== 'kind') return false;
+  const separator = /^\s*:\s*/.exec(tail);
+  if (!separator) return true;
+  const value = tail.slice(separator[0].length);
+  if (!value.startsWith('"')) return false;
+  const kind = responseValue(value.slice(0, stringEnd(value, 0) + 1));
+  return kind === undefined || kind === 'state' || kind === 'dependencies';
 }
 function pendingResponse(
   messages: z.infer<typeof stageDetail>['messages'],
@@ -397,15 +436,12 @@ function pendingResponse(
   const boundary = instructionBoundary(messages, intent, request);
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return {};
-  let value: Record<string, unknown>;
-  try {
-    value = JSON.parse(message.text);
-  } catch {
-    return {};
-  }
+  const value = responseValue(message.text);
+  if (value === undefined) return {};
   const parsed = receiptSchema.safeParse(value);
+  const version = z.object({ version: z.unknown().optional() }).safeParse(value);
   return {
-    migrationRequired: value.version !== 1,
+    migrationRequired: version.success && version.data.version !== 1,
     dependencies:
       boundary >= 0 &&
       parsed.success &&

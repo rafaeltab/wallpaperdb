@@ -67,6 +67,95 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
 
+it('retains the accepted classification while an independent review child is busy without accepting incomplete review', async () => {
+  const f = await joinFixture({
+    inProcess: true,
+    conflict: true,
+    restack: { outcome: 'COMPLEX', review: false },
+  });
+  try {
+    await prepare(f);
+    await prepare(f);
+    const { state } = await worker(f);
+    await configure(f, {
+      descendants: [{ threadId: 'pending-reviewer', parentThreadId: state.thread.threadId }],
+      descendantSnapshots: { 'pending-reviewer': { status: 'running', activeRunId: 'review-run' } },
+    });
+    await prepare(f);
+    expect(await recoveries(f)).toContainEqual(
+      expect.objectContaining({
+        classification: 'COMPLEX',
+        progress: 'Awaiting independent review-loop',
+      })
+    );
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+    expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each([false, true].flatMap((replace) => [false, true].map((legacy) => ({ replace, legacy }))))(
+  'retains the resolution owner before review, replacement=$replace legacy journal=$legacy',
+  async ({ replace, legacy }) => {
+    const f = await joinFixture({
+      inProcess: true,
+      conflict: true,
+      restack: { outcome: 'SIMPLE', review: true },
+    });
+    try {
+      const original = `${f.host.binary}-original`;
+      await rename(f.host.binary, original);
+      await f.host.nodeCommand(
+        't3-wrapper',
+        `
+        import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+        import { join } from 'node:path';
+        import { spawnSync } from 'node:child_process';
+        import { DatabaseSync } from 'node:sqlite';
+        const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
+        const marker = join(config.directory, 'owner-injected');
+        if (process.argv[2] === 'thread' && process.argv[3] === 'show' && !existsSync(marker)) {
+          const db = new DatabaseSync(join(config.directory, 'factory.sqlite'));
+          const resolved = db.prepare("select 1 from records where name='resolution.json' limit 1").get();
+          if (resolved && ${legacy}) db.prepare("delete from records where name='worker.json'").run();
+          db.close();
+          if (resolved) {
+            const name = readdirSync(config.directory).find(n => n.startsWith('restacker') && n.endsWith('.json'));
+            const path = join(config.directory, name);
+            const state = JSON.parse(readFileSync(path, 'utf8'));
+            if (${replace}) {
+              state.requestedThreadId = 'restacker-replaced';
+              state.thread.threadId = 'restacker-replaced';
+            }
+            writeFileSync(path, JSON.stringify(state));
+            writeFileSync(marker, 'true');
+          }
+        }
+        const result = spawnSync(${JSON.stringify(original)}, process.argv.slice(2), { env: process.env, stdio: 'inherit' });
+        process.exit(result.status ?? 1);
+      `,
+        { path: f.host.binary, module: true }
+      );
+      for (let n = 0; n < 5; n++) await prepare(f);
+      expect(await readFile(join(f.host.directory, 'owner-injected'), 'utf8')).toBe('true');
+      const sends = (await f.host.calls()).filter((c) => c.args[1] === 'send');
+      expect(sends.map((c) => c.args[2])).toEqual(replace ? [] : ['restacker']);
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(!replace);
+      if (replace)
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({
+            phase: 'manual-recovery',
+            active: false,
+            progress: expect.stringContaining('owning worker changed'),
+          })
+        );
+    } finally {
+      await f.close();
+    }
+  }
+);
+
 it.each(
   ['completed', 'cancelled', 'rolled_back'].flatMap((status) =>
     ['show', 'activity'].map((boundary) => ({ status, boundary }))

@@ -41,6 +41,7 @@ const detail = z.object({
 const cancellationState = z.object({
   thread: detail.shape.thread.pick({ threadId: true, latestRunId: true, status: true }),
 });
+const workerIdentity = z.object({ threadId: z.string().min(1) });
 const latestRecoveryResponse = (messages: z.infer<typeof detail>['messages']) =>
   [...messages].reverse().find((message) => {
     if (latestStructured([message])) return true;
@@ -100,6 +101,26 @@ export function t3Restacker(
       await command('git', ['branch', '--show-current'], thread.worktreePath, signal)
     ).trim();
     if (actualBranch !== branch) return null;
+    if (!(await journal.read('worker.json'))) {
+      const retained = await Promise.all(
+        ['resolution.json', 'review-delivery.json', 'reconciliation-1.json'].map((name) =>
+          journal.read(name)
+        )
+      );
+      const owner = retained
+        .map((value) => workerIdentity.safeParse(value))
+        .find((value) => value.success);
+      await journal.write('worker.json', owner?.data ?? { threadId: observed.thread.threadId });
+    }
+    const owner = workerIdentity.parse(await journal.read('worker.json'));
+    if (owner.threadId !== observed.thread.threadId) {
+      await journal.write('owner-changed.json', {
+        ...owner,
+        replacement: observed.thread.threadId,
+      });
+      return null;
+    }
+    if (await journal.read('owner-changed.json')) return null;
     await cancelled(observed, signal);
     return observed;
   };
@@ -149,7 +170,11 @@ export function t3Restacker(
       observed.thread.latestRunId,
       signal
     );
-    return state === 'idle' && !(await journal.read('cancelled.json'));
+    return (
+      state === 'idle' &&
+      !(await journal.read('cancelled.json')) &&
+      !(await journal.read('owner-changed.json'))
+    );
   };
   const reconciliation = recoveryReconciliation(
     journal,
@@ -325,15 +350,17 @@ export function t3Restacker(
     active: observed.thread.pendingRequestCount === 0,
     question: await question(observed, signal),
   });
+  const matchingResolution = (saved: unknown, head: string) =>
+    z
+      .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
+      .safeParse(saved);
   const savedResolution = async (
     saved: unknown,
     observed: z.infer<typeof detail>,
     head: string,
     signal?: AbortSignal
   ) => {
-    const accepted = z
-      .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
-      .safeParse(saved);
+    const accepted = matchingResolution(saved, head);
     if (accepted.success) return accepted.data;
     if (
       (await journal.read('review-delivery.json')) &&
@@ -374,6 +401,20 @@ export function t3Restacker(
   };
   const execution = {
     resolve: async (signal?: AbortSignal) => {
+      const changedOwner = async () => {
+        const owner = workerIdentity.safeParse(await journal.read('owner-changed.json'));
+        return owner.success
+          ? {
+              phase: 'manual-recovery' as const,
+              active: false,
+              bindingAvailable: false,
+              threadId: owner.data.threadId,
+              progress: 'Recovery owning worker changed; manual recovery required',
+            }
+          : null;
+      };
+      const ownerStop = await changedOwner();
+      if (ownerStop) return ownerStop;
       if (await journal.read('cancelled.json'))
         return {
           phase: 'manual-recovery' as const,
@@ -382,7 +423,12 @@ export function t3Restacker(
         };
       const observed = await ensureLaunch(signal);
       if (!observed)
-        return { progress: 'Recovery launch pending reconciliation', bindingAvailable: false };
+        return (
+          (await changedOwner()) ?? {
+            progress: 'Recovery launch pending reconciliation',
+            bindingAvailable: false,
+          }
+        );
       const display = await presentation(observed, signal);
       const saved = await journal.read('resolution.json');
       if (await cancelled(observed, signal)) {
@@ -404,8 +450,20 @@ export function t3Restacker(
         };
       }
       const head = await currentHead(observed, signal);
-      if (!(await idle(observed, signal))) return display;
       const reviewDelivery = await journal.read('review-delivery.json');
+      const accepted = head ? matchingResolution(saved, head) : null;
+      // Retain classification for display only. Incomplete review never carries a
+      // commit into the capability's readiness path.
+      const pending =
+        reviewDelivery && accepted?.success
+          ? {
+              ...display,
+              phase: 'reviewing' as const,
+              classification: accepted.data.classification,
+              progress: 'Awaiting independent review-loop',
+            }
+          : display;
+      if (!(await idle(observed, signal))) return pending;
       if (
         reviewDelivery &&
         !observed.messages.some(
@@ -416,15 +474,15 @@ export function t3Restacker(
         )
       )
         return {
-          ...display,
+          ...pending,
           phase: 'reviewing' as const,
           progress: 'Recovery review delivery pending reconciliation',
         };
       const phase = reviewDelivery ? ('review' as const) : ('resolve' as const);
       if (!head || !(await receipt(observed, phase, head, signal)))
-        return { ...display, ...(await reconcile(observed, phase, signal)) };
+        return { ...pending, ...(await reconcile(observed, phase, signal)) };
       return {
-        ...display,
+        ...pending,
         ...(saved
           ? await savedResolution(saved, observed, head, signal)
           : await acceptResolution(observed, head, signal)),

@@ -1,3 +1,4 @@
+import { readdir as physicalDirectory } from 'node:fs/promises';
 import { readFile, writeFile, readdir, rename, unlink } from './fixtures/durable-state.js';
 import { join } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -76,6 +77,7 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
                 ...host.mcp,
                 project: host.repository,
                 projectId: 'project-id',
+                ...f.host.mcp,
                 binary: host.binary,
               })
             )
@@ -342,6 +344,7 @@ it('continues a disjoint join while another prerequisite path remains conflicted
         directory: join(f.host.directory, 'joins'),
         binary: f.host.binary,
         projectId: 'project-id',
+        ...f.host.mcp,
       },
     });
     if (!second.prepare) throw new Error('Missing preparation');
@@ -588,6 +591,7 @@ it.each([
                 directory: join(f.host.directory, 'joins'),
                 binary: f.host.binary,
                 projectId: 'project-id',
+                ...f.host.mcp,
               },
             })
           : f.reopen();
@@ -639,6 +643,7 @@ it.each([
                     ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
+                    ...f.host.mcp,
                     binary: f.host.binary,
                   })
                 )
@@ -718,6 +723,7 @@ it.each([
         directory: join(f.host.directory, 'joins'),
         binary: f.host.binary,
         projectId: 'project-id',
+        ...f.host.mcp,
       },
     };
     const second = githubIssues(config, f.readGitHub);
@@ -835,7 +841,7 @@ it.each([
 });
 
 it.each([
-  { outcome: 'SIMPLE' as const, review: false, ready: true },
+  { outcome: 'SIMPLE' as const, review: true, ready: true },
   { outcome: 'COMPLEX' as const, review: true, ready: true },
   { outcome: 'COMPLEX' as const, review: true, repair: true, ready: true },
   { outcome: 'COMPLEX' as const, review: true, resolveOrdinal: 8, reviewOrdinal: 21, ready: true },
@@ -843,6 +849,7 @@ it.each([
   { outcome: 'COMPLEX' as const, review: true, resolveOrdinal: 8, reviewOrdinal: 8, ready: false },
   { outcome: 'SIMPLE' as const, staleRun: true, ready: true },
   { outcome: 'SIMPLE' as const, wrongDelivery: true, ready: false },
+  { outcome: 'SIMPLE' as const, wrongBase: true, ready: false },
   { outcome: 'SIMPLE' as const, responseThreadId: 'different-thread', ready: false },
   { outcome: 'COMPLEX' as const, review: false, ready: false },
   { outcome: undefined, review: false, ready: false },
@@ -1103,6 +1110,8 @@ it('resumes a later conflict using the earlier durable replay head across commit
           directory: join(f.host.directory, 'joins'),
           binary: f.host.binary,
           projectId: 'project-id',
+          ...f.host.mcp,
+          ...f.host.mcp,
         },
       });
     process.env.GIT_COMMITTER_DATE = '2026-11-02T00:00:01Z';
@@ -1264,14 +1273,19 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
       saved.thread.status = 'completed';
       saved.thread.pendingRequestCount = 0;
       saved.messages = [
+        { role: 'user', text: `Factory instruction ${saved.operation}:resolve.` },
+        { role: 'assistant', text: '<RESTACK>SIMPLE</RESTACK>' },
         {
           role: 'assistant',
           runId: 'resolve-run',
           text: JSON.stringify({
-            delivery: `${saved.operation}:resolve`,
-            operation: saved.operation,
-            commit: saved.head,
-            outcome: '<RESTACK>SIMPLE</RESTACK>',
+            version: 1,
+            kind: 'state',
+            jobId: saved.operation,
+            implemented: saved.implemented,
+            base: saved.onto,
+            checked: saved.head,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ];
@@ -1324,6 +1338,101 @@ it('normalizes independent layers on different authenticated main revisions with
         `${f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]}..${head}`
       )
     ).toBe('C.txt');
+  } finally {
+    await f.close();
+  }
+});
+
+it('withholds automatic replay publication and dependent work without fresh review at the reconstructed head', async () => {
+  const f = await fixture({ independentMain: true, automaticReview: false });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(false);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(f.d);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    expect(
+      (await f.host.calls()).some((call) => call.args[0] === 'pr' && call.args[1] === 'edit')
+    ).toBe(false);
+  } finally {
+    await f.close();
+  }
+});
+
+it('withholds conflict recovery while a descendant below a finished reviewer remains active', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
+  try {
+    await f.host.save({
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      descendants: [
+        { threadId: 'finished-reviewer', parentThreadId: 'restacker' },
+        { threadId: 'active-leaf', parentThreadId: 'finished-reviewer' },
+      ],
+      descendantSnapshots: { 'active-leaf': { status: 'running', activeRunId: 'leaf-run' } },
+    });
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(false);
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+  } finally {
+    await f.close();
+  }
+});
+
+it('resumes a retained normalization comparison after main advances without duplicating its review worker', async () => {
+  const f = await fixture({ independentMain: true, automaticReview: false });
+  try {
+    const boundary = f.git('rev-parse', 'main');
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(false);
+    const name = (await physicalDirectory(f.host.directory)).find(
+      (name) => name.startsWith('restacker-') && name.endsWith('.json')
+    );
+    if (!name)
+      throw new Error(
+        `Missing retained review worker: ${JSON.stringify(await Effect.runPromise(f.issues.inspect(5)))}; calls ${JSON.stringify((await f.host.calls()).filter((call) => call.program === 't3'))}`
+      );
+    const path = join(f.host.directory, name);
+    const worker = JSON.parse(await readFile(path, 'utf8'));
+    const message = worker.messages.at(-1);
+    const state = JSON.parse(message.text);
+    message.text = JSON.stringify({ ...state, reviewed: state.checked });
+    await writeFile(path, JSON.stringify(worker));
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    await f.host.save({ ...config, automaticReview: true });
+    f.git('switch', 'main');
+    await writeFile(join(f.host.repository, 'later-main.txt'), 'later independent main');
+    f.git('add', '.');
+    f.git('commit', '-m', 'later main');
+    f.git('push', 'origin', 'main');
+    f.git('switch', '--detach', f.host.base);
+    const resumed = f.reopen();
+    await Effect.runPromise(resumed.prepare?.(5) ?? Effect.void);
+    const result = await Effect.runPromise(resumed.inspect(5));
+    expect(result.blockersReady).toBe(true);
+    const head = result.prerequisite?.base;
+    if (!head) throw new Error('Missing resumed head');
+    expect(f.git('log', '--format=%s', `${boundary}..${head}`)).toBe('C\nD');
+    expect(f.git('ls-tree', '--name-only', head)).toBe('C.txt\nD.txt\nmain-update.txt');
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(2);
+  } finally {
+    await f.close();
+  }
+});
+
+it('preserves the selected open prerequisite as its own layer while normalizing different main roots', async () => {
+  const f = await fixture({ independentMain: 'with-prerequisite' });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const result = await Effect.runPromise(f.issues.inspect(5));
+    expect(result.blockersReady).toBe(true);
+    const head = result.prerequisite?.base;
+    if (!head) throw new Error('Missing normalized head');
+    expect(f.git('log', '--format=%s', `main..${head}`)).toBe('C\nD\nA');
+    expect(f.git('ls-tree', '--name-only', head)).toBe('A.txt\nC.txt\nD.txt\nmain-update.txt');
+    const metadata = JSON.parse(await readFile(join(f.host.directory, 'join-live.json'), 'utf8'));
+    expect(metadata.prs[101].base).toBe('main');
+    expect(metadata.prs[103].base).toBe('A');
+    expect(metadata.prs[104].base).toBe('D');
   } finally {
     await f.close();
   }

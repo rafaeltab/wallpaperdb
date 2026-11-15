@@ -87,7 +87,7 @@ async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
   await saveLanding(f, {
     join: joinState,
     landing: { merge: merged, head: a },
-    restack: options.restack,
+    restack: options.restack ? { review: true, ...options.restack } : undefined,
     joinWriter: options.writer,
   });
   const config = {
@@ -103,6 +103,7 @@ async function landedFixture(options: Parameters<typeof fixture>[0] = {}) {
       directory: join(host.directory, 'joins'),
       binary: host.binary,
       projectId: 'project-id',
+      ...f.host.mcp,
     },
   };
   return {
@@ -342,14 +343,19 @@ it('reserves the released recovery slot before a COMPLEX review send alongside u
     saved.thread.status = 'completed';
     saved.thread.pendingRequestCount = 0;
     saved.messages = [
+      { role: 'user', text: `Factory instruction ${saved.operation}:resolve.` },
+      { role: 'assistant', text: '<RESTACK>COMPLEX</RESTACK>' },
       {
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
-          delivery: `${saved.operation}:resolve`,
-          operation: saved.operation,
-          commit: saved.head,
-          outcome: '<RESTACK>COMPLEX</RESTACK>',
+          version: 1,
+          kind: 'state',
+          jobId: saved.operation,
+          implemented: saved.implemented,
+          base: saved.onto,
+          checked: saved.head,
+          checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
         }),
       },
     ];
@@ -602,6 +608,7 @@ it.each([false, true])(
           ...f.host.mcp,
           project: f.host.repository,
           projectId: 'project-id',
+          ...f.host.mcp,
           binary: f.host.binary,
         });
         const store = fileStore(join(f.host.directory, 'successive-stage'));
@@ -668,8 +675,8 @@ it.each([false, true])(
               kind: 'found',
             });
             if (candidate === prior)
-              await expect(Effect.runPromise(execution.observe(command))).rejects.toMatchObject({
-                _tag: 'Unavailable',
+              expect(await Effect.runPromise(execution.observe(command))).toMatchObject({
+                kind: 'found',
               });
             await Effect.runPromise(execution.sendStage(command, request));
             expect(
@@ -1156,6 +1163,7 @@ it.each([false, true])(
           directory: join(f.host.directory, 'joins'),
           binary: f.host.binary,
           projectId: 'project-id',
+          ...f.host.mcp,
         },
       };
       if (knownExternal) state.prs[102].base = 'main';
@@ -1781,6 +1789,7 @@ it.each(['review', 'publication', 'ci'] as const)(
         ...f.host.mcp,
         project: f.host.repository,
         projectId: 'project-id',
+        ...f.host.mcp,
         binary: f.host.binary,
       });
       for (const context of [
@@ -1788,9 +1797,14 @@ it.each(['review', 'publication', 'ci'] as const)(
         { ...request, threadId: 'unrelated' },
         { ...request, stage: 'implementation' as const },
       ])
-        await expect(Effect.runPromise(execution.observe(intent, context))).rejects.toMatchObject({
-          _tag: 'Unavailable',
+        expect(await Effect.runPromise(execution.observe(intent, context))).toMatchObject({
+          kind: 'found',
         });
+      expect(
+        await Effect.runPromise(
+          execution.inspectStage(intent, { ...request, stage: 'implementation' })
+        )
+      ).not.toMatchObject({ accepted: true });
       expect(
         await Effect.runPromise(execution.observe(intent, { ...request, stage: 'babysitting' }))
       ).toMatchObject({ kind: 'found' });
@@ -2068,6 +2082,7 @@ it.each(['C', 'B'])(
         binary: f.host.binary,
         project: f.host.repository,
         projectId: 'project-id',
+        ...f.host.mcp,
       });
       const authority = async (stage: 'review' | 'publication', commit = h2, attempt = 0) => {
         const index = (stage === 'review' ? 5 : 6) + attempt;
@@ -2118,6 +2133,7 @@ it.each(['C', 'B'])(
             threadId: request.threadId,
             title: `Factory ${intent.id}`,
             projectId: 'project-id',
+            ...f.host.mcp,
             providerInstanceId: 'codex',
             model: 'gpt-6.1-sol',
             branch,
@@ -2555,6 +2571,7 @@ process.exit(result.status ?? 1);
       ...f.host.mcp,
       project: f.host.repository,
       projectId: 'project-id',
+      ...f.host.mcp,
       binary: parentBinary,
     });
     const request: import('../src/capabilities/job/index.js').StageRequest = {
@@ -2673,14 +2690,19 @@ process.exit(result.status ?? 1);
     saved.thread.status = 'completed';
     saved.thread.pendingRequestCount = 0;
     saved.messages = [
+      { role: 'user', text: `Factory instruction ${saved.operation}:resolve.` },
+      { role: 'assistant', text: '<RESTACK>COMPLEX</RESTACK>' },
       {
         role: 'assistant',
         runId: 'resolve-run',
         text: JSON.stringify({
-          delivery: `${saved.operation}:resolve`,
-          operation: saved.operation,
-          commit: saved.head,
-          outcome: '<RESTACK>COMPLEX</RESTACK>',
+          version: 1,
+          kind: 'state',
+          jobId: saved.operation,
+          implemented: saved.implemented,
+          base: saved.onto,
+          checked: saved.head,
+          checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
         }),
       },
     ];

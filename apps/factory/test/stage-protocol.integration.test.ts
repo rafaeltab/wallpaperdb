@@ -791,8 +791,73 @@ it('accepts an authenticated newer-main comparison at a freshly checked and revi
       commit: head,
       base,
     });
+    for (const change of [
+      { base: intent.base },
+      { reviewed: intent.base },
+      { base: 'f'.repeat(40) },
+    ]) {
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          instruction(intent, current),
+          { role: 'assistant', text: JSON.stringify({ ...state(intent, head), base, ...change }) },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        accepted: true,
+      });
+    }
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(intent, current),
+        { role: 'assistant', text: JSON.stringify({ ...state(intent, head), base }) },
+      ],
+    });
     git('push', 'origin', `${intent.base}:refs/heads/main`, '--force');
     expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
       accepted: true,
     });
+  }));
+
+it('requires manual recovery when rebasing to main omits a prepared unmerged prerequisite', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const binding = await Effect.runPromise(adapter.observe(intent));
+    if (binding.kind !== 'found') throw new Error('Missing owner');
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' }).trim();
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.invalid');
+    execFileSync('git', ['init', '--bare', join(host.directory, 'origin.git')]);
+    git('remote', 'add', 'origin', join(host.directory, 'origin.git'));
+    await writeFile(join(binding.worktree, 'prerequisite.txt'), 'required open code');
+    git('add', '.');
+    git('commit', '-m', 'prerequisite');
+    const prepared = git('rev-parse', 'HEAD');
+    await writeFile(join(binding.worktree, 'issue.txt'), 'issue code');
+    git('add', '.');
+    git('commit', '-m', 'issue');
+    git('switch', '--detach', intent.base);
+    await writeFile(join(binding.worktree, 'main.txt'), 'main advancement');
+    git('add', '.');
+    git('commit', '-m', 'main');
+    const main = git('rev-parse', 'HEAD');
+    git('push', 'origin', 'HEAD:refs/heads/main');
+    git('switch', intent.branch);
+    git('rebase', '--onto', main, prepared);
+    const head = git('rev-parse', 'HEAD');
+    const original = { ...intent, base: prepared, prBase: 'prerequisite' };
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(original, request),
+        { role: 'assistant', text: JSON.stringify({ ...state(original, head), base: main }) },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(original, request))).toMatchObject({
+      accepted: false,
+      unexpectedBase: true,
+      commit: head,
+    });
+    expect(git('ls-tree', '--name-only', head)).toBe('issue.txt\nmain.txt');
   }));

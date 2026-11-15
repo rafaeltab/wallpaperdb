@@ -60,6 +60,7 @@ for (const { boundary, edit } of scenarios) {
     const origin = `http://127.0.0.1:${address.port}`;
     const env = {
       ...process.env,
+      ...host.mcpEnvironment,
       FACTORY_FIXTURE: host.configFile,
       FACTORY_PROJECT: host.repository,
       FACTORY_T3_PROJECT_ID: 'project-id',
@@ -198,6 +199,7 @@ for (const { boundary, edit } of scenarios) {
         calls.filter(
           (call) =>
             call.args[1] === 'start' &&
+            !call.args[3]?.includes('Automatic replay review.') &&
             !call.args.includes('--help') &&
             call.args.includes('--title')
         ).length
@@ -209,7 +211,7 @@ for (const { boundary, edit } of scenarios) {
         )
       ).toHaveLength(1);
       if (boundary === 'local')
-        expect(git('worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(2);
+        expect(git('worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(3);
       process.stdout.write(
         `Restack SIGKILL recovery ${boundary}: ${JSON.stringify({ head, target: live.prs['104'].base, members: live.groups[0].pull_requests, ready: observed.blockersReady, storage: 'production journal', protocols: 'controlled GitHub/T3/CI; operator asserted prerequisite reviews', landing: false })}\n`
       );

@@ -248,10 +248,17 @@ async function verifyObservedHead(
   const bound = repair?.threadId === threadId ? repair : undefined;
   const head = (await command('git', ['rev-parse', 'HEAD'], worktree, signal)).trim();
   if (exactReplayHead(head, bound)) return;
-  await command(
-    'git',
-    ['merge-base', '--is-ancestor', replayObservationBase(intent, bound), 'HEAD'],
-    worktree,
-    signal
-  );
+  try {
+    await command(
+      'git',
+      ['merge-base', '--is-ancestor', replayObservationBase(intent, bound), 'HEAD'],
+      worktree,
+      signal
+    );
+  } catch (cause) {
+    // A changed base does not change thread/worktree ownership. Completion's
+    // comparison verifier rejects omitted prerequisites as manual recovery.
+    if (cause instanceof Error && 'code' in cause && cause.code === 1) return;
+    throw cause;
+  }
 }

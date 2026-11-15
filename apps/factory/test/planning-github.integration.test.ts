@@ -125,6 +125,7 @@ it.each([undefined, false, true])(
           directory: join(f.host.directory, 'joins'),
           binary: f.host.binary,
           projectId: 'project-id',
+          ...f.host.mcp,
         },
         admitRecovery: () => Effect.succeed(false),
       });

@@ -10,7 +10,7 @@ export const RestackLive = Layer.effect(
           const resolution = yield* ports.resolve();
           if (!resolution.classification || !resolution.commit)
             return { ...resolution, ready: false };
-          if (resolution.classification === 'COMPLEX' && !(yield* ports.review(resolution.commit)))
+          if (!(yield* ports.review(resolution.commit)))
             return {
               ...resolution,
               phase: 'reviewing' as const,

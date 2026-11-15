@@ -658,3 +658,33 @@ it.each(['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back
       expect(JSON.parse(sends[0].args[2]).threadId).toBe('thread-live');
     })
 );
+
+it.each(['prose', 'malformed', 'invalid-version-one', 'legacy', 'supported-negative'] as const)(
+  'distinguishes response support after migration: %s',
+  (kind) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const text =
+        kind === 'prose'
+          ? 'I could not complete the migration.'
+          : kind === 'malformed'
+            ? '{"version":1,"kind":"state",'
+            : kind === 'invalid-version-one'
+              ? JSON.stringify({ version: 1, kind: 'state', jobId: intent.id })
+              : kind === 'legacy'
+                ? JSON.stringify({ jobId: intent.id, outcome: '<TASK>COMPLETE</TASK>' })
+                : JSON.stringify({
+                    ...state(intent, host.base),
+                    checks: { ...state(intent, host.base).checks, tests: false },
+                  });
+      const migration = { ...request, reconciliation: 'migration' as const };
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [instruction(intent, migration), { role: 'assistant', text }],
+      });
+      const evidence = await Effect.runPromise(adapter.inspectStage(intent, migration));
+      expect(evidence?.accepted).toBe(false);
+      expect(evidence?.migrationRequired).toBe(
+        kind === 'legacy' ? true : kind === 'supported-negative' ? false : undefined
+      );
+    })
+);

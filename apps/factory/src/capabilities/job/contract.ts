@@ -320,6 +320,8 @@ export interface StageRequest {
 }
 export interface StageEvidence {
   readonly idle?: boolean;
+  /** True identifies an obsolete format; false proves a structurally supported
+   * response after the instruction. Absence supplies neither proof. */
   readonly migrationRequired?: boolean;
   readonly dependencies?: readonly string[];
   readonly runId: string;

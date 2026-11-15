@@ -17,7 +17,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
   let accepted = false;
   let idle = false;
   let observationStatus: string | undefined;
-  let migrationRequired = false;
+  let migrationRequired: boolean | undefined = false;
   let dependencies: readonly string[] | undefined;
   let clean = true;
   let run = 1;
@@ -128,7 +128,7 @@ export async function completionFixture(limit = 3, store: JobStore = controlledS
     }) => {
       accepted = change.accepted ?? accepted;
       idle = change.idle ?? idle;
-      migrationRequired = change.migrationRequired ?? migrationRequired;
+      if ('migrationRequired' in change) migrationRequired = change.migrationRequired;
       dependencies = change.dependencies ?? dependencies;
       commit = change.commit ?? commit;
       prCommit = change.prCommit ?? prCommit;

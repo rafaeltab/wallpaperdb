@@ -463,7 +463,12 @@ function pendingResponse(
   const parsed = receiptSchema.safeParse(value);
   const version = z.object({ version: z.unknown().optional() }).safeParse(value);
   return {
-    migrationRequired: version.success && version.data.version !== 1,
+    migrationRequired:
+      boundary >= 0 && parsed.success
+        ? false
+        : version.success && version.data.version !== 1
+          ? true
+          : undefined,
     dependencies:
       boundary >= 0 &&
       parsed.success &&

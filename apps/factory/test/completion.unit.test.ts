@@ -460,3 +460,31 @@ it('does not spend a stale implementation attempt after a concurrent valid obser
     await f.close();
   }
 });
+
+it('carries the verified new comparison into review and publication without changing admission identity', async () => {
+  const f = await fixture();
+  try {
+    const base = 'd'.repeat(40);
+    f.state({ accepted: true, idle: true, base });
+    await f.status();
+    expect(f.sends.at(-1)).toMatchObject({ stage: 'review', acceptedBase: base });
+    f.state({ accepted: true, idle: true });
+    await f.status();
+    expect(f.sends.at(-1)).toMatchObject({ stage: 'publication', acceptedBase: base });
+    expect(await Effect.runPromise(f.store.read())).toMatchObject({ base: 'a'.repeat(40) });
+  } finally {
+    await f.close();
+  }
+});
+it('withholds progression and reconciliation for an unexpected comparison', async () => {
+  const f = await fixture();
+  try {
+    f.state({ idle: true, unexpectedBase: true });
+    expect(await f.status()).toMatchObject({
+      delivery: { activity: 'manual-recovery', active: false, ready: false },
+    });
+    expect(f.sends).toHaveLength(0);
+  } finally {
+    await f.close();
+  }
+});

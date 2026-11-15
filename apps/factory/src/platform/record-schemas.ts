@@ -23,6 +23,10 @@ export const intentSchema = z
   .strict();
 const stageSchema = z
   .object({
+    acceptedBase: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/)
+      .optional(),
     receiptProtocol: z.literal('delivery-v1').optional(),
     handback: z.array(z.string()).optional(),
     reconciliation: z.enum(['state', 'migration']).optional(),

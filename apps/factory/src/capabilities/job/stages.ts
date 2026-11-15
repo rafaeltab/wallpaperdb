@@ -86,6 +86,7 @@ function advance(
       index: waiting.index + 1,
       receiptProtocol: 'delivery-v1',
       comparison: nextComparison(waiting),
+      acceptedBase: evidence.base ?? waiting.acceptedBase,
       stage:
         waiting.stage === 'publication'
           ? 'ci'
@@ -287,6 +288,13 @@ function reconcileStage(
       ready: false,
       landed: false,
     };
+    if (evidence?.unexpectedBase)
+      return {
+        ...delivery,
+        active: false,
+        activity: 'manual-recovery' as const,
+        progress: 'Unexpected comparison base; manual recovery required.',
+      };
     const verified = completedEvidence(evidence) ? evidence : null;
     const publication =
       verified && ['publication', 'babysitting'].includes(waiting.stage)

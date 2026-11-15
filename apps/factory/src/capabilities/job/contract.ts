@@ -315,6 +315,8 @@ export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
 /** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
+  /** Authenticated main comparison retained after an agent rebase. */
+  readonly acceptedBase?: string;
   readonly handback?: readonly string[];
   readonly reconciliation?: 'state' | 'migration';
   readonly receiptProtocol?: 'delivery-v1';
@@ -343,6 +345,8 @@ export interface StageRequest {
   readonly previousRunId: string | null;
 }
 export interface StageEvidence {
+  readonly base?: string;
+  readonly unexpectedBase?: boolean;
   readonly idle?: boolean;
   /** True identifies an obsolete format; false proves a structurally supported
    * response after the instruction. Absence supplies neither proof. */

@@ -9,6 +9,7 @@ import {
   Unavailable,
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
+import { verifiedComparison } from './comparison.js';
 
 const historyWindow = 1000;
 const responseShape = `type AgentResponse =
@@ -25,7 +26,7 @@ export function receiptInstructions(
 \`\`\`typescript
 ${responseShape}
 \`\`\`
-Use version 1, jobId=${JSON.stringify(intent.id)}, implemented=${JSON.stringify(String(intent.issue))} and base=${JSON.stringify(intent.base)}. Every true check attests successful required local validation at checked, including formatting and lint. Established repository exemptions require a reason in the retained evidence. checked must match the current clean owning HEAD. ${stage === 'implementation' ? '' : 'reviewed must match checked and attest fresh independent Standards, Spec and Defects reviews at that commit.'} ${['publication', 'babysitting'].includes(stage) ? 'published must also match checked and the authoritative linked PR head.' : ''} Keep detailed validation, review and demonstration evidence in the outside-repository ledger. If prerequisite work is needed, return the dependencies variant without claiming completion or successful checks. Do not invent successful checks or a waiting outcome. Registered waits and PR watchers keep you busy until their continuations settle.`;
+Use version 1, jobId=${JSON.stringify(intent.id)}, implemented=${JSON.stringify(String(intent.issue))} and report your actual comparison in base, initially ${JSON.stringify(intent.base)}. A newer main comparison must preserve the allowed boundary and required unmerged prerequisites. The factory verifies ancestry independently. Unexpected feature bases require manual recovery. If required issue code is missing, use the dependencies response; do not invent a stack. Every true check attests successful required local validation at checked, including formatting and lint. Established repository exemptions require a reason in the retained evidence. checked must match the current clean owning HEAD. ${stage === 'implementation' ? '' : 'reviewed must match checked and attest fresh independent Standards, Spec and Defects reviews at that commit.'} ${['publication', 'babysitting'].includes(stage) ? 'published must also match checked and the authoritative linked PR head.' : ''} Keep detailed validation, review and demonstration evidence in the outside-repository ledger. If prerequisite work is needed, return the dependencies variant without claiming completion or successful checks. Do not invent successful checks or a waiting outcome. Registered waits and PR watchers keep you busy until their continuations settle.`;
 }
 const receiptSchema = z.discriminatedUnion('kind', [
   z
@@ -188,7 +189,23 @@ export function stageExecution(
               const pending = pendingRun(raw, request, intent);
               return pending ? { ...pending, commit, worktreeClean: !dirty } : null;
             }
+            const comparison = await verifiedComparison(
+              binding.worktree,
+              original,
+              intent,
+              result.base,
+              commit,
+              Boolean(request.comparison),
+              signal
+            );
+            if (!comparison) {
+              const pending = pendingRun(raw, request, intent);
+              return pending
+                ? { ...pending, commit, worktreeClean: true, unexpectedBase: true }
+                : null;
+            }
             return {
+              base: result.base,
               runId: thread.latestRunId,
               ordinal: thread.runCount,
               commit,
@@ -210,6 +227,7 @@ export function stageExecution(
 }
 
 function comparisonIntent(intent: Intent, request: StageRequest): Intent {
+  if (request.acceptedBase) return { ...intent, base: request.acceptedBase };
   return request.comparison
     ? { ...intent, base: request.comparison.base, prBase: request.comparison.prBase }
     : intent;
@@ -247,7 +265,6 @@ function matchesReceipt(
     result.kind === 'state' &&
     result.jobId === intent.id &&
     result.implemented === String(intent.issue) &&
-    result.base === intent.base &&
     Object.values(result.checks).every(Boolean) &&
     (request.stage === 'implementation' || result.reviewed === result.checked) &&
     (!['publication', 'babysitting'].includes(request.stage) || result.published === result.checked)

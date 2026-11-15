@@ -18,6 +18,8 @@ export async function completionFixture(
   store: JobStore = controlledStore(),
   verified?: () => Effect.Effect<void>
 ) {
+  let base: string | undefined;
+  let unexpectedBase = false;
   let accepted = false;
   let idle = false;
   let observationStatus: string | undefined;
@@ -80,6 +82,8 @@ export async function completionFixture(
               }),
             inspectStage: (_intent, stage) =>
               Effect.succeed({
+                base,
+                unexpectedBase,
                 runId: `run-${run}`,
                 ordinal: run,
                 stageIndex: stage.index,
@@ -127,6 +131,8 @@ export async function completionFixture(
       call((job) => job.resume(command)),
     cancel: (id: string) => call((job) => job.cancel(id)),
     state: (change: {
+      base?: string;
+      unexpectedBase?: boolean;
       accepted?: boolean;
       idle?: boolean;
       migrationRequired?: boolean;
@@ -141,6 +147,8 @@ export async function completionFixture(
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
       handbackVerified?: boolean;
     }) => {
+      base = change.base ?? base;
+      unexpectedBase = change.unexpectedBase ?? unexpectedBase;
       dependencyResult = change.dependencyResult ?? dependencyResult;
       handbackVerified = change.handbackVerified ?? handbackVerified;
       accepted = change.accepted ?? accepted;

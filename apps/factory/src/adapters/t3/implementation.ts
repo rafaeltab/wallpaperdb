@@ -235,7 +235,7 @@ function exactReplayHead(head: string, repair?: StageRequest) {
   );
 }
 function replayObservationBase(intent: Intent, repair?: StageRequest) {
-  return repair?.comparison && repair.stage !== 'implementation' ? repair.commit : intent.base;
+  return repair?.comparison?.base ?? repair?.acceptedBase ?? intent.base;
 }
 
 async function verifyObservedHead(

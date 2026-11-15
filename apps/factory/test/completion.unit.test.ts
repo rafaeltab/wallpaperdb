@@ -219,3 +219,55 @@ it('does not turn a dependency response into readiness through failed-babysitter
     await f.close();
   }
 });
+
+it.each([
+  { status: 'failed', attempts: 0 },
+  { status: 'interrupted', attempts: 0 },
+  { status: 'failed', attempts: 2 },
+  { status: 'interrupted', attempts: 2 },
+])(
+  'observes successful CI before idle $status reconciliation with $attempts attempts spent',
+  async ({ status, attempts }) => {
+    const f = await fixture(2);
+    try {
+      for (let stage = 0; stage < 3; stage++) {
+        f.state({ accepted: true, idle: true });
+        await f.status();
+      }
+      await Effect.runPromise(
+        f.store.saveStage({
+          index: 4,
+          stage: 'babysitting',
+          threadId: 'owner',
+          commit: 'b'.repeat(40),
+          previousRunId: 'run-3',
+          ordinal: 4,
+        })
+      );
+      await Effect.runPromise(f.store.claimStage(4));
+      const control = await Effect.runPromise(f.store.readControl());
+      await Effect.runPromise(
+        f.store.saveControl({
+          ...control,
+          revision: control.revision + 1,
+          reconciliation: { attempts, migrated: false },
+        })
+      );
+      f.state({ accepted: false, idle: true, observationStatus: status, run: 4, ready: true });
+      const sends = f.sends.length;
+      for (let observation = 0; observation < 2; observation++)
+        expect(await f.status()).toMatchObject({
+          resume: undefined,
+          delivery: { stage: 'ci', ready: true, active: false },
+        });
+      expect(f.sends).toHaveLength(sends);
+      expect((await Effect.runPromise(f.store.readControl())).reconciliation).toEqual({
+        attempts,
+        migrated: false,
+      });
+      expect(await Effect.runPromise(f.store.readStage(5))).toBeNull();
+    } finally {
+      await f.close();
+    }
+  }
+);

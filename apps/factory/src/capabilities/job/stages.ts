@@ -271,6 +271,10 @@ function reconcileStage(
         publication.commit === verified?.commit &&
         Boolean(verified?.linked?.includes(publication.url)));
     if (!verified || !publicationValid) {
+      if (waiting.stage === 'babysitting') {
+        const reconciled = yield* terminalCI(store, issues, intent, waiting, observation, evidence);
+        if (reconciled) return reconciled;
+      }
       const reconciliation = yield* requestReconciliation(
         store,
         waiting,
@@ -451,20 +455,9 @@ function pendingDelivery(
       };
     });
   if (waiting.stage === 'babysitting')
-    return Effect.gen(function* () {
-      const reconciled = yield* terminalCI(store, issues, intent, waiting, observation, evidence);
-      if (reconciled) return reconciled;
-      return yield* watchdog(
-        store,
-        issues,
-        intent,
-        waiting,
-        observation,
-        time,
-        evidence,
-        (request) => deliver(store, execution, intent, request)
-      );
-    });
+    return watchdog(store, issues, intent, waiting, observation, time, evidence, (request) =>
+      deliver(store, execution, intent, request)
+    );
   return Effect.succeed(delivery);
 }
 

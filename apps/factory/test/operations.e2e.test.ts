@@ -248,7 +248,11 @@ it('parks a question visibly, resumes its existing worker once, and cancels expl
         'href',
         't3code://threads/controlled-environment/thread-live'
       );
-      await host.save({ activity: [], overrides: { pendingRequestCount: 0, status: 'completed' } });
+      await host.save({
+        activity: [],
+        holdImplementation: true,
+        overrides: { pendingRequestCount: 0, status: 'completed' },
+      });
       await page.reload();
       await page.getByRole('button', { name: 'Resume existing job' }).click();
       await browserExpect(page.getByRole('button', { name: 'Resume existing job' })).toHaveCount(0);
@@ -323,7 +327,6 @@ it('previews automatically discovered work without starting an implementation wo
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
-      ...host.mcpEnvironment,
       FACTORY_STATE: `${host.directory}/state`,
       FACTORY_PORT: '0',
     });
@@ -361,6 +364,7 @@ it('previews automatically discovered work without starting an implementation wo
 
 it('edits durable scheduler limits and pauses admissions while an existing job continues', async () => {
   const host = await protocol();
+  await host.save({ metadataUnavailable: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = `${host.directory}:${previous.path}`;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -439,6 +443,10 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
 it('shows conflict classification and pending questions with a recovery-thread link', async () => {
   const { joinFixture } = await import('./fixtures/join.js');
   const f = await joinFixture({ conflict: true, restack: { outcome: 'COMPLEX', review: false } });
+  await f.host.save({
+    ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+    metadataUnavailable: true,
+  });
   const browser = await chromium.launch({ headless: true });
   let running: Awaited<ReturnType<typeof startFactory>> | undefined;
   try {
@@ -520,6 +528,8 @@ it.each(['implementation', 'publication'] as const)(
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: host.base,
         FACTORY_T3_BINARY: host.binary,
+        // This journey exercises the maintainer's manual stage retry policy.
+        FACTORY_AGENT_RECONCILIATION_LIMIT: '0',
         FACTORY_STATE: `${host.directory}/state`,
         FACTORY_PORT: '0',
         FACTORY_T3_MCP_ENDPOINT: 'http://127.0.0.1:1/mcp',

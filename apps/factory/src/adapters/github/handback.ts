@@ -71,33 +71,48 @@ export function dependencyHandback(
         if (issue.state !== 'OPEN') return false;
         const recorded = await edges(issue, signal);
         if (!dependencies.every((number) => recorded.includes(Number(number)))) return false;
-        const project = z
+        const projectEvidence = z
           .object({
-            number: z.number(),
-            projectItems: z.array(
-              z.object({ title: z.string(), status: z.object({ name: z.string() }).nullable() })
-            ),
+            errors: z.array(z.unknown()).max(0).optional(),
+            data: z.object({
+              repository: z.object({
+                issue: z.object({
+                  number: z.number().int().positive(),
+                  url: z.string(),
+                  projectItems: z.object({
+                    nodes: z.array(
+                      z.object({
+                        project: z.object({
+                          number: z.number().int().positive(),
+                          owner: z.object({ login: z.string() }),
+                        }),
+                        fieldValueByName: z.object({ name: z.string() }).nullable(),
+                      })
+                    ),
+                    pageInfo: z.object({ hasNextPage: z.literal(false) }),
+                  }),
+                }),
+              }),
+            }),
           })
           .parse(
             await gh(
               [
-                'issue',
-                'view',
-                String(intent.issue),
-                '--repo',
-                repo,
-                '--json',
-                'number,projectItems',
+                'api',
+                'graphql',
+                '-f',
+                `query=query { repository(owner:"rafaeltab",name:"wallpaperdb") { issue(number:${intent.issue}) { number url projectItems(first:100) { nodes { project { number owner { ... on User { login } ... on Organization { login } } } fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } pageInfo { hasNextPage } } } } }`,
               ],
               signal
             )
           );
-        if (
-          project.number !== intent.issue ||
-          !project.projectItems.some(
-            (item) => item.title === 'WallpaperDB' && item.status?.name === 'Planned'
-          )
-        )
+        const projectIssue = projectEvidence.data.repository.issue;
+        if (projectIssue.number !== intent.issue || projectIssue.url !== issue.url)
+          throw new Error('Mismatched handback project issue');
+        const projects = projectIssue.projectItems.nodes.filter(
+          (item) => item.project.owner.login === 'rafaeltab' && item.project.number === 7
+        );
+        if (projects.length !== 1 || projects[0]?.fieldValueByName?.name !== 'Planned')
           return false;
         const prs = z
           .array(

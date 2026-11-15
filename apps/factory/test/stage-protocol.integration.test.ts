@@ -390,6 +390,15 @@ it.each([
   String.raw`{"\u006aobId":"1","checks":{"lint":false},`,
   String.raw`{"kind":"st\u0061te`,
   '{"note":"{ not structural }","version":1,',
+  '{"checks":{"lint":false} "jobId":"1",',
+  '{"checks":{"lint":false} "kind":"state",',
+  '{"checks":"failed" "jobId":"1",',
+  '{"checks":false "jobId":"1",',
+  '{"checks":false "kind":"state",',
+  String.raw`{"checks":{"lint":false} "\u0076ersion":1,`,
+  '{"checks" "jobId":"1",',
+  '{"checks" "kind":"state",',
+  '```json\n{"version":1,"kind":"state","checks":{"lint":false},\n```',
 ])('withholds older success behind a newer malformed response: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const success = response(intent, host.base);
@@ -421,6 +430,11 @@ it.each([
   '{"command":"completed","result":{"kind":"state"},',
   '{"command":"completed","result":[{"jobId":"1"}],',
   '{"kind":"notification","text":"done",',
+  '{"command":"version",',
+  '{"command":"jobId",',
+  '{"command":"kind",',
+  '{"command":"jobId" "result":"version",',
+  '```json\n{"command":"completed","result":{"version":1}}\n```',
   `${JSON.stringify({ command: 'completed', result: '{"version":1}' }).slice(0, -1)},`,
 ])('retains coherent state after unrelated nonresponse text: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {

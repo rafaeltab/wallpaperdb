@@ -16,6 +16,8 @@ function fixture() {
   let fallback = false;
   let status = 'Planned';
   let prState = 'CLOSED';
+  let prBranch = intent.branch;
+  let prUrl = 'https://github.com/rafaeltab/wallpaperdb/pull/765';
   let wrongIssue = false;
   const graph = new Map<number, number[]>([
     [758, [757]],
@@ -32,8 +34,8 @@ function fixture() {
       if (args[0] === 'pr')
         return [
           {
-            url: 'https://github.com/rafaeltab/wallpaperdb/pull/765',
-            headRefName: intent.branch,
+            url: prUrl,
+            headRefName: prBranch,
             state: prState,
           },
         ];
@@ -62,6 +64,10 @@ function fixture() {
     },
     pr: (value: string) => {
       prState = value;
+    },
+    prIdentity: (branch: string, url: string) => {
+      prBranch = branch;
+      prUrl = url;
     },
     wrongIssue: () => {
       wrongIssue = true;
@@ -94,5 +100,21 @@ it.each([false, true])(
     await expect(
       Effect.runPromise(f.adapter.verifyHandback(intent, ['757']))
     ).rejects.toMatchObject({ operation: 'verify-dependency-handback' });
+  }
+);
+
+it.each(['branch', 'repository'] as const)(
+  'rejects unrelated closed PR evidence from the wrong %s',
+  async (identity) => {
+    const f = fixture();
+    if (!f.adapter.verifyHandback) throw new Error('Missing verification contract');
+    expect(await Effect.runPromise(f.adapter.verifyHandback(intent, ['757']))).toBe(true);
+    f.prIdentity(
+      identity === 'branch' ? 'factory/unrelated' : intent.branch,
+      identity === 'repository'
+        ? 'https://github.com/other/wallpaperdb/pull/765'
+        : 'https://github.com/rafaeltab/wallpaperdb/pull/765'
+    );
+    expect(await Effect.runPromise(f.adapter.verifyHandback(intent, ['757']))).toBe(false);
   }
 );

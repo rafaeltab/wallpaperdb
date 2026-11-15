@@ -129,3 +129,22 @@ it('preserves cancellation after a durable cycle recovery decision', async () =>
     await f.close();
   }
 });
+
+it('reconciles a self-dependency within the shared budget without issuing handback', async () => {
+  const f = await fixture(1);
+  try {
+    // The owning issue is 757; the controlled validator otherwise accepts requests.
+    f.state({ idle: true, dependencies: ['757'] });
+    expect(await f.status()).toMatchObject({ reconciliation: { attempts: 1 } });
+    expect(f.sends.at(-1)?.reconciliation).toBe('state');
+    expect(f.sends.some((request) => request.handback)).toBe(false);
+    f.state({ idle: true });
+    expect(await f.status()).toMatchObject({
+      delivery: { activity: 'manual-recovery', active: false },
+    });
+    expect(f.sends).toHaveLength(1);
+    expect(f.sends.some((request) => request.handback)).toBe(false);
+  } finally {
+    await f.close();
+  }
+});

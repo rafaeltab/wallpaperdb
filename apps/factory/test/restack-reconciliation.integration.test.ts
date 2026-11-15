@@ -90,6 +90,17 @@ it('retains the accepted classification while an independent review child is bus
     );
     expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
     expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(1);
+    const pending = await worker(f);
+    pending.state.thread.status = 'waiting';
+    pending.state.thread.pendingRequestCount = 1;
+    await writeFile(pending.path, JSON.stringify(pending.state));
+    await prepare(f);
+    expect(await recoveries(f)).toContainEqual(
+      expect.objectContaining({
+        question: 'Open recovery thread to answer the pending question',
+        active: false,
+      })
+    );
   } finally {
     await f.close();
   }

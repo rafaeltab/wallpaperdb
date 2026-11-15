@@ -626,6 +626,21 @@ export async function runProtocol(
       );
       process.exit(0);
     }
+    if (
+      basename(process.argv[1]) === 'gh' &&
+      args[0] === 'api' &&
+      args[1] === 'repos/rafaeltab/wallpaperdb/git/ref/heads/main'
+    ) {
+      const sha = execFileSync(
+        'git',
+        ['-C', config.repository, 'ls-remote', '--heads', 'origin', 'refs/heads/main'],
+        { encoding: 'utf8' }
+      )
+        .trim()
+        .split(/\s/)[0];
+      console.log(JSON.stringify({ object: { sha: config.authenticatedMain ?? sha } }));
+      process.exit(0);
+    }
     if (config.join && basename(process.argv[1]) === 'gh' && !observationQuery) {
       const statePath = join(config.directory, 'join-live.json');
       const state = existsSync(statePath)

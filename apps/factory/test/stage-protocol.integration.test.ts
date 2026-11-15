@@ -37,6 +37,8 @@ function response(intent: Intent, head: string) {
 }
 async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   const host = await protocol();
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${host.directory}:${previousPath}`;
   const previous = process.env.FACTORY_FIXTURE;
   process.env.FACTORY_FIXTURE = host.configFile;
   try {
@@ -69,6 +71,7 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;
+    process.env.PATH = previousPath;
     await host.cleanup();
   }
 }
@@ -813,6 +816,18 @@ it('accepts an authenticated newer-main comparison at a freshly checked and revi
         instruction(intent, current),
         { role: 'assistant', text: JSON.stringify({ ...state(intent, head), base }) },
       ],
+    });
+    await host.save({
+      authenticatedMain: intent.base,
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(intent, current),
+        { role: 'assistant', text: JSON.stringify({ ...state(intent, head), base }) },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+      accepted: false,
+      unexpectedBase: true,
     });
     git('push', 'origin', `${intent.base}:refs/heads/main`, '--force');
     expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({

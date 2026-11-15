@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Intent } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 
@@ -32,8 +33,23 @@ export async function verifiedComparison(
   if ((await common(reported, head)) !== reported) return false;
   if (exact || (original.prBase ?? 'main') !== 'main') return unchanged;
   if (!(await git(['remote'])).split('\n').includes('origin')) return unchanged;
-  const main = (await git(['ls-remote', '--heads', 'origin', 'refs/heads/main'])).split(/\s/)[0];
-  if (!main || !/^[a-f0-9]{40}$/.test(main)) return unchanged;
+  const localMain = (await git(['ls-remote', '--heads', 'origin', 'refs/heads/main'])).split(
+    /\s/
+  )[0];
+  if (unchanged && !localMain) return true;
+  const authority = z
+    .object({ object: z.object({ sha: z.string().regex(/^[a-f0-9]{40}$/) }) })
+    .parse(
+      JSON.parse(
+        await command(
+          'gh',
+          ['api', 'repos/rafaeltab/wallpaperdb/git/ref/heads/main', '--hostname', 'github.com'],
+          worktree,
+          signal
+        )
+      )
+    );
+  const main = authority.object.sha;
   await git(['fetch', '--no-tags', '--no-write-fetch-head', 'origin', main]);
   if ((await common(original.base, reported)) !== original.base) return false;
   if ((await common(expected.base, reported)) !== expected.base) return false;

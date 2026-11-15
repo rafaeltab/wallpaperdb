@@ -4,7 +4,7 @@ import type { RecoveryPorts } from '../../capabilities/restack/index.js';
 import { Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion, mcpCall } from './questions.js';
 import { inactiveLineage } from './inactivity.js';
-import { receiptSchema, responseShape } from './response.js';
+import { receiptSchema, responseShape, latestStructured } from './response.js';
 import { command } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
 export interface RestackOperation {
@@ -158,15 +158,8 @@ export function t3Restacker(
     }
     if (boundary < 0) return null;
     const replies = messages.slice(boundary + 1).filter((message) => message.role === 'assistant');
-    let latest: unknown;
-    for (const message of replies) {
-      try {
-        latest = JSON.parse(message.text);
-      } catch {
-        /* Delayed prose is not state. */
-      }
-    }
-    const parsed = receiptSchema.safeParse(latest);
+    const message = latestStructured(replies);
+    const parsed = receiptSchema.safeParse(message ? JSON.parse(message.text) : null);
     if (!parsed.success || parsed.data.kind !== 'state') return null;
     const state = parsed.data;
     if (
@@ -277,9 +270,8 @@ export function t3Restacker(
           classification: parsed.success ? parsed.data.classification : undefined,
         };
       }
-      if (!(await idle(observed, signal))) return display;
       const head = await currentHead(observed, signal);
-      if (!head) return display;
+      if (!head || !(await idle(observed, signal))) return display;
       return {
         ...display,
         ...(saved

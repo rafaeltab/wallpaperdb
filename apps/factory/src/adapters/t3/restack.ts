@@ -219,7 +219,11 @@ export function t3Restacker(
         ordinal: observed.thread.runCount,
         acknowledged: pending?.phase !== phase || acknowledged(observed, pending),
       },
-      version.success && version.data.version !== 1,
+      boundary >= 0 && receiptSchema.safeParse(value).success
+        ? false
+        : version.success && version.data.version !== 1
+          ? true
+          : undefined,
       signal
     );
   };

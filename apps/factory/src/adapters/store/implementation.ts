@@ -1,3 +1,4 @@
+import { saveStageControl } from './control.js';
 import { createHash } from 'node:crypto';
 import { publisher, requiredRecord, acquireCycle } from '../../platform/index.js';
 import { Effect, Option } from 'effect';
@@ -9,7 +10,12 @@ import {
   controlSchema,
   scheduleSchema,
 } from '../../platform/index.js';
-import { type Intent, type JobStore, Unavailable } from '../../capabilities/job/index.js';
+import {
+  type Intent,
+  type JobStore,
+  type StageRequest,
+  Unavailable,
+} from '../../capabilities/job/index.js';
 import { initialScheduleState } from '../../capabilities/plan/index.js';
 
 const code = (cause: unknown, expected: string) =>
@@ -48,13 +54,18 @@ export function fileStore(directory: string): JobStore {
       }
     }
   };
-  const saveControl = async (state: import('../../capabilities/job/index.js').Control) => {
+  const saveControl = async (
+    state: import('../../capabilities/job/index.js').Control,
+    stage?: StageRequest
+  ) => {
     if (state.revision !== (await readControl()).revision + 1) return false;
-    return publish(`control-${state.revision}.json`, controlSchema.parse(state));
+    return stage
+      ? saveStageControl(directory, state, stage)
+      : publish(`control-${state.revision}.json`, controlSchema.parse(state));
   };
   return {
     readControl: () => effect('read-control', readControl),
-    saveControl: (state) => effect('save-control', () => saveControl(state)),
+    saveControl: (state, stage) => effect('save-control', () => saveControl(state, stage)),
     readWait: () => effect('read-wait', readWait),
     saveWait: (state) =>
       effect('save-wait', async () => {

@@ -5,6 +5,63 @@ export function storeContract(
   name: string,
   setup: () => Promise<{ store: JobStore; reopen: () => JobStore; close: () => Promise<void> }>
 ) {
+  it.each(['reserve', 'occupied', 'stale', 'mismatch', 'race-reserve', 'race-stage'] as const)(
+    `${name}: atomically reserves a reconciliation stage with its budget: %s`,
+    async (kind) => {
+      const fixture = await setup();
+      try {
+        const request = {
+          index: 1,
+          stage: 'implementation' as const,
+          threadId: 'owner',
+          commit: 'a'.repeat(40),
+          previousRunId: 'run-1',
+          ordinal: 2,
+          reconciliation: 'state' as const,
+        };
+        const review = { ...request, stage: 'review' as const, reconciliation: undefined };
+        const current = await Effect.runPromise(fixture.store.readControl());
+        const control = {
+          ...current,
+          revision: current.revision + 1,
+          reconciliation: { attempts: 1, migrated: false, pending: request },
+        };
+        if (kind === 'occupied') await Effect.runPromise(fixture.store.saveStage(review));
+        if (kind === 'stale')
+          await Effect.runPromise(
+            fixture.store.saveControl({
+              ...current,
+              revision: current.revision + 1,
+              cancelled: true,
+            })
+          );
+        if (kind.startsWith('race')) {
+          const reserve = () => Effect.runPromise(fixture.store.saveControl(control, request));
+          const advance = () => Effect.runPromise(fixture.reopen().saveStage(review));
+          await Promise.all(
+            kind === 'race-reserve' ? [reserve(), advance()] : [advance(), reserve()]
+          );
+          const state = await Effect.runPromise(fixture.reopen().readControl());
+          const stage = await Effect.runPromise(fixture.reopen().readStage(1));
+          if (state.reconciliation) expect(stage).toEqual(request);
+          else expect(stage).toEqual(review);
+        } else {
+          const won = await Effect.runPromise(
+            fixture.store.saveControl(control, kind === 'mismatch' ? review : request)
+          );
+          expect(won).toBe(kind === 'reserve');
+          expect(await Effect.runPromise(fixture.reopen().readStage(1))).toEqual(
+            kind === 'reserve' ? request : kind === 'occupied' ? review : null
+          );
+          expect((await Effect.runPromise(fixture.reopen().readControl())).reconciliation).toEqual(
+            kind === 'reserve' ? control.reconciliation : undefined
+          );
+        }
+      } finally {
+        await fixture.close();
+      }
+    }
+  );
   it(`${name}: retains reconciliation budget, migration and exact instruction across reopen and send claims`, async () => {
     const fixture = await setup();
     try {

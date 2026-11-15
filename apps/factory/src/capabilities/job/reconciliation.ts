@@ -2,8 +2,8 @@ import { Effect } from 'effect';
 import { retainManualRepair } from './manual-repair.js';
 import type { Delivery, JobStore, StageEvidence, StageRequest, Unavailable } from './contract.js';
 
-/** The counter and intended instruction are one CAS record, before immutable
- * stage creation or its at-most-once send claim. Restart can finish journaling it. */
+/** New authorizations reserve the counter and immutable instruction together,
+ * before its send claim. Recover older pending-only records without resending. */
 export function recoverReconciliation(store: JobStore) {
   return Effect.gen(function* () {
     const pending = (yield* store.readControl()).reconciliation?.pending;
@@ -74,18 +74,31 @@ export function requestReconciliation(
       reconciliation: migration ? 'migration' : 'state',
     };
     if (
-      !(yield* store.saveControl({
-        ...control,
-        revision: control.revision + 1,
-        reconciliation: {
-          attempts: state.attempts + (migration ? 0 : 1),
-          migrated: state.migrated || migration,
-          pending: request,
+      !(yield* store.saveControl(
+        {
+          ...control,
+          revision: control.revision + 1,
+          reconciliation: {
+            attempts: state.attempts + (migration ? 0 : 1),
+            migrated: state.migrated || migration,
+            pending: request,
+          },
         },
-      }))
-    )
-      // Re-read the winner before reporting a stopped job or authorizing work.
-      return yield* requestReconciliation(store, waiting, evidence, limit);
+        request
+      ))
+    ) {
+      // This observation lost authority. Keep the slot until a fresh observation
+      // validates the winner; never authorize another attempt with stale evidence.
+      if ((yield* store.readControl()).cancelled) return null;
+      return {
+        stage: waiting.stage,
+        commit: evidence.commit,
+        ready: false,
+        landed: false,
+        active: true,
+        activity: 'continuation-pending',
+      } satisfies Delivery;
+    }
     yield* recoverReconciliation(store);
     return {
       stage: waiting.stage,

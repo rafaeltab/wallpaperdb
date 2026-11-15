@@ -385,6 +385,11 @@ it.each([
   '{"checks":{"lint":false},"jobId":"1",',
   '{"kind":"dependencies","version":1,"requireUnimplementedIssues":["758"],',
   '{"version":2,"kind":"state",',
+  String.raw`{"\u0076ersion":1,"\u006bind":"state","checks":{"lint":false},`,
+  String.raw`{"\u006bind":"st\u0061te","checks":{"lint":false},`,
+  String.raw`{"\u006aobId":"1","checks":{"lint":false},`,
+  String.raw`{"kind":"st\u0061te`,
+  '{"note":"{ not structural }","version":1,',
 ])('withholds older success behind a newer malformed response: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const success = response(intent, host.base);
@@ -412,6 +417,11 @@ it.each([
 it.each([
   'The delayed command finished; its log included {"version":1.',
   '{"command":"completed",',
+  '{"command":"completed","result":{"version":1},',
+  '{"command":"completed","result":{"kind":"state"},',
+  '{"command":"completed","result":[{"jobId":"1"}],',
+  '{"kind":"notification","text":"done",',
+  `${JSON.stringify({ command: 'completed', result: '{"version":1}' }).slice(0, -1)},`,
 ])('retains coherent state after unrelated nonresponse text: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     await host.save({
@@ -427,6 +437,24 @@ it.each([
     });
   })
 );
+
+it('accepts a coherent escaped JSON state at the current clean head', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const success = response(intent, host.base);
+    success.text = success.text
+      .replace('"version"', String.raw`"\u0076ersion"`)
+      .replace('"kind"', String.raw`"\u006bind"`)
+      .replace('"jobId"', String.raw`"\u006aobId"`)
+      .replace('"state"', String.raw`"st\u0061te"`);
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [instruction(intent, request), success],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+      commit: host.base,
+    });
+  }));
 
 it.each([
   { activeRunId: 'active' },

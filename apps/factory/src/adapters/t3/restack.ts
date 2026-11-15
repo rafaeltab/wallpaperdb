@@ -38,6 +38,9 @@ const detail = z.object({
   }),
   messages: z.array(z.object({ role: z.string(), runId: z.string().optional(), text: z.string() })),
 });
+const cancellationState = z.object({
+  thread: detail.shape.thread.pick({ threadId: true, latestRunId: true, status: true }),
+});
 const latestRecoveryResponse = (messages: z.infer<typeof detail>['messages']) =>
   [...messages].reverse().find((message) => {
     if (latestStructured([message])) return true;
@@ -130,14 +133,21 @@ export function t3Restacker(
   };
   const idle = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
     if (!config.mcpEndpoint || !config.mcpAuthorizationFile) return false;
-    return (
-      (await inactiveLineage(
-        (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
-        observed.thread.threadId,
-        observed.thread.latestRunId,
-        signal
-      )) === 'idle'
+    const state = await inactiveLineage(
+      async (tool, args, childSignal) => {
+        const value = await mcpCall(config, tool, args, childSignal);
+        if (tool === 't3_thread_read') {
+          const current = cancellationState.safeParse(value);
+          if (current.success && current.data.thread.threadId === observed.thread.threadId)
+            await cancelled(current.data, childSignal);
+        }
+        return value;
+      },
+      observed.thread.threadId,
+      observed.thread.latestRunId,
+      signal
     );
+    return state === 'idle' && !(await journal.read('cancelled.json'));
   };
   const reconciliation = recoveryReconciliation(
     journal,
@@ -350,7 +360,7 @@ export function t3Restacker(
     });
     return result;
   };
-  const cancelled = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
+  const cancelled = async (observed: z.infer<typeof cancellationState>, signal?: AbortSignal) => {
     signal?.throwIfAborted();
     if (await journal.read('cancelled.json')) return true;
     if (!['cancelled', 'rolled_back'].includes(observed.thread.status)) return false;

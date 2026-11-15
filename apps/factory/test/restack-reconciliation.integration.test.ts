@@ -745,3 +745,66 @@ it('does not transfer a pending reconciliation to a replacement thread with copi
     await f.close();
   }
 });
+
+it.each(['prose', 'malformed', 'invalid-version-one', 'supported-negative'] as const)(
+  'requires supported recovery evidence after the migration instruction: %s',
+  async (kind) => {
+    const f = await joinFixture({
+      inProcess: true,
+      independentMain: true,
+      automaticReview: false,
+      reconciliationLimit: 2,
+    });
+    try {
+      await configure(f, { legacyRecoveryInitial: true, legacyRecoveryReply: true });
+      await prepare(f);
+      const { path, state } = await worker(f);
+      const reply = state.messages.at(-1);
+      reply.text =
+        kind === 'prose'
+          ? 'I could not complete migration.'
+          : kind === 'malformed'
+            ? '{"version":1,"kind":"state",'
+            : kind === 'invalid-version-one'
+              ? JSON.stringify({ version: 1, kind: 'state', jobId: state.operation })
+              : JSON.stringify({
+                  version: 1,
+                  kind: 'state',
+                  jobId: state.operation,
+                  implemented: state.implemented,
+                  base: state.onto,
+                  checked: state.head,
+                  reviewed: state.head,
+                  checks: { format: true, lint: true, tests: false, coverage: true, crap: true },
+                });
+      await writeFile(path, JSON.stringify(state));
+      await configure(f, { legacyRecoveryReply: false, reconcileReview: true });
+      await prepare(f);
+      const ownSends = (await f.host.calls()).filter(
+        (call) => call.args[1] === 'send' && call.args[2] === state.thread.threadId
+      );
+      expect(ownSends).toHaveLength(kind === 'supported-negative' ? 2 : 1);
+      expect(ownSends[0]?.args[3]).toContain('Migrate once to version 1');
+      if (kind === 'supported-negative') {
+        expect(ownSends[1]?.args[3]).toContain('Reconcile the inconsistent current recovery state');
+      } else {
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({
+            phase: 'manual-recovery',
+            active: false,
+            progress: expect.stringContaining('migration failed'),
+          })
+        );
+        await prepare(f);
+        expect(
+          (await f.host.calls()).filter(
+            (call) => call.args[1] === 'send' && call.args[2] === state.thread.threadId
+          )
+        ).toHaveLength(1);
+        expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);

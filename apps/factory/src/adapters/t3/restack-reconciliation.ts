@@ -75,7 +75,7 @@ export function recoveryReconciliation(
     advance: async (
       phase: Entry['phase'],
       worker: { threadId: string; runId: string | null; ordinal: number; acknowledged: boolean },
-      migration: boolean,
+      migration: boolean | undefined,
       signal?: AbortSignal
     ): Promise<Resolution> => {
       if (await cancelled(signal))
@@ -107,18 +107,23 @@ export function recoveryReconciliation(
       }
       const attempts = previous?.attempts ?? 0;
       const migrated = previous?.migrated ?? false;
-      const exhausted = migration ? migrated : attempts >= limit;
+      const failedMigration =
+        previous?.kind === 'migration' &&
+        previous.phase === phase &&
+        worker.acknowledged &&
+        migration !== false;
+      const exhausted = failedMigration || (migration ? migrated : attempts >= limit);
       const value: Entry = {
         index: (previous?.index ?? 0) + 1,
         phase,
         kind: exhausted ? 'manual' : migration ? 'migration' : 'state',
         attempts: attempts + (!exhausted && !migration ? 1 : 0),
-        migrated: migrated || (!exhausted && migration),
+        migrated: migrated || (!exhausted && migration === true),
         threadId: worker.threadId,
         runId: worker.runId,
         ordinal: worker.ordinal,
         progress: exhausted
-          ? migration
+          ? migration || failedMigration
             ? 'Recovery response migration failed; manual intervention required'
             : 'Recovery reconciliation attempt limit reached; manual intervention required'
           : migration

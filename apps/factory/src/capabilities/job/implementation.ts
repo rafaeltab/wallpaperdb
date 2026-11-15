@@ -256,6 +256,7 @@ export const JobLive = Layer.effect(
                 ...control,
                 revision: control.revision + 1,
                 reconciliation: { attempts: 0, migrated: false },
+                dependencyRecovery: undefined,
               }))
             )
               return { kind: 'rejected' as const };
@@ -350,6 +351,7 @@ function matchesResume(
     intent.id === command.jobId &&
     !control.cancelled &&
     !control.released &&
+    !control.dependencyRecovery &&
     waiting.index === command.index &&
     control.parked?.index === waiting.index &&
     control.parked.question.id === command.questionId
@@ -373,7 +375,13 @@ function resumeCommand(
   observation: import('./contract.js').Observation
 ) {
   const parked = control.parked;
-  if (control.cancelled || control.released || !parked || parked.index !== stage?.index)
+  if (
+    control.cancelled ||
+    control.released ||
+    control.dependencyRecovery ||
+    !parked ||
+    parked.index !== stage?.index
+  )
     return undefined;
   if (hasAnsweredQuestion(observation, parked.question.id)) return undefined;
   return { index: parked.index, questionId: parked.question.id };

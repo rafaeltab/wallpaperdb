@@ -77,55 +77,70 @@ it('retains handback responsibility through restart without resending the instru
   }
 });
 
-it('invalidates completed handback when a concurrent observation supersedes its verification revision', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'factory-handback-supersede-'));
-  const original = fileStore(directory);
-  let interleave = false;
-  let arm = false;
-  let nested:
-    | Awaited<ReturnType<Awaited<ReturnType<typeof completionFixture>>['status']>>
-    | undefined;
-  let owner: Awaited<ReturnType<typeof completionFixture>> | undefined;
-  const store = {
-    ...original,
-    readControl: () =>
-      Effect.gen(function* () {
-        // A port read may capture a valid snapshot while another public operation
-        // commits before that read returns. No private read-count assumption.
-        const snapshot = yield* original.readControl();
-        const currentOwner = owner;
-        if (interleave && currentOwner) {
-          interleave = false;
-          currentOwner.state({ idle: true, dependencies: ['759'], handbackVerified: true });
-          nested = yield* Effect.promise(() => currentOwner.status());
+it.each(['valid', 'cycle', 'invalid'] as const)(
+  'invalidates completed handback when a concurrent %s dependency response supersedes verification',
+  async (dependencyResult) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-handback-supersede-'));
+    const original = fileStore(directory);
+    let interleave = false;
+    let arm = false;
+    let nested:
+      | Awaited<ReturnType<Awaited<ReturnType<typeof completionFixture>>['status']>>
+      | undefined;
+    let owner: Awaited<ReturnType<typeof completionFixture>> | undefined;
+    const store = {
+      ...original,
+      readControl: () =>
+        Effect.gen(function* () {
+          // A port read may capture a valid snapshot while another public operation
+          // commits before that read returns. No private read-count assumption.
+          const snapshot = yield* original.readControl();
+          const currentOwner = owner;
+          if (interleave && currentOwner) {
+            interleave = false;
+            currentOwner.state({
+              idle: true,
+              run: 3,
+              dependencies: ['759'],
+              dependencyResult,
+              handbackVerified: true,
+            });
+            nested = yield* Effect.promise(() => currentOwner.status());
+          }
+          return snapshot;
+        }),
+    };
+    const f = await completionFixture(dependencyResult === 'invalid' ? 0 : 3, store, () =>
+      Effect.sync(() => {
+        if (arm) {
+          arm = false;
+          interleave = true;
         }
-        return snapshot;
-      }),
-  };
-  const f = await completionFixture(3, store, () =>
-    Effect.sync(() => {
-      if (arm) {
-        arm = false;
-        interleave = true;
-      }
-    })
-  );
-  owner = f;
-  try {
-    f.state({ idle: true, dependencies: ['758'] });
-    await f.status();
-    await f.status();
-    arm = true;
-    f.state({ idle: true, handbackVerified: true });
-    const outer = await f.status();
-    expect(nested).toMatchObject({ delivery: { activity: 'continuation-pending' } });
-    expect(f.sends.map((request) => request.handback)).toEqual([['758'], ['759']]);
-    expect(outer).not.toMatchObject({ delivery: { activity: 'dependency-handback' } });
-  } finally {
-    await f.close();
-    await rm(directory, { recursive: true, force: true });
+      })
+    );
+    owner = f;
+    try {
+      f.state({ idle: true, dependencies: ['758'] });
+      await f.status();
+      await f.status();
+      arm = true;
+      f.state({ idle: true, handbackVerified: true });
+      const outer = await f.status();
+      expect(nested).toMatchObject({
+        delivery: {
+          activity: dependencyResult === 'valid' ? 'continuation-pending' : 'manual-recovery',
+        },
+      });
+      expect(f.sends.map((request) => request.handback)).toEqual(
+        dependencyResult === 'valid' ? [['758'], ['759']] : [['758']]
+      );
+      expect(outer).not.toMatchObject({ delivery: { activity: 'dependency-handback' } });
+    } finally {
+      await f.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   }
-});
+);
 
 it('retires the old Job with its refund so later observations cannot deliver another handback', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-handback-retired-'));
@@ -225,6 +240,47 @@ it('rejects old handback evidence when association completion overlaps a newer i
     expect(nested).toMatchObject({ delivery: { activity: 'continuation-pending', active: true } });
     expect(f.sends.map((request) => request.handback)).toEqual([['758'], ['759']]);
     expect(outer).not.toMatchObject({ delivery: { activity: 'dependency-handback' } });
+  } finally {
+    await f.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('retains cycle recovery across restart until explicit reset revalidates the corrected response', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-dependency-cycle-'));
+  let f = await completionFixture(3, fileStore(directory));
+  try {
+    f.state({ idle: true, dependencies: ['758'] });
+    await f.status();
+    await f.status();
+    f.state({ idle: true, dependencies: ['759'], dependencyResult: 'cycle' });
+    expect(await f.status()).toMatchObject({
+      delivery: { activity: 'manual-recovery', active: false },
+    });
+    await f.close();
+    f = await completionFixture(3, fileStore(directory));
+    f.state({
+      idle: true,
+      run: 2,
+      dependencies: ['758'],
+      dependencyResult: 'valid',
+      handbackVerified: true,
+    });
+    const blocked = await f.status();
+    expect(blocked).toMatchObject({ delivery: { activity: 'manual-recovery', active: false } });
+    if (blocked.kind !== 'job' || blocked.stageIndex === undefined)
+      throw new Error('Missing recovery association');
+    const control = await Effect.runPromise(f.store.readControl());
+    expect(
+      await f.resume({
+        jobId: blocked.intent.id,
+        index: blocked.stageIndex,
+        runId: 'run-2',
+        revision: control.revision,
+        resetReconciliation: true,
+      })
+    ).toMatchObject({ delivery: { activity: 'dependency-handback', active: false } });
+    expect(f.sends).toEqual([]);
   } finally {
     await f.close();
     await rm(directory, { recursive: true, force: true });

@@ -8,7 +8,7 @@ import type {
   StageEvidence,
   StageRequest,
 } from './contract.js';
-import { requestReconciliation } from './reconciliation.js';
+import { requestReconciliation, retainDependencyRecovery } from './reconciliation.js';
 
 export function dependencyHandback(
   store: JobStore,
@@ -62,13 +62,12 @@ export function dependencyHandback(
             Effect.succeed('invalid' as const)
         : 'invalid';
     if ((yield* store.readControl()).revision !== control.revision) return delivery;
-    if (result === 'cycle')
-      return {
-        ...delivery,
-        activity: 'manual-recovery' as const,
-        active: false,
-        progress: 'Dependency cycle requires maintainer recovery.',
-      };
+    if (result === 'cycle') {
+      const progress = 'Dependency cycle requires maintainer recovery.';
+      if (!(yield* retainDependencyRecovery(store, control, waiting, evidence, progress)))
+        return delivery;
+      return { ...delivery, activity: 'manual-recovery' as const, active: false, progress };
+    }
     if (result === 'invalid') return yield* reconcile();
     if (waiting.handback) {
       const same =

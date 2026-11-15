@@ -92,6 +92,11 @@ export interface AcceptedPublication {
 export interface Control {
   /** Terminal ownership fence, committed atomically with dependency-admission release. */
   readonly released?: boolean;
+  readonly dependencyRecovery?: {
+    readonly index: number;
+    readonly run: { readonly id: string; readonly ordinal: number };
+    readonly progress: string;
+  };
   /** A verified unsuccessful implementation opens same-thread manual repair.
    * Successor associations are immutable stage records, never another launch. */
   readonly reconciliation?: {

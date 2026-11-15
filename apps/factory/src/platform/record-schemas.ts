@@ -61,6 +61,14 @@ const waitSchema = z
 const controlSchema = z
   .object({
     released: z.boolean().optional(),
+    dependencyRecovery: z
+      .object({
+        index: z.number().int().nonnegative(),
+        run: z.object({ id: z.string().min(1), ordinal: z.number().int().positive() }),
+        progress: z.string().max(1000),
+      })
+      .strict()
+      .optional(),
     reconciliation: z
       .object({
         attempts: z.number().int().nonnegative(),

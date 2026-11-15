@@ -33,6 +33,7 @@ export function restartAction(
     if (
       control.cancelled ||
       control.released ||
+      control.dependencyRecovery ||
       stage?.handback !== undefined ||
       control.prerequisite ||
       control.parked?.index === stage?.index ||

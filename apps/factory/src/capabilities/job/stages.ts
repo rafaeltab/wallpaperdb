@@ -404,6 +404,16 @@ function suspension(
         activity: 'cancelled' as const,
         active: false,
       };
+    if (control.dependencyRecovery)
+      return {
+        stage: waiting.stage,
+        commit: waiting.commit,
+        ready: false,
+        landed: false,
+        activity: 'manual-recovery' as const,
+        active: false,
+        progress: control.dependencyRecovery.progress,
+      };
     if (answerContinuation(control, waiting, observation))
       return yield* adoptAnswer(store, waiting, observation, control);
     const repaired = yield* adoptManualRepair(store, waiting, observation, control);

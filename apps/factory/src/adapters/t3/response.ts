@@ -53,6 +53,20 @@ export function latestStructured(
     );
   });
 }
+export function latestRecoveryResponse(
+  messages: readonly { readonly role: string; readonly text: string }[]
+) {
+  return [...messages].reverse().find((message) => {
+    if (latestStructured([message])) return true;
+    if (message.role !== 'assistant') return false;
+    const value = responseValue(message.text);
+    if (value === undefined)
+      return malformedResponse(message.text, (key) => key === 'operation' || key === 'outcome');
+    return (
+      value !== null && typeof value === 'object' && ('operation' in value || 'outcome' in value)
+    );
+  });
+}
 export function responseValue(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -60,7 +74,7 @@ export function responseValue(text: string): unknown {
     return undefined;
   }
 }
-function malformedResponse(text: string) {
+function malformedResponse(text: string, matchesField = responseField) {
   const start = /^\s*(?:```[^\r\n]*\r?\n\s*)?\{/.exec(text);
   if (!start) return false;
   let depth = 0;
@@ -72,7 +86,7 @@ function malformedResponse(text: string) {
       if (end >= text.length) return false;
       const tail = text.slice(end + 1);
       if (depth === 1 && (key || /^\s*:/.test(tail))) {
-        if (responseField(responseValue(text.slice(index, end + 1)), tail)) return true;
+        if (matchesField(responseValue(text.slice(index, end + 1)), tail)) return true;
         key = false;
       } else if (depth === 1) {
         key = true;

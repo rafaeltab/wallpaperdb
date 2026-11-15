@@ -397,7 +397,7 @@ function pendingResponse(
   const boundary = instructionBoundary(messages, intent, request);
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return {};
-  let value;
+  let value: Record<string, unknown>;
   try {
     value = JSON.parse(message.text);
   } catch {

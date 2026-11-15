@@ -452,6 +452,16 @@ it('shows conflict classification and pending questions with a recovery-thread l
   try {
     await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
     await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const reviewWorker = JSON.parse(
+      await readFile(join(f.host.directory, 'restacker.json'), 'utf8')
+    );
+    // This journey observes a genuinely pending review, rather than an idle
+    // invalid receipt that must now enter bounded reconciliation.
+    await f.host.save({
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      descendants: [{ threadId: 'pending-reviewer', parentThreadId: reviewWorker.thread.threadId }],
+      descendantSnapshots: { 'pending-reviewer': { status: 'running', activeRunId: 'review-run' } },
+    });
     running = await startFactory({
       FACTORY_PROJECT: f.host.repository,
       ...f.host.mcpEnvironment,

@@ -141,9 +141,13 @@ it.each(
   }
 );
 
-it.each([1, 2])(
-  'bounds an unclaimed intent overtaken by a worker run with limit %s',
-  async (limit) => {
+it.each(
+  [1, 2].flatMap((limit) =>
+    ['completed', 'cancelled', 'rolled_back'].map((status) => ({ limit, status }))
+  )
+)(
+  'bounds an unclaimed intent with limit $limit after observing $status',
+  async ({ limit, status }) => {
     const f = await joinFixture({
       inProcess: true,
       independentMain: true,
@@ -171,8 +175,11 @@ it.each([1, 2])(
           const name = readdirSync(config.directory).find(n => n.startsWith('restacker-') && n.endsWith('.json'));
           const path = join(config.directory, name);
           const state = JSON.parse(readFileSync(path, 'utf8'));
-          state.thread.runCount += 1;
-          state.thread.latestRunId = 'concurrent-completed-run';
+          state.thread.status = ${JSON.stringify(status)};
+          if (state.thread.status === 'completed') {
+            state.thread.runCount += 1;
+            state.thread.latestRunId = 'concurrent-completed-run';
+          }
           writeFileSync(path, JSON.stringify(state));
           writeFileSync(marker, 'true');
         }
@@ -182,18 +189,23 @@ it.each([1, 2])(
     `,
         { path: f.host.binary, module: true }
       );
-      for (let n = 0; n < 5; n++) await prepare(f);
+      await prepare(f);
+      const { path, state } = await worker(f);
+      state.thread.status = 'completed';
+      await writeFile(path, JSON.stringify(state));
+      for (let n = 0; n < 4; n++) await prepare(f);
       expect(await readFile(join(f.host.directory, 'race-injected'), 'utf8')).toBe('true');
-      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(limit === 2);
+      const ready = status === 'completed' && limit === 2;
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(ready);
       expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(
-        limit === 2 ? 2 : 0
+        ready ? 2 : 0
       );
-      if (limit === 1)
+      if (!ready)
         expect(await recoveries(f)).toContainEqual(
           expect.objectContaining({
             phase: 'manual-recovery',
             active: false,
-            progress: expect.stringContaining('limit'),
+            progress: expect.stringContaining(status === 'completed' ? 'limit' : 'cancelled'),
           })
         );
     } finally {

@@ -99,7 +99,9 @@ export function t3Restacker(
     const actualBranch = (
       await command('git', ['branch', '--show-current'], thread.worktreePath, signal)
     ).trim();
-    return actualBranch === branch ? observed : null;
+    if (actualBranch !== branch) return null;
+    await cancelled(observed, signal);
+    return observed;
   };
   const currentHead = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
     const path = observed.thread.worktreePath;

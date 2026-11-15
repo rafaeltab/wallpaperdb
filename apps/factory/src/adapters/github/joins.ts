@@ -874,6 +874,21 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return order;
   };
+  const normalizedMain = async (
+    boundary: JoinBoundary,
+    sources: readonly Layer[],
+    signal?: AbortSignal
+  ): Promise<JoinBoundary | null> => {
+    const main = await remote('main', signal);
+    if (!main || main === boundary.pin) return null;
+    await git(['fetch', '--no-tags', '--no-write-fetch-head', 'origin', main], signal);
+    if (!(await containsRequired(project, main, boundary, signal))) return null;
+    // Only normalize authenticated main-rooted layers here. Open feature parents
+    // keep their factory-selected order and containing boundary.
+    for (const source of sources)
+      if (!(await isAncestor(source.parent, main, signal))) return null;
+    return { ...boundary, base: main, prBase: 'main' };
+  };
   const replayOrder = async (
     layers: readonly Layer[],
     boundary: JoinBoundary,
@@ -885,6 +900,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         parent: await openReplayParent(project, item.parent, item.commit, boundary, signal),
       }))
     );
+    const main = await normalizedMain(boundary, sources, signal);
+    if (main) {
+      const order = await orderFrom(sources, [main.base], main, signal);
+      if (order) return { order, boundary: main };
+    }
     for (const anchor of sources) {
       if (!(await containsRequired(project, anchor.commit, boundary, signal))) continue;
       const order = await orderFrom(sources, [anchor.commit], boundary, signal);

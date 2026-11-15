@@ -7,6 +7,7 @@ import { protocol } from './setup.js';
 export async function joinFixture(
   options: {
     inProcess?: boolean;
+    independentMain?: boolean;
     conflict?: boolean;
     context?: string;
     owningThreadId?: string;
@@ -75,7 +76,7 @@ export async function joinFixture(
   const a = await commit('A');
   git('switch', '-c', 'B');
   const b = await commit('B');
-  git('switch', '-c', 'D');
+  git('switch', '-c', 'D', ...(options.independentMain ? [host.base] : []));
   let d = await commit('D');
   if (options.merge) {
     git('switch', '-c', 'side', a);
@@ -84,7 +85,12 @@ export async function joinFixture(
     git('merge', '--no-ff', 'side', '-m', 'merge');
     d = git('rev-parse', 'HEAD');
   }
-  git('switch', '-c', 'C', a);
+  if (options.independentMain) {
+    git('switch', '-C', 'main', host.base);
+    await commit('main-update');
+    git('push', 'origin', 'main');
+  }
+  git('switch', '-c', 'C', options.independentMain ? 'main' : a);
   let c = await commit('C');
   for (let index = 2; index <= (options.cCommits ?? (options.multiple ? 2 : 1)); index++)
     c = await commit(`C${index}`);
@@ -133,10 +139,10 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
       prs: {
         101: { branch: 'A', base: rootBranch },
         102: { branch: 'B', base: 'A' },
-        103: { branch: 'D', base: 'B' },
-        104: { branch: 'C', base: 'A' },
+        103: { branch: 'D', base: options.independentMain ? 'main' : 'B' },
+        104: { branch: 'C', base: options.independentMain ? 'main' : 'A' },
       },
-      members: [101, 102, 103].map(
+      members: (options.independentMain ? [103] : [101, 102, 103]).map(
         (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
       ),
     },

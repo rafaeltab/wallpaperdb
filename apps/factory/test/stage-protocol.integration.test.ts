@@ -758,3 +758,41 @@ it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
       });
     })
 );
+
+it('accepts an authenticated newer-main comparison at a freshly checked and reviewed head', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const binding = await Effect.runPromise(adapter.observe(intent));
+    if (binding.kind !== 'found') throw new Error('Missing owner');
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', binding.worktree, ...args], { encoding: 'utf8' }).trim();
+    execFileSync('git', ['init', '--bare', join(host.directory, 'origin.git')]);
+    git('remote', 'add', 'origin', join(host.directory, 'origin.git'));
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.invalid');
+    await writeFile(join(binding.worktree, 'main.txt'), 'new main');
+    git('add', '.');
+    git('commit', '-m', 'main advancement');
+    const base = git('rev-parse', 'HEAD');
+    git('push', 'origin', 'HEAD:refs/heads/main');
+    await writeFile(join(binding.worktree, 'issue.txt'), 'issue only');
+    git('add', '.');
+    git('commit', '-m', 'issue');
+    const head = git('rev-parse', 'HEAD');
+    const current = { ...request, stage: 'publication' as const };
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(intent, current),
+        { role: 'assistant', text: JSON.stringify({ ...state(intent, head), base }) },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+      accepted: true,
+      commit: head,
+      base,
+    });
+    git('push', 'origin', `${intent.base}:refs/heads/main`, '--force');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+      accepted: true,
+    });
+  }));

@@ -1305,3 +1305,26 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
     }
   }
 );
+
+it('normalizes independent layers on different authenticated main revisions without replaying main as issue code', async () => {
+  const f = await fixture({ independentMain: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing prepare');
+    await Effect.runPromise(f.issues.prepare(5));
+    const result = await Effect.runPromise(f.issues.inspect(5));
+    expect(result.blockersReady).toBe(true);
+    const head = result.prerequisite?.base;
+    if (!head) throw new Error('Missing combined head');
+    expect(f.git('log', '--format=%s', `main..${head}`)).toBe('C\nD');
+    expect(f.git('ls-tree', '--name-only', head)).toBe('C.txt\nD.txt\nmain-update.txt');
+    expect(
+      f.git(
+        'diff',
+        '--name-only',
+        `${f.git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]}..${head}`
+      )
+    ).toBe('C.txt');
+  } finally {
+    await f.close();
+  }
+});

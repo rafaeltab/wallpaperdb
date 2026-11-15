@@ -51,7 +51,13 @@ export function controlledStore(): JobStore {
       }),
     claimStage: (index) =>
       Effect.sync(() => {
-        if (control.cancelled || control.released || claims.has(index)) return false;
+        if (
+          control.cancelled ||
+          control.released ||
+          control.dependencyRecovery ||
+          claims.has(index)
+        )
+          return false;
         claims.add(index);
         control = {
           ...control,

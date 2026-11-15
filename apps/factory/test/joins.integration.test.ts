@@ -1290,6 +1290,7 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
       const check = Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
       if (kind === 'missing-object') {
         await expect(check).rejects.toMatchObject({ _tag: 'Unavailable' });
+        const journalRecords = new Map<string, unknown>();
         const agent = t3Restacker(
           { binary: f.host.binary, project: f.host.repository, projectId: 'project-id' },
           {
@@ -1301,7 +1302,14 @@ it.each(['unrelated', 'valid', 'missing-object'] as const)(
             onto: f.d,
             context: '',
           },
-          { read: async () => null, write: async () => false }
+          {
+            read: async (name) => journalRecords.get(name) ?? null,
+            write: async (name, value) => {
+              if (journalRecords.has(name)) return false;
+              journalRecords.set(name, value);
+              return true;
+            },
+          }
         );
         const failure = await Effect.runPromise(Effect.flip(agent.resolve()));
         expect(failure).toMatchObject({ _tag: 'Unavailable', cause: { code: 128 } });

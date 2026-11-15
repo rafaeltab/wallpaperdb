@@ -710,3 +710,51 @@ it('delivers bounded abandonment instructions to the existing agent without clai
     expect(JSON.stringify(delivery)).toContain('Do not relabel or admit prerequisites');
     expect(JSON.stringify(delivery)).toContain('Planned');
   }));
+
+it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
+  'translates the exact job-bound dependency list at the %s boundary without accepting completion',
+  (stage) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const current = { ...request, stage };
+      const dependencies = ['758', '759'];
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          instruction(intent, current),
+          {
+            role: 'assistant',
+            text: JSON.stringify({
+              version: 1,
+              kind: 'dependencies',
+              jobId: intent.id,
+              requireUnimplementedIssues: dependencies,
+            }),
+          },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+        dependencies: ['758', '759'],
+        accepted: false,
+        idle: true,
+        stageIndex: current.index,
+      });
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          instruction(intent, current),
+          {
+            role: 'assistant',
+            text: JSON.stringify({
+              version: 1,
+              kind: 'dependencies',
+              jobId: 'unrelated-job',
+              requireUnimplementedIssues: dependencies,
+            }),
+          },
+        ],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
+        dependencies: ['758', '759'],
+      });
+    })
+);

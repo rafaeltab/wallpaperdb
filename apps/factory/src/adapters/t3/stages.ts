@@ -382,7 +382,10 @@ function latestStructured(messages: z.infer<typeof stageDetail>['messages']) {
           value.kind === 'dependencies')
       );
     } catch {
-      return false;
+      return (
+        /^\s*\{/.test(m.text) &&
+        /"(?:jobId|version)"\s*:|"kind"\s*:\s*"(?:state|dependencies)"/.test(m.text)
+      );
     }
   });
 }
@@ -394,7 +397,12 @@ function pendingResponse(
   const boundary = instructionBoundary(messages, intent, request);
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return {};
-  const value = JSON.parse(message.text);
+  let value;
+  try {
+    value = JSON.parse(message.text);
+  } catch {
+    return {};
+  }
   const parsed = receiptSchema.safeParse(value);
   return {
     migrationRequired: value.version !== 1,

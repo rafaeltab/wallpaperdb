@@ -381,6 +381,54 @@ it('retains a state response after delayed assistant prose without accepting a l
   }));
 
 it.each([
+  '{"version":1,"kind":"state","checks":{"lint":false},',
+  '{"checks":{"lint":false},"jobId":"1",',
+  '{"kind":"dependencies","version":1,"requireUnimplementedIssues":["758"],',
+  '{"version":2,"kind":"state",',
+])('withholds older success behind a newer malformed response: %s', (text) =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const success = response(intent, host.base);
+    const messages = [instruction(intent, request), success];
+    const overrides = { status: 'completed' };
+    await host.save({ overrides, messages });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+    const malformed = { role: 'assistant', text };
+    await host.save({ overrides, messages: [...messages, malformed] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: false,
+      idle: true,
+    });
+    await host.save({ overrides, messages: [...messages, malformed, success] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+    expect(
+      (await host.calls()).filter((c) => ['send', 't3_thread_send'].includes(c.args[1]))
+    ).toHaveLength(0);
+  })
+);
+it.each([
+  'The delayed command finished; its log included {"version":1.',
+  '{"command":"completed",',
+])('retains coherent state after unrelated nonresponse text: %s', (text) =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [
+        instruction(intent, request),
+        response(intent, host.base),
+        { role: 'assistant', text },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+  })
+);
+
+it.each([
   { activeRunId: 'active' },
   { status: 'running' },
   { status: 'queued' },

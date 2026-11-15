@@ -1419,6 +1419,19 @@ it('retains review repairs and rebuilds descendants when resuming an uncertified
     expect(
       f.git('ls-remote', '--heads', 'origin', `refs/heads/${first.branch}`).split(/\s/)[0]
     ).toBe(repaired);
+    const reviewComparisons = (await f.host.calls())
+      .filter(
+        (call) => call.args[1] === 'start' && call.args[3]?.includes('Automatic replay review.')
+      )
+      .map((call) =>
+        JSON.stringify([
+          call.args[call.args.indexOf('--worktree') + 1],
+          call.args[3]?.match(/git rebase --onto ([a-f0-9]+)/)?.[1],
+          call.args[3]?.match(/issues\/(\d+)/)?.[1],
+        ])
+      );
+    expect(reviewComparisons).toHaveLength(3);
+    expect(new Set(reviewComparisons).size).toBe(reviewComparisons.length);
     const launches = (await f.host.calls()).filter((call) => call.args[1] === 'start').length;
     await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
     expect((await Effect.runPromise(f.reopen().inspect(5))).prerequisite?.base).toBe(head);

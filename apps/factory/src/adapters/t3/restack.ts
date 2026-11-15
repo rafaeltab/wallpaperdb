@@ -9,7 +9,7 @@ import {
 import { defaultAgentReconciliationLimit, Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion, mcpCall } from './questions.js';
 import { inactiveLineage } from './inactivity.js';
-import { receiptSchema, responseShape, latestStructured } from './response.js';
+import { receiptSchema, responseShape, latestRecoveryResponse, responseValue } from './response.js';
 import { command } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
 export interface RestackOperation {
@@ -42,17 +42,6 @@ const cancellationState = z.object({
   thread: detail.shape.thread.pick({ threadId: true, latestRunId: true, status: true }),
 });
 const workerIdentity = z.object({ threadId: z.string().min(1) });
-const latestRecoveryResponse = (messages: z.infer<typeof detail>['messages']) =>
-  [...messages].reverse().find((message) => {
-    if (latestStructured([message])) return true;
-    if (message.role !== 'assistant') return false;
-    try {
-      const value: unknown = JSON.parse(message.text);
-      return !!value && typeof value === 'object' && ('operation' in value || 'outcome' in value);
-    } catch {
-      return false;
-    }
-  });
 /** A unique title reconciles uncertain launch; immutable claims prohibit duplicate delivery. */
 export function t3Restacker(
   config: {
@@ -220,7 +209,7 @@ export function t3Restacker(
         boundary = index;
     const replies = boundary >= 0 ? observed.messages.slice(boundary + 1) : observed.messages;
     const latest = latestRecoveryResponse(replies);
-    const value: unknown = latest ? JSON.parse(latest.text) : undefined;
+    const value = latest ? responseValue(latest.text) : undefined;
     const version = z.object({ version: z.unknown().optional() }).safeParse(value);
     return reconciliation.advance(
       phase,
@@ -278,7 +267,7 @@ export function t3Restacker(
     if (boundary < 0) return null;
     const replies = messages.slice(boundary + 1).filter((message) => message.role === 'assistant');
     const message = latestRecoveryResponse(replies);
-    const parsed = receiptSchema.safeParse(message ? JSON.parse(message.text) : null);
+    const parsed = receiptSchema.safeParse(message ? responseValue(message.text) : null);
     if (!parsed.success || parsed.data.kind !== 'state') return null;
     const state = parsed.data;
     if (

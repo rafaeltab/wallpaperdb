@@ -67,6 +67,59 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
 
+it.each(['state', 'dependencies', 'legacy', 'notification'])(
+  'keeps latest $0 recovery evidence coherent across malformed input and restart',
+  async (kind) => {
+    const f = await joinFixture({
+      inProcess: true,
+      independentMain: true,
+      automaticReview: false,
+      reconciliationLimit: 1,
+    });
+    try {
+      await configure(f, { recoveryStatus: 'running', reconcileReview: true });
+      await prepare(f);
+      const { path, state } = await worker(f);
+      const earlier = state.messages.at(-1);
+      const proof = JSON.parse(earlier.text);
+      earlier.text = JSON.stringify({ ...proof, reviewed: proof.checked });
+      state.thread.status = 'completed';
+      state.messages.push({
+        role: 'assistant',
+        text:
+          kind === 'notification'
+            ? '{"kind":"notification'
+            : kind === 'legacy'
+              ? `{"operation":${JSON.stringify(state.operation)},"outcome":`
+              : kind === 'dependencies'
+                ? '{"version":1,"kind":"dependencies","requireUnimplementedIssues":["758"],'
+                : '{"version":1,"kind":"state","checks":{"lint":false},',
+      });
+      await writeFile(path, JSON.stringify(state));
+      await configure(f, { recoveryStatus: 'completed' });
+      await prepare(f);
+      const ownSends = (await f.host.calls()).filter(
+        (call) => call.args[1] === 'send' && call.args[2] === state.thread.threadId
+      );
+      expect(ownSends).toHaveLength(kind === 'notification' ? 0 : 1);
+      if (kind !== 'notification')
+        expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+      for (let attempt = 0; attempt < 3; attempt++) await prepare(f);
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+      const calls = await f.host.calls();
+      expect(calls.filter((call) => call.args[1] === 'start')).toHaveLength(2);
+      expect(calls.filter((call) => call.args[1] === 'send')).toHaveLength(
+        kind === 'notification' ? 1 : 2
+      );
+      expect(
+        calls.filter((call) => call.args[1] === 'send' && call.args[2] === state.thread.threadId)
+      ).toHaveLength(kind === 'notification' ? 0 : 1);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
 it('retains the accepted classification while an independent review child is busy without accepting incomplete review', async () => {
   const f = await joinFixture({
     inProcess: true,

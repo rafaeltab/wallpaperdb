@@ -191,10 +191,12 @@ export function t3Restacker(
   };
   const question = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
     if (!observed.thread.pendingRequestCount) return undefined;
-    if (!config.mcpEndpoint) return 'Open recovery thread to answer the pending question';
+    const fallback = 'Open recovery thread to answer the pending question';
+    if (!config.mcpEndpoint) return fallback;
     return (
-      await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal)
-    ).question?.text;
+      (await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal))
+        .question?.text ?? fallback
+    );
   };
   const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => ({
     phase: observed.thread.pendingRequestCount

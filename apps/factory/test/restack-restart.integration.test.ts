@@ -14,6 +14,7 @@ const scenarios = [
   { boundary: 'base', edit: '' },
   { boundary: 'group', edit: '' },
   { boundary: 'restack', edit: '' },
+  { boundary: 'recovery-send', edit: '' },
   { boundary: 'local', edit: 'dirty' },
   { boundary: 'conflict', edit: 'dirty' },
   { boundary: 'local', edit: 'commit' },
@@ -26,11 +27,12 @@ for (const { boundary, edit } of scenarios) {
   it(`recovers the actual factory after SIGKILL at ${boundary} ${edit} while preserving external changes`, async () => {
     const f = await joinFixture({
       conflict: ['restack', 'conflict'].includes(boundary),
+      automaticReview: boundary === 'recovery-send' ? false : undefined,
       restack: boundary === 'restack' ? { outcome: 'SIMPLE' } : undefined,
     });
     const { host, git } = f;
     const initial = JSON.parse(await readFile(host.configFile, 'utf8'));
-    await host.save({ ...initial, hold: boundary });
+    await host.save({ ...initial, hold: boundary, reconcileReview: boundary === 'recovery-send' });
     const marker = join(host.directory, 'held');
     const release = join(host.directory, 'release');
     if (boundary === 'local' || boundary === 'remote') {
@@ -195,6 +197,12 @@ for (const { boundary, edit } of scenarios) {
         101, 102, 103, 104,
       ]);
       const calls = await host.calls();
+      if (boundary === 'recovery-send')
+        expect(
+          calls.filter(
+            (call) => call.args[1] === 'send' && call.args[3]?.includes('Restack reconciliation ')
+          )
+        ).toHaveLength(1);
       expect(
         calls.filter(
           (call) =>

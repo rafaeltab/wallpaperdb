@@ -53,3 +53,28 @@ it.each(['SIMPLE', 'COMPLEX', undefined] as const)(
     ).toBe(Boolean(classification));
   }
 );
+
+it('keeps exhausted recovery inactive without reviewing or verifying obsolete checked code', async () => {
+  const ports = {
+    resolve: () =>
+      Effect.succeed({
+        phase: 'manual-recovery' as const,
+        active: false,
+        commit: 'obsolete-checked-head',
+        progress: 'Recovery reconciliation attempt limit reached; manual intervention required',
+      }),
+    review: () => Effect.die('Manual recovery cannot start another review'),
+    verify: () => Effect.die('Manual recovery cannot publish or grant readiness'),
+  };
+  const result = await Effect.runPromise(
+    Effect.flatMap(Restack, (restack) => restack.advance()).pipe(
+      Effect.provide(RestackLive.pipe(Layer.provide(Layer.succeed(RecoveryPorts, ports))))
+    )
+  );
+  expect(result).toMatchObject({
+    phase: 'manual-recovery',
+    active: false,
+    ready: false,
+    progress: expect.stringContaining('limit reached'),
+  });
+});

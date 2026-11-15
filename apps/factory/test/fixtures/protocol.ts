@@ -422,7 +422,7 @@ export async function runProtocol(
             providerInstanceId: 'codex',
             model: 'gpt-6.1-sol',
             worktreePath: worktree,
-            status: config.restack.question ? 'waiting' : 'completed',
+            status: config.restack.question ? 'waiting' : (config.recoveryStatus ?? 'completed'),
             pendingRequestCount: config.restack.question ? 1 : 0,
             latestRunId: 'resolve-run',
             runCount: config.restack.resolveOrdinal ?? 1,
@@ -435,25 +435,39 @@ export async function runProtocol(
             { role: 'user', text: `Factory instruction ${operation}:resolve.` },
             {
               role: 'assistant',
-              text: config.restack.outcome
-                ? `<RESTACK>${config.restack.outcome}</RESTACK>`
-                : 'unknown',
+              text:
+                config.restack.outcome && !config.omitRecoveryClassification
+                  ? `<RESTACK>${config.restack.outcome}</RESTACK>`
+                  : 'unknown',
             },
             {
               role: 'assistant',
               runId: config.restack.staleRun ? 'prior-run' : 'resolve-run',
               text:
                 config.restack.question ??
-                JSON.stringify({
-                  version: 1,
-                  kind: 'state',
-                  jobId: config.restack.stale || config.restack.wrongDelivery ? 'stale' : operation,
-                  implemented: prompt.match(/issues\/(\d+)/)![1],
-                  base: config.restack.wrongBase ? config.base : onto,
-                  checked: head,
-                  reviewed: automatic && config.restack.review ? head : undefined,
-                  checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
-                }),
+                JSON.stringify(
+                  config.legacyRecoveryInitial
+                    ? { operation, commit: head, outcome: '<RESTACK>SIMPLE</RESTACK>' }
+                    : {
+                        version: 1,
+                        kind: 'state',
+                        jobId:
+                          config.restack.stale || config.restack.wrongDelivery
+                            ? 'stale'
+                            : operation,
+                        implemented: prompt.match(/issues\/(\d+)/)![1],
+                        base: config.restack.wrongBase ? config.base : onto,
+                        checked: config.recoveryChecked ?? head,
+                        reviewed: automatic && config.restack.review ? head : undefined,
+                        checks: {
+                          format: true,
+                          lint: true,
+                          tests: true,
+                          coverage: true,
+                          crap: true,
+                        },
+                      }
+                ),
             },
           ],
         };
@@ -468,6 +482,54 @@ export async function runProtocol(
           })
         );
       } else if (args[1] === 'send') {
+        if (args[3].includes('Restack reconciliation ')) {
+          if (config.dropRecoverySend) throw new Error('Controlled undelivered recovery send');
+          state.thread.runCount += 1;
+          state.thread.latestRunId = `reconciliation-${state.thread.runCount}`;
+          state.thread.status = config.cancelRecoveryOnSend ? 'cancelled' : 'completed';
+          const phase = args[3].match(/Factory instruction [^:]+:(resolve|review)\./)![1];
+          const head = git(state.thread.worktreePath, 'rev-parse', 'HEAD');
+          state.messages.push(
+            { role: 'user', text: args[3] },
+            { role: 'assistant', text: `<RESTACK>${config.restack.outcome ?? 'SIMPLE'}</RESTACK>` },
+            {
+              role: 'assistant',
+              text: JSON.stringify(
+                config.legacyRecoveryReply
+                  ? {
+                      operation: state.operation,
+                      commit: head,
+                      outcome: '<RESTACK>SIMPLE</RESTACK>',
+                    }
+                  : {
+                      version: 1,
+                      kind: 'state',
+                      jobId:
+                        config.restack.stale || config.restack.wrongDelivery
+                          ? 'stale'
+                          : state.operation,
+                      implemented: state.implemented,
+                      base: config.restack.wrongBase ? config.base : state.onto,
+                      checked: head,
+                      reviewed: (
+                        state.automatic
+                          ? config.reconcileReview
+                          : phase === 'review' && config.restack.review
+                      )
+                        ? head
+                        : undefined,
+                      checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+                    }
+              ),
+            }
+          );
+          writeFileSync(path, JSON.stringify(state));
+          await hold('recovery-send');
+          if (config.loseRecoverySend) throw new Error('Controlled lost recovery response');
+          console.log('{}');
+          process.exit(0);
+        }
+        if (config.dropInitialReviewSend) throw new Error('Controlled undelivered initial review');
         const { DatabaseSync } = await import('node:sqlite');
         const shared = existsSync(join(config.directory, 'factory.sqlite'));
         const database = new DatabaseSync(
@@ -495,28 +557,38 @@ export async function runProtocol(
           git(state.thread.worktreePath, 'commit', '-m', 'Repair C conflict after review');
           state.head = git(state.thread.worktreePath, 'rev-parse', 'HEAD');
         }
-        state.thread.runCount = config.restack.reviewOrdinal ?? 2;
+        state.thread.runCount = config.restack.reviewOrdinal ?? state.thread.runCount + 1;
         state.thread.latestRunId = 'review-run';
         state.messages = [
           { role: 'user', text: `Factory instruction ${state.operation}:review.` },
           {
             role: 'assistant',
             runId: 'review-run',
-            text: JSON.stringify({
-              version: 1,
-              kind: 'state',
-              jobId: state.operation,
-              implemented: state.implemented,
-              base: state.onto,
-              checked: git(state.thread.worktreePath, 'rev-parse', 'HEAD'),
-              reviewed: config.restack.review
-                ? git(state.thread.worktreePath, 'rev-parse', 'HEAD')
-                : undefined,
-              checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
-            }),
+            text: JSON.stringify(
+              config.legacyReviewReply
+                ? {
+                    operation: state.operation,
+                    commit: state.head,
+                    outcome: '<REVIEW>COMPLETE</REVIEW>',
+                  }
+                : {
+                    version: 1,
+                    kind: 'state',
+                    jobId: state.operation,
+                    implemented: state.implemented,
+                    base: state.onto,
+                    checked: git(state.thread.worktreePath, 'rev-parse', 'HEAD'),
+                    reviewed: config.restack.review
+                      ? git(state.thread.worktreePath, 'rev-parse', 'HEAD')
+                      : undefined,
+                    checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
+                  }
+            ),
           },
         ];
         writeFileSync(path, JSON.stringify(state));
+        if (config.loseInitialReviewSend)
+          throw new Error('Controlled lost initial review response');
         console.log('{}');
       } else if (args[1] === 'list')
         console.log(

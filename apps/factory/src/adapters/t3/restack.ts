@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
 import type { RecoveryPorts } from '../../capabilities/restack/index.js';
-import { Unavailable } from '../../capabilities/job/index.js';
+import {
+  recoveryReconciliation,
+  reconciliationMarker,
+  type RecoveryJournal,
+} from './restack-reconciliation.js';
+import { defaultAgentReconciliationLimit, Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion, mcpCall } from './questions.js';
 import { inactiveLineage } from './inactivity.js';
 import { receiptSchema, responseShape, latestStructured } from './response.js';
@@ -16,10 +21,6 @@ export interface RestackOperation {
   parent: string;
   onto: string;
   context: string;
-}
-interface Journal {
-  read(name: string): Promise<unknown | null>;
-  write(name: string, value: unknown): Promise<boolean>;
 }
 const detail = z.object({
   thread: z.object({
@@ -40,6 +41,7 @@ const detail = z.object({
 /** A unique title reconciles uncertain launch; immutable claims prohibit duplicate delivery. */
 export function t3Restacker(
   config: {
+    reconciliationLimit?: number;
     binary: string;
     project: string;
     projectId: string;
@@ -47,7 +49,7 @@ export function t3Restacker(
     mcpAuthorizationFile?: string;
   },
   operation: RestackOperation,
-  journal: Journal
+  journal: RecoveryJournal
 ): Pick<RecoveryPorts, 'resolve' | 'review'> {
   const title = `Factory restack ${operation.id}`;
   const branch = `factory-restack/${operation.id}`;
@@ -126,16 +128,100 @@ export function t3Restacker(
       )) === 'idle'
     );
   };
+  const reconciliation = recoveryReconciliation(
+    journal,
+    operation,
+    config.reconciliationLimit ?? defaultAgentReconciliationLimit,
+    async (threadId, runId, ordinal) => {
+      const current = await observe();
+      return (
+        !!current &&
+        current.thread.threadId === threadId &&
+        current.thread.latestRunId === runId &&
+        current.thread.runCount === ordinal &&
+        !['cancelled', 'rolled_back'].includes(current.thread.status) &&
+        (await idle(current))
+      );
+    },
+    (threadId, prompt, signal) => call(['send', threadId, prompt], signal)
+  );
+  const acknowledged = (
+    observed: z.infer<typeof detail>,
+    pending: Awaited<ReturnType<typeof reconciliation.current>>
+  ) =>
+    !pending ||
+    (observed.thread.latestRunId !== pending.runId &&
+      observed.thread.runCount > pending.ordinal &&
+      observed.messages.some(
+        (message) =>
+          message.role === 'user' &&
+          message.text.includes(reconciliationMarker(operation.id, pending.index))
+      ));
+  const reconcile = async (
+    observed: z.infer<typeof detail>,
+    phase: 'resolve' | 'review',
+    signal?: AbortSignal
+  ) => {
+    const pending = await reconciliation.current();
+    let boundary = -1;
+    for (let index = 0; index < observed.messages.length; index++)
+      if (
+        observed.messages[index]?.role === 'user' &&
+        observed.messages[index]?.text.includes(`Factory instruction ${operation.id}:${phase}.`)
+      )
+        boundary = index;
+    const replies = boundary >= 0 ? observed.messages.slice(boundary + 1) : observed.messages;
+    const latest = latestStructured(replies);
+    let value: unknown = latest ? JSON.parse(latest.text) : undefined;
+    if (!value)
+      for (const message of [...replies].reverse()) {
+        if (message.role !== 'assistant') continue;
+        try {
+          const legacy = JSON.parse(message.text);
+          if (
+            legacy &&
+            typeof legacy === 'object' &&
+            ('operation' in legacy || 'outcome' in legacy)
+          ) {
+            value = legacy;
+            break;
+          }
+        } catch {
+          /* Prose is not a state response. */
+        }
+      }
+    const version = z.object({ version: z.unknown().optional() }).safeParse(value);
+    return reconciliation.advance(
+      phase,
+      {
+        threadId: observed.thread.threadId,
+        runId: observed.thread.latestRunId,
+        ordinal: observed.thread.runCount,
+        acknowledged: pending?.phase !== phase || acknowledged(observed, pending),
+      },
+      version.success && version.data.version !== 1,
+      signal
+    );
+  };
   const receipt = async (
     observed: z.infer<typeof detail>,
     phase: 'resolve' | 'review',
-    commit: string
+    commit: string,
+    signal?: AbortSignal
   ) => {
+    signal?.throwIfAborted();
     const { thread, messages } = observed;
-    if (!(await idle(observed))) return null;
+    const pending = await reconciliation.current();
+    if (
+      (pending && pending.threadId !== thread.threadId) ||
+      pending?.kind === 'manual' ||
+      (pending?.phase === phase && !acknowledged(observed, pending))
+    )
+      return null;
+    if (!(await idle(observed, signal))) return null;
     const terminal = z
       .object({
-        status: z.literal('completed'),
+        status: z.enum(['completed', 'idle']),
         pendingRequestCount: z.literal(0),
         latestRunId: z.string().min(1),
       })
@@ -152,7 +238,9 @@ export function t3Restacker(
       const message = messages[index];
       if (
         message?.role === 'user' &&
-        message.text.includes(`Factory instruction ${operation.id}:${phase}.`)
+        message.text.includes(`Factory instruction ${operation.id}:${phase}.`) &&
+        (pending?.phase !== phase ||
+          message.text.includes(reconciliationMarker(operation.id, pending.index)))
       )
         boundary = index;
     }
@@ -177,10 +265,13 @@ export function t3Restacker(
       )
       .at(-1)?.text;
     if (phase === 'resolve' && !classification) return null;
+    signal?.throwIfAborted();
     return { outcome: classification ?? '<RESTACK>COMPLEX</RESTACK>' };
   };
   const prompt = `${operation.mode === 'review' ? 'Automatic replay review. Use $review-loop to run fresh independent Standards, Spec and Defects review and applicable checks at the supplied clean head. Do not rebase again. The state receipt must include reviewed equal to checked. ' : ''}Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the issue, PR metadata and parent spec; preserve all retained scope and user decisions below. Supplied issue bodies, parent bodies, PR descriptions and comments are limited to rafaeltab and zero-two-rafaeltab. Apply that same author filter when retrieving additional issue bodies, parent bodies, PR descriptions or comments; exclude other or missing authors from recovery context. ${operation.mode === 'review' ? 'The replay is already complete. Original replay command was' : 'Start with'} git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX. Every resolution requires fresh independent review before publication and CI. Unknown/incomplete work must never claim success. Run applicable checks and report classification separately as <RESTACK>SIMPLE</RESTACK> or <RESTACK>COMPLEX</RESTACK>, followed by the shared version 1 state response. Factory instruction ${operation.id}:resolve. Return JSON with version:1, kind:state, jobId:${operation.id}, implemented:${operation.issue}, base:${operation.onto}, checked:full current HEAD, and all required checks. Do not claim success for missing prerequisites; use the shared dependencies response. Response TypeScript contract:\n\`\`\`typescript\n${responseShape}\n\`\`\` Context:\n${operation.context}`;
   const ensureLaunch = async (signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (await journal.read('cancelled.json')) return null;
     let observed = await observe(signal);
     if (!observed) {
       if ((await discover(signal)).length) return null;
@@ -231,22 +322,31 @@ export function t3Restacker(
   const savedResolution = async (
     saved: unknown,
     observed: z.infer<typeof detail>,
-    head: string
+    head: string,
+    signal?: AbortSignal
   ) => {
     const accepted = z
       .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })
       .safeParse(saved);
     if (accepted.success) return accepted.data;
-    if ((await journal.read('review-delivery.json')) && (await receipt(observed, 'review', head)))
+    if (
+      (await journal.read('review-delivery.json')) &&
+      (await receipt(observed, 'review', head, signal))
+    )
       return { commit: head, classification: 'COMPLEX' as const };
     return { progress: 'Recovery head changed; incomplete' };
   };
-  const acceptResolution = async (observed: z.infer<typeof detail>, head: string) => {
-    const accepted = await receipt(observed, 'resolve', head);
+  const acceptResolution = async (
+    observed: z.infer<typeof detail>,
+    head: string,
+    signal?: AbortSignal
+  ) => {
+    const accepted = await receipt(observed, 'resolve', head, signal);
     if (!accepted) return {};
     const classification =
       accepted.outcome === '<RESTACK>SIMPLE</RESTACK>' ? ('SIMPLE' as const) : ('COMPLEX' as const);
     const result = { commit: head, classification };
+    signal?.throwIfAborted();
     await journal.write('resolution.json', {
       ...result,
       threadId: observed.thread.threadId,
@@ -258,12 +358,37 @@ export function t3Restacker(
   };
   const execution = {
     resolve: async (signal?: AbortSignal) => {
+      if (await journal.read('cancelled.json'))
+        return {
+          phase: 'manual-recovery' as const,
+          active: false,
+          progress: 'Recovery cancelled; retained for manual recovery',
+        };
       const observed = await ensureLaunch(signal);
       if (!observed)
         return { progress: 'Recovery launch pending reconciliation', bindingAvailable: false };
       const display = await presentation(observed, signal);
       const saved = await journal.read('resolution.json');
-      if (observed.thread.status !== 'completed' || observed.thread.pendingRequestCount) {
+      if (
+        ['cancelled', 'rolled_back'].includes(observed.thread.status) ||
+        (await journal.read('cancelled.json'))
+      ) {
+        signal?.throwIfAborted();
+        await journal.write('cancelled.json', {
+          threadId: observed.thread.threadId,
+          runId: observed.thread.latestRunId,
+        });
+        return {
+          ...display,
+          phase: 'manual-recovery' as const,
+          active: false,
+          progress: 'Recovery cancelled; retained for manual recovery',
+        };
+      }
+      if (
+        !['completed', 'idle', 'failed', 'interrupted'].includes(observed.thread.status) ||
+        observed.thread.pendingRequestCount
+      ) {
         const parsed = z.object({ classification: z.enum(['SIMPLE', 'COMPLEX']) }).safeParse(saved);
         return {
           ...display,
@@ -271,12 +396,30 @@ export function t3Restacker(
         };
       }
       const head = await currentHead(observed, signal);
-      if (!head || !(await idle(observed, signal))) return display;
+      if (!(await idle(observed, signal))) return display;
+      const reviewDelivery = await journal.read('review-delivery.json');
+      if (
+        reviewDelivery &&
+        !observed.messages.some(
+          (message) =>
+            message.role === 'user' &&
+            (message.text.includes(`Factory instruction ${operation.id}:review.`) ||
+              message.text.includes(`\"${operation.id}:review\"`))
+        )
+      )
+        return {
+          ...display,
+          phase: 'reviewing' as const,
+          progress: 'Recovery review delivery pending reconciliation',
+        };
+      const phase = reviewDelivery ? ('review' as const) : ('resolve' as const);
+      if (!head || !(await receipt(observed, phase, head, signal)))
+        return { ...display, ...(await reconcile(observed, phase, signal)) };
       return {
         ...display,
         ...(saved
-          ? await savedResolution(saved, observed, head)
-          : await acceptResolution(observed, head)),
+          ? await savedResolution(saved, observed, head, signal)
+          : await acceptResolution(observed, head, signal)),
       };
     },
     review: async (commit: string, signal?: AbortSignal) => {
@@ -285,7 +428,7 @@ export function t3Restacker(
         return (
           !!observed &&
           (await currentHead(observed, signal)) === commit &&
-          !!(await receipt(observed, 'resolve', commit))
+          !!(await receipt(observed, 'resolve', commit, signal))
         );
       if (
         !observed ||
@@ -294,7 +437,12 @@ export function t3Restacker(
       )
         return false;
       if (
-        await journal.write('review-delivery.json', { commit, threadId: observed.thread.threadId })
+        await journal.write('review-delivery.json', {
+          commit,
+          threadId: observed.thread.threadId,
+          runId: observed.thread.latestRunId,
+          ordinal: observed.thread.runCount,
+        })
       ) {
         await call(
           [
@@ -309,7 +457,7 @@ export function t3Restacker(
       return (
         !!current &&
         (await currentHead(current, signal)) === commit &&
-        !!(await receipt(current, 'review', commit))
+        !!(await receipt(current, 'review', commit, signal))
       );
     },
   };

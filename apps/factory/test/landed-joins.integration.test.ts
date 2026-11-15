@@ -638,9 +638,14 @@ it.each([
       expect(prompt).toContain(f.base);
       expect(prompt).toContain(f.landed);
       expect(prompt).toContain(f.original);
-      expect(
-        calls.filter((call) => ['send', 't3_thread_send'].includes(call.args[1]))
-      ).toHaveLength(recovery.outcome ? 1 : 0);
+      const sends = calls.filter((call) => ['send', 't3_thread_send'].includes(call.args[1]));
+      const initialReviews = sends.filter(
+        (call) => !call.args[3]?.includes('Restack reconciliation ')
+      );
+      expect(initialReviews.length).toBeLessThanOrEqual(1);
+      if (recovery.outcome) expect(initialReviews).toHaveLength(1);
+      if (!recovery.accepted)
+        expect(sends.some((call) => call.args[3]?.includes('Restack reconciliation '))).toBe(true);
       if (!recovery.accepted) return;
       const head = ready.prerequisite?.base;
       if (!head) throw new Error('Missing recovered join head');

@@ -984,7 +984,7 @@ it('retains generic recovery guidance when a pending question has no bound activ
         question: 'Open recovery thread to answer the pending question',
       }),
     ]);
-    await rename(join(f.host.directory, 'mcp-auth'), join(f.host.directory, 'mcp-auth.offline'));
+    await rename(f.host.mcp.mcpAuthorizationFile, `${f.host.mcp.mcpAuthorizationFile}.offline`);
     await expect(Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void)).rejects.toMatchObject({
       _tag: 'Unavailable',
     });

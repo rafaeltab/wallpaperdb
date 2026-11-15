@@ -608,7 +608,6 @@ it.each([false, true])(
           ...f.host.mcp,
           project: f.host.repository,
           projectId: 'project-id',
-          ...f.host.mcp,
           binary: f.host.binary,
         });
         const store = fileStore(join(f.host.directory, 'successive-stage'));
@@ -1789,7 +1788,6 @@ it.each(['review', 'publication', 'ci'] as const)(
         ...f.host.mcp,
         project: f.host.repository,
         projectId: 'project-id',
-        ...f.host.mcp,
         binary: f.host.binary,
       });
       for (const context of [
@@ -2082,7 +2080,6 @@ it.each(['C', 'B'])(
         binary: f.host.binary,
         project: f.host.repository,
         projectId: 'project-id',
-        ...f.host.mcp,
       });
       const authority = async (stage: 'review' | 'publication', commit = h2, attempt = 0) => {
         const index = (stage === 'review' ? 5 : 6) + attempt;
@@ -2571,7 +2568,6 @@ process.exit(result.status ?? 1);
       ...f.host.mcp,
       project: f.host.repository,
       projectId: 'project-id',
-      ...f.host.mcp,
       binary: parentBinary,
     });
     const request: import('../src/capabilities/job/index.js').StageRequest = {

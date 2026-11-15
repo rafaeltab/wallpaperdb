@@ -359,3 +359,57 @@ it('reconciles a supported negative state after migration using the ordinary bud
     await f.close();
   }
 });
+
+it('keeps the reconciliation slot when an overlapping authorization loses the control revision', async () => {
+  const store = controlledStore();
+  const gate = await Effect.runPromise(Deferred.make<void>());
+  let armed = false;
+  let arrivals = 0;
+  const f = await fixture(2, {
+    ...store,
+    saveControl: (control) =>
+      Effect.gen(function* () {
+        if (armed && control.reconciliation?.pending?.index === 1) {
+          arrivals++;
+          if (arrivals === 2) yield* Deferred.succeed(gate, undefined);
+          yield* Deferred.await(gate);
+        }
+        return yield* store.saveControl(control);
+      }),
+  });
+  try {
+    armed = true;
+    f.state({ idle: true });
+    const observations = await Promise.all([f.status(), f.status()]);
+    for (const status of observations)
+      expect(status).toMatchObject({
+        delivery: { activity: 'continuation-pending', active: true },
+      });
+    expect((await Effect.runPromise(store.readControl())).reconciliation?.attempts).toBe(1);
+    await f.status();
+    expect(f.sends).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});
+it('reconciles a PR mismatch after migration with accepted local evidence and absent pending-format metadata', async () => {
+  const f = await fixture();
+  try {
+    f.state({ idle: true, accepted: true });
+    await f.status();
+    f.state({ idle: true, accepted: true });
+    await f.status();
+    f.state({ idle: true, accepted: false, migrationRequired: true });
+    await f.status();
+    await f.status();
+    f.state({ idle: true, accepted: true, migrationRequired: undefined, prCommit: 'c'.repeat(40) });
+    expect(await f.status()).toMatchObject({
+      delivery: { activity: 'continuation-pending', active: true },
+    });
+    expect((await Effect.runPromise(f.store.readControl())).reconciliation?.attempts).toBe(1);
+    await f.status();
+    expect(f.sends.at(-1)).toMatchObject({ stage: 'publication', reconciliation: 'state' });
+  } finally {
+    await f.close();
+  }
+});

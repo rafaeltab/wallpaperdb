@@ -37,7 +37,8 @@ export function requestReconciliation(
     const failedMigration =
       state.migrated &&
       waiting.reconciliation === 'migration' &&
-      evidence.migrationRequired !== false;
+      evidence.migrationRequired !== false &&
+      !evidence.accepted;
     if (
       failedMigration ||
       (migration && state.migrated) ||
@@ -83,7 +84,8 @@ export function requestReconciliation(
         },
       }))
     )
-      return null;
+      // Re-read the winner before reporting a stopped job or authorizing work.
+      return yield* requestReconciliation(store, waiting, evidence, limit);
     yield* recoverReconciliation(store);
     return {
       stage: waiting.stage,

@@ -102,14 +102,19 @@ it.each([undefined, false, true])(
       saved.thread.status = 'completed';
       saved.thread.pendingRequestCount = 0;
       saved.messages = [
+        { role: 'user', text: `Factory instruction ${saved.operation}:resolve.` },
+        { role: 'assistant', text: '<RESTACK>COMPLEX</RESTACK>' },
         {
           role: 'assistant',
           runId: 'resolve-run',
           text: JSON.stringify({
-            delivery: `${saved.operation}:resolve`,
-            operation: saved.operation,
-            commit: saved.head,
-            outcome: '<RESTACK>COMPLEX</RESTACK>',
+            version: 1,
+            kind: 'state',
+            jobId: saved.operation,
+            implemented: saved.implemented,
+            base: saved.onto,
+            checked: saved.head,
+            checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
           }),
         },
       ];

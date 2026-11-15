@@ -1387,10 +1387,7 @@ it('resumes a retained normalization comparison after main advances without dupl
     const name = (await physicalDirectory(f.host.directory)).find(
       (name) => name.startsWith('restacker-') && name.endsWith('.json')
     );
-    if (!name)
-      throw new Error(
-        `Missing retained review worker: ${JSON.stringify(await Effect.runPromise(f.issues.inspect(5)))}; calls ${JSON.stringify((await f.host.calls()).filter((call) => call.program === 't3'))}`
-      );
+    if (!name) throw new Error('Missing retained review worker');
     const path = join(f.host.directory, name);
     const worker = JSON.parse(await readFile(path, 'utf8'));
     const message = worker.messages.at(-1);
@@ -1433,6 +1430,24 @@ it('preserves the selected open prerequisite as its own layer while normalizing 
     expect(metadata.prs[101].base).toBe('main');
     expect(metadata.prs[103].base).toBe('A');
     expect(metadata.prs[104].base).toBe('D');
+  } finally {
+    await f.close();
+  }
+});
+
+it('rejects a locally advertised main base absent from authenticated repository history', async () => {
+  const f = await fixture({ independentMain: true });
+  try {
+    await f.host.save({
+      ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+      authenticatedMain: f.host.base,
+    });
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({
+      blockersReady: false,
+      blockedReason: expect.stringContaining('unexpected-main-base'),
+    });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
   } finally {
     await f.close();
   }

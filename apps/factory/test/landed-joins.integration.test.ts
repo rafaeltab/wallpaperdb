@@ -224,7 +224,6 @@ it.each([false, true])(
                     ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
-                    ...f.host.mcp,
                     binary: f.host.binary,
                   })
                 )

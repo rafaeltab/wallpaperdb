@@ -77,7 +77,6 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
                 ...host.mcp,
                 project: host.repository,
                 projectId: 'project-id',
-                ...f.host.mcp,
                 binary: host.binary,
               })
             )
@@ -643,7 +642,6 @@ it.each([
                     ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
-                    ...f.host.mcp,
                     binary: f.host.binary,
                   })
                 )
@@ -1110,7 +1108,6 @@ it('resumes a later conflict using the earlier durable replay head across commit
           directory: join(f.host.directory, 'joins'),
           binary: f.host.binary,
           projectId: 'project-id',
-          ...f.host.mcp,
           ...f.host.mcp,
         },
       });

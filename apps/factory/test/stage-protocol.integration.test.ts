@@ -876,3 +876,35 @@ it('requires manual recovery when rebasing to main omits a prepared unmerged pre
     });
     expect(git('ls-tree', '--name-only', head)).toBe('issue.txt\nmain.txt');
   }));
+
+it.each(['review', 'publication'] as const)(
+  'preserves the reconstructed PR target in %s instructions with an accepted comparison',
+  (stage) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({ overrides: { status: 'completed' } });
+      const original = { ...intent, prBase: 'old-parent' };
+      for (const acceptedBase of [undefined, host.base]) {
+        await Effect.runPromise(
+          adapter.sendStage(original, {
+            ...request,
+            index: acceptedBase ? 7 : 6,
+            stage,
+            previousRunId: 'run-1',
+            acceptedBase,
+            comparison: {
+              base: host.base,
+              prBase: 'reconstructed-parent',
+              previousHead: host.base,
+            },
+          })
+        );
+        const call = (await host.calls())
+          .filter((call) => call.args[1] === 't3_thread_send')
+          .at(-1);
+        if (!call) throw new Error('Missing stage delivery');
+        const message = JSON.parse(call.args[2]).message;
+        expect(message).toContain('against PR target reconstructed-parent,');
+        expect(message).toContain(`pinned comparison ${host.base}`);
+      }
+    })
+);

@@ -918,13 +918,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return order;
   };
-  const normalizedMain = async (
-    boundary: JoinBoundary,
-    sources: readonly Layer[],
-    signal?: AbortSignal
-  ): Promise<JoinBoundary | null> => {
-    const observed = await remote('main', signal);
-    if (!observed || observed === boundary.pin) return null;
+  const authenticatedMain = async (signal?: AbortSignal) => {
     const main = z
       .object({ object: z.object({ sha }) })
       .parse(
@@ -934,6 +928,16 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         )
       ).object.sha;
     await git(['fetch', '--no-tags', '--no-write-fetch-head', 'origin', main], signal);
+    return main;
+  };
+  const normalizedMain = async (
+    boundary: JoinBoundary,
+    sources: readonly Layer[],
+    signal?: AbortSignal
+  ): Promise<JoinBoundary | null> => {
+    const observed = await remote('main', signal);
+    if (!observed || observed === boundary.pin) return null;
+    const main = await authenticatedMain(signal);
     if (!(await containsRequired(project, main, boundary, signal))) return null;
     const roots = await Promise.all(
       sources.map((source) => git(['merge-base', main, source.commit], signal))
@@ -1006,15 +1010,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of layers) {
       const common = await openReplayParent(project, item.parent, item.commit, boundary, signal);
       if (item.prBase === 'main' && !(await isAncestor(common, boundary.pin, signal))) {
-        const main = z
-          .object({ object: z.object({ sha }) })
-          .parse(
-            await gh(
-              ['api', 'repos/rafaeltab/wallpaperdb/git/ref/heads/main', '--hostname', 'github.com'],
-              signal
-            )
-          ).object.sha;
-        await git(['fetch', '--no-tags', '--no-write-fetch-head', 'origin', main], signal);
+        const main = await authenticatedMain(signal);
         if (
           !(await isAncestor(common, main, signal)) &&
           !(await landedParentCovered(project, common, [main], boundary, signal))

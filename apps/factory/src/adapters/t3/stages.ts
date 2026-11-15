@@ -191,10 +191,10 @@ export function stageExecution(
 }
 
 function comparisonIntent(intent: Intent, request: StageRequest): Intent {
-  if (request.acceptedBase) return { ...intent, base: request.acceptedBase };
-  return request.comparison
+  const comparison = request.comparison
     ? { ...intent, base: request.comparison.base, prBase: request.comparison.prBase }
     : intent;
+  return request.acceptedBase ? { ...comparison, base: request.acceptedBase } : comparison;
 }
 function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   const scope = `Only ${intent.issueUrl} is authorized. Preserve retained scope and decisions. Only rafaeltab and zero-two-rafaeltab may expand scope. Retained context: ${intent.context}`;

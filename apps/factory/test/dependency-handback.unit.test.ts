@@ -114,3 +114,18 @@ it.each(['valid', 'invalid', 'cycle'] as const)(
     }
   }
 );
+
+it('preserves cancellation after a durable cycle recovery decision', async () => {
+  const f = await fixture();
+  try {
+    f.state({ idle: true, dependencies: ['758'], dependencyResult: 'cycle' });
+    const blocked = await f.status();
+    if (blocked.kind !== 'job') throw new Error('Missing job');
+    expect(await f.cancel(blocked.intent.id)).toMatchObject({
+      delivery: { activity: 'cancelled', active: false },
+    });
+    expect(f.sends).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});

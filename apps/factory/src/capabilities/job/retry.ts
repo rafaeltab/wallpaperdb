@@ -20,6 +20,7 @@ function retryableStage(control: Control, stage: StageRequest | null): stage is 
   return (
     !control.cancelled &&
     !control.released &&
+    !control.dependencyRecovery &&
     stage !== null &&
     stage.stage !== 'ci' &&
     control.parked?.index !== stage.index

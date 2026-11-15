@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { retainManualRepair } from './manual-repair.js';
-import type { Delivery, JobStore, StageEvidence, StageRequest, Unavailable } from './contract.js';
+import type { Control, Delivery, JobStore, StageEvidence, StageRequest, Unavailable } from './contract.js';
 
 /** New authorizations reserve the counter and immutable instruction together,
  * before its send claim. Recover older pending-only records without resending. */
@@ -21,7 +21,12 @@ export function requestReconciliation(
     if (!evidence?.idle) return null;
     const control = yield* store.readControl();
     if (expectedRevision !== undefined && control.revision !== expectedRevision) return null;
-    if (control.cancelled || control.released || control.parked?.index === waiting.index)
+    if (
+      control.cancelled ||
+      control.released ||
+      control.dependencyRecovery ||
+      control.parked?.index === waiting.index
+    )
       return null;
     const state = control.reconciliation ?? { attempts: 0, migrated: false };
     // The pending instruction is also the authorization high-water mark. Read
@@ -47,11 +52,17 @@ export function requestReconciliation(
       (migration && state.migrated) ||
       (!migration && state.attempts >= limit)
     ) {
-      if (waiting.stage === 'implementation')
+      const progress = migration || failedMigration
+        ? 'Agent response migration failed. Maintainer intervention required.'
+        : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.';
+      if (expectedRevision !== undefined) {
+        if (!(yield* retainDependencyRecovery(store, control, waiting, evidence, progress))) return null;
+      } else if (waiting.stage === 'implementation') {
         yield* retainManualRepair(store, waiting, {
           id: evidence.runId,
           ordinal: evidence.ordinal,
         });
+      }
       return {
         stage: waiting.stage,
         commit: evidence.commit,
@@ -59,10 +70,7 @@ export function requestReconciliation(
         landed: false,
         active: false,
         activity: 'manual-recovery',
-        progress:
-          migration || failedMigration
-            ? 'Agent response migration failed. Maintainer intervention required.'
-            : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.',
+        progress,
       } satisfies Delivery;
     }
     const request: StageRequest = {
@@ -114,5 +122,25 @@ export function requestReconciliation(
         ? 'Migrating agent response to version 1.'
         : `Agent reconciliation attempt ${state.attempts + 1} of ${limit}.`,
     } satisfies Delivery;
+  });
+}
+
+/** A manual dependency decision revokes older completion authority before it is reported. */
+export function retainDependencyRecovery(
+  store: JobStore,
+  control: Control,
+  waiting: StageRequest,
+  evidence: StageEvidence,
+  progress: string
+) {
+  return store.saveControl({
+    ...control,
+    revision: control.revision + 1,
+    reconciliation: control.reconciliation ?? { attempts: 0, migrated: false },
+    dependencyRecovery: {
+      index: waiting.index,
+      run: { id: evidence.runId, ordinal: evidence.ordinal },
+      progress,
+    },
   });
 }

@@ -386,18 +386,21 @@ function responseValue(text: string): unknown {
   }
 }
 function malformedResponse(text: string) {
-  if (!text.trimStart().startsWith('{')) return false;
+  const start = /^\s*(?:```[^\r\n]*\r?\n\s*)?\{/.exec(text);
+  if (!start) return false;
   let depth = 0;
   let key = false;
-  for (let index = 0; index < text.length; index++) {
+  for (let index = start[0].length - 1; index < text.length; index++) {
     const character = text[index];
     if (character === '"') {
       const end = stringEnd(text, index);
       if (end >= text.length) return false;
-      if (depth === 1 && key) {
-        if (responseField(responseValue(text.slice(index, end + 1)), text.slice(end + 1)))
-          return true;
+      const tail = text.slice(end + 1);
+      if (depth === 1 && (key || /^\s*:/.test(tail))) {
+        if (responseField(responseValue(text.slice(index, end + 1)), tail)) return true;
         key = false;
+      } else if (depth === 1) {
+        key = true;
       }
       index = end;
     } else if (character === '{' || character === '[') {
@@ -405,7 +408,8 @@ function malformedResponse(text: string) {
       if (depth === 1) key = true;
     } else if (character === '}' || character === ']') {
       depth--;
-    } else if (character === ',' && depth === 1) {
+      if (depth === 1) key = true;
+    } else if (depth === 1 && character !== ':' && Boolean(character?.trim())) {
       key = true;
     }
   }

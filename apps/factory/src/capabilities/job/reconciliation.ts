@@ -1,6 +1,13 @@
 import { Effect } from 'effect';
 import { retainManualRepair } from './manual-repair.js';
-import type { Control, Delivery, JobStore, StageEvidence, StageRequest, Unavailable } from './contract.js';
+import type {
+  Control,
+  Delivery,
+  JobStore,
+  StageEvidence,
+  StageRequest,
+  Unavailable,
+} from './contract.js';
 
 /** New authorizations reserve the counter and immutable instruction together,
  * before its send claim. Recover older pending-only records without resending. */
@@ -52,11 +59,13 @@ export function requestReconciliation(
       (migration && state.migrated) ||
       (!migration && state.attempts >= limit)
     ) {
-      const progress = migration || failedMigration
-        ? 'Agent response migration failed. Maintainer intervention required.'
-        : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.';
+      const progress =
+        migration || failedMigration
+          ? 'Agent response migration failed. Maintainer intervention required.'
+          : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.';
       if (expectedRevision !== undefined) {
-        if (!(yield* retainDependencyRecovery(store, control, waiting, evidence, progress))) return null;
+        if (!(yield* retainDependencyRecovery(store, control, waiting, evidence, progress)))
+          return null;
       } else if (waiting.stage === 'implementation') {
         yield* retainManualRepair(store, waiting, {
           id: evidence.runId,

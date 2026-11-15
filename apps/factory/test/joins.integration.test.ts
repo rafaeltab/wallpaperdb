@@ -955,6 +955,39 @@ it('exposes the current structured T3 question without establishing readiness', 
   }
 });
 
+it('retains generic recovery guidance when a pending question has no bound activity text', async () => {
+  const f = await fixture({
+    conflict: true,
+    restack: { mcp: true, question: 'May I change this requirement?' },
+  });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    await f.host.save({ ...config, restack: { ...config.restack, question: undefined } });
+    await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
+      blockersReady: false,
+      recovery: {
+        question: 'Open recovery thread to answer the pending question',
+        threadId: 'restacker',
+      },
+    });
+    expect(await Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]))).toEqual([
+      expect.objectContaining({
+        active: false,
+        question: 'Open recovery thread to answer the pending question',
+      }),
+    ]);
+    await rename(join(f.host.directory, 'mcp-auth'), join(f.host.directory, 'mcp-auth.offline'));
+    await expect(Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void)).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+  } finally {
+    await f.close();
+  }
+});
+
 it.each(['SIMPLE', 'COMPLEX'] as const)(
   'preserves the owning job readiness after verified %s recovery',
   async (classification) => {

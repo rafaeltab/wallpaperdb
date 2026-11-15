@@ -46,11 +46,35 @@ export async function runProtocol(
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
     const args = process.argv.slice(2);
+    // Manual-operation fixtures still serve the background observation queries.
+    // Reuse the project protocol without inventing discoverable admissions.
+    const observationQuery =
+      !config.planning &&
+      basename(process.argv[1]) === 'gh' &&
+      args[0] === 'api' &&
+      args[1] === 'graphql' &&
+      (args.join(' ').includes('projectV2(number:7)') ||
+        /[ip]\d+:(?:issue|pullRequest)\(number:/.test(args.join(' ')));
+    if (observationQuery)
+      config.planning = {
+        issues: [...args.join(' ').matchAll(/i\d+:issue\(number:(\d+)\)/g)].map((match) => ({
+          number: Number(match[1]),
+          url: `https://github.com/rafaeltab/wallpaperdb/issues/${match[1]}`,
+          title: config.issueTitle ?? 'Controlled issue',
+          updatedAt: '2026-11-13T00:00:00Z',
+          body: config.body ?? '',
+          state: config.issueStates?.[match[1]] ?? 'OPEN',
+          author: { login: 'rafaeltab' },
+          labels: [],
+          comments: [],
+        })),
+      };
     const stageHeld = (resource: { stage?: string; status?: string } | null) =>
       !['failed', 'interrupted', 'cancelled'].includes(
         config.overrides?.status ?? resource?.status
       ) &&
-      ((resource?.stage === 'review' && config.holdReview) ||
+      ((resource?.stage === 'implementation' && config.holdImplementation) ||
+        (resource?.stage === 'review' && config.holdReview) ||
         (resource?.stage === 'publication' && config.holdPublication));
     const hold = async (boundary: string) => {
       const separate = config.holds?.includes(boundary);
@@ -140,7 +164,11 @@ export async function runProtocol(
     }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_environment_read') {
       console.log(
-        JSON.stringify({ structuredContent: { environmentId: 'controlled-environment' } })
+        JSON.stringify(
+          config.metadataUnavailable
+            ? { isError: true }
+            : { structuredContent: { environmentId: 'controlled-environment' } }
+        )
       );
       process.exit(0);
     }
@@ -250,17 +278,19 @@ export async function runProtocol(
           JSON.stringify({
             structuredContent: {
               thread: { latestRunId: state.thread.latestRunId },
-              items: [
-                {
-                  itemId: 'restack-question',
-                  runId: state.thread.latestRunId,
-                  type: 'user_input_request',
-                  status: 'waiting',
-                  text: config.restack.question,
-                  sourceThreadId: 'restacker',
-                  visibility: 'local',
-                },
-              ],
+              items: config.restack.question
+                ? [
+                    {
+                      itemId: 'restack-question',
+                      runId: state.thread.latestRunId,
+                      type: 'user_input_request',
+                      status: 'waiting',
+                      text: config.restack.question,
+                      sourceThreadId: 'restacker',
+                      visibility: 'local',
+                    },
+                  ]
+                : [],
               hasMore: false,
               nextPosition: null,
             },
@@ -485,7 +515,7 @@ export async function runProtocol(
       );
       process.exit(0);
     }
-    if (config.join && basename(process.argv[1]) === 'gh') {
+    if (config.join && basename(process.argv[1]) === 'gh' && !observationQuery) {
       const statePath = join(config.directory, 'join-live.json');
       const state = existsSync(statePath)
         ? JSON.parse(readFileSync(statePath, 'utf8'))

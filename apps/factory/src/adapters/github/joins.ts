@@ -2880,6 +2880,22 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       replay,
     };
     if (!(await operationFactsValid(candidate, signal))) return false;
+    const scratch = repairDirectory(record, fixed.next);
+    // Descendants have already been reviewed at these exact heads and bases.
+    // Retain that evidence before making the successor operation visible;
+    // the immutable scratch journals keep the originating worker provenance.
+    for (const item of replay) {
+      const name = `reviewed-${item.next}.json`;
+      const certificate = z
+        .object({
+          commit: z.literal(item.next),
+          onto: z.literal(item.onto),
+          operation: z.string().regex(/^[a-f0-9]{64}$/),
+        })
+        .safeParse(await read(scratch, name));
+      if (certificate.success)
+        await publish(record.directory, name, { ...certificate.data, directory: scratch });
+    }
     await publish(
       record.directory,
       `repair-${record.operation.generation ?? 'initial'}.json`,

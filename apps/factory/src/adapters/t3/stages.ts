@@ -429,8 +429,26 @@ function responseField(key: unknown, tail: string) {
   if (!separator) return true;
   const value = tail.slice(separator[0].length);
   if (!value.startsWith('"')) return false;
-  const kind = responseValue(value.slice(0, stringEnd(value, 0) + 1));
-  return kind === undefined || kind === 'state' || kind === 'dependencies';
+  const raw = value.slice(0, stringEnd(value, 0) + 1);
+  const kinds = ['state', 'dependencies'];
+  const kind = responseValue(raw);
+  if (kind !== undefined) return kinds.some((candidate) => candidate === kind);
+  let prefix = '';
+  for (let index = 1; index < raw.length; index++) {
+    let character = raw.charAt(index);
+    if (character === '\\') {
+      const length = raw[index + 1] === 'u' ? 6 : 2;
+      const decoded = responseValue(`"${raw.slice(index, index + length)}"`);
+      if (typeof decoded !== 'string') return true;
+      character = decoded;
+      index += length - 1;
+    } else if (character.charCodeAt(0) < 32) {
+      return true;
+    }
+    prefix += character;
+    if (!kinds.some((candidate) => candidate.startsWith(prefix))) return false;
+  }
+  return true;
 }
 function pendingResponse(
   messages: z.infer<typeof stageDetail>['messages'],

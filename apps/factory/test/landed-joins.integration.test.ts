@@ -90,7 +90,8 @@ async function fixture(
   };
   let config = {
     lost: false,
-    restack: recovery,
+    automaticReviews: true,
+    restack: recovery ? { review: true, ...recovery } : undefined,
     issueStates: { 1: 'CLOSED', ...(multipleClosed ? { 9: 'CLOSED' } : {}) },
     defaultBranch: { name: 'primary', tip: landed },
     landedPrerequisites: { 1: [101], ...(multipleClosed ? { 9: [199] } : {}) },
@@ -131,6 +132,7 @@ async function fixture(
           directory: join(host.directory, 'joins'),
           binary: host.binary,
           projectId: 'project-id',
+          ...host.mcp,
         },
       },
       inProcess ? host.readGitHub : undefined
@@ -222,6 +224,7 @@ it.each([false, true])(
                     ...f.host.mcp,
                     project: f.host.repository,
                     projectId: 'project-id',
+                    ...f.host.mcp,
                     binary: f.host.binary,
                   })
                 )
@@ -590,7 +593,7 @@ it.each([
 });
 
 it.each([
-  { outcome: 'SIMPLE' as const, review: false, accepted: true },
+  { outcome: 'SIMPLE' as const, review: true, accepted: true },
   { outcome: 'COMPLEX' as const, review: true, accepted: true },
   { outcome: 'COMPLEX' as const, review: false, accepted: false },
   { outcome: undefined, review: false, accepted: false },
@@ -628,7 +631,9 @@ it.each([
         })
       );
       const calls = await f.host.calls();
-      const launches = calls.filter((call) => call.args[1] === 'start');
+      const launches = calls.filter(
+        (call) => call.args[1] === 'start' && !call.args[3]?.includes('Automatic replay review.')
+      );
       expect(launches).toHaveLength(1);
       const prompt = launches[0]?.args[3] ?? '';
       expect(prompt).toContain(f.base);
@@ -636,7 +641,7 @@ it.each([
       expect(prompt).toContain(f.original);
       expect(
         calls.filter((call) => ['send', 't3_thread_send'].includes(call.args[1]))
-      ).toHaveLength(recovery.outcome === 'COMPLEX' ? 1 : 0);
+      ).toHaveLength(recovery.outcome ? 1 : 0);
       if (!recovery.accepted) return;
       const head = ready.prerequisite?.base;
       if (!head) throw new Error('Missing recovered join head');
@@ -679,7 +684,11 @@ it('withholds a recovery launch when its durable landed facts drift before resta
     if (!reopened.reconcile) throw new Error('Missing reconcile');
     await Effect.runPromise(reopened.reconcile());
     expect((await Effect.runPromise(reopened.inspect(4))).blockersReady).toBe(false);
-    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(0);
+    expect(
+      (await f.host.calls()).filter(
+        (call) => call.args[1] === 'start' && !call.args[3]?.includes('Automatic replay review.')
+      )
+    ).toHaveLength(0);
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
   } finally {
     await f.close();
@@ -711,9 +720,11 @@ it.each([false, true])(
       await Effect.runPromise(reopened.reconcile());
       const ready = await Effect.runPromise(reopened.inspect(4));
       expect(ready.blockersReady).toBe(!closed);
-      expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
-        closed ? 0 : 1
-      );
+      expect(
+        (await f.host.calls()).filter(
+          (call) => call.args[1] === 'start' && !call.args[3]?.includes('Automatic replay review.')
+        )
+      ).toHaveLength(closed ? 0 : 1);
       expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/B').split(/\s/)[0]).toBe(f.b);
       const remote = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
       if (closed) expect(remote).toBe(f.c);
@@ -873,6 +884,7 @@ it.each([false, true])(
           directory: join(f.host.directory, 'joins'),
           binary: f.host.binary,
           projectId: 'project-id',
+          ...f.host.mcp,
         },
       });
       await Effect.runPromise(required(current.reconcile)());

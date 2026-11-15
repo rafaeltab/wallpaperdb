@@ -336,10 +336,14 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       ? null
       : blocked;
   };
+  const recoveryProgress = async (dir: string) => {
+    const saved = await read(dir, 'recovery-progress.json');
+    return z.object({ cleared: z.literal(true) }).safeParse(saved).success ? null : saved;
+  };
   const state = async (numbers: readonly number[]) => ({
     operation: await load(numbers),
     blocked: await blockingState(numbers),
-    recovery: await read(directory(numbers), 'recovery-progress.json'),
+    recovery: await recoveryProgress(directory(numbers)),
   });
   const attemptSnapshot = async (path: string, signal?: AbortSignal) => {
     const values = [];
@@ -618,12 +622,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     reviewed: boolean,
     signal?: AbortSignal
   ) => {
-    if (
-      !result.commit ||
-      !result.classification ||
-      (result.classification === 'COMPLEX' && !reviewed)
-    )
-      return false;
+    if (!result.commit || !result.classification || !reviewed) return false;
     if (!(await preservedAttempt(dir, item.issue, value, result.threadId, signal))) return false;
     const tree = await git(['rev-parse', `${result.commit}^{tree}`], signal);
     await publish(dir, `resolved-${item.issue}.json`, {
@@ -798,6 +797,49 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     });
     return;
   };
+  const reviewAutomatic = async (
+    item: Layer,
+    next: string,
+    onto: string,
+    dir: string,
+    signal?: AbortSignal
+  ) => {
+    const operation = createHash('sha256')
+      .update(JSON.stringify([dir, item.issue, next, onto]))
+      .digest('hex');
+    const journal = join(dir, 'automatic-review', operation);
+    const agent = t3Restacker(
+      { ...config, project },
+      {
+        id: operation,
+        issue: item.issue,
+        pr: item.url,
+        oldHead: next,
+        parent: onto,
+        onto,
+        mode: 'review',
+        context: JSON.stringify(await conflictContext(item, signal)),
+      },
+      { read: (name) => read(journal, name), write: (name, value) => publish(journal, name, value) }
+    );
+    if (!(await admitRecovery(item.issue, signal))) return null;
+    const result = await runRecovery({ ...agent, verify: () => Effect.succeed(true) }, signal);
+    if (!result.ready || !result.commit) {
+      await saveProgress(dir, { ...result, issue: item.issue, pr: item.url });
+      return null;
+    }
+    const previous = z
+      .object({ threadId: z.string() })
+      .safeParse(await read(dir, 'recovery-progress.json'));
+    if (previous.success && previous.data.threadId === result.threadId)
+      await saveProgress(dir, { cleared: true });
+    await publish(dir, `reviewed-${result.commit}.json`, {
+      commit: result.commit,
+      onto,
+      operation,
+    });
+    return result.commit;
+  };
   const replayLayer = async (
     item: Layer,
     onto: string,
@@ -818,8 +860,8 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
     const path = await replayAttempt(item, onto, parent, dir, signal);
     if (!path) return;
-    const next = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
-    if (!(await git(['diff', '--name-only', onto, next], signal))) {
+    const automatic = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
+    if (!(await git(['diff', '--name-only', onto, automatic], signal))) {
       await publish(dir, 'blocked.json', {
         kind: 'empty-replay',
         issue: item.issue,
@@ -830,7 +872,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       });
       return;
     }
-    const tree = (await command('git', ['rev-parse', 'HEAD^{tree}'], path, signal)).trim();
+    const next = await reviewAutomatic(item, automatic, onto, dir, signal);
+    if (!next) return;
+    const tree = await git(['rev-parse', `${next}^{tree}`], signal);
     await publish(dir, `replay-${item.issue}.json`, { ...item, parent, next, onto, target, tree });
     return layer
       .extend({ next: sha, onto: z.literal(onto), target: z.literal(target), tree: sha })
@@ -883,10 +927,23 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!main || main === boundary.pin) return null;
     await git(['fetch', '--no-tags', '--no-write-fetch-head', 'origin', main], signal);
     if (!(await containsRequired(project, main, boundary, signal))) return null;
+    const roots = await Promise.all(
+      sources.map((source) => git(['merge-base', main, source.commit], signal))
+    );
+    if (new Set(roots).size < 2) return null;
     // Only normalize authenticated main-rooted layers here. Open feature parents
     // keep their factory-selected order and containing boundary.
-    for (const source of sources)
-      if (!(await isAncestor(source.parent, main, signal))) return null;
+    for (const source of sources) {
+      if (await isAncestor(source.parent, main, signal)) continue;
+      if (
+        !(await coveredBy(
+          source.parent,
+          sources.filter((item) => item.issue !== source.issue).map((item) => item.commit),
+          signal
+        ))
+      )
+        return null;
+    }
     return { ...boundary, base: main, prBase: 'main' };
   };
   const replayOrder = async (
@@ -939,9 +996,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     for (const item of layers) {
-      const common = boundary.landed.length
-        ? await openReplayParent(project, item.parent, item.commit, boundary, signal)
-        : await git(['merge-base', base, item.commit], signal);
+      const common = await openReplayParent(project, item.parent, item.commit, boundary, signal);
       if (await git(['rev-list', '--merges', `${common}..${item.commit}`], signal))
         return 'nonlinear-prerequisite';
     }
@@ -1033,7 +1088,29 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       await publish(dir, 'blocked.json', { kind: invalid });
       return;
     }
-    const plan = await replayOrder(layers, boundary, signal);
+    const planName = `replay-plan-${createHash('sha256')
+      .update(
+        JSON.stringify([
+          layers,
+          boundary.pin,
+          boundary.landed.map(({ issue, pr, commit, originalHead }) => ({
+            issue,
+            pr,
+            commit,
+            originalHead,
+          })),
+        ])
+      )
+      .digest('hex')}.json`;
+    const retained = await read(dir, planName);
+    const proposed = retained
+      ? z.object({ order: z.array(layer), boundary: joinBoundary }).parse(retained)
+      : await replayOrder(layers, boundary, signal);
+    if (proposed) await publish(dir, planName, proposed);
+    const saved = await read(dir, planName);
+    const plan = saved
+      ? z.object({ order: z.array(layer), boundary: joinBoundary }).parse(saved)
+      : null;
     if (!plan) {
       await publish(dir, 'blocked.json', { kind: 'missing-parent-boundary' });
       return;
@@ -1347,7 +1424,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         '--repo',
         'rafaeltab/wallpaperdb',
         '--body',
-        `Verified issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Original independent review commit ${reviewOrigin(item)}; prior published head ${item.commit}. Automatic replays retain original review; conflict recovery records classification and applicable review separately in durable operation state.`,
+        `Verified issue-only join: ${item.url} at ${item.next}, tree ${item.tree}, parent ${item.onto}. CI passed on this replayed tree. Original independent review commit ${reviewOrigin(item)}; prior published head ${item.commit}. Fresh independent review of the replayed head and original review provenance are retained separately in durable operation state.`,
       ],
       signal
     );
@@ -1385,6 +1462,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.replay) {
       const saved = await read(dir, `resolved-${item.issue}.json`);
       if (repairedResolution(operation, item, saved)) {
+        if (
+          !(await read(dir, `reviewed-${item.next}.json`)) &&
+          (await reviewAutomatic(item, item.next, item.onto, dir, signal)) !== item.next
+        )
+          return false;
         if (!(await validate(item, dir, signal))) return false;
         continue;
       }
@@ -1777,7 +1859,27 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     const candidates = await completedCandidates(records, issue);
-    const latest = latestReplay(candidates);
+    let latest = latestReplay(candidates);
+    const selected = latest?.item;
+    if (
+      latest?.uncertain &&
+      selected &&
+      candidates.every(
+        (item) =>
+          sameOwningIssue(item, selected) &&
+          item.next === selected.next &&
+          item.tree === selected.tree &&
+          item.onto === selected.onto
+      )
+    ) {
+      let valid = true;
+      for (const record of records.filter((value) => value.complete))
+        for (const certificate of record.operation.replay.filter(
+          (value) => value.issue === issue && value.next === latest?.item.next
+        ))
+          valid &&= await completedComparisonValid(record.operation, certificate, signal);
+      if (valid) latest = { ...latest, uncertain: false };
+    }
     for (const record of records.filter((value) => !value.complete))
       for (const item of record.operation.replay.filter((value) => value.issue === issue)) {
         const pending = await pendingReplayObservation(records, record, item, signal);
@@ -1854,8 +1956,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     signal?: AbortSignal
   ) => {
     for (const record of matchingReplays(records, item).filter((record) => record.complete)) {
+      const certificate = record.operation.replay.find(
+        (value) => sameOwningIssue(value, item) && value.next === item.next
+      );
       if (
-        (await completedComparisonValid(record.operation, item, signal)) &&
+        certificate &&
+        (await completedComparisonValid(record.operation, certificate, signal)) &&
         (await groupingMatches(record.operation, signal))
       )
         return true;
@@ -1926,11 +2032,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const fallback = z.object({ kind: z.literal('conflict') }).safeParse(blocked).success
       ? blocked
       : null;
-    return (
-      (await read(dir, 'recovery-progress.json')) ??
-      fallback ??
-      (await landingFailure(dir, blocked))
-    );
+    return (await recoveryProgress(dir)) ?? fallback ?? (await landingFailure(dir, blocked));
   };
   const recoveryStatus = async (dir: string) => {
     const limit = z.object({ source: layer }).safeParse(await read(dir, 'limit.json'));

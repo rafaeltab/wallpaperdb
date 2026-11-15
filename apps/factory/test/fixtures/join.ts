@@ -7,7 +7,8 @@ import { protocol } from './setup.js';
 export async function joinFixture(
   options: {
     inProcess?: boolean;
-    independentMain?: boolean;
+    independentMain?: boolean | 'with-prerequisite';
+    automaticReview?: boolean;
     conflict?: boolean;
     context?: string;
     owningThreadId?: string;
@@ -16,6 +17,7 @@ export async function joinFixture(
       repair?: boolean;
       staleRun?: boolean;
       wrongDelivery?: boolean;
+      wrongBase?: boolean;
       responseThreadId?: string;
       mcp?: boolean;
       outcome?: 'SIMPLE' | 'COMPLEX';
@@ -76,7 +78,14 @@ export async function joinFixture(
   const a = await commit('A');
   git('switch', '-c', 'B');
   const b = await commit('B');
-  git('switch', '-c', 'D', ...(options.independentMain ? [host.base] : []));
+  git(
+    'switch',
+    '-c',
+    'D',
+    ...(options.independentMain
+      ? [options.independentMain === 'with-prerequisite' ? a : host.base]
+      : [])
+  );
   let d = await commit('D');
   if (options.merge) {
     git('switch', '-c', 'side', a);
@@ -115,17 +124,26 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
   }
   await host.save({
     lost: false,
-    restack: options.restack,
+    automaticReviews: true,
+    automaticReview: options.automaticReview,
+    restack: options.restack ? { review: true, ...options.restack } : undefined,
     joinWriter: options.descendant ? true : options.writer,
     joinWriterBranch: options.descendant ? 'F' : 'C',
     join: {
       lose: options.lose,
-      blockers: options.reverse
-        ? [
-            { number: 4, state: 'open' },
-            { number: 3, state: 'open' },
-          ]
-        : undefined,
+      blockers:
+        options.independentMain === 'with-prerequisite'
+          ? [
+              { number: 1, state: 'open' },
+              { number: 3, state: 'open' },
+              { number: 4, state: 'open' },
+            ]
+          : options.reverse
+            ? [
+                { number: 4, state: 'open' },
+                { number: 3, state: 'open' },
+              ]
+            : undefined,
       originalHeads: { 101: a, 102: b, 103: d, 104: c },
       groups: options.groups
         ? [
@@ -135,31 +153,40 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
         : undefined,
       newCI: options.ciFails ? 'FAILURE' : 'SUCCESS',
       corruptGrouping: options.corruptGrouping,
-      evidence: `https://github.com/rafaeltab/wallpaperdb/pull/103 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/104 ${c}`,
+      evidence: `${options.independentMain === 'with-prerequisite' ? `https://github.com/rafaeltab/wallpaperdb/pull/101 ${a}\n` : ''}https://github.com/rafaeltab/wallpaperdb/pull/103 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/104 ${c}`,
       prs: {
         101: { branch: 'A', base: rootBranch },
         102: { branch: 'B', base: 'A' },
-        103: { branch: 'D', base: options.independentMain ? 'main' : 'B' },
+        103: {
+          branch: 'D',
+          base:
+            options.independentMain === 'with-prerequisite'
+              ? 'A'
+              : options.independentMain
+                ? 'main'
+                : 'B',
+        },
         104: { branch: 'C', base: options.independentMain ? 'main' : 'A' },
       },
-      members: (options.independentMain ? [103] : [101, 102, 103]).map(
-        (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
-      ),
+      members: (options.independentMain === 'with-prerequisite'
+        ? [101, 103]
+        : options.independentMain
+          ? [103]
+          : [101, 102, 103]
+      ).map((number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`),
     },
   });
   await writeFile(join(host.directory, 'mcp-auth'), 'controlled-protocol');
-  const mcp = options.restack?.mcp
-    ? {
-        mcpEndpoint: 'http://controlled.invalid/mcp',
-        mcpAuthorizationFile: join(host.directory, 'mcp-auth'),
-      }
-    : {};
+  const mcp = host.mcp;
   const read = options.inProcess ? host.readGitHub : undefined;
   const issues = githubIssues(
     {
       project: host.repository,
       base: host.base,
       prerequisites: [
+        ...(options.independentMain === 'with-prerequisite'
+          ? [{ issue: 1, pr: 101, commit: a }]
+          : []),
         { issue: 3, pr: 103, commit: d },
         {
           issue: 4,

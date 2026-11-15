@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import {
-  type AgentResponse,
   type Execution,
   type Intent,
   type StageRequest,
@@ -10,13 +9,9 @@ import {
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 import { verifiedComparison } from './comparison.js';
+import { receiptSchema, responseShape } from './response.js';
 
 const historyWindow = 1000;
-const responseShape = `type AgentResponse =
-  | { version: 1; kind: 'state'; jobId: string;
-      checks: { format: boolean; lint: boolean; tests: boolean; crap: boolean; coverage: boolean };
-      base: string; implemented: string; checked: string; reviewed?: string; published?: string }
-  | { version: 1; kind: 'dependencies'; jobId: string; requireUnimplementedIssues: string[] };`;
 export function receiptInstructions(
   intent: Intent,
   stage: StageRequest['stage'],
@@ -28,37 +23,6 @@ ${responseShape}
 \`\`\`
 Use version 1, jobId=${JSON.stringify(intent.id)}, implemented=${JSON.stringify(String(intent.issue))} and report your actual comparison in base, initially ${JSON.stringify(intent.base)}. A newer main comparison must preserve the allowed boundary and required unmerged prerequisites. The factory verifies ancestry independently. Unexpected feature bases require manual recovery. If required issue code is missing, use the dependencies response; do not invent a stack. Every true check attests successful required local validation at checked, including formatting and lint. Established repository exemptions require a reason in the retained evidence. checked must match the current clean owning HEAD. ${stage === 'implementation' ? '' : 'reviewed must match checked and attest fresh independent Standards, Spec and Defects reviews at that commit.'} ${['publication', 'babysitting'].includes(stage) ? 'published must also match checked and the authoritative linked PR head.' : ''} Keep detailed validation, review and demonstration evidence in the outside-repository ledger. If prerequisite work is needed, return the dependencies variant without claiming completion or successful checks. Do not invent successful checks or a waiting outcome. Registered waits and PR watchers keep you busy until their continuations settle.`;
 }
-const receiptSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      version: z.literal(1),
-      kind: z.literal('state'),
-      jobId: z.string(),
-      checks: z
-        .object({
-          format: z.boolean(),
-          lint: z.boolean(),
-          tests: z.boolean(),
-          crap: z.boolean(),
-          coverage: z.boolean(),
-        })
-        .strict(),
-      base: z.string(),
-      implemented: z.string(),
-      checked: z.string(),
-      reviewed: z.string().optional(),
-      published: z.string().optional(),
-    })
-    .strict(),
-  z
-    .object({
-      version: z.literal(1),
-      kind: z.literal('dependencies'),
-      jobId: z.string(),
-      requireUnimplementedIssues: z.array(z.string()),
-    })
-    .strict(),
-]) satisfies z.ZodType<AgentResponse>;
 const stageDetail = z.object({
   thread: z.object({
     threadId: z.string(),

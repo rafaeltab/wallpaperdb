@@ -182,7 +182,17 @@ export async function runProtocol(
       console.log(
         JSON.stringify({
           structuredContent: {
-            threads: [...resources, ...(config.descendants ?? [])],
+            threads: [
+              ...resources,
+              ...readdirSync(config.directory)
+                .filter((name) => /^restacker.*\.json$/.test(name))
+                .map((name) => ({
+                  threadId: JSON.parse(readFileSync(join(config.directory, name), 'utf8')).thread
+                    .threadId,
+                  parentThreadId: null,
+                })),
+              ...(config.descendants ?? []),
+            ],
             nextCursor: config.lineageTruncated ? 1 : null,
           },
         })
@@ -263,8 +273,40 @@ export async function runProtocol(
       console.log(JSON.stringify(config.mergedPrerequisites?.[args[1].split('/').at(-1)!] ?? null));
       process.exit(0);
     }
-    if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--help')) {
-      const path = join(config.directory, 'restacker.json');
+    if (
+      (config.restack || config.automaticReviews) &&
+      basename(process.argv[1]) === 't3' &&
+      !args.includes('--help') &&
+      (args[1] === 'list' ||
+        (args[1] === 'start' && args[3]?.includes('Operation ')) ||
+        args[2]?.startsWith('restacker') ||
+        (args[0] === 'acp-mcp-call' &&
+          args[2] &&
+          JSON.parse(args[2]).threadId?.startsWith('restacker')))
+    ) {
+      config.restack ??= { outcome: 'SIMPLE', review: true };
+      const records = readdirSync(config.directory)
+        .filter((name) => /^restacker.*\.json$/.test(name))
+        .map((name) => ({
+          name,
+          state: JSON.parse(readFileSync(join(config.directory, name), 'utf8')),
+        }));
+      const selected = records.find(
+        ({ state }) =>
+          state.thread.threadId ===
+          (args[0] === 'acp-mcp-call' ? JSON.parse(args[2]).threadId : args[2])
+      );
+      const automatic =
+        (args[1] === 'start' && args[3]?.includes('Automatic replay review.')) ||
+        selected?.state.automatic === true;
+      if (automatic)
+        config.restack = { outcome: 'SIMPLE', review: config.automaticReview !== false };
+      const path = join(
+        config.directory,
+        automatic && args[1] === 'start'
+          ? `restacker-${args[3].match(/Operation ([a-f0-9]+)\./)![1]}.json`
+          : (selected?.name ?? 'restacker.json')
+      );
       const flag = (name: string) => args[args.indexOf(name) + 1];
       let state = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
       const git = (cwd: string, ...values: string[]) =>
@@ -273,7 +315,41 @@ export async function runProtocol(
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         }).trim();
-      if (args[0] === 'acp-mcp-call') {
+      if (
+        args[0] === 'acp-mcp-call' &&
+        args[1] === 't3_thread_read' &&
+        JSON.parse(args[2]).view === 'activity'
+      ) {
+        console.log(
+          JSON.stringify({
+            structuredContent: {
+              thread: {
+                ...state.thread,
+                activeRunId: null,
+                pendingBackgroundTasks: [],
+                blockedOnThreadWait: false,
+                pullRequests: [],
+              },
+              items:
+                config.restack.question && state.thread.pendingRequestCount > 0
+                  ? [
+                      {
+                        itemId: 'restack-question',
+                        type: 'user_input_request',
+                        runId: state.thread.latestRunId,
+                        status: 'waiting',
+                        text: config.restack.question,
+                        sourceThreadId: state.thread.threadId,
+                        visibility: 'local',
+                      },
+                    ]
+                  : [],
+              hasMore: false,
+              nextPosition: null,
+            },
+          })
+        );
+      } else if (args[0] === 'acp-mcp-call') {
         console.log(
           JSON.stringify({
             structuredContent: {
@@ -299,6 +375,7 @@ export async function runProtocol(
       } else if (args[1] === 'start') {
         const prompt = args[3];
         const operation = prompt.match(/Operation ([a-f0-9]+)\./)![1];
+        const implemented = prompt.match(/issues\/(\d+)/)![1];
         const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/)!.slice(1);
         const worktree = join(config.directory, `recovery-worker-${operation}`);
         git(
@@ -326,9 +403,19 @@ export async function runProtocol(
           });
         }
         const head = git(worktree, 'rev-parse', 'HEAD');
+        const conflictCount = records.filter(({ state }) => !state.automatic).length;
+        if (!automatic && state?.operation && state.operation !== operation)
+          writeFileSync(
+            join(config.directory, `restacker-${state.operation}.json`),
+            JSON.stringify(state)
+          );
+        const requestedThreadId =
+          automatic || conflictCount > 0 ? `restacker-${operation}` : 'restacker';
         state = {
+          automatic,
+          requestedThreadId,
           thread: {
-            threadId: config.restack.responseThreadId ?? 'restacker',
+            threadId: config.restack.responseThreadId ?? requestedThreadId,
             projectId: 'project-id',
             title: flag('--title'),
             branch: flag('--branch'),
@@ -341,22 +428,31 @@ export async function runProtocol(
             runCount: config.restack.resolveOrdinal ?? 1,
           },
           operation,
+          onto,
+          implemented,
           head,
           messages: [
+            { role: 'user', text: `Factory instruction ${operation}:resolve.` },
+            {
+              role: 'assistant',
+              text: config.restack.outcome
+                ? `<RESTACK>${config.restack.outcome}</RESTACK>`
+                : 'unknown',
+            },
             {
               role: 'assistant',
               runId: config.restack.staleRun ? 'prior-run' : 'resolve-run',
               text:
                 config.restack.question ??
                 JSON.stringify({
-                  delivery: config.restack.wrongDelivery
-                    ? `${operation}:review`
-                    : `${operation}:resolve`,
-                  operation: config.restack.stale ? 'stale' : operation,
-                  commit: head,
-                  outcome: config.restack.outcome
-                    ? `<RESTACK>${config.restack.outcome}</RESTACK>`
-                    : 'done',
+                  version: 1,
+                  kind: 'state',
+                  jobId: config.restack.stale || config.restack.wrongDelivery ? 'stale' : operation,
+                  implemented: prompt.match(/issues\/(\d+)/)![1],
+                  base: config.restack.wrongBase ? config.base : onto,
+                  checked: head,
+                  reviewed: automatic && config.restack.review ? head : undefined,
+                  checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
                 }),
             },
           ],
@@ -365,7 +461,11 @@ export async function runProtocol(
         await hold('restack');
         if (config.restack.loseLaunch) process.exit(1);
         console.log(
-          JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
+          JSON.stringify({
+            threadId: state.thread.threadId,
+            projectId: 'project-id',
+            runId: 'resolve-run',
+          })
         );
       } else if (args[1] === 'send') {
         const { DatabaseSync } = await import('node:sqlite');
@@ -398,14 +498,21 @@ export async function runProtocol(
         state.thread.runCount = config.restack.reviewOrdinal ?? 2;
         state.thread.latestRunId = 'review-run';
         state.messages = [
+          { role: 'user', text: `Factory instruction ${state.operation}:review.` },
           {
             role: 'assistant',
             runId: 'review-run',
             text: JSON.stringify({
-              delivery: `${state.operation}:review`,
-              operation: state.operation,
-              commit: state.head,
-              outcome: config.restack.review ? '<REVIEW>COMPLETE</REVIEW>' : 'incomplete',
+              version: 1,
+              kind: 'state',
+              jobId: state.operation,
+              implemented: state.implemented,
+              base: state.onto,
+              checked: git(state.thread.worktreePath, 'rev-parse', 'HEAD'),
+              reviewed: config.restack.review
+                ? git(state.thread.worktreePath, 'rev-parse', 'HEAD')
+                : undefined,
+              checks: { format: true, lint: true, tests: true, coverage: true, crap: true },
             }),
           },
         ];
@@ -413,14 +520,18 @@ export async function runProtocol(
         console.log('{}');
       } else if (args[1] === 'list')
         console.log(
-          JSON.stringify(
-            state
-              ? Array.from({ length: config.duplicate ? 2 : 1 }, () => ({
-                  threadId: 'restacker',
-                  title: state.thread.title,
-                }))
-              : []
-          )
+          JSON.stringify([
+            ...(config.joinWriter ? [{ threadId: 'writer-C', title: 'Controlled writer' }] : []),
+            ...readdirSync(config.directory)
+              .filter((name) => /^resource.*\.json$/.test(name))
+              .map((name) => JSON.parse(readFileSync(join(config.directory, name), 'utf8'))),
+            ...records.flatMap(({ state }) =>
+              Array.from({ length: config.duplicate ? 2 : 1 }, () => ({
+                threadId: state.requestedThreadId ?? state.thread.threadId,
+                title: state.thread.title,
+              }))
+            ),
+          ])
         );
       else console.log(JSON.stringify(state));
       process.exit(0);

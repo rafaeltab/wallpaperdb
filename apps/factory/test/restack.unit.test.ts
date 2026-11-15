@@ -28,9 +28,7 @@ it.each(['SIMPLE', 'COMPLEX', undefined] as const)(
         )
       ).ready
     ).toBe(false);
-    expect(calls).toEqual(
-      classification === 'SIMPLE' ? ['ci'] : classification === 'COMPLEX' ? ['review'] : []
-    );
+    expect(calls).toEqual(classification ? ['review'] : []);
     reviewed = true;
     calls.length = 0;
     expect(
@@ -42,9 +40,7 @@ it.each(['SIMPLE', 'COMPLEX', undefined] as const)(
         )
       ).ready
     ).toBe(false);
-    expect(calls).toEqual(
-      classification === 'COMPLEX' ? ['review', 'ci'] : classification === 'SIMPLE' ? ['ci'] : []
-    );
+    expect(calls).toEqual(classification ? ['review', 'ci'] : []);
     ci = true;
     expect(
       (

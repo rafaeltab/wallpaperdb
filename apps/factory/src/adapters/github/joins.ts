@@ -1483,11 +1483,32 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     for (const item of operation.replay) {
       const saved = await read(dir, `resolved-${item.issue}.json`);
       if (repairedResolution(operation, item, saved)) {
-        if (
-          !(await read(dir, `reviewed-${item.next}.json`)) &&
-          (await reviewAutomatic(item, item.next, item.onto, dir, signal)) !== item.next
-        )
-          return false;
+        if (!(await read(dir, `reviewed-${item.next}.json`))) {
+          const reviewed = await reviewAutomatic(item, item.next, item.onto, dir, signal);
+          if (!reviewed) return false;
+          if (reviewed !== item.next) {
+            if (!(await isAncestor(item.next, reviewed, signal))) return false;
+            if (!(await publicationSafe(operation, dir, signal))) return false;
+            await promoteRepair(
+              {
+                operation,
+                directory: dir,
+                history: await operationHistory(dir),
+                complete: false,
+              },
+              {
+                ...item,
+                commit: item.next,
+                next: reviewed,
+                tree: await git(['rev-parse', `${reviewed}^{tree}`], signal),
+                reviewedCommit: reviewOrigin(item),
+              },
+              signal
+            );
+            // The successor must be reloaded before publishing or checking CI.
+            return false;
+          }
+        }
         if (!(await validate(item, dir, signal))) return false;
         continue;
       }

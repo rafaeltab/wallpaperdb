@@ -1363,6 +1363,73 @@ it('withholds automatic replay publication and dependent work without fresh revi
   }
 });
 
+it('retains review repairs and rebuilds descendants when resuming an uncertified replay', async () => {
+  const f = await fixture({ independentMain: true, ciFails: true });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const root = join(f.host.directory, 'joins');
+    const key = (await readdir(root)).find((name) => /^[a-f0-9]{64}$/.test(name));
+    if (!key) throw new Error('Missing retained join');
+    const dir = join(root, key);
+    const intent = JSON.parse(await readFile(join(dir, 'intent.json'), 'utf8'));
+    const first = intent.replay[0];
+    const workers = await physicalDirectory(f.host.directory);
+    let repaired: string | undefined;
+    for (const name of workers.filter((name) => /^restacker-.*\.json$/.test(name))) {
+      const path = join(f.host.directory, name);
+      const worker = JSON.parse(await readFile(path, 'utf8'));
+      if (worker.head !== first.next) continue;
+      await unlink(join(dir, 'automatic-review', worker.operation, 'resolution.json'));
+      const worktree = worker.thread.worktreePath;
+      await writeFile(join(worktree, 'review-fix.txt'), 'retained independent review repair');
+      f.git('-C', worktree, 'add', 'review-fix.txt');
+      f.git('-C', worktree, 'commit', '-m', 'Review repair');
+      repaired = f.git('-C', worktree, 'rev-parse', 'HEAD');
+      worker.head = repaired;
+      const message = worker.messages.at(-1);
+      message.text = JSON.stringify({
+        ...JSON.parse(message.text),
+        checked: repaired,
+        reviewed: repaired,
+      });
+      await writeFile(path, JSON.stringify(worker));
+    }
+    if (!repaired) throw new Error('Missing repaired review worker');
+    await unlink(join(dir, `reviewed-${first.next}.json`));
+    for (let attempt = 0; attempt < 2; attempt++)
+      await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+    expect(
+      f.git('ls-remote', '--heads', 'origin', `refs/heads/${first.branch}`).split(/\s/)[0]
+    ).toBe(repaired);
+    const livePath = join(f.host.directory, 'join-live.json');
+    const live = JSON.parse(await readFile(livePath, 'utf8'));
+    await writeFile(livePath, JSON.stringify({ ...live, newCI: 'SUCCESS' }));
+    for (let attempt = 0; attempt < 3; attempt++)
+      await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect(JSON.parse(await readFile(join(dir, `reviewed-${repaired}.json`), 'utf8')).commit).toBe(
+      repaired
+    );
+    const result = await Effect.runPromise(f.reopen().inspect(5));
+    expect(result.blockersReady).toBe(true);
+    const head = result.prerequisite?.base;
+    if (!head) throw new Error('Missing repaired replay tip');
+    expect(f.git('merge-base', repaired, head)).toBe(repaired);
+    expect(f.git('show', `${head}:review-fix.txt`)).toBe('retained independent review repair');
+    expect(
+      f.git('ls-remote', '--heads', 'origin', `refs/heads/${first.branch}`).split(/\s/)[0]
+    ).toBe(repaired);
+    const launches = (await f.host.calls()).filter((call) => call.args[1] === 'start').length;
+    await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).prerequisite?.base).toBe(head);
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
+      launches
+    );
+  } finally {
+    await f.close();
+  }
+});
+
 it('withholds conflict recovery while a descendant below a finished reviewer remains active', async () => {
   const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
   try {

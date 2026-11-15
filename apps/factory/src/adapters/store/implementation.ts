@@ -109,7 +109,13 @@ export function fileStore(directory: string): JobStore {
         }
         for (;;) {
           const state = await readControl();
-          if (state.cancelled || state.released || state.claimed.includes(index)) return false;
+          if (
+            state.cancelled ||
+            state.released ||
+            state.dependencyRecovery ||
+            state.claimed.includes(index)
+          )
+            return false;
           if (
             await saveControl({
               ...state,

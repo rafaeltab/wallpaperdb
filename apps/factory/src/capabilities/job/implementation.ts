@@ -216,7 +216,7 @@ export const JobLive = Layer.effect(
             return { kind: 'rejected' as const };
           if (yield* store.claimStage(index)) {
             const current = yield* store.readControl();
-            if (!current.cancelled && !current.released) {
+            if (!current.cancelled && !current.released && !current.dependencyRecovery) {
               const active = attemptIntent(intent, index);
               const launch = yield* execution.launch(active);
               if (launch.kind === 'submitted' && reporting)

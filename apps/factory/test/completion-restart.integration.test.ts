@@ -257,6 +257,7 @@ it('retains cycle recovery across restart until explicit reset revalidates the c
     expect(await f.status()).toMatchObject({
       delivery: { activity: 'manual-recovery', active: false },
     });
+    expect(await Effect.runPromise(f.store.claimStage(20))).toBe(false);
     await f.close();
     f = await completionFixture(3, fileStore(directory));
     f.state({

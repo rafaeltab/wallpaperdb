@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
@@ -66,6 +66,105 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
+
+it.each([1, 2])(
+  'bounds an unclaimed intent overtaken by a worker run with limit %s',
+  async (limit) => {
+    const f = await joinFixture({
+      inProcess: true,
+      independentMain: true,
+      automaticReview: false,
+      reconciliationLimit: limit,
+    });
+    try {
+      await configure(f, { reconcileReview: true });
+      const original = `${f.host.binary}-original`;
+      await rename(f.host.binary, original);
+      await f.host.nodeCommand(
+        't3-wrapper',
+        `
+      import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+      import { join } from 'node:path';
+      import { spawnSync } from 'node:child_process';
+      import { DatabaseSync } from 'node:sqlite';
+      const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
+      const marker = join(config.directory, 'race-injected');
+      if (process.argv[2] === 'thread' && process.argv[3] === 'show' && !existsSync(marker)) {
+        const db = new DatabaseSync(join(config.directory, 'factory.sqlite'), { readOnly: true });
+        const reserved = db.prepare("select 1 from records where name='reconciliation-1.json' limit 1").get();
+        db.close();
+        if (reserved) {
+          const name = readdirSync(config.directory).find(n => n.startsWith('restacker-') && n.endsWith('.json'));
+          const path = join(config.directory, name);
+          const state = JSON.parse(readFileSync(path, 'utf8'));
+          state.thread.runCount += 1;
+          state.thread.latestRunId = 'concurrent-completed-run';
+          writeFileSync(path, JSON.stringify(state));
+          writeFileSync(marker, 'true');
+        }
+      }
+      const result = spawnSync(${JSON.stringify(original)}, process.argv.slice(2), { env: process.env, stdio: 'inherit' });
+      process.exit(result.status ?? 1);
+    `,
+        { path: f.host.binary, module: true }
+      );
+      for (let n = 0; n < 5; n++) await prepare(f);
+      expect(await readFile(join(f.host.directory, 'race-injected'), 'utf8')).toBe('true');
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(limit === 2);
+      expect((await f.host.calls()).filter((c) => c.args[1] === 'send')).toHaveLength(
+        limit === 2 ? 2 : 0
+      );
+      if (limit === 1)
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({
+            phase: 'manual-recovery',
+            active: false,
+            progress: expect.stringContaining('limit'),
+          })
+        );
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'lets a later legacy response supersede prior success before migration, corrected=%s',
+  async (corrected) => {
+    const f = await joinFixture({ inProcess: true, independentMain: true, automaticReview: true });
+    try {
+      await configure(f, {
+        recoveryStatus: 'running',
+        reconcileReview: true,
+        legacyRecoveryReply: !corrected,
+      });
+      await prepare(f);
+      const { path, state } = await worker(f);
+      state.thread.status = 'completed';
+      state.messages.push({
+        role: 'assistant',
+        text: JSON.stringify({
+          operation: state.operation,
+          commit: 'f'.repeat(40),
+          outcome: 'incomplete',
+        }),
+      });
+      await writeFile(path, JSON.stringify(state));
+      await configure(f, { recoveryStatus: 'completed' });
+      for (let n = 0; n < 4; n++) await prepare(f);
+      const sends = (await f.host.calls()).filter((c) => c.args[1] === 'send');
+      expect(sends).toHaveLength(1);
+      expect(sends[0]?.args[3]).toContain('Migrate once to version 1');
+      expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(corrected);
+      if (!corrected)
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({ phase: 'manual-recovery', active: false })
+        );
+    } finally {
+      await f.close();
+    }
+  }
+);
 
 it('accepts corrected checked and reviewed evidence from the same workers after reconciliation across reopen', async () => {
   const f = await joinFixture({ inProcess: true, independentMain: true, automaticReview: false });

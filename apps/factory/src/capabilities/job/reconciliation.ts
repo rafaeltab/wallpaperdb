@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { retainManualRepair } from './manual-repair.js';
-import type { Delivery, JobStore, StageEvidence, StageRequest } from './contract.js';
+import type { Delivery, JobStore, StageEvidence, StageRequest, Unavailable } from './contract.js';
 
 /** The counter and intended instruction are one CAS record, before immutable
  * stage creation or its at-most-once send claim. Restart can finish journaling it. */
@@ -15,7 +15,7 @@ export function requestReconciliation(
   waiting: StageRequest,
   evidence: StageEvidence | null,
   limit: number
-) {
+): Effect.Effect<Delivery | null, Unavailable> {
   return Effect.gen(function* () {
     if (!evidence?.idle || evidence.dependencies) return null;
     const control = yield* store.readControl();

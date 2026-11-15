@@ -67,9 +67,13 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
 
-it.each(['completed', 'cancelled', 'rolled_back'])(
-  'gates the initial review effect after resolution when its worker becomes %s',
-  async (status) => {
+it.each(
+  ['completed', 'cancelled', 'rolled_back'].flatMap((status) =>
+    ['show', 'activity'].map((boundary) => ({ status, boundary }))
+  )
+)(
+  'gates the initial review effect after resolution when its worker becomes $status at $boundary',
+  async ({ status, boundary }) => {
     const f = await joinFixture({
       inProcess: true,
       conflict: true,
@@ -87,7 +91,11 @@ it.each(['completed', 'cancelled', 'rolled_back'])(
         import { DatabaseSync } from 'node:sqlite';
         const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE, 'utf8'));
         const marker = join(config.directory, 'cancel-injected');
-        if (process.argv[2] === 'thread' && process.argv[3] === 'show' && !existsSync(marker)) {
+        const boundary = ${JSON.stringify(boundary)};
+        const observed = boundary === 'show'
+          ? process.argv[2] === 'thread' && process.argv[3] === 'show'
+          : process.argv[2] === 'acp-mcp-call' && process.argv[3] === 't3_thread_read';
+        if (observed && !existsSync(marker)) {
           const db = new DatabaseSync(join(config.directory, 'factory.sqlite'), { readOnly: true });
           const resolved = db.prepare("select 1 from records where name='resolution.json' limit 1").get();
           db.close();

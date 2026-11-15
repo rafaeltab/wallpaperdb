@@ -1,6 +1,7 @@
-import { Effect } from 'effect';
+import { Deferred, Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { completionFixture as fixture } from './fixtures/completion.js';
+import { controlledStore } from './fixtures/store.js';
 
 it('reconciles a failed idle state in the same job and spends a durable budget across stages', async () => {
   const f = await fixture(2);
@@ -271,3 +272,90 @@ it.each([
     }
   }
 );
+
+it('charges one reconciliation when overlapping observations authorize the same instruction', async () => {
+  const store = controlledStore();
+  const associated = await Effect.runPromise(Deferred.make<void>());
+  const authorized = await Effect.runPromise(Deferred.make<void>());
+  let bindings = 0;
+  let overlapping = false;
+  const f = await fixture(2, {
+    ...store,
+    bindRun: (request, runId, ordinal) =>
+      Effect.gen(function* () {
+        const bound = yield* store.bindRun(request, runId, ordinal);
+        if (!overlapping || request.index !== 0) return bound;
+        bindings++;
+        if (bindings === 1) yield* Deferred.await(associated);
+        else {
+          yield* Deferred.succeed(associated, undefined);
+          yield* Deferred.await(authorized);
+        }
+        return bound;
+      }),
+    saveControl: (control) =>
+      store
+        .saveControl(control)
+        .pipe(
+          Effect.tap((saved) =>
+            saved && control.reconciliation?.pending
+              ? Deferred.succeed(authorized, undefined)
+              : Effect.void
+          )
+        ),
+  });
+  try {
+    overlapping = true;
+    f.state({ idle: true });
+    await Promise.all([f.status(), f.status()]);
+    expect((await Effect.runPromise(store.readControl())).reconciliation?.attempts).toBe(1);
+    await f.status();
+    expect(f.sends).toHaveLength(1);
+    f.state({ idle: true });
+    expect(await f.status()).toMatchObject({ delivery: { activity: 'continuation-pending' } });
+    expect((await Effect.runPromise(store.readControl())).reconciliation?.attempts).toBe(2);
+    await f.status();
+    expect(f.sends).toHaveLength(2);
+  } finally {
+    await f.close();
+  }
+});
+it.each([undefined, true])(
+  'requires intervention after a migration without a supported response: %s',
+  async (migrationRequired) => {
+    const f = await fixture();
+    try {
+      f.state({ idle: true, migrationRequired: true });
+      await f.status();
+      await f.status();
+      f.state({ idle: true, migrationRequired });
+      expect(await f.status()).toMatchObject({
+        delivery: {
+          activity: 'manual-recovery',
+          active: false,
+          progress: expect.stringContaining('migration failed'),
+        },
+      });
+      await f.status();
+      expect(f.sends).toHaveLength(1);
+      expect((await Effect.runPromise(f.store.readControl())).reconciliation?.attempts).toBe(0);
+    } finally {
+      await f.close();
+    }
+  }
+);
+it('reconciles a supported negative state after migration using the ordinary budget', async () => {
+  const f = await fixture();
+  try {
+    f.state({ idle: true, migrationRequired: true });
+    await f.status();
+    await f.status();
+    f.state({ idle: true, migrationRequired: false });
+    expect(await f.status()).toMatchObject({ delivery: { activity: 'continuation-pending' } });
+    await f.status();
+    expect(f.sends.map((request) => request.reconciliation)).toEqual(['migration', 'state']);
+    expect((await Effect.runPromise(f.store.readControl())).reconciliation?.attempts).toBe(1);
+  } finally {
+    await f.close();
+  }
+});

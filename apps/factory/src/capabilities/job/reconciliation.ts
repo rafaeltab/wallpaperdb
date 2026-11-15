@@ -21,8 +21,28 @@ export function requestReconciliation(
     const control = yield* store.readControl();
     if (control.cancelled || control.parked?.index === waiting.index) return null;
     const state = control.reconciliation ?? { attempts: 0, migrated: false };
+    // The pending instruction is also the authorization high-water mark. Read
+    // it from the same revision used below so overlapping observations cannot
+    // spend another attempt for a stage whose successor already won.
+    if ((state.pending?.index ?? -1) > waiting.index)
+      return {
+        stage: waiting.stage,
+        commit: evidence.commit,
+        ready: false,
+        landed: false,
+        activity: 'continuation-pending',
+        active: true,
+      } satisfies Delivery;
     const migration = evidence.migrationRequired === true;
-    if ((migration && state.migrated) || (!migration && state.attempts >= limit)) {
+    const failedMigration =
+      state.migrated &&
+      waiting.reconciliation === 'migration' &&
+      evidence.migrationRequired !== false;
+    if (
+      failedMigration ||
+      (migration && state.migrated) ||
+      (!migration && state.attempts >= limit)
+    ) {
       if (waiting.stage === 'implementation')
         yield* retainManualRepair(store, waiting, {
           id: evidence.runId,
@@ -35,9 +55,10 @@ export function requestReconciliation(
         landed: false,
         active: false,
         activity: 'manual-recovery',
-        progress: migration
-          ? 'Agent response migration failed. Maintainer intervention required.'
-          : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.',
+        progress:
+          migration || failedMigration
+            ? 'Agent response migration failed. Maintainer intervention required.'
+            : 'Agent reconciliation attempt limit reached. Maintainer intervention and explicit reset required.',
       } satisfies Delivery;
     }
     const request: StageRequest = {

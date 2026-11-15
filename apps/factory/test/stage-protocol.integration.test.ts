@@ -399,6 +399,11 @@ it.each([
   '{"checks" "jobId":"1",',
   '{"checks" "kind":"state",',
   '```json\n{"version":1,"kind":"state","checks":{"lint":false},\n```',
+  '{"kind":"sta',
+  '{"kind":"dep',
+  '{"kind":"',
+  String.raw`{"kind":"\u0073ta\u`,
+  '{"kind":"sta\n',
 ])('withholds older success behind a newer malformed response: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const success = response(intent, host.base);
@@ -435,6 +440,13 @@ it.each([
   '{"command":"kind",',
   '{"command":"jobId" "result":"version",',
   '```json\n{"command":"completed","result":{"version":1}}\n```',
+  '{"kind":"notification',
+  '{"kind":"notif',
+  '{"kind":"command',
+  '{"kind":"stateful',
+  String.raw`{"kind":"not\u0069f`,
+  String.raw`{"kind":"notif\u00`,
+  '{"kind":"notif\n',
   `${JSON.stringify({ command: 'completed', result: '{"version":1}' }).slice(0, -1)},`,
 ])('retains coherent state after unrelated nonresponse text: %s', (text) =>
   stageFixture(async ({ host, adapter, intent, request }) => {

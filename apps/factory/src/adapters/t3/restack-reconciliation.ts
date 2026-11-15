@@ -97,8 +97,13 @@ export function recoveryReconciliation(
         return display(entry.parse(await journal.read(`reconciliation-${stopped.index}.json`)));
       }
       if (previous?.phase === phase && !worker.acknowledged) {
-        await deliver(previous, signal);
-        return display(previous);
+        const claimed = await journal.read(`reconciliation-send-${previous.index}.json`);
+        if (claimed || (previous.runId === worker.runId && previous.ordinal === worker.ordinal)) {
+          await deliver(previous, signal);
+          return display(previous);
+        }
+        // A newer run overtook an unsent intention. Its reserved attempt remains
+        // spent, but only an actual send claim can require uncertain-delivery waiting.
       }
       const attempts = previous?.attempts ?? 0;
       const migrated = previous?.migrated ?? false;

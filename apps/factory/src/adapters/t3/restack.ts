@@ -38,6 +38,17 @@ const detail = z.object({
   }),
   messages: z.array(z.object({ role: z.string(), runId: z.string().optional(), text: z.string() })),
 });
+const latestRecoveryResponse = (messages: z.infer<typeof detail>['messages']) =>
+  [...messages].reverse().find((message) => {
+    if (latestStructured([message])) return true;
+    if (message.role !== 'assistant') return false;
+    try {
+      const value: unknown = JSON.parse(message.text);
+      return !!value && typeof value === 'object' && ('operation' in value || 'outcome' in value);
+    } catch {
+      return false;
+    }
+  });
 /** A unique title reconciles uncertain launch; immutable claims prohibit duplicate delivery. */
 export function t3Restacker(
   config: {
@@ -171,25 +182,8 @@ export function t3Restacker(
       )
         boundary = index;
     const replies = boundary >= 0 ? observed.messages.slice(boundary + 1) : observed.messages;
-    const latest = latestStructured(replies);
-    let value: unknown = latest ? JSON.parse(latest.text) : undefined;
-    if (!value)
-      for (const message of [...replies].reverse()) {
-        if (message.role !== 'assistant') continue;
-        try {
-          const legacy = JSON.parse(message.text);
-          if (
-            legacy &&
-            typeof legacy === 'object' &&
-            ('operation' in legacy || 'outcome' in legacy)
-          ) {
-            value = legacy;
-            break;
-          }
-        } catch {
-          /* Prose is not a state response. */
-        }
-      }
+    const latest = latestRecoveryResponse(replies);
+    const value: unknown = latest ? JSON.parse(latest.text) : undefined;
     const version = z.object({ version: z.unknown().optional() }).safeParse(value);
     return reconciliation.advance(
       phase,
@@ -246,7 +240,7 @@ export function t3Restacker(
     }
     if (boundary < 0) return null;
     const replies = messages.slice(boundary + 1).filter((message) => message.role === 'assistant');
-    const message = latestStructured(replies);
+    const message = latestRecoveryResponse(replies);
     const parsed = receiptSchema.safeParse(message ? JSON.parse(message.text) : null);
     if (!parsed.success || parsed.data.kind !== 'state') return null;
     const state = parsed.data;

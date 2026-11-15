@@ -98,7 +98,16 @@ it.each(['absent', 'ambiguous'] as const)(
           thread: { ...retained.thread, status: 'failed', pendingRequestCount: 0 },
         })
       );
-      const config = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+      // Keep this an observation-only failure while its owned child is still busy.
+      // An entirely idle failed worker now correctly enters bounded reconciliation.
+      const config = {
+        ...JSON.parse(await readFile(f.host.configFile, 'utf8')),
+        descendants: [{ threadId: 'retained-child', parentThreadId: retained.thread.threadId }],
+        descendantSnapshots: {
+          'retained-child': { status: 'running', activeRunId: 'retained-child-run' },
+        },
+      };
+      await f.host.save(config);
       const running = await startFactory({
         FACTORY_PROJECT: f.host.repository,
         FACTORY_T3_PROJECT_ID: 'project-id',

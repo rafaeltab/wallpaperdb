@@ -293,9 +293,9 @@ it('charges one reconciliation when overlapping observations authorize the same 
         }
         return bound;
       }),
-    saveControl: (control) =>
+    saveControl: (control, stage) =>
       store
-        .saveControl(control)
+        .saveControl(control, stage)
         .pipe(
           Effect.tap((saved) =>
             saved && control.reconciliation?.pending
@@ -367,14 +367,14 @@ it('keeps the reconciliation slot when an overlapping authorization loses the co
   let arrivals = 0;
   const f = await fixture(2, {
     ...store,
-    saveControl: (control) =>
+    saveControl: (control, stage) =>
       Effect.gen(function* () {
         if (armed && control.reconciliation?.pending?.index === 1) {
           arrivals++;
           if (arrivals === 2) yield* Deferred.succeed(gate, undefined);
           yield* Deferred.await(gate);
         }
-        return yield* store.saveControl(control);
+        return yield* store.saveControl(control, stage);
       }),
   });
   try {
@@ -410,6 +410,53 @@ it('reconciles a PR mismatch after migration with accepted local evidence and ab
     await f.status();
     expect(f.sends.at(-1)).toMatchObject({ stage: 'publication', reconciliation: 'state' });
   } finally {
+    await f.close();
+  }
+});
+
+it('does not spend a stale implementation attempt after a concurrent valid observation advances the stage', async () => {
+  const store = controlledStore();
+  const entered = await Effect.runPromise(Deferred.make<void>());
+  const release = await Effect.runPromise(Deferred.make<void>());
+  let armed = false;
+  let gated = false;
+  const f = await fixture(1, {
+    ...store,
+    saveControl: (control, stage) =>
+      Effect.gen(function* () {
+        if (armed && !gated && control.reconciliation?.pending?.index === 1) {
+          gated = true;
+          yield* Deferred.succeed(entered, undefined);
+          yield* Deferred.await(release);
+        }
+        return yield* store.saveControl(control, stage);
+      }),
+  });
+  try {
+    armed = true;
+    f.state({ idle: true });
+    const stale = f.status();
+    await Effect.runPromise(Deferred.await(entered));
+    f.state({ idle: true, accepted: true });
+    await f.status();
+    expect(f.sends).toHaveLength(1);
+    expect(f.sends[0]?.stage).toBe('review');
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    expect(await stale).toMatchObject({
+      delivery: { activity: 'continuation-pending', active: true },
+    });
+    expect((await Effect.runPromise(store.readControl())).reconciliation).toBeUndefined();
+    expect(await Effect.runPromise(store.readStage(1))).toMatchObject({ stage: 'review' });
+    f.state({ idle: true, accepted: false });
+    expect(await f.status()).toMatchObject({
+      reconciliation: { attempts: 1 },
+      delivery: { activity: 'continuation-pending' },
+    });
+    await f.status();
+    expect(f.sends).toHaveLength(2);
+    expect(f.sends[1]).toMatchObject({ stage: 'review', reconciliation: 'state' });
+  } finally {
+    await Effect.runPromise(Deferred.succeed(release, undefined));
     await f.close();
   }
 });

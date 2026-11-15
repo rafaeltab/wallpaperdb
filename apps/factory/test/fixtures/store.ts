@@ -14,10 +14,17 @@ export function controlledStore(): JobStore {
   const claims = new Set<number>();
   return {
     readControl: () => Effect.sync(() => control),
-    saveControl: (state) =>
+    saveControl: (state, stage) =>
       Effect.sync(() => {
         if (state.revision !== control.revision + 1) return false;
+        if (
+          stage &&
+          (stages.has(stage.index) ||
+            JSON.stringify(state.reconciliation?.pending) !== JSON.stringify(stage))
+        )
+          return false;
         control = state;
+        if (stage) stages.set(stage.index, stage);
         return true;
       }),
     readWait: () => Effect.sync(() => wait),

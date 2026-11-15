@@ -56,8 +56,11 @@ export type Observation =
 export interface JobStore {
   read(): Effect.Effect<Intent | null, Unavailable>;
   readControl(): Effect.Effect<Control, Unavailable>;
-  /** Atomic revision compare-and-set. Commands and delivery claims share this journal. */
-  saveControl(state: Control): Effect.Effect<boolean, Unavailable>;
+  /** Atomic revision compare-and-set. Commands and delivery claims share this journal.
+   * With a stage, reserve that absent immutable stage and matching pending control
+   * together. A stale revision, occupied stage or mismatching pending request rejects
+   * both writes, so a superseded instruction cannot consume a reconciliation attempt. */
+  saveControl(state: Control, stage?: StageRequest): Effect.Effect<boolean, Unavailable>;
   readWait(): Effect.Effect<WaitState | null, Unavailable>;
   /** Append atomically at revision; competing writers cannot overwrite a deadline or delivery identity. */
   saveWait(state: WaitState): Effect.Effect<boolean, Unavailable>;

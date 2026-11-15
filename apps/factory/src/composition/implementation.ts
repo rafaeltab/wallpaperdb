@@ -197,6 +197,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       readyPrerequisites: prerequisites,
       admitRecovery: (issue) => recoveryAdmission(issue),
       joins: {
+        reconciliationLimit: configuration.FACTORY_AGENT_RECONCILIATION_LIMIT,
         directory: resolve(configuration.FACTORY_STATE, 'joins'),
         binary: configuration.FACTORY_T3_BINARY,
         projectId: configuration.FACTORY_T3_PROJECT_ID,

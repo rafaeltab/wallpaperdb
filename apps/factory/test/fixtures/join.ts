@@ -7,6 +7,7 @@ import { protocol } from './setup.js';
 export async function joinFixture(
   options: {
     inProcess?: boolean;
+    reconciliationLimit?: number;
     independentMain?: boolean | 'with-prerequisite';
     automaticReview?: boolean;
     conflict?: boolean;
@@ -200,6 +201,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
         directory: join(host.directory, 'joins'),
         binary: host.binary,
         projectId: 'project-id',
+        reconciliationLimit: options.reconciliationLimit,
         ...mcp,
       },
     },
@@ -231,6 +233,7 @@ git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${
             directory: join(host.directory, 'joins'),
             binary: host.binary,
             projectId: 'project-id',
+            reconciliationLimit: options.reconciliationLimit,
             ...mcp,
           },
         },

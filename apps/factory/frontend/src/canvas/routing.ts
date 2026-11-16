@@ -41,36 +41,49 @@ function lowerBound(values: number[], value: number) {
   return low;
 }
 class Queue {
-  entries: { key: number; score: number }[] = [];
+  length = 0;
+  score = 0;
+  private keys = new Float64Array(1024);
+  private scores = new Float64Array(1024);
   push(key: number, score: number) {
-    const entry = { key, score };
-    let index = this.entries.length;
-    this.entries.push(entry);
+    if (this.length === this.keys.length) {
+      const keys = new Float64Array(this.length * 2),
+        scores = new Float64Array(this.length * 2);
+      keys.set(this.keys);
+      scores.set(this.scores);
+      this.keys = keys;
+      this.scores = scores;
+    }
+    let index = this.length++;
     while (index > 0) {
       const parent = (index - 1) >> 1;
-      if (this.entries[parent].score <= score) break;
-      this.entries[index] = this.entries[parent];
+      if (this.scores[parent] <= score) break;
+      this.keys[index] = this.keys[parent];
+      this.scores[index] = this.scores[parent];
       index = parent;
     }
-    this.entries[index] = entry;
+    this.keys[index] = key;
+    this.scores[index] = score;
   }
   pop() {
-    const first = this.entries[0],
-      last = this.entries.pop();
-    if (!this.entries.length || !last) return first;
+    if (!this.length) return undefined;
+    const first = this.keys[0];
+    this.score = this.scores[0];
+    const last = --this.length,
+      key = this.keys[last],
+      score = this.scores[last];
+    if (!this.length) return first;
     let index = 0;
-    while (index * 2 + 1 < this.entries.length) {
+    while (index * 2 + 1 < this.length) {
       let child = index * 2 + 1;
-      if (
-        child + 1 < this.entries.length &&
-        this.entries[child + 1].score < this.entries[child].score
-      )
-        child++;
-      if (this.entries[child].score >= last.score) break;
-      this.entries[index] = this.entries[child];
+      if (child + 1 < this.length && this.scores[child + 1] < this.scores[child]) child++;
+      if (this.scores[child] >= score) break;
+      this.keys[index] = this.keys[child];
+      this.scores[index] = this.scores[child];
       index = child;
     }
-    this.entries[index] = last;
+    this.keys[index] = key;
+    this.scores[index] = score;
     return first;
   }
 }
@@ -317,20 +330,17 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
       costs[initial] = 0;
       queue.push(initial, 0);
       let final = -1;
-      while (queue.entries.length) {
+      while (queue.length) {
         const current = queue.pop();
-        if (!current) break;
-        const at = Math.floor(current.key / 3),
+        if (current === undefined) break;
+        const at = Math.floor(current / 3),
           x = at % cols,
           y = Math.floor(at / cols),
-          dir = current.key % 3;
-        if (
-          current.score >
-          costs[current.key] + Math.abs(xs[x] - end.x) + Math.abs(ys[y] - end.y) + 1e-6
-        )
+          dir = current % 3;
+        if (queue.score > costs[current] + Math.abs(xs[x] - end.x) + Math.abs(ys[y] - end.y) + 1e-6)
           continue;
         if (x === ex && y === ey) {
-          final = current.key;
+          final = current;
           break;
         }
         for (const [dx, dy, d] of directions) {
@@ -345,7 +355,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           if (overlapCache[segment] === 2) continue;
           const next = encode(nx, ny, d),
             cost =
-              costs[current.key] +
+              costs[current] +
               Math.abs(p.x - q.x) +
               Math.abs(p.y - q.y) +
               (d !== dir ? 5 : 0) +
@@ -354,7 +364,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
                 : verticalCrowding[cell(x, Math.min(y, ny))]);
           if (cost >= costs[next]) continue;
           costs[next] = cost;
-          previous[next] = current.key;
+          previous[next] = current;
           queue.push(next, cost + Math.abs(q.x - end.x) + Math.abs(q.y - end.y));
         }
       }

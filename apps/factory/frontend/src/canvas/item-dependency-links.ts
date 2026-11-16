@@ -1,5 +1,5 @@
 import { stageHeadingWidth, type canvasLayout } from './geometry';
-import { routeCanvas, type Edge, type Rect } from './routing';
+import { createCanvasRouter, routeCanvas, type Edge, type Rect } from './routing';
 
 /** Ordered geometry only. Earlier links affect the paths chosen for later links. */
 export type ItemDependencyLinkInput = {
@@ -75,4 +75,11 @@ export function createItemDependencyLinkInput(
 
 export function computeItemDependencyLinks(input: ItemDependencyLinkInput): ItemDependencyLink[] {
   return routeCanvas(input.nodes, input.edges, input.width, input.height);
+}
+
+/** Ordered finished links; one session can reuse independently validated routes across scenes. */
+export function createItemDependencyLinkRouter() {
+  const route = createCanvasRouter();
+  return (input: ItemDependencyLinkInput) =>
+    route(input.nodes, input.edges, input.width, input.height);
 }

@@ -3,10 +3,14 @@ import type { ItemDependencyLink, ItemDependencyLinkInput } from './item-depende
 export type ItemDependencyLinkRequest = { id: number; input: ItemDependencyLinkInput };
 export type ItemDependencyLinkResponse =
   | { id: number; links: ItemDependencyLink[] }
+  | { id: number; progress: ItemDependencyLink[] }
   | { id: number; error: string };
 
 export interface ItemDependencyLinkExecutor {
-  compute(input: ItemDependencyLinkInput): Promise<ItemDependencyLink[]>;
+  compute(
+    input: ItemDependencyLinkInput,
+    onProgress?: (links: ItemDependencyLink[]) => void
+  ): Promise<ItemDependencyLink[]>;
   dispose(): void;
 }
 
@@ -26,6 +30,7 @@ export function createItemDependencyLinkExecutor(
   type Calculation = {
     id: number;
     input: ItemDependencyLinkInput;
+    onProgress?: (links: ItemDependencyLink[]) => void;
     resolve: (links: ItemDependencyLink[]) => void;
     reject: (error: Error) => void;
   };
@@ -45,6 +50,15 @@ export function createItemDependencyLinkExecutor(
   }
   worker.addEventListener('message', (event: MessageEvent<ItemDependencyLinkResponse>) => {
     if (disposed || !running || event.data.id !== running.id) return;
+    if ('progress' in event.data) {
+      try {
+        running.onProgress?.(event.data.progress);
+      } catch (error) {
+        running.onProgress = undefined;
+        running.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      return;
+    }
     const complete = running;
     running = undefined;
     if ('error' in event.data) complete.reject(new Error(event.data.error));
@@ -70,10 +84,10 @@ export function createItemDependencyLinkExecutor(
     fail(new Error('Item dependency link result could not be received'));
   });
   return {
-    compute(input) {
+    compute(input, onProgress) {
       if (disposed) return Promise.reject(new Error('Item dependency link executor is disposed'));
       return new Promise((resolve, reject) => {
-        const calculation = { id: ++sequence, input, resolve, reject };
+        const calculation = { id: ++sequence, input, onProgress, resolve, reject };
         if (running) {
           queued?.reject(new DOMException('Replaced by a newer Project canvas', 'AbortError'));
           queued = calculation;

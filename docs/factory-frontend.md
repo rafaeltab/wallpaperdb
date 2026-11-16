@@ -44,6 +44,18 @@ The [browser integration journey](../apps/factory/frontend/test/canvas.integrati
 
 The [factory build script](../apps/factory/package.json) places Vite output in `apps/factory/dist/frontend`. [Installation](../apps/factory/scripts/install.ts) includes it in the pinned release alongside the backend. The backend serves `/` and hashed `/assets` paths from that release, without GitHub/T3 calls or a Vite server. Production activation remains an explicit host operation using the existing installation contract.
 
+## Project item and dependency link publication
+
+The [Project canvas](../apps/factory/frontend/src/canvas/canvas.tsx) publishes the current Project item placement immediately. Initial rendering, collapse and expansion do not wait for Item dependency links. Navigation, selection and current item actions remain available while the viewport reports routing activity through `aria-busy`.
+
+The [routing worker](../apps/factory/frontend/src/canvas/item-dependency-link-worker.ts) publishes its first finished link immediately, then sends additional completed links in batches about every 16 ms. Links are routed in order because terminal reservations and earlier paths affect later paths. Progressive publication preserves that ordering and the final result. A slow individual link can delay the next batch.
+
+The [routing session](../apps/factory/frontend/src/canvas/routing.ts) retains the preceding completed scene's routes. Before reusing a route, it validates every attempted search window against its endpoints, ordered obstacles, terminal reservations and occupied lanes. Unrelated geometry can therefore reuse a route without repeating its path search; a changed dependency invalidates it conservatively.
+
+The [React integration](../apps/factory/frontend/src/canvas/use-item-dependency-links.ts) retains an old visible path during replacement only when its endpoints and terminal fan remain unchanged and newly placed obstacles do not cross it. This temporary visibility check does not certify the final route. The worker still validates or recomputes it. Equal results retain their object and SVG identity, so adding other links does not rewrite an unchanged path. Obsolete progress and completions cannot publish into a newer scene. If routing fails, the current Project items remain available and the canvas reports the error.
+
+The [held-worker browser check](../apps/factory/frontend/test/project-canvas-generation.integration.test.ts) covers immediate item placement, partial links, obsolete results, deletion and SVG retention. The [executor suite](../apps/factory/frontend/test/item-dependency-link-executor.unit.test.ts) checks bounded work, progress, failure and disposal.
+
 ## Measure canvas expansion
 
 Run the [expansion budget check](../apps/factory/frontend/scripts/benchmark-project-canvas-expansion.ts) separately from coverage-instrumented correctness checks:
@@ -52,7 +64,13 @@ Run the [expansion budget check](../apps/factory/frontend/scripts/benchmark-proj
 make run PACKAGE=factory SCRIPT=bench:project-canvas-expansion ARGS='--rounds 5'
 ```
 
-The check builds the production frontend and runs Chromium and Firefox against controlled HTTP responses. It uses three fixed synthetic 100-item scenes, including a 75-link scene, without connecting to a running backend. It measures both the first expansion of previously uncomputed routes and repeat expansion from all collapsed. Timing starts at the Expand all click and includes matching expanded placement and dependency-link paths plus the next animation-frame boundary. Every measured current sample must be below the default 100 ms budget; a failure exits nonzero. The output retains individual samples and observed ranges rather than hiding slow runs.
+The check builds the production frontend and runs Chromium and Firefox against controlled HTTP responses. It uses three fixed synthetic 100-item scenes, including a 75-link scene, without connecting to a running backend. It measures both the first expansion of previously uncomputed routes and repeat expansion from all collapsed. Timing starts at the Expand all click. It records the following independent milestones, each including the next animation-frame boundary:
+
+- `itemsReadyMs`: all expected Project item and group geometry is present and visible, even if links are pending.
+- `firstLinkMs`: at least one complete expected dependency link is visible alongside the current geometry. A valid retained link counts; a stale or mismatched path does not.
+- `durationMs`: the complete expected geometry and dependency links are published and routing is idle.
+
+The output also retains observed link publication counts over time. The default 100 ms budget still applies to full completion, not the earlier item milestone. Every measured current completion sample must be below that budget; a failure exits nonzero. Individual samples and observed ranges remain available rather than hiding slow runs.
 
 The [saved expectations](../apps/factory/frontend/test/fixtures/canvas/expansion100.json) preserve original placement and link geometry. Keep these expectations fixed when optimizing. The existing [routing suite](../apps/factory/frontend/test/item-dependency-links.unit.test.ts) checks additional title modes, collapsed scenes, and routing failures.
 

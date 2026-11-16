@@ -61,6 +61,68 @@ it('migrates obsolete responses once without consuming reconciliation attempts',
     await f.close();
   }
 });
+it.each([false, true])(
+  'migrates retained legacy publication before evaluating current CI: failed=%s',
+  async (failed) => {
+    const f = await fixture();
+    try {
+      for (let stage = 0; stage < 3; stage++) {
+        f.state({ accepted: true, idle: true });
+        await f.status();
+      }
+      f.state({ accepted: false, idle: true, migrationRequired: true, ready: !failed, failed });
+      expect(await f.status()).toMatchObject({
+        delivery: { stage: 'publication', ready: false, activity: 'continuation-pending' },
+      });
+      await f.status();
+      await f.status();
+      expect(f.sends).toHaveLength(3);
+      expect(f.sends.at(-1)).toMatchObject({
+        index: 4,
+        threadId: 'owner',
+        stage: 'publication',
+        reconciliation: 'migration',
+      });
+      expect((await Effect.runPromise(f.store.readControl())).reconciliation).toMatchObject({
+        migrated: true,
+        attempts: 0,
+      });
+      f.state({ accepted: true, idle: true, migrationRequired: false });
+      expect(await f.status()).toMatchObject({
+        delivery: { stage: failed ? 'babysitting' : 'ci', ready: !failed },
+      });
+    } finally {
+      await f.close();
+    }
+  }
+);
+it('keeps retained CI migration unverified while busy and requires intervention after its single failed migration', async () => {
+  const f = await fixture();
+  try {
+    for (let stage = 0; stage < 3; stage++) {
+      f.state({ accepted: true, idle: true });
+      await f.status();
+    }
+    f.state({ accepted: false, idle: false, migrationRequired: true, ready: true });
+    expect(await f.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+    expect(f.sends).toHaveLength(2);
+    f.state({ idle: true });
+    await f.status();
+    await f.status();
+    f.state({ idle: true });
+    expect(await f.status()).toMatchObject({
+      delivery: {
+        activity: 'manual-recovery',
+        progress: expect.stringContaining('migration failed'),
+      },
+    });
+    await f.status();
+    expect(f.sends).toHaveLength(3);
+    expect((await Effect.runPromise(f.store.readControl())).reconciliation?.attempts).toBe(0);
+  } finally {
+    await f.close();
+  }
+});
 it('accepts a freshly checked and reviewed publication head while hosted CI remains independent', async () => {
   const f = await fixture();
   try {

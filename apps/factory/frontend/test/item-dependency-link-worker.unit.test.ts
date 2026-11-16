@@ -6,7 +6,7 @@ import type {
   ItemDependencyLinkInput,
 } from '../src/canvas/item-dependency-links';
 
-it('posts the first finished link, append-only batches, and the exact final scene from the worker entry', async () => {
+it('posts the first finished link and the exact final scene without a redundant tail update', async () => {
   const fixtures: { name: string; input: ItemDependencyLinkInput; links: ItemDependencyLink[] }[] =
     JSON.parse(
       readFileSync(new URL('./fixtures/canvas/item-dependency-links.json', import.meta.url), 'utf8')
@@ -27,7 +27,8 @@ it('posts the first finished link, append-only batches, and the exact final scen
     const batches = messages.flatMap((message) =>
       'progress' in message ? [message.progress] : []
     );
-    expect(batches).toEqual([[fixture.links[0]], fixture.links.slice(1)]);
+    expect(batches).toEqual([[fixture.links[0]]]);
+    expect(messages).toHaveLength(2);
     expect(messages.at(-1)).toEqual({ id: 7, links: fixture.links });
     expect(messages.every(({ id }) => id === 7)).toBe(true);
     scope.dispatchEvent(

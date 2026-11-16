@@ -101,7 +101,7 @@ ${receiptInstructions(intent, 'implementation')}`,
       ),
     observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({
-        try: async (signal): Promise<Observation> => {
+        try: async (signal): Promise<Observation & { failure?: Unavailable }> => {
           const matches = repair
             ? [{ threadId: repair.threadId, title: title(intent) }]
             : listing
@@ -161,12 +161,21 @@ ${receiptInstructions(intent, 'implementation')}`,
             };
           } catch (error) {
             // Checkout/receipt verification cannot erase a known worker lifecycle.
-            if (repair && !signal.aborted) return unverified;
+            if (repair && !signal.aborted)
+              return {
+                ...unverified,
+                failure: new Unavailable({ operation: 'observe-binding', cause: error }),
+              };
             throw error;
           }
         },
         catch: (cause) => new Unavailable({ operation: 'observe', cause }),
       }).pipe(
+        Effect.flatMap(({ failure, ...observation }) =>
+          failure
+            ? Effect.logError(failure).pipe(Effect.as(observation))
+            : Effect.succeed(observation)
+        ),
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.t3.observe')
       ),

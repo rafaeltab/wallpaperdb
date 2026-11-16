@@ -544,6 +544,79 @@ it('accepts idle state when activity omits PR enrichment and authoritative watch
     });
   }));
 
+it.each([false, true])(
+  'checks every authoritative PR page before accepting idle state: watched=%s',
+  (watching) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [instruction(intent, request), response(intent, host.base)],
+        omitActivityPullRequests: true,
+        watcherPages: {
+          first: { structuredContent: { pullRequests: [{ watching: false }], nextCursor: 'last' } },
+          last: { structuredContent: { pullRequests: [{ watching }], nextCursor: null } },
+        },
+      });
+      const observed = await Effect.runPromise(adapter.inspectStage(intent, request));
+      if (watching) {
+        expect(observed).toMatchObject({ idle: false, waitingForGitHub: true });
+        expect(observed?.accepted).not.toBe(true);
+      } else expect(observed).toMatchObject({ accepted: true });
+      expect((await host.calls()).filter((c) => c.args[1] === 't3_thread_send')).toHaveLength(0);
+    })
+);
+
+it.each([
+  { isError: true },
+  { structuredContent: { pullRequests: [] } },
+  { structuredContent: { pullRequests: [{}], nextCursor: null } },
+  { structuredContent: { pullRequests: null, nextCursor: null } },
+  { structuredContent: { pullRequests: [], nextCursor: 'first' } },
+])('cannot establish inactivity from unavailable or incomplete watcher metadata: %j', (reply) =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({
+      overrides: { status: 'completed' },
+      messages: [instruction(intent, request), response(intent, host.base)],
+      omitActivityPullRequests: true,
+      watcherPages: { first: reply },
+    });
+    await expect(Effect.runPromise(adapter.inspectStage(intent, request))).rejects.toMatchObject({
+      operation: 'inspect-stage',
+    });
+    expect((await host.calls()).filter((c) => c.args[1] === 't3_thread_send')).toHaveLength(0);
+  })
+);
+
+it.each([false, true])(
+  'resolves omitted watcher metadata for descendants too: watched=%s',
+  (watching) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [instruction(intent, request), response(intent, host.base)],
+        omitActivityPullRequests: true,
+        descendants: [
+          { threadId: 'child', parentThreadId: 'thread-live' },
+          { threadId: 'grandchild', parentThreadId: 'child' },
+        ],
+        watcherReplies: Object.fromEntries(
+          ['thread-live', 'child', 'grandchild'].map((id) => [
+            id,
+            {
+              structuredContent: {
+                pullRequests: [{ watching: id === 'grandchild' && watching }],
+                nextCursor: null,
+              },
+            },
+          ])
+        ),
+      });
+      const observed = await Effect.runPromise(adapter.inspectStage(intent, request));
+      if (watching) expect(observed?.accepted).not.toBe(true);
+      else expect(observed).toMatchObject({ accepted: true });
+    })
+);
+
 it('traverses a completed child to reject an active grandchild and rejects missing inactivity evidence', () =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const messages = [

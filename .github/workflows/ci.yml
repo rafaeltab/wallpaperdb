@@ -70,8 +70,8 @@ jobs:
             fi
           done
 
-      - name: Install Chromium for browser adapter contracts
-        run: make run PACKAGE=web SCRIPT=test:browser:install
+      - name: Install Chromium and Firefox for browser adapter contracts
+        run: make run PACKAGE=factory SCRIPT=test:browser:install
 
       - name: Build, lint, and type-check
         run: make check TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"

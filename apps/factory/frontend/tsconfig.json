@@ -13,5 +13,5 @@
     "types": ["vite/client"],
     "experimentalDecorators": true
   },
-  "include": ["src", "vite.config.ts", "test", "vitest*.ts"]
+  "include": ["src", "vite.config.ts", "test", "scripts", "vitest*.ts"]
 }

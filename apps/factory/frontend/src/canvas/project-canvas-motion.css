@@ -1,0 +1,23 @@
+/* Only the active indicators animate. The lifecycle module aligns their timelines. */
+@keyframes cc-activity-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.82;
+  }
+}
+
+.cc-status-active,
+.cc-item.cc-active-job.cc-selected::after {
+  animation: cc-activity-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-status-active,
+  .cc-item.cc-active-job.cc-selected::after {
+    animation: none;
+    opacity: 1;
+  }
+}

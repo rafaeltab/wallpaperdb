@@ -302,6 +302,7 @@ export type Attention =
       }[];
     };
 export type StatusCode =
+  | 'completion-unverified'
   | 'ready'
   | 'blocked'
   | 'implementing'

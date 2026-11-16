@@ -7,19 +7,26 @@ export const JobReportingLive = Layer.effect(
   Effect.gen(function* () {
     const reporting = yield* Reporting;
     const time = yield* Time;
+    let sequence = 0;
     return {
       begin: reporting.begin,
       failed: (generation, intent, error) =>
         Effect.gen(function* () {
           yield* reporting.enqueue(generation, [
-            { kind: 'failure', key: `job:${intent.id}`, error, at: yield* time.now(), sequence: 1 },
+            {
+              kind: 'failure',
+              key: `job:${intent.id}`,
+              error,
+              at: yield* time.now(),
+              sequence: ++sequence,
+            },
           ]);
         }),
       observed: (generation, value) =>
         Effect.gen(function* () {
           if (value.kind !== 'job') return;
           yield* reporting.enqueue(generation, [
-            { kind: 'job', value, at: yield* time.now(), sequence: 1 },
+            { kind: 'job', value, at: yield* time.now(), sequence: ++sequence },
           ]);
         }),
       accepted: (intent, stage, index, commit) =>
@@ -30,7 +37,7 @@ export const JobReportingLive = Layer.effect(
             {
               kind: 'job',
               at,
-              sequence: 1,
+              sequence: ++sequence,
               value: {
                 kind: 'job',
                 stageIndex: index,

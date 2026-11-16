@@ -3,6 +3,30 @@ import { expect, it } from 'vitest';
 import { completionFixture as fixture } from './fixtures/completion.js';
 import { controlledStore } from './fixtures/store.js';
 
+it('publishes observed terminal execution before receipt inspection fails', async () => {
+  const observations: import('../src/capabilities/job/index.js').Status[] = [];
+  const f = await fixture(3, controlledStore(), undefined, {
+    begin: () => Effect.succeed(1),
+    accepted: () => Effect.void,
+    failed: () => Effect.void,
+    observed: (_generation, status) =>
+      Effect.sync(() => {
+        observations.push(status);
+      }),
+  });
+  try {
+    observations.length = 0;
+    f.state({ idle: true, inspectFailed: true });
+    await expect(f.status()).rejects.toBeDefined();
+    expect(observations).toContainEqual(
+      expect.objectContaining({ execution: expect.objectContaining({ status: 'completed' }) })
+    );
+    expect(observations.every((s) => s.kind !== 'job' || !s.delivery?.ready)).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
 it('reconciles a failed idle state in the same job and spends a durable budget across stages', async () => {
   const f = await fixture(2);
   try {

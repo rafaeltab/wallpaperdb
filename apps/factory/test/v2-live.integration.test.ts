@@ -238,27 +238,30 @@ it.each([
           { issue: 3, base: source.intent.base, context: '' },
         ],
       };
-      input.jobs.push({
-        ...source,
-        intent: { ...source.intent, id: 'active-owner', issue: 3 },
-        resume: undefined,
-        execution: { ...source.execution, status: 'running' },
-        delivery: {
-          stage: 'publication',
-          commit: pull.head,
-          ready: false,
-          landed: false,
-          active: true,
-          pr: {
-            kind: 'found',
-            url: pull.url,
+      input.jobs = [
+        ...input.jobs,
+        {
+          ...source,
+          intent: { ...source.intent, id: 'active-owner', issue: 3 },
+          resume: undefined,
+          execution: { ...source.execution, status: 'running' },
+          delivery: {
+            stage: 'publication',
             commit: pull.head,
-            base: 'main',
             ready: false,
             landed: false,
+            active: true,
+            pr: {
+              kind: 'found',
+              url: pull.url,
+              commit: pull.head,
+              base: 'main',
+              ready: false,
+              landed: false,
+            },
           },
         },
-      });
+      ];
     }
     const before: ScheduleSnapshot = {
       ...input,

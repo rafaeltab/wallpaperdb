@@ -344,8 +344,9 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
         const at = Math.floor(current / 3),
           x = at % cols,
           y = Math.floor(at / cols),
-          dir = current % 3;
-        if (queue.score > costs[current] + Math.abs(xs[x] - end.x) + Math.abs(ys[y] - end.y) + 1e-6)
+          dir = current % 3,
+          baseCost = costs[current];
+        if (queue.score > baseCost + Math.abs(xs[x] - end.x) + Math.abs(ys[y] - end.y) + 1e-6)
           continue;
         if (x === ex && y === ey) {
           final = current;
@@ -361,6 +362,9 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
             nextCell = at + (horizontal ? step : step * cols),
             d = horizontal ? 0 : 1;
           if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || blocked[nextCell]) continue;
+          const next = nextCell * 3 + d;
+          // Every step adds nonnegative distance, turn and crowding costs.
+          if (baseCost >= costs[next]) continue;
           const px = xs[x],
             py = ys[y],
             qx = xs[nx],
@@ -368,13 +372,12 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           const overlapCache = horizontal ? horizontalOverlap : verticalOverlap,
             segment = forward ? at : nextCell;
           if (overlapCache[segment]) continue;
-          const next = nextCell * 3 + d,
-            cost =
-              costs[current] +
-              Math.abs(px - qx) +
-              Math.abs(py - qy) +
-              (d !== dir ? 5 : 0) +
-              (horizontal ? horizontalCrowding[segment] : verticalCrowding[segment]);
+          const cost =
+            baseCost +
+            Math.abs(px - qx) +
+            Math.abs(py - qy) +
+            (d !== dir ? 5 : 0) +
+            (horizontal ? horizontalCrowding[segment] : verticalCrowding[segment]);
           if (cost >= costs[next]) continue;
           costs[next] = cost;
           previous[next] = current;

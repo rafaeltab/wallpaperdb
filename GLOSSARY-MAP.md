@@ -19,6 +19,8 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 ## Operational contexts
 
+- [Testing](./TESTING_GLOSSARY.md) - defines test scopes, types, purposes, boundaries, runtimes, runners, and mutation-testing terminology for repository work.
+
 - [Software Factory](./apps/factory/GLOSSARY.md) - owns issue admission, execution progress and verified PR readiness for repository development. It is separate from the WallpaperDB product contexts. Its [local ADRs](./apps/factory/docs/adr/) record orchestration authority, recovery trade-offs and dependency-stack policy.
 
 ## Existing implementation relationships

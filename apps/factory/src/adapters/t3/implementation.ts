@@ -63,34 +63,36 @@ export function t3Execution(config: {
     launch: (intent: Intent) =>
       Effect.tryPromise({
         try: async (signal) => {
-          z.object({
-            threadId: z.string().min(1),
-            projectId: z.literal(config.projectId),
-            runId: z.string().nullable(),
-          }).parse(
-            await call(
-              [
-                'start',
-                config.projectId,
-                `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
+          const launched = z
+            .object({
+              threadId: z.string().min(1),
+              projectId: z.literal(config.projectId),
+              runId: z.string().nullable(),
+            })
+            .parse(
+              await call(
+                [
+                  'start',
+                  config.projectId,
+                  `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
 ${intent.context}
 Verified prerequisite evidence: ${intent.prerequisiteEvidence ?? 'None'}
 ${receiptInstructions(intent, 'implementation')}`,
-                '--title',
-                title(intent),
-                '--provider',
-                'codex',
-                '--model',
-                'gpt-6.1-sol',
-                '--worktree',
-                intent.base,
-                '--branch',
-                intent.branch,
-              ],
-              signal
-            )
-          );
-          return { kind: 'submitted' as const };
+                  '--title',
+                  title(intent),
+                  '--provider',
+                  'codex',
+                  '--model',
+                  'gpt-6.1-sol',
+                  '--worktree',
+                  intent.base,
+                  '--branch',
+                  intent.branch,
+                ],
+                signal
+              )
+            );
+          return { kind: 'submitted' as const, threadId: launched.threadId };
         },
         catch: (cause) => new Unavailable({ operation: 'launch', cause }),
       }).pipe(

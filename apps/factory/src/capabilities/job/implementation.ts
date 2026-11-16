@@ -1,7 +1,13 @@
 import { retryAction, retryStage } from './retry.js';
 import { attemptIntent, matchesRestart, restartAction } from './restart.js';
 import { Effect, Layer, Random, Option } from 'effect';
-import { reconcileStages, currentStage, hasAnsweredQuestion, stageRunOrder } from './stages.js';
+import {
+  reconcileStages,
+  currentStage,
+  hasAnsweredQuestion,
+  stageRunOrder,
+  retainInitialStage,
+} from './stages.js';
 import {
   AgentReconciliationPolicy,
   defaultAgentReconciliationLimit,
@@ -26,6 +32,16 @@ export const JobLive = Layer.effect(
     const policy = Option.getOrUndefined(yield* Effect.serviceOption(AgentReconciliationPolicy));
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
+    const launchOwned = (intent: Intent, index: number) =>
+      Effect.gen(function* () {
+        const result = yield* execution.launch(intent);
+        if (result.kind === 'submitted' && result.threadId) {
+          // This records delivery ownership, never receipt acceptance.
+          yield* retainInitialStage(store, intent, index, result.threadId);
+          yield* retainOwnership(store, result.threadId);
+        }
+        return result;
+      });
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const generation = reporting ? yield* reporting.begin() : 0;
@@ -272,7 +288,7 @@ export const JobLive = Layer.effect(
             const current = yield* store.readControl();
             if (!current.cancelled && !current.released && !current.dependencyRecovery) {
               const active = attemptIntent(intent, index);
-              const launch = yield* execution.launch(active);
+              const launch = yield* launchOwned(active, index);
               if (launch.kind === 'submitted' && reporting)
                 yield* reporting.accepted({ ...active, id: intent.id }, 'implementation', index);
             }
@@ -362,7 +378,7 @@ export const JobLive = Layer.effect(
           };
           if (!(yield* store.reserve(intent))) return { kind: 'occupied' as const };
           if (yield* store.claimLaunch()) {
-            const launch = yield* execution.launch(intent);
+            const launch = yield* launchOwned(intent, 0);
             if (launch.kind === 'submitted' && reporting)
               yield* reporting.accepted(intent, 'implementation', 0);
           }

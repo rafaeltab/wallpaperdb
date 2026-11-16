@@ -262,7 +262,10 @@ export interface Execution {
     request: StageRequest
   ): Effect.Effect<StageEvidence | null, Unavailable>;
   sendStage(intent: Intent, request: StageRequest): Effect.Effect<void, Unavailable>;
-  launch(intent: Intent): Effect.Effect<{ kind: 'submitted' | 'uncertain' }, Unavailable>;
+  /** Retain a confirmed owning thread when the provider returns it. */
+  launch(
+    intent: Intent
+  ): Effect.Effect<{ kind: 'submitted'; threadId?: string } | { kind: 'uncertain' }, Unavailable>;
   /** A persisted owned replay stage may bind exact historical heads and repairs of its current commit. */
   observe(intent: Intent, repair?: StageRequest): Effect.Effect<Observation, Unavailable>;
 }

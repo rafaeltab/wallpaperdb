@@ -6,6 +6,34 @@ import { expect, it } from 'vitest';
 import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { completionFixture } from './fixtures/completion.js';
 
+it.each([false, true])(
+  'retains a confirmed launch before discovery, available=%s, through SQLite reopen',
+  async (discoveryAvailable) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-launch-ownership-'));
+    const f = await completionFixture(3, fileStore(directory), undefined, undefined, {
+      threadId: 'owner',
+      discoveryAvailable,
+    });
+    try {
+      expect(await f.status()).toMatchObject({ execution: { kind: 'found', threadId: 'owner' } });
+      await f.close();
+      const reopened = fileStore(directory);
+      expect(await Effect.runPromise(reopened.readControl())).toMatchObject({
+        ownership: { threadId: 'owner' },
+      });
+      expect(await Effect.runPromise(reopened.readStage(0))).toMatchObject({
+        stage: 'implementation',
+        threadId: 'owner',
+      });
+      expect(await Effect.runPromise(reopened.readStage(1))).toBeNull();
+      expect(await Effect.runPromise(reopened.claimLaunch())).toBe(false);
+    } finally {
+      await f.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 it.each(['publication', 'babysitting'])(
   'retains ownership during %s without requiring readiness, through a store reopen',
   async (stage) => {

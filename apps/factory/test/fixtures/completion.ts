@@ -18,7 +18,8 @@ export async function completionFixture(
   limit = 3,
   store: JobStore = controlledStore(),
   verified?: () => Effect.Effect<void>,
-  reporting?: JobReporting
+  reporting?: JobReporting,
+  launch?: { threadId: string; discoveryAvailable: boolean }
 ) {
   let base: string | undefined;
   let unexpectedBase = false;
@@ -80,21 +81,24 @@ export async function completionFixture(
                   }),
           }),
           Layer.succeed(Execution, {
-            launch: () => Effect.succeed({ kind: 'submitted' as const }),
+            launch: () =>
+              Effect.succeed({ kind: 'submitted' as const, threadId: launch?.threadId }),
             interrupt: (_intent, threadId) =>
               Effect.sync(() => {
                 interrupts.push(threadId);
               }),
-            observe: (intent) =>
-              Effect.succeed({
-                kind: 'found' as const,
-                threadId: 'owner',
-                status: observationStatus ?? (idle ? 'completed' : 'running'),
-                run: { id: `run-${run}`, ordinal: run },
-                worktree: '/owner',
-                branch: intent.branch,
-                model: 'gpt-6.1-sol',
-              }),
+            observe: (intent, stage) =>
+              launch && !launch.discoveryAvailable && !stage
+                ? Effect.succeed({ kind: 'ambiguous' as const })
+                : Effect.succeed({
+                    kind: 'found' as const,
+                    threadId: 'owner',
+                    status: observationStatus ?? (idle ? 'completed' : 'running'),
+                    run: { id: `run-${run}`, ordinal: run },
+                    worktree: '/owner',
+                    branch: intent.branch,
+                    model: 'gpt-6.1-sol',
+                  }),
             inspectStage: (_intent, stage) =>
               inspectFailed
                 ? Effect.fail(

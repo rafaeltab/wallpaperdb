@@ -62,6 +62,95 @@ it('runs bounded parallel reads within a cycle and retains its next-cycle budget
     expect(reopened.cycleReady()).toBe(true);
   }));
 
+it.each([
+  { firstAt: 15_000, secondAt: undefined, debtUntil: 26_000 },
+  { firstAt: 5_000, secondAt: 12_500, debtUntil: 24_500 },
+])(
+  'preserves uncertain parallel cost after elapsed refunds: $firstAt/$secondAt',
+  async ({ firstAt, secondAt, debtUntil }) =>
+    withGithub(async (host, stop) => {
+      const startedAt = Date.UTC(2026, 10, 7, 12);
+      let now = startedAt;
+      const reset = startedAt / 1000 + 3600;
+      const clock = {
+        now: () => now,
+        wait: async (milliseconds: number, signal: AbortSignal) => {
+          signal.throwIfAborted();
+          now += milliseconds;
+        },
+      };
+      await host.nodeCommand(
+        'gh',
+        `
+      const fs = require('node:fs');
+      const directory = ${JSON.stringify(host.directory)};
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: { graphql: { limit:7200, remaining:7200, reset:${reset} } } }));
+      } else {
+        const query = process.argv.find(arg => arg.startsWith('query='));
+        const tag = query.match(/Case([ABC])/)[1];
+        fs.writeFileSync(directory + '/ready-' + tag, 'ready');
+        const timer = setInterval(() => {
+          if (!fs.existsSync(directory + '/release-' + tag)) return;
+          clearInterval(timer);
+          console.error('< HTTP/2.0 200');
+          console.error('< X-Ratelimit-Resource: graphql');
+          console.error('< X-Ratelimit-Limit: 7200');
+          console.error('< X-Ratelimit-Remaining: 7200');
+          console.error('< X-Ratelimit-Reset: ${reset}');
+          console.error('');
+          console.log(JSON.stringify({ data: { factoryRateLimit: {
+            cost:1, limit:7200, remaining:7200, resetAt:new Date(${reset} * 1000).toISOString()
+          }, viewer:{login:'controlled'} } }));
+        }, 10);
+      }
+    `
+      );
+      const config = {
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      };
+      const requests = githubRequests(config);
+      const pending: { tag: string; abort: AbortController; result: Promise<unknown> }[] = [];
+      try {
+        for (const tag of secondAt === undefined ? ['A', 'B'] : ['A', 'B', 'C']) {
+          if (tag === 'B' && secondAt === undefined) now = startedAt + firstAt;
+          const abort = new AbortController();
+          const result = requests(
+            ['api', 'graphql', '-f', `query=query Case${tag} { viewer { login } }`],
+            abort.signal
+          );
+          void result.catch(() => undefined);
+          pending.push({ tag, abort, result });
+          await vi.waitFor(async () =>
+            expect(await readFile(`${host.directory}/ready-${tag}`, 'utf8')).toBe('ready')
+          );
+        }
+        now = startedAt + firstAt;
+        await writeFile(host.directory + '/release-A', 'release');
+        await pending[0]?.result;
+        if (secondAt !== undefined) {
+          now = startedAt + secondAt;
+          await writeFile(host.directory + '/release-B', 'release');
+          await pending[1]?.result;
+        }
+        const uncertain = pending.at(-1);
+        if (!uncertain) throw new Error('Missing held request');
+        uncertain.abort.abort();
+        await expect(uncertain.result).rejects.toBeDefined();
+        const reopened = githubRequests(config);
+        await reopened.waitForCycle(stop.signal);
+        expect(now - startedAt).toBe(debtUntil);
+      } finally {
+        for (const item of pending) item.abort.abort();
+        await Promise.allSettled(pending.map((item) => item.result));
+        await requests.drain();
+      }
+    })
+);
+
 it('bounds parallel reads and reserves request capacity for work while background reads wait', async () =>
   withGithub(async (host, stop) => {
     await host.nodeCommand(

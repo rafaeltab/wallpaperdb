@@ -274,6 +274,8 @@ it.each([100, 200, 300] as const)(
       await page.route('**/api/v2/board', (route) => route.fulfill({ json: board }));
       await page.goto(origin);
       await browserExpect(page.locator('.cc-item')).toHaveCount(count, { timeout: 30000 });
+      await browserExpect(page.locator('.cc-viewport')).toHaveAttribute('aria-busy', 'false');
+      await browserExpect(page.locator('.cc-item').first()).toBeVisible();
       const styles = await page.locator('.cc-app').evaluate((app) => {
         const style = (selector: string) => {
           const element = app.querySelector(selector);

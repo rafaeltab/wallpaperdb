@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
@@ -719,7 +719,9 @@ it('keeps failed checks and detail check names visible without URLs', async () =
   render(<FactoryApp client={client} />);
   const checks = await screen.findByLabelText('Checks: failed. Current head');
   expect(checks.querySelector('.cc-check.failed svg')).toBeTruthy();
-  await user.click(screen.getByRole('group', { name: 'Select Expose observation metadata' }));
+  await user.click(
+    await screen.findByRole('group', { name: 'Select Expose observation metadata' })
+  );
   await user.click(screen.getByRole('button', { name: 'Details' }));
   await screen.findByText('Check without a provider link');
 });
@@ -1139,11 +1141,13 @@ it('reveals collapsed items when attention highlighting is enabled', async () =>
   const board = await sample(),
     user = userEvent.setup();
   render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
-  await screen.findByText('Implement the command centre');
+  await screen.findByRole('group', { name: 'Select Implement the command centre' });
   const collapse = screen.getAllByRole('button', { name: /^Collapse all/ });
   await user.click(collapse[1]);
   await user.click(collapse[2]);
-  expect(screen.queryByRole('group', { name: 'Select Reconcile a paused worker' })).toBeNull();
+  await waitFor(() =>
+    expect(screen.queryByRole('group', { name: 'Select Reconcile a paused worker' })).toBeNull()
+  );
   await user.click(
     screen.getByRole('button', { name: 'Highlight 2 items needing human attention' })
   );

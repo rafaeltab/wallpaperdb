@@ -18,6 +18,7 @@ export default defineBaseConfig({
         test: {
           name: 'factory-frontend-dom',
           environment: 'jsdom',
+          setupFiles: ['frontend/test/dependency-link-worker.setup.ts'],
           include: ['frontend/test/**/*.dom.test.tsx'],
         },
       },

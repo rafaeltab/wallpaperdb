@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bench:item-dependency-links": "tsx frontend/scripts/benchmark-item-dependency-links.ts",
+    "bench:project-canvas": "tsx frontend/scripts/benchmark-project-canvas.ts",
     "build": "vite build --config frontend/vite.config.ts && node --experimental-strip-types esbuild.config.ts",
     "start": "node --env-file=.env dist/main.js",
     "format": "biome format --write .",
@@ -19,7 +21,7 @@
     "format:files": "biome format --write",
     "dev": "node --env-file=.env --import tsx src/main.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "test:browser:install": "playwright install --with-deps chromium",
+    "test:browser:install": "playwright install --with-deps chromium firefox",
     "service:install": "node scripts/install.ts",
     "service:activate": "node scripts/activate.ts",
     "db:generate": "drizzle-kit generate",

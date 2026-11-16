@@ -15,37 +15,12 @@ function layout(board: FactoryV2Snapshot, collapsed: Set<string>) {
   });
 }
 import { routeCanvas } from '../src/canvas/routing';
-function routeLayout(graph: ReturnType<typeof canvasLayout>) {
-  return routeCanvas(
-    [
-      ...graph.boxes,
-      ...graph.headerNodes,
-      ...graph.aggregateNodes,
-      ...graph.groups
-        .filter((g) => !g.parent)
-        .map((g, i) => ({
-          id: -4_000_000 - i,
-          x: g.x,
-          y: g.y,
-          width: g.collapsed ? g.headingWidth : g.width,
-          height: g.head,
-        })),
-      ...graph.panels.map((p, i) => ({ id: -500 - i, x: p.x, y: p.y, width: p.width, height: 32 })),
-      ...graph.areas.map((a, i) => ({ id: -100 - i, x: 20, y: a.y - 10, width: 310, height: 20 })),
-      ...[...graph.groups, ...graph.panels].flatMap((g, i) =>
-        [
-          [g.x, g.y],
-          [g.x + g.width, g.y],
-          [g.x, g.y + g.height],
-          [g.x + g.width, g.y + g.height],
-        ].map(([x, y], j) => ({ id: -1000 - i * 4 - j, x, y, width: 0, height: 0 }))
-      ),
-    ],
-    graph.routingConnections,
-    graph.width,
-    graph.height
-  );
-}
+import {
+  computeItemDependencyLinks,
+  createItemDependencyLinkInput,
+} from '../src/canvas/item-dependency-links';
+const routeLayout = (graph: ReturnType<typeof canvasLayout>) =>
+  computeItemDependencyLinks(createItemDependencyLinkInput(graph));
 async function sample() {
   const app = fakeV2Server({ epoch: 'layout' });
   try {

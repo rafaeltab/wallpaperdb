@@ -1,4 +1,4 @@
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
@@ -42,6 +42,7 @@ function mount(value: FactoryV2Snapshot) {
 }
 it('keeps wrapped sibling prerequisite connections continuous and clear of cards and parent headers', async () => {
   const { container } = mount(await board());
+  await waitFor(() => expect(container.querySelector('[data-edge]')).toBeTruthy());
   const cards = [...container.querySelectorAll<HTMLElement>('.cc-item')];
   const source = cards.find((el) => el.getAttribute('aria-label') === 'Select Issue 250');
   const target = cards.find((el) => el.getAttribute('aria-label') === 'Select Issue 461');

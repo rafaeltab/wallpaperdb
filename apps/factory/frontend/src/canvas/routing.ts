@@ -24,6 +24,22 @@ const colors = [
   '#c9a0cc',
   '#c0b293',
 ];
+const directions = [
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 1],
+  [0, -1, 1],
+];
+function lowerBound(values: number[], value: number) {
+  let low = 0,
+    high = values.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (values[middle] < value) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
 class Queue {
   entries: { key: number; score: number }[] = [];
   push(key: number, score: number) {
@@ -90,10 +106,23 @@ function rounded(points: Point[]) {
 export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height: number) {
   const nodeById = new Map<number, Rect>();
   for (const node of nodes) if (!nodeById.has(node.id)) nodeById.set(node.id, node);
-  const physicalKey = (id: number) => {
-    const n = nodeById.get(id);
-    return n ? `${n.x}:${n.y}:${n.width}:${n.height}` : undefined;
-  };
+  const physicalKeys = new Map(
+    [...nodeById].map(([id, node]) => [id, `${node.x}:${node.y}:${node.width}:${node.height}`])
+  );
+  const outgoingByPosition = new Map<string, Edge[]>(),
+    incomingByPosition = new Map<string, Edge[]>();
+  for (const edge of edges) {
+    for (const [id, positions] of [
+      [edge.source, outgoingByPosition],
+      [edge.target, incomingByPosition],
+    ] as const) {
+      const key = physicalKeys.get(id);
+      if (key === undefined) continue;
+      const group = positions.get(key);
+      if (group) group.push(edge);
+      else positions.set(key, [edge]);
+    }
+  }
   const occupiedLines = new Map<string, { min: number; max: number }[]>();
   const overlap = (a: Point, b: Point) => {
     const horizontal = a.y === b.y,
@@ -120,8 +149,8 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
       b = nodeById.get(edge.target);
     if (!a || !b) return undefined;
     // A collapsed header can represent both a parent and its hidden children.
-    const outgoing = edges.filter((e) => physicalKey(e.source) === physicalKey(a.id)),
-      incoming = edges.filter((e) => physicalKey(e.target) === physicalKey(b.id)),
+    const outgoing = outgoingByPosition.get(physicalKeys.get(a.id) ?? '') ?? [],
+      incoming = incomingByPosition.get(physicalKeys.get(b.id) ?? '') ?? [],
       left = !a.stacked && b.x + b.width / 2 <= a.x + a.width / 2;
     const from = {
       x: left ? a.x : a.x + a.width,
@@ -229,24 +258,16 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
         cell = (x: number, y: number) => y * cols + x;
       const blocked = new Uint8Array(cols * rows);
       for (const n of obstacles)
-        for (let y = 0; y < rows; y++) {
-          if (ys[y] < n.y || ys[y] > n.bottom) continue;
-          for (let x = 0; x < cols; x++)
-            if (xs[x] >= n.x && xs[x] <= n.right) blocked[cell(x, y)] = 1;
+        for (let y = lowerBound(ys, n.y); y < rows && ys[y] <= n.bottom; y++) {
+          const first = lowerBound(xs, n.x),
+            last = lowerBound(xs, n.right);
+          // The original obstacle test includes both boundaries.
+          const until = last < cols && xs[last] === n.right ? last + 1 : last;
+          blocked.fill(1, cell(first, y), cell(until, y));
         }
       // Prefer breathing room along parallel runs, without penalizing crossings or short port fans.
       const horizontalCrowding = new Float64Array(cols * rows),
         verticalCrowding = new Float64Array(cols * rows);
-      const lowerBound = (values: number[], value: number) => {
-        let low = 0,
-          high = values.length;
-        while (low < high) {
-          const middle = (low + high) >> 1;
-          if (values[middle] < value) low = middle + 1;
-          else high = middle;
-        }
-        return low;
-      };
       for (const [key, ranges] of occupiedLines) {
         const horizontal = key.startsWith('h:'),
           axis = Number(key.slice(2));
@@ -287,6 +308,10 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
         encode = (x: number, y: number, d: number) => cell(x, y) * 3 + d;
       const costs = new Float64Array(cols * rows * 3).fill(Infinity),
         previous = new Int32Array(costs.length).fill(-1),
+        // Occupied runs stay fixed throughout this search. Each undirected grid
+        // segment can be checked once instead of once per direction state.
+        horizontalOverlap = new Uint8Array(cols * rows),
+        verticalOverlap = new Uint8Array(cols * rows),
         queue = new Queue(),
         initial = encode(sx, sy, 2);
       costs[initial] = 0;
@@ -308,18 +333,16 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           final = current.key;
           break;
         }
-        for (const [dx, dy, d] of [
-          [1, 0, 0],
-          [-1, 0, 0],
-          [0, 1, 1],
-          [0, -1, 1],
-        ]) {
+        for (const [dx, dy, d] of directions) {
           const nx = x + dx,
             ny = y + dy;
           if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || blocked[cell(nx, ny)]) continue;
           const p = { x: xs[x], y: ys[y] },
             q = { x: xs[nx], y: ys[ny] };
-          if (overlap(p, q) > 1e-6) continue;
+          const overlapCache = d === 0 ? horizontalOverlap : verticalOverlap,
+            segment = d === 0 ? cell(Math.min(x, nx), y) : cell(x, Math.min(y, ny));
+          if (!overlapCache[segment]) overlapCache[segment] = overlap(p, q) > 1e-6 ? 2 : 1;
+          if (overlapCache[segment] === 2) continue;
           const next = encode(nx, ny, d),
             cost =
               costs[current.key] +

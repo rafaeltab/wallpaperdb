@@ -29,6 +29,7 @@ export const JobLive = Layer.effect(
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const generation = reporting ? yield* reporting.begin() : 0;
+        let observedOwnership: { threadId: string; prUrl?: string } | undefined;
         const reportingExecution: Execution = {
           ...execution,
           sendStage: (active, request) =>
@@ -58,6 +59,8 @@ export const JobLive = Layer.effect(
           const owningStage =
             latestStage && latestStage.index >= (before.restart?.index ?? 0) ? latestStage : null;
           const observation = yield* execution.observe(activeIntent, owningStage ?? undefined);
+          const owner = observation.kind === 'found' ? observation.threadId : owningStage?.threadId;
+          if (owner) observedOwnership = { threadId: owner };
           // Execution is an observed fact even if subsequent receipt validation fails.
           // Publish it before any external validation or continuation can fail.
           if (reporting) {
@@ -73,19 +76,24 @@ export const JobLive = Layer.effect(
                 : undefined,
             });
           }
+          const cancelled = (yield* store.readControl()).cancelled;
+          if (cancelled && observation.kind === 'found')
+            yield* execution.interrupt(activeIntent, observation.threadId);
           // Backfill existing publications from the issue adapter, including failed CI.
           // This association is ownership evidence and does not assert readiness.
           let observedPublication: string | undefined;
           if (
+            !cancelled &&
             owningStage &&
             ['publication', 'babysitting', 'ci'].includes(owningStage.stage) &&
             !(yield* store.readControl()).ownership?.prUrl
           ) {
             const publication = yield* issues.pullRequest(activeIntent);
-            if (publication.kind === 'found') observedPublication = publication.url;
+            if (publication.kind === 'found') {
+              observedPublication = publication.url;
+              if (observedOwnership) observedOwnership.prUrl = publication.url;
+            }
           }
-          if ((yield* store.readControl()).cancelled && observation.kind === 'found')
-            yield* execution.interrupt(activeIntent, observation.threadId);
           let delivery: Delivery | undefined = yield* reconcileStages(
             store,
             reportingExecution,
@@ -98,7 +106,6 @@ export const JobLive = Layer.effect(
             policy?.limit ?? defaultAgentReconciliationLimit
           );
           yield* retainPrerequisite(store, delivery);
-          const owner = observation.kind === 'found' ? observation.threadId : owningStage?.threadId;
           // Verified handback retains its exact revision until admission release.
           if (owner && delivery?.activity !== 'dependency-handback')
             yield* retainOwnership(
@@ -174,8 +181,18 @@ export const JobLive = Layer.effect(
           if (reporting) yield* reporting.observed(generation, status);
           return status;
         }).pipe(
-          Effect.tapError(
-            (error) => reporting?.failed(generation, intent, error.operation) ?? Effect.void
+          Effect.tapError((error) =>
+            Effect.gen(function* () {
+              // Reconciliation has stopped, so retaining ownership cannot revoke
+              // a still-running handback decision's control revision.
+              if (observedOwnership)
+                yield* retainOwnership(
+                  store,
+                  observedOwnership.threadId,
+                  observedOwnership.prUrl
+                ).pipe(Effect.catch(Effect.logError));
+              if (reporting) yield* reporting.failed(generation, intent, error.operation);
+            })
           )
         );
       }).pipe(Effect.withSpan('factory.job.observe'));

@@ -37,7 +37,9 @@ export async function completionFixture(
   let handbackVerified = false;
   let lost = false;
   let inspectFailed = false;
+  let publicationUnavailable = false;
   const sends: StageRequest[] = [];
+  const interrupts: string[] = [];
   const runtime = ManagedRuntime.make(
     JobLive.pipe(
       Layer.provide(
@@ -64,18 +66,25 @@ export async function completionFixture(
                 url: 'https://github.com/rafaeltab/wallpaperdb/issues/757',
               }),
             pullRequest: () =>
-              Effect.succeed({
-                kind: 'found' as const,
-                url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
-                commit: prCommit,
-                ready,
-                landed: false,
-                ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
-              }),
+              publicationUnavailable
+                ? Effect.fail(
+                    new Unavailable({ operation: 'observe-publication', cause: 'outage' })
+                  )
+                : Effect.succeed({
+                    kind: 'found' as const,
+                    url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+                    commit: prCommit,
+                    ready,
+                    landed: false,
+                    ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
+                  }),
           }),
           Layer.succeed(Execution, {
             launch: () => Effect.succeed({ kind: 'submitted' as const }),
-            interrupt: () => Effect.void,
+            interrupt: (_intent, threadId) =>
+              Effect.sync(() => {
+                interrupts.push(threadId);
+              }),
             observe: (intent) =>
               Effect.succeed({
                 kind: 'found' as const,
@@ -135,6 +144,7 @@ export async function completionFixture(
   return {
     store,
     sends,
+    interrupts,
     status: () => call((job) => job.status()),
     close: () => runtime.dispose(),
     resume: (command: import('../../src/capabilities/job/index.js').Resume) =>
@@ -154,6 +164,7 @@ export async function completionFixture(
       clean?: boolean;
       lost?: boolean;
       inspectFailed?: boolean;
+      publicationUnavailable?: boolean;
       run?: number;
       observationStatus?: string;
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
@@ -174,6 +185,7 @@ export async function completionFixture(
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;
       inspectFailed = change.inspectFailed ?? inspectFailed;
+      publicationUnavailable = change.publicationUnavailable ?? publicationUnavailable;
       run = change.run ?? run;
       observationStatus = change.observationStatus ?? observationStatus;
     },

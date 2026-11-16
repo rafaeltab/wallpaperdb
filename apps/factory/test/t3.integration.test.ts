@@ -85,6 +85,25 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
         })
       )
     ).toMatchObject({ kind: 'unverified', threadId: 'thread-live', status: 'completed' });
+    await host.save({
+      overrides: { worktreePath: `${host.directory}/missing-checkout`, status: 'completed' },
+    });
+    expect(
+      await Effect.runPromise(
+        adapter.observe(intent, {
+          index: 0,
+          stage: 'implementation',
+          threadId: 'thread-live',
+          commit: intent.base,
+          previousRunId: null,
+        })
+      )
+    ).toEqual({
+      kind: 'unverified',
+      threadId: 'thread-live',
+      status: 'completed',
+      run: { id: 'run-1', ordinal: 1 },
+    });
     for (const overrides of [{ threadId: 'another-worker' }, { projectId: 'wrong' }]) {
       await host.save({ overrides });
       expect(

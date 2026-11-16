@@ -3,6 +3,57 @@ import { expect, it } from 'vitest';
 import { completionFixture as fixture } from './fixtures/completion.js';
 import { controlledStore } from './fixtures/store.js';
 
+it.each([false, true])(
+  'cancels during publication outage with retained PR %s',
+  async (retained) => {
+    const f = await fixture();
+    try {
+      for (let stage = 0; stage < 2; stage++) {
+        f.state({ accepted: true, idle: true });
+        await f.status();
+      }
+      const control = await Effect.runPromise(f.store.readControl());
+      expect(control.ownership).not.toHaveProperty('prUrl', expect.anything());
+      if (retained)
+        await Effect.runPromise(
+          f.store.saveControl({
+            ...control,
+            revision: control.revision + 1,
+            ownership: {
+              threadId: 'owner',
+              prUrl: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+            },
+          })
+        );
+      const intent = await Effect.runPromise(f.store.read());
+      if (!intent) throw new Error('Missing job');
+      f.state({ publicationUnavailable: true });
+      expect(await f.cancel(intent.id)).toMatchObject({ delivery: { activity: 'cancelled' } });
+      expect(f.interrupts).toEqual(['owner']);
+      expect(await Effect.runPromise(f.store.readControl())).toMatchObject({ cancelled: true });
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it('retains discovered publication ownership when receipt inspection fails', async () => {
+  const f = await fixture();
+  try {
+    for (let stage = 0; stage < 2; stage++) {
+      f.state({ accepted: true, idle: true });
+      await f.status();
+    }
+    f.state({ inspectFailed: true, idle: true });
+    await expect(f.status()).rejects.toMatchObject({ operation: 'inspect-stage' });
+    expect(await Effect.runPromise(f.store.readControl())).toMatchObject({
+      ownership: { threadId: 'owner', prUrl: 'https://github.com/rafaeltab/wallpaperdb/pull/999' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+
 it('publishes observed terminal execution before receipt inspection fails', async () => {
   const observations: import('../src/capabilities/job/index.js').Status[] = [];
   const f = await fixture(3, controlledStore(), undefined, {

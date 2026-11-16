@@ -27,7 +27,10 @@ it.each(goldens)(
   'preserves exact Project canvas dependency-link geometry for $name',
   ({ input, links }) => {
     expect(computeItemDependencyLinks(input)).toEqual(links);
-  }
+  },
+  // Coverage instrumentation makes the 300-item correctness fixtures exceed the
+  // default five seconds. Performance comparisons live in the benchmark command.
+  30000
 );
 
 it('assembles the same compact geometry for production, tests and the worker', () => {

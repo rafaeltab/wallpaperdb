@@ -430,32 +430,45 @@ it('refreshes Start authorization after controls change while preserving the con
       },
     });
   });
-  const user = userEvent.setup();
+  // Advance receipt and search clocks explicitly through the React workflow interface.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  const click = async (element: HTMLElement) => {
+    await act(async () => {
+      fireEvent.click(element);
+    });
+  };
   try {
-    render(<FactoryApp client={client} />);
-    await user.click(
-      await screen.findByRole('group', { name: 'Select Add a searchable issue list' })
-    );
-    await user.click(screen.getByRole('button', { name: 'Start issue' }));
-    await user.click(
-      await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
-    );
-    await user.type(screen.getByLabelText('Execution context'), 'Keep this reviewed scope');
-    await user.click(screen.getByRole('button', { name: 'Ⅱ Pause' }));
-    const resume = await screen.findByRole<HTMLButtonElement>('button', { name: '▶ Resume' });
-    await vi.waitFor(() => expect(resume.disabled).toBe(false), { timeout: 5000, interval: 20 });
-    await user.click(resume);
-    const pause = await screen.findByRole<HTMLButtonElement>('button', { name: 'Ⅱ Pause' });
-    await vi.waitFor(() => expect(pause.disabled).toBe(false), { timeout: 5000, interval: 20 });
+    await act(async () => {
+      render(<FactoryApp client={client} />);
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    await click(screen.getByRole('group', { name: 'Select Add a searchable issue list' }));
+    await click(screen.getByRole('button', { name: 'Start issue' }));
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await click(screen.getByRole('button', { name: '#1001 Add a searchable issue list' }));
+    fireEvent.change(screen.getByLabelText('Execution context'), {
+      target: { value: 'Keep this reviewed scope' },
+    });
+    await click(screen.getByRole('button', { name: 'Ⅱ Pause' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    const resume = screen.getByRole<HTMLButtonElement>('button', { name: '▶ Resume' });
+    expect(resume.disabled).toBe(false);
+    await click(resume);
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    const pause = screen.getByRole<HTMLButtonElement>('button', { name: 'Ⅱ Pause' });
+    expect(pause.disabled).toBe(false);
     expect(screen.getByLabelText<HTMLTextAreaElement>('Execution context').value).toBe(
       'Keep this reviewed scope'
     );
     expect(screen.queryByRole('button', { name: 'Start selected issue' })).toBeNull();
-    await user.click(
-      await screen.findByRole('button', { name: '#1001 Add a searchable issue list' })
-    );
-    await user.click(screen.getByRole('button', { name: 'Start selected issue' }));
-    await screen.findByText('Command succeeded', {}, { timeout: 5000 });
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await click(screen.getByRole('button', { name: '#1001 Add a searchable issue list' }));
+    await click(screen.getByRole('button', { name: 'Start selected issue' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText('Command succeeded')).toBeTruthy();
     expect(startStatuses).toEqual([202]);
     expect(commands.filter((command) => command.kind === 'start')).toEqual([
       expect.objectContaining({ payload: { context: 'Keep this reviewed scope' } }),
@@ -781,7 +794,7 @@ it('retains supported browser links when native T3 links are unavailable', async
     client = new FactoryClient(async () => json(board));
   const user = userEvent.setup();
   render(<FactoryApp client={client} />);
-  await screen.findByText('Implement the command centre');
+  await screen.findByRole('group', { name: 'Select Implement the command centre' });
   const initial = screen.getAllByRole('link', { name: /T3 ·/ }).map((a) => a.getAttribute('href'));
   await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   await user.selectOptions(screen.getByLabelText('T3 link destination'), 'native');
@@ -1421,7 +1434,8 @@ it.each([
       expect(toggle.getAttribute('aria-describedby')).toBeNull();
       return;
     }
-    const status = screen.getByRole('status');
+    const status = screen.getByText('Attention count may be outdated').closest('[role="status"]');
+    if (!status) throw new Error('Expected the attention qualification status');
     expect(status.textContent).toContain('Attention count may be outdated');
     expect(status.textContent).toContain(kind);
     expect(toggle.textContent).toContain(observed ? 'as of' : 'source unavailable');
@@ -1462,7 +1476,8 @@ it('dates attention by the oldest affected observation rather than publication o
   };
   render(<FactoryApp client={new FactoryClient(async () => json(board))} />);
   await screen.findByText('Implement the command centre');
-  const status = screen.getByRole('status');
+  const status = screen.getByText('Attention count may be outdated').closest('[role="status"]');
+  if (!status) throw new Error('Expected the attention qualification status');
   expect(status.textContent).toContain('github');
   expect(status.querySelector('time')?.getAttribute('datetime')).toBe('2026-11-10T11:58:00.000Z');
 });

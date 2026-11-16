@@ -5,15 +5,24 @@ import { fakeV2Server, type FactoryV2Snapshot } from '../../src/http/index.js';
 
 it('publishes Project canvas geometry and item dependency links together after rapid interactions', async () => {
   const fake = fakeV2Server({ epoch: 'generation-browser' });
-  const board = (await fake.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+  const seed = (await fake.inject('/api/v2/board')).json<FactoryV2Snapshot>();
   await fake.close();
-  const blocker = board.entities.relationships['relationship:blocker'];
+  const blocker = seed.entities.relationships['relationship:blocker'];
   if (blocker.kind !== 'prerequisite') throw new Error('Expected a prerequisite relationship');
-  board.entities.relationships['relationship:unrelated'] = {
-    ...blocker,
-    id: 'relationship:unrelated',
-    prerequisiteIssueId: 'issue:1001',
-    dependantIssueId: 'issue:1005',
+  const board: FactoryV2Snapshot = {
+    ...seed,
+    entities: {
+      ...seed.entities,
+      relationships: {
+        ...seed.entities.relationships,
+        'relationship:unrelated': {
+          ...blocker,
+          id: 'relationship:unrelated',
+          prerequisiteIssueId: 'issue:1001',
+          dependantIssueId: 'issue:1005',
+        },
+      },
+    },
   };
   let served = board;
   const vite = await createServer({ configFile: 'frontend/vite.config.ts', server: { port: 0 } });

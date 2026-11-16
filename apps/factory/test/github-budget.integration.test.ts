@@ -25,6 +25,81 @@ async function withGithub(
   }
 }
 
+it.each([false, true])(
+  'keeps queued mutations serialized and cancellable: cancel=%s',
+  async (cancel) =>
+    withGithub(async (host, stop) => {
+      const caller = new AbortController();
+      await host.nodeCommand(
+        'gh',
+        `
+      const fs = require('node:fs'); const directory = ${JSON.stringify(host.directory)};
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: Object.fromEntries(['core','graphql'].map(resource => [resource,{
+          limit:7200,remaining:7200,reset:Math.ceil(Date.now()/1000)+3600
+        }])) }));
+      } else if (process.argv[2] === 'issue') {
+        console.log('{}');
+      } else {
+        const id = process.argv[4];
+        fs.writeFileSync(directory + '/started-' + id, 'ready');
+        const timer = setInterval(() => {
+          if (!fs.existsSync(directory + '/release-' + id)) return;
+          clearInterval(timer); console.log('{}');
+        }, 10);
+      }
+    `
+      );
+      const requests = githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+      });
+      const first = requests(['pr', 'edit', '1', '--body', 'Controlled mutation']);
+      void first.catch(() => undefined);
+      let second: Promise<unknown> | undefined;
+      try {
+        await vi.waitFor(async () =>
+          expect(await readFile(host.directory + '/started-1', 'utf8')).toBe('ready')
+        );
+        let settled = false;
+        second = requests(
+          ['pr', 'edit', '2', '--body', 'Controlled mutation'],
+          caller.signal
+        ).finally(() => {
+          settled = true;
+        });
+        void second.catch(() => undefined);
+        expect(await requests(['issue', 'view', '581', '--json', 'number'])).toEqual({});
+        await expect(readFile(host.directory + '/started-2')).rejects.toMatchObject({
+          code: 'ENOENT',
+        });
+        if (cancel) {
+          caller.abort();
+          await vi.waitFor(() => expect(settled).toBe(true), { timeout: 300, interval: 10 });
+          await expect(second).rejects.toBeDefined();
+          await expect(readFile(host.directory + '/started-2')).rejects.toMatchObject({
+            code: 'ENOENT',
+          });
+        }
+        await writeFile(host.directory + '/release-1', 'release');
+        await first;
+        if (!cancel) {
+          await vi.waitFor(
+            async () => expect(await readFile(host.directory + '/started-2', 'utf8')).toBe('ready'),
+            { timeout: 3000, interval: 20 }
+          );
+          await writeFile(host.directory + '/release-2', 'release');
+          expect(await second).toEqual({});
+        }
+      } finally {
+        stop.abort();
+        await Promise.allSettled([first, second]);
+        await requests.drain();
+      }
+    })
+);
+
 it('runs bounded parallel reads within a cycle and retains its next-cycle budget across reopen', async () =>
   withGithub(async (host, stop) => {
     const startedAt = Date.UTC(2026, 10, 16, 12);

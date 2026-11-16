@@ -41,7 +41,7 @@ export function githubRequests(config: {
   const running = new Set<Promise<void>>();
   let backgroundActive = 0;
   let bootstrap: Promise<void> | undefined;
-  let mutations = Promise.resolve();
+  let mutationActive = false;
   const mutating = (args: readonly string[]) =>
     args[0] === 'api'
       ? args.some((a) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(a))
@@ -187,25 +187,29 @@ export function githubRequests(config: {
   };
   const pump = () => {
     while (running.size < 4) {
-      const work = queue.findIndex((entry) => entry.priority === 'work');
-      if (work < 0 && backgroundActive >= 2) return;
-      const [entry] = queue.splice(work < 0 ? 0 : work, 1);
+      const eligible = (entry: Entry) => !mutationActive || !mutating(entry.args);
+      const work = queue.findIndex((entry) => entry.priority === 'work' && eligible(entry));
+      const index =
+        work >= 0
+          ? work
+          : backgroundActive < 2
+            ? queue.findIndex((entry) => entry.priority === 'background' && eligible(entry))
+            : -1;
+      if (index < 0) return;
+      const [entry] = queue.splice(index, 1);
       if (!entry) return;
       entry.signal.removeEventListener('abort', entry.abort);
       if (entry.priority === 'background') backgroundActive++;
-      const operation = mutating(entry.args)
-        ? mutations.then(() => execute(entry))
-        : execute(entry);
-      if (mutating(entry.args))
-        mutations = operation.then(
-          () => undefined,
-          () => undefined
-        );
-      const pending = operation.then(entry.resolve, entry.reject).finally(() => {
-        running.delete(pending);
-        if (entry.priority === 'background') backgroundActive--;
-        pump();
-      });
+      const mutation = mutating(entry.args);
+      if (mutation) mutationActive = true;
+      const pending = execute(entry)
+        .then(entry.resolve, entry.reject)
+        .finally(() => {
+          running.delete(pending);
+          if (mutation) mutationActive = false;
+          if (entry.priority === 'background') backgroundActive--;
+          pump();
+        });
       running.add(pending);
     }
   };

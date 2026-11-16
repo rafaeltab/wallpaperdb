@@ -202,6 +202,9 @@ try {
   const variants = [await prepareVariant('current', source)];
   if (compareSource) variants.push(await prepareVariant('reference', resolve(compareSource)));
   type Sample = {
+    itemsReadyMs: number;
+    firstLinkMs: number;
+    linkPublications: { durationMs: number; count: number }[];
     durationMs: number;
     workerDurationsMs: number[];
     maxFrameMs: number;
@@ -253,15 +256,39 @@ try {
         const observer = typeof PerformanceObserver === 'function' && PerformanceObserver.supportedEntryTypes.includes('longtask') ? new PerformanceObserver(list => tasks.push(...list.getEntries().map(entry=>entry.duration))) : null;
         observer?.observe({type:'longtask'});
         const snapshot = ${snapshotSource};
+        const expectedScene = JSON.parse(expected);
+        const { links: expectedLinks, ...expectedItems } = expectedScene;
+        const expectedItemsText = JSON.stringify(expectedItems);
+        const expectedLinkText = new Map(expectedLinks.map(link => [link.key, JSON.stringify(link)]));
+        let itemsReadyMs, firstLinkMs, itemsScheduled = false, linkScheduled = false;
+        const linkPublications = []; let lastLinkCount = 0;
         function tick() {
           const now = performance.now(); frames.push(now-last); last=now;
           if (now-start > 15000) { observer?.disconnect(); reject(new Error('Expansion readiness deadline exceeded')); return; }
-          const ready = document.querySelector('.cc-viewport')?.getAttribute('aria-busy') === 'false' && document.querySelectorAll('.cc-item').length === 100;
-          if (ready && JSON.stringify(snapshot()) === expected) {
+          const actual = snapshot();
+          const { links: actualLinks, ...actualItems } = actual ?? { links: [] };
+          const world = document.querySelector('.cc-world');
+          const itemsReady = world && getComputedStyle(world).visibility !== 'hidden' && JSON.stringify(actualItems) === expectedItemsText;
+          if (itemsReady && !itemsScheduled) {
+            itemsScheduled = true;
+            requestAnimationFrame(() => { itemsReadyMs = performance.now()-start; });
+          }
+          const currentLinkCount = itemsReady ? actualLinks.filter(link => expectedLinkText.get(link.key) === JSON.stringify(link)).length : 0;
+          if (currentLinkCount !== lastLinkCount) {
+            lastLinkCount = currentLinkCount;
+            linkPublications.push({ durationMs: now-start, count: currentLinkCount });
+          }
+          if (currentLinkCount > 0 && !linkScheduled) {
+            linkScheduled = true;
+            requestAnimationFrame(() => { firstLinkMs = performance.now()-start; });
+          }
+          const ready = document.querySelector('.cc-viewport')?.getAttribute('aria-busy') === 'false' && itemsReady;
+          if (ready && JSON.stringify(actual) === expected) {
             requestAnimationFrame(() => {
               const end=performance.now(); frames.push(end-last);
               tasks.push(...(observer?.takeRecords().map(entry=>entry.duration) ?? [])); observer?.disconnect();
-              resolve({ durationMs: end-start, workerDurationsMs: window.__expansionWorkers.slice(workerStart).map(worker=>worker.duration), maxFrameMs: Math.max(...frames), longTasksMs: observer ? tasks : null });
+              if (itemsReadyMs === undefined || firstLinkMs === undefined) { reject(new Error('Expansion completed without observable item/link milestones')); return; }
+              resolve({ itemsReadyMs, firstLinkMs, linkPublications, durationMs: end-start, workerDurationsMs: window.__expansionWorkers.slice(workerStart).map(worker=>worker.duration), maxFrameMs: Math.max(...frames), longTasksMs: observer ? tasks : null });
             });
           } else requestAnimationFrame(tick);
         }
@@ -291,6 +318,8 @@ try {
             budgetMs: budget,
             viewport: { width: 1600, height: 1000 },
             expectation: 'Pinned predecessor routing and geometry, no real backend',
+            milestones:
+              'Exact visible item geometry, first matching current link (retained links count), complete exact scene; each timing includes a following animation-frame boundary',
             fixtureSha256,
             recording: !!demoDirectory,
             timingWarning: demoDirectory
@@ -424,31 +453,33 @@ try {
   for (const browser of ['chromium', 'firefox'])
     for (const { variant } of variants)
       for (const scenario of scenarios)
-        for (const phase of ['uncached', 'repeat'] as const) {
-          const samples = results
-            .filter(
-              (value) =>
-                value.variant === variant &&
-                value.browser === browser &&
-                value.scenario === scenario.name
-            )
-            .map((value) => value[phase].durationMs)
-            .sort((a, b) => a - b);
-          console.log(
-            JSON.stringify({
-              event: 'summary',
-              variant,
-              browser,
-              scenario: scenario.name,
-              phase,
-              samplesMs: samples,
-              minMs: samples[0],
-              medianMs: samples[Math.floor(samples.length / 2)],
-              maxMs: samples.at(-1),
-              budgetMs: budget,
-            })
-          );
-        }
+        for (const phase of ['uncached', 'repeat'] as const)
+          for (const metric of ['itemsReadyMs', 'firstLinkMs', 'durationMs'] as const) {
+            const samples = results
+              .filter(
+                (value) =>
+                  value.variant === variant &&
+                  value.browser === browser &&
+                  value.scenario === scenario.name
+              )
+              .map((value) => value[phase][metric])
+              .sort((a, b) => a - b);
+            console.log(
+              JSON.stringify({
+                event: metric === 'durationMs' ? 'summary' : 'milestone-summary',
+                variant,
+                browser,
+                scenario: scenario.name,
+                phase,
+                metric,
+                samplesMs: samples,
+                minMs: samples[0],
+                medianMs: samples[Math.floor(samples.length / 2)],
+                maxMs: samples.at(-1),
+                budgetMs: metric === 'durationMs' ? budget : undefined,
+              })
+            );
+          }
   if (failures.length) {
     console.error(
       `Expansion budget exceeded in ${failures.length} samples:\n${failures.join('\n')}`

@@ -71,7 +71,7 @@ it('shows a semantic proposal without dispatch', async () => {
 });
 
 it.each([false, true])(
-  'reuses cycle discovery but still independently rejects changed inputs=%s',
+  'uses supplied cycle discovery without recollecting changed inputs=%s',
   async (changed) => {
     const input: PlanningInput = {
       issues: [issue],
@@ -105,9 +105,9 @@ it.each([false, true])(
           plan.preview({ input, automatic: true, progress: () => Effect.void })
         )
       );
-      expect(reads).toBe(1);
-      expect(result.kind).toBe(changed ? 'stale' : 'preview');
-      expect(result.selected).toEqual(changed ? [] : proposal.selected);
+      expect(reads).toBe(0);
+      expect(result.kind).toBe('preview');
+      expect(result.selected).toEqual(proposal.selected);
     } finally {
       await runtime.dispose();
     }
@@ -209,7 +209,7 @@ it.each([
 ])('retains semantic uncertainty %#', async (item) => {
   expect((await preview([issue], { selected: [item], deferred: [] })).selected).toEqual([]);
 });
-it('rejects duplicate and stale proposals', async () => {
+it('rejects duplicate proposals', async () => {
   expect(
     (
       await preview([issue], {
@@ -218,7 +218,13 @@ it('rejects duplicate and stale proposals', async () => {
       })
     ).selected
   ).toEqual([]);
-  expect(await preview([issue], proposal, true)).toMatchObject({ kind: 'stale', selected: [] });
+});
+
+it('collects once for an advisory preview even when later inputs would differ', async () => {
+  expect(await preview([issue], proposal, true)).toMatchObject({
+    kind: 'preview',
+    selected: proposal.selected,
+  });
 });
 
 it('keeps inferred API blockers and unselected work visible', async () => {

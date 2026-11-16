@@ -50,9 +50,9 @@ it('processes a retained selection even when its input matches an older deferred
     await writeFile(original, await readFile(`${host.directory}/commands/gh.mjs`, 'utf8'));
     const phaseFile = `${host.directory}/priority-phase`;
     // Project choices can change independently of issue.updatedAt. The next
-    // model receives the poll's P0 input. Its independent freshness read sees
-    // P2 and requires another model. That retained P2 selection then matches
-    // the older deferred input without authorizing a fourth model.
+    // model receives the poll's P0 input. The batch must survive the failed
+    // acceptance write without recollecting the restored P2 input or asking
+    // another model to replace this completed proposal.
     await host.nodeCommand(
       'gh',
       `
@@ -137,7 +137,7 @@ it('processes a retained selection even when its input matches an older deferred
         ).toBe(true),
       { timeout: 6000, interval: 20 }
     );
-    expect((await starts()).filter((call) => !call.args.includes('--worktree'))).toHaveLength(3);
+    expect((await starts()).filter((call) => !call.args.includes('--worktree'))).toHaveLength(2);
     database.exec('DROP TRIGGER reject_retained_success');
     await vi.waitFor(async () => expect((await board()).meta.factory.admission.consumed).toBe(1), {
       timeout: 10000,
@@ -148,7 +148,7 @@ it('processes a retained selection even when its input matches an older deferred
         expect((await starts()).filter((call) => call.args.includes('--worktree'))).toHaveLength(1),
       { timeout: 6000, interval: 20 }
     );
-    expect((await starts()).filter((call) => !call.args.includes('--worktree'))).toHaveLength(3);
+    expect((await starts()).filter((call) => !call.args.includes('--worktree'))).toHaveLength(2);
   } finally {
     database?.close();
     await running?.close();

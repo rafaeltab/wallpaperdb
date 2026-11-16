@@ -288,14 +288,12 @@ export const SchedulerLive = Layer.effect(
           let snapshot = yield* status();
           if (snapshot.state.paused || snapshot.state.cycle?.requestId !== cycle.requestId) return;
           if (snapshot.state.admissions.some((item) => item.issue === selection.issue)) continue;
-          const input = yield* source.read();
           if (
-            requirementsIdentity(input, cycle.selected ?? []) !== cycle.scope ||
             snapshot.state.concurrency !== cycle.concurrency ||
             snapshot.state.allowance !== cycle.allowance
           ) {
             yield* Effect.logWarning(
-              'Accepted selection invalidated by external requirements or controls; gather and replan',
+              'Accepted selection invalidated by controls; gather and replan',
               { requestId: cycle.requestId, issue: selection.issue }
             );
             yield* replan(snapshot.state);
@@ -353,16 +351,8 @@ export const SchedulerLive = Layer.effect(
           }
           // Preparation can remain in an explicit recovery/verification state. The durable batch owns the retry.
           if (!dispatchable(inspected, snapshot.jobs)) return;
-          const fresh = yield* source.read();
           snapshot = yield* status();
-          if (snapshot.state.paused) return;
-          if (requirementsIdentity(fresh, cycle.selected ?? []) !== cycle.scope) {
-            yield* Effect.logWarning('Requirements changed during preparation; gather and replan', {
-              requestId: cycle.requestId,
-            });
-            yield* replan(snapshot.state);
-            return;
-          }
+          if (snapshot.state.paused || snapshot.state.cycle?.requestId !== cycle.requestId) return;
           if (!inspected.prerequisite)
             return yield* Effect.fail(
               new Unavailable({ operation: 'selection-comparison-missing', cause: selection.issue })

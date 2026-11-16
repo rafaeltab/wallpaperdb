@@ -178,9 +178,11 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     expect(await page.locator('.cc-parent-focused').count()).toBe(1);
     await page.keyboard.press('Escape');
     const planned = page.locator('[data-area=planned]');
+    const originalItemCount = await page.locator('.cc-item').count();
     await planned.getByRole('button', { name: 'Collapse all Planned', exact: true }).click();
-    expect(await page.locator('.cc-item').count()).toBe(5);
+    await browserExpect(page.locator('.cc-item')).toHaveCount(5);
     await planned.getByRole('button', { name: 'Expand all Planned', exact: true }).click();
+    await browserExpect(page.locator('.cc-item')).toHaveCount(originalItemCount);
     await page.getByRole('button', { name: 'Factory settings', exact: true }).click();
     const settings = page.getByRole('dialog', { name: 'Factory controls' });
     await settings.getByLabel('Concurrency', { exact: true }).fill('5');

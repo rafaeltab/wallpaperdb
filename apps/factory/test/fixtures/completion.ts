@@ -30,6 +30,7 @@ export async function completionFixture(
   let commit = 'b'.repeat(40);
   let prCommit = commit;
   let ready = false;
+  let failed = false;
   let dependencyResult: 'valid' | 'invalid' | 'cycle' = 'valid';
   let handbackVerified = false;
   let lost = false;
@@ -65,6 +66,7 @@ export async function completionFixture(
                 commit: prCommit,
                 ready,
                 landed: false,
+                ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
               }),
           }),
           Layer.succeed(Execution, {
@@ -140,6 +142,7 @@ export async function completionFixture(
       commit?: string;
       prCommit?: string;
       ready?: boolean;
+      failed?: boolean;
       clean?: boolean;
       lost?: boolean;
       run?: number;
@@ -158,6 +161,7 @@ export async function completionFixture(
       commit = change.commit ?? commit;
       prCommit = change.prCommit ?? prCommit;
       ready = change.ready ?? ready;
+      failed = change.failed ?? failed;
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;
       run = change.run ?? run;

@@ -151,7 +151,8 @@ function readiness(
   issues: Issues,
   intent: Intent,
   accepted: StageRequest,
-  observation?: Extract<Observation, { kind: 'found' }>
+  observation?: Extract<Observation, { kind: 'found' }>,
+  reconciliationLimit = defaultAgentReconciliationLimit
 ) {
   return Effect.gen(function* () {
     const publication = yield* store.readStage(accepted.index - 1);
@@ -170,6 +171,17 @@ function readiness(
         activity: 'manual-recovery' as const,
         pr,
       };
+    if (!matches && publication && evidence?.migrationRequired) {
+      // Older installations already entered CI using legacy publication receipts.
+      // Retain that history and append migration after the current CI record.
+      const migration = yield* requestReconciliation(
+        store,
+        { ...publication, index: accepted.index },
+        evidence,
+        reconciliationLimit
+      );
+      if (migration) return migration;
+    }
     if (pr.kind === 'found' && (yield* repairAllowed(issues, intent, matches, pr))) {
       yield* dispatchRepair(store, execution, intent, accepted, evidence, pr, observation);
       return {
@@ -264,7 +276,15 @@ function reconcileStage(
       return suspended;
     }
     if (waiting.stage === 'ci')
-      return yield* readiness(store, execution, issues, intent, waiting, observation);
+      return yield* readiness(
+        store,
+        execution,
+        issues,
+        intent,
+        waiting,
+        observation,
+        reconciliationLimit
+      );
     yield* deliver(store, execution, intent, waiting);
     const observed = yield* execution.inspectStage(intent, waiting);
     const evidence = yield* associateStage(store, observed, waiting);

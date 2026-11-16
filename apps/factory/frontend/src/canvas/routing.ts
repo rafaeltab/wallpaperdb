@@ -137,16 +137,6 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
     }
   }
   const occupiedLines = new Map<string, { min: number; max: number }[]>();
-  const overlap = (a: Point, b: Point) => {
-    const horizontal = a.y === b.y,
-      key = horizontal ? `h:${a.y}` : `v:${a.x}`,
-      min = Math.min(horizontal ? a.x : a.y, horizontal ? b.x : b.y),
-      max = Math.max(horizontal ? a.x : a.y, horizontal ? b.x : b.y);
-    return (occupiedLines.get(key) ?? []).reduce(
-      (n, r) => n + Math.max(0, Math.min(max, r.max) - Math.max(min, r.min)),
-      0
-    );
-  };
   const remember = (a: Point, b: Point) => {
     const h = a.y === b.y,
       key = h ? `h:${a.y}` : `v:${a.x}`,
@@ -319,12 +309,36 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
         ex = xs.indexOf(end.x),
         ey = ys.indexOf(end.y),
         encode = (x: number, y: number, d: number) => cell(x, y) * 3 + d;
+      // Occupied runs stay fixed throughout this search. Only segments on an
+      // occupied axis can overlap. Sum ranges in their original order before
+      // applying the same tolerance as the point-wise overlap calculation.
+      const horizontalOverlap = new Uint8Array(cols * rows),
+        verticalOverlap = new Uint8Array(cols * rows),
+        segmentOverlap = new Float64Array(Math.max(cols, rows));
+      for (const [key, ranges] of occupiedLines) {
+        const horizontal = key.startsWith('h:'),
+          axis = Number(key.slice(2)),
+          across = horizontal ? ys : xs,
+          along = horizontal ? xs : ys,
+          i = lowerBound(across, axis);
+        if (across[i] !== axis) continue;
+        segmentOverlap.fill(0, 0, along.length - 1);
+        for (const range of ranges)
+          for (
+            let j = Math.max(0, lowerBound(along, range.min) - 1);
+            j < along.length - 1 && along[j] < range.max;
+            j++
+          )
+            segmentOverlap[j] += Math.max(
+              0,
+              Math.min(along[j + 1], range.max) - Math.max(along[j], range.min)
+            );
+        const overlap = horizontal ? horizontalOverlap : verticalOverlap;
+        for (let j = 0; j < along.length - 1; j++)
+          if (segmentOverlap[j] > 1e-6) overlap[horizontal ? cell(j, i) : cell(i, j)] = 1;
+      }
       const costs = new Float64Array(cols * rows * 3).fill(Infinity),
         previous = new Int32Array(costs.length).fill(-1),
-        // Occupied runs stay fixed throughout this search. Each undirected grid
-        // segment can be checked once instead of once per direction state.
-        horizontalOverlap = new Uint8Array(cols * rows),
-        verticalOverlap = new Uint8Array(cols * rows),
         queue = new Queue(),
         initial = encode(sx, sy, 2);
       costs[initial] = 0;
@@ -351,8 +365,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
             q = { x: xs[nx], y: ys[ny] };
           const overlapCache = d === 0 ? horizontalOverlap : verticalOverlap,
             segment = d === 0 ? cell(Math.min(x, nx), y) : cell(x, Math.min(y, ny));
-          if (!overlapCache[segment]) overlapCache[segment] = overlap(p, q) > 1e-6 ? 2 : 1;
-          if (overlapCache[segment] === 2) continue;
+          if (overlapCache[segment]) continue;
           const next = encode(nx, ny, d),
             cost =
               costs[current] +

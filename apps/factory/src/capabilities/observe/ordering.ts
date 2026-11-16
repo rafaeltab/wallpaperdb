@@ -8,10 +8,25 @@ export function jobObservationIsOlder(previous: JobObservation | undefined, next
   if ((previous.stageIndex ?? -1) > (next.stageIndex ?? -1)) return true;
   const before = previous.execution;
   const after = next.execution;
+  // A provisional lifecycle report must not erase a fully reconciled view of
+  // the same execution. Changed lifecycle facts still publish immediately.
+  if (
+    previous.controlRevision !== undefined &&
+    next.controlRevision === undefined &&
+    previous.stageIndex === next.stageIndex &&
+    before.kind === after.kind &&
+    (before.kind === 'found' || before.kind === 'unverified') &&
+    (after.kind === 'found' || after.kind === 'unverified') &&
+    before.threadId === after.threadId &&
+    before.run?.id === after.run?.id &&
+    before.status === after.status
+  )
+    return true;
   if (
     previous.stageIndex === next.stageIndex &&
     (before.kind === 'found' || before.kind === 'unverified') &&
     (after.kind === 'found' || after.kind === 'unverified') &&
+    before.threadId === after.threadId &&
     before.run?.id &&
     before.run.id === after.run?.id &&
     ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
@@ -24,6 +39,7 @@ export function jobObservationIsOlder(previous: JobObservation | undefined, next
     previous.stageIndex === next.stageIndex &&
     (before.kind === 'found' || before.kind === 'unverified') &&
     (after.kind === 'found' || after.kind === 'unverified') &&
+    before.threadId === after.threadId &&
     !!before.run &&
     !!after.run &&
     before.run.ordinal > after.run.ordinal

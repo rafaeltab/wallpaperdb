@@ -1375,7 +1375,7 @@ export async function runProtocol(
       const sent = { threadId: resource.threadId, runId: resource.latestRunId };
       reply(mcpSend ? { structuredContent: sent } : sent);
     } else {
-      if (args[1] === 'list' && config.delayObserve) {
+      if (['list', 'show'].includes(args[1]) && config.delayObserve) {
         writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));
         await new Promise((resolve) => setTimeout(resolve, 30000));
       }

@@ -1790,14 +1790,13 @@ it.each(['review', 'publication', 'ci'] as const)(
         projectId: 'project-id',
         binary: f.host.binary,
       });
-      for (const context of [
-        undefined,
-        { ...request, threadId: 'unrelated' },
-        { ...request, stage: 'implementation' as const },
-      ])
+      for (const context of [undefined, { ...request, stage: 'implementation' as const }])
         expect(await Effect.runPromise(execution.observe(intent, context))).toMatchObject({
           kind: 'found',
         });
+      expect(
+        await Effect.runPromise(execution.observe(intent, { ...request, threadId: 'unrelated' }))
+      ).toEqual({ kind: 'ambiguous' });
       expect(
         await Effect.runPromise(
           execution.inspectStage(intent, { ...request, stage: 'implementation' })

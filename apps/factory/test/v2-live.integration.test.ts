@@ -211,12 +211,12 @@ it.each(['running', 'completed'])(
         },
       },
     });
-    expect(
-      board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status
-    ).toMatchObject({
-      code: status === 'completed' ? 'completion-unverified' : 'unknown',
-      active: false,
-    });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject(
+      {
+        code: status === 'completed' ? 'completion-unverified' : 'unknown',
+        active: false,
+      }
+    );
   }
 );
 

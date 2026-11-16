@@ -65,16 +65,19 @@ export const JobLive = Layer.effect(
           // Publish it before any external validation or continuation can fail.
           if (reporting) {
             const stage = yield* currentStage(store);
-            yield* reporting.observed(generation, {
-              kind: 'job',
-              intent,
-              execution: observation,
-              stageIndex: stage?.index,
-              elapsedMs: Math.max(0, (yield* time.now()) - intent.createdAt),
-              delivery: stage
-                ? { stage: stage.stage, commit: stage.commit, ready: false, landed: false }
-                : undefined,
-            });
+            yield* reporting
+              .observed(generation, {
+                kind: 'job',
+                intent,
+                execution: observation,
+                stageIndex: stage?.index,
+                elapsedMs: Math.max(0, (yield* time.now()) - intent.createdAt),
+                delivery: stage
+                  ? { stage: stage.stage, commit: stage.commit, ready: false, landed: false }
+                  : undefined,
+              })
+              // Provisional reporting cannot prevent cancellation or reconciliation.
+              .pipe(Effect.catch(Effect.logError));
           }
           const cancelled = (yield* store.readControl()).cancelled;
           if (cancelled && observation.kind === 'found')

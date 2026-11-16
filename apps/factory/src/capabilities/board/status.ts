@@ -30,6 +30,15 @@ export function factoryStatus(
     jobs.some(
       (j) =>
         j.execution.state === 'known' &&
+        ['running', 'waiting'].includes(j.execution.value.state) &&
+        (j.activity === 'manual-continuation' || j.stage === 'ci')
+    )
+  )
+    return 'worker-active';
+  if (
+    jobs.some(
+      (j) =>
+        j.execution.state === 'known' &&
         ['finished', 'interrupted'].includes(j.execution.value.state)
     )
   ) {
@@ -42,7 +51,9 @@ export function factoryStatus(
       pr.checks.value.state === 'pending'
     )
       return 'ci-running';
-    return 'completion-unverified';
+    return jobs.some((j) => j.activity === 'manual-continuation')
+      ? 'awaiting-verification'
+      : 'completion-unverified';
   }
   if (jobs.some((j) => j.execution.state === 'unknown')) return 'launching';
   if (jobs.some((j) => j.activity === 'repairing')) return 'repairing-ci';
@@ -61,15 +72,22 @@ export function providerStatus(
   )
     return 'conflict';
   if (pr.readiness.state === 'ready') return 'ready';
-  if (pr.checks.state === 'known' && pr.checks.value.state === 'failed') return 'ci-failed';
+  const currentChecks =
+    pr.metadata.state === 'known' &&
+    pr.checks.state === 'known' &&
+    pr.checks.value.comparison.headOid === pr.metadata.value.comparison.headOid;
+  if (currentChecks && pr.checks.state === 'known' && pr.checks.value.state === 'failed')
+    return 'ci-failed';
   if (
     pr.reviews.state === 'known' &&
     pr.reviews.value.state === 'required' &&
     pr.metadata.state === 'known' &&
+    pr.reviews.value.comparison.headOid === pr.metadata.value.comparison.headOid &&
     !pr.metadata.value.draft
   )
     return 'needs-review';
-  if (pr.checks.state === 'known' && pr.checks.value.state === 'pending') return 'ci-running';
+  if (currentChecks && pr.checks.state === 'known' && pr.checks.value.state === 'pending')
+    return 'ci-running';
   return undefined;
 }
 export function attention(code: StatusCode): Attention {
@@ -102,6 +120,7 @@ export function attention(code: StatusCode): Attention {
       };
     case 'unknown':
     case 'completion-unverified':
+    case 'awaiting-verification':
     case 'ci-failed':
     case 'conflict':
     case 'launching':

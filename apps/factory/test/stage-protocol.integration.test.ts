@@ -76,6 +76,51 @@ async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   }
 }
 
+it.each(['manual-run', 'run-1'])(
+  'does not reuse a pre-manual receipt for %s, but accepts a fresh state without replaying the instruction',
+  (manualRun) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      const manual = {
+        itemId: 'manual-message',
+        position: 10,
+        createdBy: 'user',
+        creationSource: 'web',
+        runId: manualRun,
+        sourceThreadId: 'thread-live',
+        visibility: 'local',
+        type: 'user_message',
+        status: 'completed',
+        text: 'Please make a change',
+      };
+      const messages = [
+        instruction(intent, request),
+        response(intent, host.base),
+        { role: 'user', runId: manualRun, text: manual.text },
+        { role: 'assistant', runId: manualRun, text: 'Done.' },
+      ];
+      await host.save({
+        overrides: { status: 'completed', latestRunId: manualRun, runCount: 9 },
+        activity: [manual],
+        messages,
+      });
+      expect(await Effect.runPromise(adapter.observe(intent, request))).toMatchObject({
+        manual: { runId: manualRun },
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+        accepted: true,
+      });
+      await host.save({
+        overrides: { status: 'completed', latestRunId: manualRun, runCount: 9 },
+        activity: [manual],
+        messages: [...messages, { ...response(intent, host.base), runId: manualRun }],
+      });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+        accepted: true,
+        ordinal: 9,
+      });
+    })
+);
+
 it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
   'accepts %s state after its instruction despite later turns',
   (stage) =>

@@ -302,6 +302,8 @@ export type Attention =
       }[];
     };
 export type StatusCode =
+  | 'worker-active'
+  | 'awaiting-verification'
   | 'completion-unverified'
   | 'ready'
   | 'blocked'

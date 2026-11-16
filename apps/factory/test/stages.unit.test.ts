@@ -159,6 +159,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let missingEvidence = false;
   let worktreeClean = true;
   let stageIndex: number | undefined;
+  let manual = false;
   let question: { id: string; text: string } | undefined;
   const baseDeps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
@@ -217,6 +218,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
           question,
           answeredQuestions,
           run: { id: runId, ordinal },
+          manual: manual ? { runId } : undefined,
           worktree: '/worker',
           branch: intent.branch,
           model: 'gpt-6.1-sol',
@@ -272,6 +274,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       run((job) => job.resume(command)),
     change: (value: {
       runningAfterSend?: boolean;
+      manual?: boolean;
       loseSend?: boolean;
       ambiguous?: boolean;
       missingEvidence?: boolean;
@@ -299,6 +302,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       answeredQuestions?: readonly string[];
     }) => {
       runningAfterSend = value.runningAfterSend ?? runningAfterSend;
+      manual = value.manual ?? manual;
       loseSend = value.loseSend ?? loseSend;
       ambiguous = value.ambiguous ?? ambiguous;
       missingEvidence = value.missingEvidence ?? missingEvidence;
@@ -380,6 +384,38 @@ it('invalidates displayed readiness if the current worktree changes after accept
   job.change({ commit: 'c'.repeat(40) });
   expect(await job.status()).toMatchObject({ delivery: { ready: false } });
 });
+it('keeps the accepted CI stage across manual work and restart, verifying its new head without replaying earlier stages', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: true } });
+  const before = await Effect.runPromise(job.store.readStage(3));
+  job.change({ manual: true, runId: 'manual-9', ordinal: 9, status: 'running', accepted: false });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', ready: false },
+  });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', ready: false },
+  });
+  job.change({ status: 'completed' });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', ready: true },
+  });
+  job.change({ status: 'completed', commit: 'c'.repeat(40), prCommit: 'c'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+  job.change({ accepted: true });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', commit: 'c'.repeat(40), ready: true },
+  });
+  expect(await Effect.runPromise(job.store.readStage(3))).toEqual(before);
+  expect(await Effect.runPromise(job.store.readStage(4))).toBeNull();
+  expect(job.sends()).toBe(2);
+});
+
 it('accepts a valid delivery continued by a nonconsecutive later run', async () => {
   const job = await stagesFixture();
   job.change({ accepted: false });

@@ -307,6 +307,48 @@ async function questionProtocol(
     await host.cleanup();
   }
 }
+it('distinguishes manual instructions from notifications and later factory-owned delivery using native provenance', () =>
+  questionProtocol(async ({ host, adapter, intent }) => {
+    const manual = {
+      itemId: 'manual',
+      position: 10,
+      runId: 'run-1',
+      createdBy: 'user',
+      creationSource: 'web',
+      sourceThreadId: 'thread-live',
+      visibility: 'local',
+      type: 'user_message',
+      status: 'completed',
+      text: 'Please continue',
+    };
+    const notification = {
+      ...manual,
+      itemId: 'notice',
+      position: 11,
+      createdBy: 'system',
+      creationSource: 'mcp',
+    };
+    await host.save({ activity: [notification, manual] });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
+      manual: { runId: 'run-1' },
+    });
+    await host.save({
+      activity: [
+        manual,
+        {
+          ...notification,
+          itemId: 'factory',
+          position: 12,
+          createdBy: 'agent',
+          text: `Factory instruction ${intent.id}:8.`,
+        },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.observe(intent))).not.toHaveProperty('manual.runId');
+    await host.save({ activity: [{ ...manual, sourceThreadId: 'unrelated' }] });
+    expect(await Effect.runPromise(adapter.observe(intent))).not.toHaveProperty('manual.runId');
+  }));
+
 it('reads a question on a later native MCP activity page', () =>
   questionProtocol(async ({ host, adapter, intent }) => {
     await host.save({

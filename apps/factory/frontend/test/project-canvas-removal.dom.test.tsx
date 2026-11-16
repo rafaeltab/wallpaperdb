@@ -66,6 +66,29 @@ function props(board: FactoryV2Snapshot): ComponentProps<typeof Canvas> {
   };
 }
 
+it('shows and updates Project items without waiting for dependency links', async () => {
+  const view = render(<Canvas {...props(await board())} />);
+  const world = view.container.querySelector<HTMLElement>('.cc-world');
+  if (!world) throw new Error('Expected a Project canvas world');
+  const count = view.container.querySelectorAll('.cc-item').length;
+  expect(count).toBeGreaterThan(0);
+  expect(getComputedStyle(world).visibility).toBe('visible');
+  expect(view.container.querySelectorAll('.cc-line')).toHaveLength(0);
+  expect(view.container.querySelector('.cc-viewport')?.getAttribute('aria-busy')).toBe('true');
+  await act(async () => HeldWorker.current.complete());
+  fireEvent.click(view.getByRole('button', { name: 'Collapse all sections' }));
+  expect(view.container.querySelectorAll('.cc-item')).toHaveLength(0);
+  expect(view.container.querySelector('.cc-viewport')?.getAttribute('aria-busy')).toBe('true');
+  fireEvent.click(view.getByRole('button', { name: 'Expand all sections' }));
+  expect(view.container.querySelectorAll('.cc-item')).toHaveLength(count);
+  // Completing the obsolete collapsed input must not roll back the expanded items.
+  await act(async () => HeldWorker.current.complete());
+  expect(view.container.querySelectorAll('.cc-item')).toHaveLength(count);
+  await act(async () => HeldWorker.current.complete());
+  expect(view.container.querySelectorAll('.cc-item')).toHaveLength(count);
+  expect(view.container.querySelector('.cc-viewport')?.getAttribute('aria-busy')).toBe('false');
+});
+
 it.each([false, true])(
   'prunes a deleted collapsed Project item dependency unless another item shares its link: %s',
   async (shared) => {

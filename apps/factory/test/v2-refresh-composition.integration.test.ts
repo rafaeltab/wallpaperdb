@@ -97,6 +97,114 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
   }
 });
 
+it('gives automatic work a turn when recurring metadata wins cycle readiness', async () => {
+  const nativeTimeout = globalThis.setTimeout;
+  const pause = (milliseconds: number) =>
+    new Promise<void>((resolve) => nativeTimeout(resolve, milliseconds));
+  // Child I/O must settle without advancing the clock that controls this race.
+  const waitForIO = async (check: () => Promise<void>) => {
+    let failure: unknown;
+    for (let attempt = 0; attempt < 250; attempt++) {
+      try {
+        await check();
+        return;
+      } catch (error) {
+        failure = error;
+      }
+      await pause(20);
+    }
+    throw failure;
+  };
+  const startedAt = Math.floor(Date.now() / 1000) * 1000;
+  vi.useFakeTimers({
+    toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+  });
+  vi.setSystemTime(startedAt);
+  const host = await protocol({ origin: true });
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    await host.save({
+      githubRate: { limit: 7200, remaining: 7200, reset: startedAt / 1000 + 3600, cost: 300 },
+      planning: {
+        candidates: [580],
+        issues: [
+          {
+            number: 580,
+            title: 'Ready work',
+            body: 'Only this issue',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+            author: { login: 'rafaeltab' },
+            labels: [{ name: 'ready-for-agent' }],
+            comments: [],
+          },
+        ],
+        projectPages: [
+          {
+            data: {
+              user: {
+                projectV2: {
+                  id: 'P7',
+                  items: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                },
+              },
+            },
+          },
+        ],
+      },
+      planner: { proposal: { selected: [], deferred: [] } },
+    });
+    running = await startFactory({
+      ...host.mcpEnvironment,
+      FACTORY_PROJECT: host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: host.directory + '/state',
+      FACTORY_PORT: '0',
+    });
+    const snapshot = async () => (await running!.app.inject('/api/scheduler')).json();
+    const settled = () =>
+      waitForIO(async () => {
+        const value = await snapshot();
+        expect(value.threads.observedAt).toBe(Date.now());
+        if (value.observations.startedAt === Date.now())
+          expect(value.observations.observedAt).toBe(Date.now());
+      });
+    await vi.advanceTimersByTimeAsync(500);
+    await running.app.inject('/api/v2/board');
+    await vi.advanceTimersByTimeAsync(0);
+    await settled();
+    expect((await snapshot()).observations.observedAt).toBe(startedAt + 500);
+    for (let second = 0; second < 300; second++) {
+      await vi.advanceTimersByTimeAsync(500);
+      await pause(5);
+      await vi.advanceTimersByTimeAsync(500);
+      await pause(5);
+      if (second % 20 === 0) await running.app.inject('/api/v2/board');
+    }
+    await settled();
+    await vi.advanceTimersByTimeAsync(500);
+    await waitForIO(async () =>
+      expect(
+        (await host.calls()).filter(
+          (call) => call.binary === 'gh' && call.args[0] === 'issue' && call.args[1] === 'list'
+        ).length
+      ).toBeGreaterThan(0)
+    );
+  } finally {
+    vi.useRealTimers();
+    await running?.close();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
 it('plans with free capacity after retained CI observation has incurred quota cost', async () => {
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));

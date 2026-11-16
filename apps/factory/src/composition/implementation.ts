@@ -478,11 +478,20 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
         })),
     };
+    let automaticCycles = 0;
+    let metadataAfterCycle = -1;
     const refreshes = observationWorker(() =>
       runtime.runPromise(
         Effect.all(
           [
-            Effect.suspend(() => (github.cycleReady() ? observations.refresh() : Effect.void)),
+            Effect.suspend(() => {
+              if (!github.cycleReady() || metadataAfterCycle === automaticCycles)
+                return Effect.void;
+              // One initial collection is allowed. Subsequent metadata must give
+              // the automatic scheduler an opportunity before taking quota again.
+              metadataAfterCycle = automaticCycles;
+              return observations.refresh();
+            }),
             threads.refresh(),
           ],
           { concurrency: 2 }
@@ -562,6 +571,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     });
     const observationTimer = setInterval(() => {
       if (observing || !github.cycleReady()) return;
+      automaticCycles++;
       observing = runtime
         .runPromise(
           scheduler.tick(configuration.FACTORY_BASE).pipe(

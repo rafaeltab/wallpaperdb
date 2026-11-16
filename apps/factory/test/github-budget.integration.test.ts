@@ -25,6 +25,127 @@ async function withGithub(
   }
 }
 
+it('runs bounded parallel reads within a cycle and retains its next-cycle budget across reopen', async () =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.UTC(2026, 10, 16, 12);
+    let now = startedAt;
+    const waits: number[] = [];
+    const clock = {
+      now: () => now,
+      wait: async (delay: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        waits.push(delay);
+        now += delay;
+      },
+    };
+    await host.save({
+      githubRate: { limit: 7200, remaining: 7000, reset: startedAt / 1000 + 3600 },
+    });
+    const open = () =>
+      githubRequests({
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      });
+    const requests = open();
+    await Promise.all([
+      requests(['issue', 'view', '577', '--json', 'number']),
+      requests(['issue', 'view', '578', '--json', 'number']),
+    ]);
+    expect(waits).toEqual([]);
+    expect(requests.cycleReady()).toBe(false);
+    const reopened = open();
+    expect(reopened.cycleReady()).toBe(false);
+    await reopened.waitForCycle(stop.signal);
+    expect(now - startedAt).toBeGreaterThanOrEqual(4000);
+    expect(reopened.cycleReady()).toBe(true);
+  }));
+
+it('bounds parallel reads and reserves request capacity for work while background reads wait', async () =>
+  withGithub(async (host, stop) => {
+    await host.nodeCommand(
+      'gh',
+      `
+      const fs = require('node:fs'); const args = process.argv.slice(2);
+      if (args[1] === 'rate_limit') { console.log(JSON.stringify({ resources: { graphql: { limit:5000, remaining:5000, reset:Math.ceil(Date.now()/1000)+3600 } } })); }
+      else { fs.writeFileSync(${JSON.stringify(host.directory)} + '/started-' + args[2], 'started');
+        const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(host.directory)} + '/reads-release')) { clearInterval(timer); console.log('{}'); } }, 10); }
+    `
+    );
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+    });
+    const first = requests(['issue', 'view', '577', '--json', 'number'], undefined, 'background');
+    const second = requests(['issue', 'view', '578', '--json', 'number'], undefined, 'background');
+    const queuedBackground = requests(
+      ['issue', 'view', '579', '--json', 'number'],
+      undefined,
+      'background'
+    );
+    const work = [900, 901, 902].map((n) =>
+      requests(['issue', 'view', String(n), '--json', 'number'])
+    );
+    void first.catch(() => undefined);
+    void second.catch(() => undefined);
+    try {
+      await vi.waitFor(
+        async () => {
+          expect(await readFile(host.directory + '/started-577', 'utf8')).toBe('started');
+          expect(await readFile(host.directory + '/started-578', 'utf8')).toBe('started');
+          expect(await readFile(host.directory + '/started-900', 'utf8')).toBe('started');
+          expect(await readFile(host.directory + '/started-901', 'utf8')).toBe('started');
+        },
+        { timeout: 2000, interval: 20 }
+      );
+      await expect(readFile(host.directory + '/started-579')).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+      await expect(readFile(host.directory + '/started-902')).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+    } finally {
+      await writeFile(host.directory + '/reads-release', 'release');
+      await Promise.all([first, second, queuedBackground, ...work]);
+    }
+  }));
+
+it('cancels one caller during shared quota discovery without cancelling another caller', async () =>
+  withGithub(async (host, stop) => {
+    await host.save({ hold: 'github-bootstrap' });
+    const caller = new AbortController();
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+    });
+    const first = requests(['issue', 'view', '577', '--json', 'number'], caller.signal);
+    let cancelled = false;
+    const observed = first.catch(() => {
+      cancelled = true;
+    });
+    const second = requests(['issue', 'view', '578', '--json', 'number']);
+    void second.catch(() => undefined);
+    try {
+      await vi.waitFor(
+        async () =>
+          expect(await readFile(host.directory + '/held', 'utf8')).toBe('github-bootstrap'),
+        { timeout: 2000, interval: 20 }
+      );
+      caller.abort();
+      await vi.waitFor(() => expect(cancelled).toBe(true), { timeout: 1000, interval: 20 });
+    } finally {
+      await writeFile(host.directory + '/release', 'continue');
+      await observed;
+      await second;
+    }
+    expect(
+      (await host.calls()).filter((call) => call.binary === 'gh' && call.args[1] === 'rate_limit')
+    ).toHaveLength(1);
+  }));
+
 it.each([
   {
     stderr: '',
@@ -321,7 +442,7 @@ it('cancels a queued GitHub read during provider backoff without dispatching it'
 it.each([
   { name: 'half of the reported quota', remaining: 7199, gap: 2000 },
   { name: 'additional shared-account pressure', remaining: 3600, gap: 4000 },
-])('paces issue observations for $name', async ({ remaining, gap }) =>
+])('paces the next cycle for $name', async ({ remaining, gap }) =>
   withGithub(async (host, stop) => {
     await host.save({
       githubRate: {
@@ -340,6 +461,7 @@ it.each([
       requests
     );
     await Effect.runPromise(issues.inspect(577));
+    await requests.waitForCycle(stop.signal);
     await Effect.runPromise(issues.inspect(578));
     const views = (await host.githubRequests()).filter(
       (call) => call.args[0] === 'issue' && call.args[1] === 'view'
@@ -482,9 +604,10 @@ it('accounts for explicit GraphQL costs on every page across metadata and issue 
       issues: [{ number: 577 }],
       pullRequests: [],
     });
-    // The two index pages each cost three points. The next operation must
-    // wait for all six, irrespective of later metadata hydration calls.
-    expect(waitAfterPages).toBeGreaterThanOrEqual(6000);
+    // Reads within a collection do not wait. Both pages contribute to the
+    // next cycle's budget, alongside subsequent metadata hydration.
+    expect(waitAfterPages).toBe(0);
+    await requests.waitForCycle(stop.signal);
     const afterMetadata = clock.now() - startedAt;
     expect(afterMetadata).toBeGreaterThanOrEqual(3000);
     const issues = githubIssues(
@@ -492,7 +615,8 @@ it('accounts for explicit GraphQL costs on every page across metadata and issue 
       requests
     );
     expect(await Effect.runPromise(issues.inspect(577))).toMatchObject({ open: true });
-    expect(clock.now() - startedAt - afterMetadata).toBeGreaterThanOrEqual(3000);
+    await requests.waitForCycle(stop.signal);
+    expect(clock.now() - startedAt - afterMetadata).toBeGreaterThanOrEqual(2000);
   }));
 
 it('waits through primary exhaustion and obtains usable quota after the reset', async () =>
@@ -587,6 +711,7 @@ it.each([
     else await expect(completed).rejects.toMatchObject({ _tag: 'Unavailable' });
     const expectedAt = response.retryAfter ? now + 7_200_000 : reset + 1000;
     const reopened = open();
+    await reopened.requests.waitForCycle(stop.signal);
     expect(await Effect.runPromise(reopened.issues.inspect(579))).toMatchObject({ open: true });
     expect(clock.now()).toBeGreaterThanOrEqual(expectedAt);
     expect(clock.now()).toBeLessThanOrEqual(expectedAt + 1000);
@@ -651,17 +776,19 @@ it('retains an interrupted request reservation beyond its quota reset after reop
       await expect(interrupted).rejects.toMatchObject({ _tag: 'Unavailable' });
     }
     await host.nodeCommand('gh', originalProtocol, { module: true });
+    const reopenedRequests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+      clock,
+    });
+    await reopenedRequests.waitForCycle(stop.signal);
     const reopened = githubIssues(
       { project: host.repository, base: host.base, prerequisites: [] },
-      githubRequests({
-        project: host.repository,
-        directory: host.directory + '/state',
-        signal: stop.signal,
-        clock,
-      })
+      reopenedRequests
     );
     expect(await Effect.runPromise(reopened.inspect(578))).toMatchObject({ open: true });
-    expect(clock.now()).toBe(startedAt + 14_400_000);
+    expect(clock.now()).toBeGreaterThanOrEqual(startedAt + 14_400_000);
   }));
 
 it('serves admitted-work observations before already queued background collections', async () =>

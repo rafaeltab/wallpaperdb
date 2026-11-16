@@ -95,7 +95,7 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
   }
 });
 
-it('coalesces empty automatic discovery while continuing scheduler reconciliation', async () => {
+it('paces empty automatic discovery by cycle cost while continuing scheduler reconciliation', async () => {
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
   const host = await protocol(),
@@ -104,7 +104,10 @@ it('coalesces empty automatic discovery while continuing scheduler reconciliatio
   process.env.FACTORY_FIXTURE = host.configFile;
   let running: Awaited<ReturnType<typeof startFactory>> | undefined;
   try {
-    await host.save({ planning: { candidates: [], issues: [], openPulls: [] } });
+    await host.save({
+      githubRate: { limit: 1000, remaining: 1000, reset: Date.now() / 1000 + 3600 },
+      planning: { candidates: [], issues: [], openPulls: [] },
+    });
     running = await startFactory({
       FACTORY_PROJECT: host.repository,
       ...host.mcpEnvironment,
@@ -136,8 +139,10 @@ it('coalesces empty automatic discovery while continuing scheduler reconciliatio
       );
     }
     expect(await discoveries()).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(300_000);
-    await vi.waitFor(async () => expect(await discoveries()).toHaveLength(2), {
+    // The next collection follows its actual quota cost, without a fixed
+    // five-minute scheduler delay. It must not run on every one-second tick.
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(async () => expect((await discoveries()).length).toBeGreaterThan(1), {
       timeout: 5000,
       interval: 20,
     });

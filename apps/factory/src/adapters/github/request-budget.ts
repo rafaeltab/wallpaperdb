@@ -85,17 +85,28 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
     const samples = get(name).samples.filter((s) => s.reset > now);
     return Math.max(0, ...samples.map((s) => sampleInterval(name, now, s)));
   };
-  const due = (names: readonly string[], now: number) =>
+  const due = (names: readonly string[], now: number, cycle = false) =>
     Math.max(
       state.blockedUntil,
       ...names.flatMap((name) => [
-        get(name).nextAt,
+        cycle ? get(name).nextAt : 0,
         ...get(name)
           .samples.filter((s) => s.remaining === 0 && s.reset > now)
           .map((s) => s.reset + 1000),
       ])
     );
   return {
+    cycleReady() {
+      return due(Object.keys(state.resources), clock.now(), true) <= clock.now();
+    },
+    async waitForCycle(signal: AbortSignal) {
+      for (;;) {
+        signal.throwIfAborted();
+        const delay = due(Object.keys(state.resources), clock.now(), true) - clock.now();
+        if (delay <= 0) return;
+        await clock.wait(delay, signal);
+      }
+    },
     known(names: readonly string[]) {
       return names.every((name) =>
         get(name).samples.some((s) => s.limit > 0 && s.reset > clock.now())
@@ -113,16 +124,19 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
     reserve(names: readonly string[], cost: number, mutation = false) {
       const now = clock.now();
       const previous = new Map(names.map((name) => [name, get(name).nextAt]));
+      const charges = new Map(
+        names.map((name) => [name, interval(name, now) ? interval(name, now) * cost : 60_000])
+      );
       for (const name of names)
         get(name).nextAt =
           Math.max(now, get(name).nextAt) +
           (interval(name, now) ? interval(name, now) * cost : 60_000);
       if (mutation) state.mutationAt = Math.max(now, state.mutationAt) + 1000;
       save();
-      return { at: now, previous };
+      return { at: now, previous, charges };
     },
     complete(
-      reservation: { at: number; previous: Map<string, number> },
+      reservation: { at: number; previous: Map<string, number>; charges: Map<string, number> },
       responses: readonly RateResponse[],
       costs: ReadonlyMap<string, number>,
       success: boolean
@@ -169,7 +183,9 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
         }
       }
       if (accounted.size) {
-        for (const [name, before] of reservation.previous) get(name).nextAt = before;
+        // Reconcile only this reservation. Concurrent requests retain their charges.
+        for (const [name, charge] of reservation.charges)
+          get(name).nextAt = Math.max(now, get(name).nextAt - charge);
         for (const name of accounted) {
           const current = get(name),
             cost = costs.get(name) ?? 2,

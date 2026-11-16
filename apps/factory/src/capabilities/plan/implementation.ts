@@ -157,7 +157,7 @@ export const PlanLive = Layer.effect(
           pending = true;
           return yield* Effect.gen(function* () {
             if (attempt) yield* attempt.progress('discovery');
-            const observed = yield* source.read();
+            const observed = attempt?.input ?? (yield* source.read());
             const input = boundedInput({
               ...observed,
               maximumSelections: attempt?.maximumSelections ?? observed.maximumSelections,

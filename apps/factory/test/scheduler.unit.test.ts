@@ -1044,6 +1044,25 @@ it('does not pass the preflight discovery clock as a model deadline', async () =
   }
 });
 
+it('hands freshly gathered cycle inputs to the planner once, retaining post-model freshness reads', async () => {
+  let reads = 0;
+  const f = fixture({
+    read: () => {
+      reads++;
+    },
+    propose: () => {
+      expect(reads).toBe(1);
+    },
+  });
+  try {
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([1]);
+    expect(reads).toBeGreaterThanOrEqual(2);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
 it('retains the accepted batch through restart and preparation without another planner call', async () => {
   let plans = 0;
   const f = fixture({

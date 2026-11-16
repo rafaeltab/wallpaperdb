@@ -38,7 +38,14 @@ export function githubRequests(config: {
     abort: () => void;
   };
   const queue: Entry[] = [];
-  let running: Promise<void> | undefined;
+  const running = new Set<Promise<void>>();
+  let backgroundActive = 0;
+  let bootstrap: Promise<void> | undefined;
+  let mutations = Promise.resolve();
+  const mutating = (args: readonly string[]) =>
+    args[0] === 'api'
+      ? args.some((a) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(a))
+      : ['comment', 'edit'].includes(args[1]);
   const execute = async (entry: Entry) => {
     const { args, signal } = entry;
     const api = args[0] === 'api',
@@ -54,9 +61,7 @@ export function githubRequests(config: {
     const fields = args.indexOf('--json');
     if (fields >= 0 && args[fields + 1].split(',').some((field) => !jsonFields.has(field)))
       throw new Error('Unaccounted GitHub CLI selection');
-    const mutation = api
-      ? args.some((a) => ['POST', 'PATCH', 'PUT', 'DELETE'].includes(a))
-      : ['comment', 'edit'].includes(args[1]);
+    const mutation = mutating(args);
     const names = api
       ? [graphql ? 'graphql' : args[1].startsWith('search/') ? 'search' : 'core']
       : mutation
@@ -64,29 +69,49 @@ export function githubRequests(config: {
         : ['graphql'];
     await budget.wait(names, signal, mutation);
     if (!budget.known(names)) {
-      const reservation = budget.reserve([], 0);
-      const result = await requestProcess(config.project, ['api', 'rate_limit'], signal);
-      const parsed = z.object({ resources: z.record(quota) }).safeParse(result.value);
-      const responses: RateResponse[] = parsed.success
-        ? Object.entries(parsed.data.resources).map(([resource, value]) => ({
-            status: 200,
-            resource,
-            ...value,
-            reset: value.reset * 1000,
-          }))
-        : [];
-      const costs = new Map(
-        [...responses, ...result.responses]
-          .filter((r) => r.resource)
-          .map((r) => [r.resource ?? 'core', 0])
-      );
-      budget.complete(
-        reservation,
-        [...result.responses, ...responses],
-        costs,
-        result.code === 0 && !result.failure
-      );
-      if (!parsed.success || result.code !== 0 || result.failure) throw failure(result);
+      bootstrap ??= (async () => {
+        const reservation = budget.reserve([], 0);
+        const result = await requestProcess(config.project, ['api', 'rate_limit'], config.signal);
+        const parsed = z.object({ resources: z.record(quota) }).safeParse(result.value);
+        const responses: RateResponse[] = parsed.success
+          ? Object.entries(parsed.data.resources).map(([resource, value]) => ({
+              status: 200,
+              resource,
+              ...value,
+              reset: value.reset * 1000,
+            }))
+          : [];
+        const costs = new Map(
+          [...responses, ...result.responses]
+            .filter((r) => r.resource)
+            .map((r) => [r.resource ?? 'core', 0])
+        );
+        budget.complete(
+          reservation,
+          [...result.responses, ...responses],
+          costs,
+          result.code === 0 && !result.failure
+        );
+        if (!parsed.success || result.code !== 0 || result.failure) throw failure(result);
+      })().finally(() => {
+        bootstrap = undefined;
+      });
+      const pendingBootstrap = bootstrap;
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => reject(signal.reason);
+        signal.addEventListener('abort', abort, { once: true });
+        pendingBootstrap.then(
+          () => {
+            signal.removeEventListener('abort', abort);
+            resolve();
+          },
+          (error) => {
+            signal.removeEventListener('abort', abort);
+            reject(error);
+          }
+        );
+        if (signal.aborted) abort();
+      });
       if (!budget.known(names)) throw new Error('GitHub quota metadata is unavailable');
       await budget.wait(names, signal, mutation);
     }
@@ -161,17 +186,28 @@ export function githubRequests(config: {
     return value;
   };
   const pump = () => {
-    if (running) return;
-    const work = queue.findIndex((entry) => entry.priority === 'work');
-    const [entry] = queue.splice(work < 0 ? 0 : work, 1);
-    if (!entry) return;
-    entry.signal.removeEventListener('abort', entry.abort);
-    running = execute(entry)
-      .then(entry.resolve, entry.reject)
-      .finally(() => {
-        running = undefined;
+    while (running.size < 4) {
+      const work = queue.findIndex((entry) => entry.priority === 'work');
+      if (work < 0 && backgroundActive >= 2) return;
+      const [entry] = queue.splice(work < 0 ? 0 : work, 1);
+      if (!entry) return;
+      entry.signal.removeEventListener('abort', entry.abort);
+      if (entry.priority === 'background') backgroundActive++;
+      const operation = mutating(entry.args)
+        ? mutations.then(() => execute(entry))
+        : execute(entry);
+      if (mutating(entry.args))
+        mutations = operation.then(
+          () => undefined,
+          () => undefined
+        );
+      const pending = operation.then(entry.resolve, entry.reject).finally(() => {
+        running.delete(pending);
+        if (entry.priority === 'background') backgroundActive--;
         pump();
       });
+      running.add(pending);
+    }
   };
   const request = (
     args: readonly string[],
@@ -201,10 +237,13 @@ export function githubRequests(config: {
     });
   };
   return Object.assign(request, {
+    cycleReady: budget.cycleReady,
+    waitForCycle: budget.waitForCycle,
     // Composition cancels the owner first, then joins process exit and durable accounting.
     // An interrupted Effect alone does not wait for the underlying Promise to finish.
     drain: async () => {
-      while (running) await running;
+      while (running.size) await Promise.all(running);
+      await bootstrap?.catch(() => undefined);
     },
   });
 }

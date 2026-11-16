@@ -4,6 +4,18 @@ The Software Factory coordinates trusted implementation issues through verified 
 
 ## Language
 
+**Project canvas**:
+The visual overview of Project items and their dependencies in the Software Factory.
+_Avoid_: Board view, canvas view
+
+**Project item**:
+A distinct unit of project work represented on the Project canvas, such as an issue or pull request.
+_Avoid_: Card, node
+
+**Item dependency link**:
+A visible connection on the Project canvas showing that one Project item depends on another. Its direction identifies the prerequisite and the dependant.
+_Avoid_: Edge route, edge, connector
+
 **Ready issue**:
 An open implementation issue authorized for autonomous pickup by a trusted maintainer. Readiness for pickup does not by itself mean its blockers are satisfied or execution capacity is available.
 _Avoid_: Unblocked issue, running job

@@ -374,8 +374,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           return {
             verify: source.verify,
             read,
-            poll: () =>
-              Effect.suspend(() => (!github.cycleReady() ? Effect.succeed(undefined) : read())),
+            // The automatic tick owns cycle admission. Its own reconciliation
+            // costs must not reject the discovery that follows in that cycle.
+            poll: read,
           };
         })
       ),
@@ -560,7 +561,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       clearInterval(plannerTimer);
     });
     const observationTimer = setInterval(() => {
-      if (observing) return;
+      if (observing || !github.cycleReady()) return;
       observing = runtime
         .runPromise(
           scheduler.tick(configuration.FACTORY_BASE).pipe(

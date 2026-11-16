@@ -41,7 +41,7 @@ it('keeps dated attention and toolbar controls accessible at narrow widths', asy
     await vite.listen();
     const origin = vite.resolvedUrls?.local[0];
     if (!origin) throw new Error('Missing Vite origin');
-    const warning = page.getByRole('status');
+    const warning = page.getByRole('status').filter({ hasText: 'Attention count may be outdated' });
     const attention = page.getByRole('button', {
       name: 'Highlight 2 items needing human attention',
       exact: true,

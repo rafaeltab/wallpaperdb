@@ -73,6 +73,271 @@ it.each(
   }
 );
 
+it.each([
+  {
+    reported: 'conflicting' as const,
+    raw: 'UNKNOWN' as const,
+    head: 'a'.repeat(40),
+    base: 'main',
+    observedAt: 3000,
+    expected: 'conflict',
+  },
+  {
+    reported: 'conflicting' as const,
+    raw: 'UNKNOWN' as const,
+    head: 'c'.repeat(40),
+    base: 'main',
+    observedAt: 3000,
+    expected: 'completion-unverified',
+  },
+  {
+    reported: 'conflicting' as const,
+    raw: 'UNKNOWN' as const,
+    head: 'a'.repeat(40),
+    base: 'other',
+    observedAt: 3000,
+    expected: 'completion-unverified',
+  },
+  {
+    reported: 'conflicting' as const,
+    raw: 'UNKNOWN' as const,
+    head: 'a'.repeat(40),
+    base: 'main',
+    observedAt: 1000,
+    expected: 'completion-unverified',
+  },
+  {
+    reported: 'clean' as const,
+    raw: 'CONFLICTING' as const,
+    head: 'a'.repeat(40),
+    base: 'main',
+    observedAt: 3000,
+    expected: 'completion-unverified',
+  },
+  {
+    reported: 'pending' as const,
+    raw: 'CONFLICTING' as const,
+    head: 'a'.repeat(40),
+    base: 'main',
+    observedAt: 3000,
+    expected: 'completion-unverified',
+  },
+  {
+    reported: undefined,
+    raw: 'CONFLICTING' as const,
+    head: 'a'.repeat(40),
+    base: 'main',
+    observedAt: 3000,
+    expected: 'conflict',
+  },
+])(
+  'reports matching current publication conflicts over terminal fallback: $expected $head $base $observedAt',
+  async ({ reported, raw, head, base, observedAt, expected }) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2, { mergeability: raw });
+    const input = { ...parkedSnapshot(pull, true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'completed' },
+        delivery: {
+          stage: 'ci',
+          commit: pull.head,
+          ready: false,
+          landed: false,
+          active: true,
+          pr: {
+            kind: 'found',
+            url: pull.url,
+            commit: head,
+            base,
+            ready: false,
+            landed: false,
+            mergeability: reported,
+          },
+        },
+      },
+    ];
+    input.localWork = [];
+    input.observations = { ...input.observations, jobsObservedAt: observedAt };
+    const board = await liveBoard({ scopeId: 'publication-conflict', initial: input });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+      expected
+    );
+    expect(
+      board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].metadata
+    ).toMatchObject({
+      observedAt: new Date(2000).toISOString(),
+      value: { mergeability: raw === 'CONFLICTING' ? 'conflicting' : 'pending' },
+    });
+  }
+);
+
+it.each([
+  {
+    active: false,
+    landed: true,
+    mismatch: false,
+    question: false,
+    recovery: false,
+    visible: false,
+  },
+  {
+    active: false,
+    landed: false,
+    mismatch: false,
+    question: false,
+    recovery: false,
+    visible: true,
+  },
+  { active: false, landed: true, mismatch: true, question: false, recovery: false, visible: true },
+  { active: true, landed: true, mismatch: false, question: false, recovery: false, visible: true },
+  { active: false, landed: true, mismatch: false, question: true, recovery: false, visible: true },
+  { active: false, landed: true, mismatch: false, question: false, recovery: true, visible: true },
+])(
+  'retires only inactive verified landed items despite retained OPEN metadata: %j',
+  async ({ active, landed, mismatch, question, recovery, visible }) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2);
+    const input = { ...parkedSnapshot(pull, true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'completed' },
+        delivery: {
+          stage: 'ci',
+          commit: pull.head,
+          ready: false,
+          landed,
+          active,
+          ...(recovery ? { activity: 'manual-recovery' as const } : {}),
+          ...(question ? { question: { id: 'q', text: 'Resolve remaining work' } } : {}),
+          pr: {
+            kind: 'found',
+            url: pull.url,
+            commit: mismatch ? 'c'.repeat(40) : pull.head,
+            base: 'main',
+            ready: false,
+            landed,
+          },
+        },
+      },
+    ];
+    input.localWork = [];
+    if (active) {
+      input.state = {
+        ...input.state,
+        admissions: [
+          ...input.state.admissions,
+          { issue: 3, base: source.intent.base, context: '' },
+        ],
+      };
+      input.jobs.push({
+        ...source,
+        intent: { ...source.intent, id: 'active-owner', issue: 3 },
+        resume: undefined,
+        execution: { ...source.execution, status: 'running' },
+        delivery: {
+          stage: 'publication',
+          commit: pull.head,
+          ready: false,
+          landed: false,
+          active: true,
+          pr: {
+            kind: 'found',
+            url: pull.url,
+            commit: pull.head,
+            base: 'main',
+            ready: false,
+            landed: false,
+          },
+        },
+      });
+    }
+    const before: ScheduleSnapshot = {
+      ...input,
+      jobs: input.jobs.map((job) =>
+        job.kind === 'job' && job.delivery
+          ? {
+              ...job,
+              delivery: {
+                ...job.delivery,
+                landed: false,
+                pr:
+                  job.delivery.pr?.kind === 'found'
+                    ? { ...job.delivery.pr, landed: false }
+                    : job.delivery.pr,
+              },
+            }
+          : job
+      ),
+    };
+    const board = await liveBoard({ scopeId: 'retire-landed', initial: before });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2']).toBeDefined();
+    await board.publish(input);
+    expect(!!board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2']).toBe(visible);
+    expect(Object.keys(board.snapshot().entities.jobs)).toHaveLength(active ? 2 : 1);
+    expect(
+      board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].metadata
+    ).toMatchObject({ value: { state: 'open' } });
+  }
+);
+
+it.each(['question', 'manual-recovery', 'cancelled', 'running'] as const)(
+  'keeps %s reporting ahead of a known conflict',
+  async (guard) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2, { mergeability: 'CONFLICTING', ci: 'PENDING' });
+    const input = { ...parkedSnapshot(pull, true) };
+    const job = input.jobs[0];
+    if (job.kind !== 'job' || job.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...job,
+        resume: undefined,
+        execution: { ...job.execution, status: guard === 'running' ? 'running' : 'completed' },
+        delivery: {
+          stage: 'publication',
+          commit: pull.head,
+          ready: false,
+          landed: false,
+          active: true,
+          ...(guard === 'manual-recovery' ? { activity: 'manual-recovery' as const } : {}),
+          pr: {
+            kind: 'found',
+            url: pull.url,
+            commit: pull.head,
+            base: 'main',
+            ready: false,
+            landed: false,
+          },
+        },
+      },
+    ];
+    if (guard !== 'question')
+      input.localWork =
+        guard === 'cancelled'
+          ? [{ intent: job.intent, control: { revision: 1, cancelled: true, claimed: [] } }]
+          : [];
+    const board = await liveBoard({ scopeId: 'conflict-obligations', initial: input });
+    const expected = {
+      question: 'awaiting-answer',
+      'manual-recovery': 'manual-recovery',
+      cancelled: 'cancelled',
+      running: 'publishing',
+    };
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+      expected[guard]
+    );
+  }
+);
+
 it('shows accepted ready CI without requiring historical parent metadata', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const pull = pullObservation(2, { ci: 'SUCCESS', review: 'REVIEW_REQUIRED' });

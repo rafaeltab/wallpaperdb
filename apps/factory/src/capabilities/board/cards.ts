@@ -1,5 +1,5 @@
 import { type ProjectionContext, gh } from './context.js';
-import type { WorkItem } from './model.js';
+import type { PullRequest, WorkItem } from './model.js';
 import { attention, factoryStatus, providerStatus } from './status.js';
 import { entity, issueId, pullId, unknown } from './values.js';
 export function populateCards(context: ProjectionContext) {
@@ -17,8 +17,9 @@ export function populateCards(context: ProjectionContext) {
       input.recoveries?.some(
         (r) => r.question && pr.metadata.state === 'known' && r.pr === pr.metadata.value.url
       );
-    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion, pr),
-      provider = providerStatus(pr);
+    const mergeability = currentMergeability(context, pr);
+    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion, pr, mergeability),
+      provider = providerStatus(pr, mergeability);
     const terminal =
       (provider === 'ready' || provider === 'landed') &&
       jobs.every((j) => !j.occupiesCapacity) &&
@@ -100,7 +101,7 @@ export function populateCards(context: ProjectionContext) {
     const jobs = Object.values(tables.jobs).filter((j) => j.pullRequestId === pr.id);
     const raw = facts?.pullRequests.find((p) => p.number === pr.number);
     if (
-      raw?.state !== 'OPEN' &&
+      (pr.readiness.state === 'landed' || raw?.state !== 'OPEN') &&
       !jobs.some(
         (j) =>
           j.occupiesCapacity || (!j.cancelled && !!j.question) || j.activity === 'manual-recovery'
@@ -141,4 +142,28 @@ export function populateCards(context: ProjectionContext) {
     )
       card({ kind: 'issue', issueId: i.id }, 'planned', []);
   }
+}
+
+function currentMergeability(context: ProjectionContext, pr: PullRequest | undefined) {
+  if (pr?.metadata.state !== 'known') return undefined;
+  const metadata = pr.metadata.value;
+  const observedAt = Date.parse(pr.metadata.observedAt);
+  return context.input.jobs
+    .flatMap((job) => {
+      if (job.kind !== 'job' || job.delivery?.pr?.kind !== 'found') return [];
+      const publication = job.delivery.pr;
+      const at =
+        context.input.observations.items?.[`job:${job.intent.id}`]?.observedAt ??
+        context.input.observations.jobsObservedAt ??
+        context.input.observations.observedAt;
+      return at !== undefined &&
+        at >= observedAt &&
+        publication.url === metadata.url &&
+        publication.commit === metadata.comparison.headOid &&
+        publication.base === metadata.comparison.baseRef &&
+        publication.mergeability !== undefined
+        ? [{ at, mergeability: publication.mergeability }]
+        : [];
+    })
+    .sort((a, b) => b.at - a.at)[0]?.mergeability;
 }

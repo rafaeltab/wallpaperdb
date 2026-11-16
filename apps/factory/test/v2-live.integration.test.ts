@@ -348,6 +348,72 @@ it.each(['question', 'manual-recovery', 'cancelled', 'running'] as const)(
   }
 );
 
+it.each([
+  { conflict: true, sibling: 'running' as const, active: true },
+  { conflict: true, sibling: 'waiting' as const, active: true },
+  { conflict: true, sibling: 'completed' as const, active: false },
+  { conflict: false, sibling: 'running' as const, active: true },
+])(
+  'reports mixed-worker activity with conflict=$conflict and sibling=$sibling',
+  async ({ conflict, sibling, active }) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2, { mergeability: 'UNKNOWN', ci: 'PENDING' });
+    const input = { ...parkedSnapshot(pull, true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    const publication = {
+      kind: 'found' as const,
+      url: pull.url,
+      commit: pull.head,
+      base: 'main',
+      ready: false,
+      landed: false,
+    };
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'completed' },
+        delivery: {
+          stage: 'ci',
+          commit: pull.head,
+          ready: false,
+          landed: false,
+          active: true,
+          pr: { ...publication, mergeability: conflict ? 'conflicting' : 'pending' },
+        },
+      },
+      {
+        ...source,
+        intent: { ...source.intent, id: 'sibling', issue: 3 },
+        resume: undefined,
+        execution: { ...source.execution, status: sibling },
+        delivery: {
+          stage: 'publication',
+          commit: pull.head,
+          ready: false,
+          landed: false,
+          active: true,
+          pr: publication,
+        },
+      },
+    ];
+    input.state = {
+      ...input.state,
+      admissions: [...input.state.admissions, { issue: 3, base: source.intent.base, context: '' }],
+    };
+    input.localWork = [];
+    input.observations = { ...input.observations, jobsObservedAt: 3000 };
+    const board = await liveBoard({ scopeId: 'conflict-sibling', initial: input });
+    const snapshot = board.snapshot();
+    expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject({
+      code: conflict ? 'conflict' : 'ci-running',
+      active,
+    });
+    expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/3'].occupiesCapacity).toBe(true);
+  }
+);
+
 it('shows accepted ready CI without requiring historical parent metadata', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const pull = pullObservation(2, { ci: 'SUCCESS', review: 'REVIEW_REQUIRED' });

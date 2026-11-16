@@ -174,14 +174,18 @@ function readiness(
     // A fresh fully checked/reviewed/published state can update readiness after
     // manual work. The accepted stage journal remains immutable and never rewinds.
     const commit = fresh && evidence ? evidence.commit : accepted.commit;
+    const verifiedCommit =
+      pr.kind === 'found' && retained?.url === pr.url && retained.base === pr.base
+        ? retained.commit
+        : accepted.commit;
     const unchanged =
       observation?.manual &&
       evidence?.worktreeClean === true &&
       evidence.idle !== false &&
       !evidence.responseObserved &&
-      evidence.commit === accepted.commit &&
+      evidence.commit === verifiedCommit &&
       pr.kind === 'found' &&
-      pr.commit === accepted.commit &&
+      pr.commit === verifiedCommit &&
       ['completed', 'idle'].includes(observation.status);
     const ownerActive =
       observation &&

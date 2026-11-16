@@ -6,6 +6,7 @@
   "scripts": {
     "bench:item-dependency-links": "tsx frontend/scripts/benchmark-item-dependency-links.ts",
     "bench:project-canvas": "tsx frontend/scripts/benchmark-project-canvas.ts",
+    "bench:project-canvas-expansion": "tsx frontend/scripts/benchmark-project-canvas-expansion.ts",
     "build": "vite build --config frontend/vite.config.ts && node --experimental-strip-types esbuild.config.ts",
     "start": "node --env-file=.env dist/main.js",
     "format": "biome format --write .",

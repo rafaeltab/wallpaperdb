@@ -126,8 +126,25 @@ export function Canvas({
     const endpoints = new Set(
       [...data.boxes, ...data.headerNodes, ...data.aggregateNodes].map((node) => node.id)
     );
-    return routing.links.filter((link) => endpoints.has(link.source) && endpoints.has(link.target));
-  }, [routingMatchesGeometry, routing.links, data.boxes, data.headerNodes, data.aggregateNodes]);
+    const items = new Set([...fixture.items.map((item) => item.id), ...fixture.parentIds]);
+    return routing.links.filter(
+      (link) =>
+        endpoints.has(link.source) &&
+        endpoints.has(link.target) &&
+        data.routeRelationships
+          .get(`${link.source}-${link.target}`)
+          ?.some((dependency) => items.has(dependency.source) && items.has(dependency.target))
+    );
+  }, [
+    routingMatchesGeometry,
+    routing.links,
+    data.boxes,
+    data.headerNodes,
+    data.aggregateNodes,
+    data.routeRelationships,
+    fixture.items,
+    fixture.parentIds,
+  ]);
   const issueMetadata = fixture.metadata;
   const candidateFocus = locked ?? hovered;
   const focus =

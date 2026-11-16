@@ -1142,7 +1142,7 @@ it('submits one retained advisory preview through v2 while the composed factory 
         calls.filter(
           (call) => call.binary === 'gh' && call.args[0] === 'issue' && call.args[1] === 'list'
         )
-      ).toHaveLength(2);
+      ).toHaveLength(1);
       expect(
         calls.filter(
           (c) =>

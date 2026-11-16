@@ -18,7 +18,7 @@ export type ItemDependencyLinkWorker = Pick<
 /** One running calculation and one latest queued input bound retained work during refresh bursts. */
 export function createItemDependencyLinkExecutor(
   createWorker: () => ItemDependencyLinkWorker = () =>
-    new Worker(new URL('./item-dependency-link.worker.ts', import.meta.url), { type: 'module' })
+    new Worker(new URL('./item-dependency-link-worker.ts', import.meta.url), { type: 'module' })
 ): ItemDependencyLinkExecutor {
   const worker = createWorker();
   let sequence = 0;

@@ -270,10 +270,20 @@ it.each([false, true])(
   async (unavailableResource) =>
     withGithub(async (host, stop) => {
       await host.save({ githubRate: { unavailableResource } });
+      const startedAt = Date.now();
+      let now = startedAt;
+      const clock = {
+        now: () => now,
+        wait: async (milliseconds: number, signal: AbortSignal) => {
+          signal.throwIfAborted();
+          now += milliseconds;
+        },
+      };
       const requests = githubRequests({
         project: host.repository,
         directory: host.directory + '/state',
         signal: stop.signal,
+        clock,
       });
       const issues = githubIssues(
         { project: host.repository, base: host.base, prerequisites: [] },
@@ -291,6 +301,57 @@ it.each([false, true])(
           args: expect.arrayContaining(['issue', 'view', '577']),
         })
       );
+      await requests.waitForCycle(stop.signal);
+      expect(now - startedAt).toBeLessThan(1000);
+      expect(requests.cycleReady()).toBe(true);
+    })
+);
+
+it.each([false, true])(
+  'retains unaccounted resource responsibility across reopen, core known=%s',
+  async (coreKnown) =>
+    withGithub(async (host, stop) => {
+      const startedAt = Date.UTC(2026, 10, 7, 12);
+      let now = startedAt;
+      const reset = startedAt / 1000 + 3600;
+      const clock = {
+        now: () => now,
+        wait: async (milliseconds: number, signal: AbortSignal) => {
+          signal.throwIfAborted();
+          now += milliseconds;
+        },
+      };
+      await host.nodeCommand(
+        'gh',
+        `
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: {
+          graphql: { limit: 7200, remaining: 7200, reset: ${reset} },
+          core: { limit: 20, remaining: 20, reset: ${reset} }
+        }}));
+      } else {
+        for (const resource of ${JSON.stringify(coreKnown ? ['graphql', 'core'] : ['graphql'])}) {
+          console.error('< HTTP/2.0 200');
+          console.error('< X-Ratelimit-Resource: ' + resource);
+          console.error('< X-Ratelimit-Limit: ' + (resource === 'core' ? 20 : 7200));
+          console.error('< X-Ratelimit-Remaining: ' + (resource === 'core' ? 20 : 7200));
+          console.error('< X-Ratelimit-Reset: ${reset}');
+          console.error('');
+        }
+        console.log('{}');
+      }
+    `
+      );
+      const config = {
+        project: host.repository,
+        directory: host.directory + '/state',
+        signal: stop.signal,
+        clock,
+      };
+      await githubRequests(config)(['pr', 'edit', '999', '--body', 'Controlled mutation']);
+      const reopened = githubRequests(config);
+      await reopened.waitForCycle(stop.signal);
+      expect(now - startedAt).toBe(coreKnown ? 360_000 : 720_000);
     })
 );
 

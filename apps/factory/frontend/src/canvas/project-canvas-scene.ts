@@ -28,9 +28,11 @@ export function bindProjectCanvasScene(geometry: ProjectCanvasGeometry, fixture:
 /** Owns stable Project item identities and invalidation of geometry across snapshots. */
 export function createProjectCanvasScene() {
   const project = createCanvasProjection();
+  let projected: { board: Board; fixture: CanvasData } | undefined;
   let previous: { key: string; geometry: ProjectCanvasGeometry } | undefined;
   return (board: Board, options: LayoutOptions) => {
-    const fixture = project(board);
+    if (projected?.board !== board) projected = { board, fixture: project(board) };
+    const fixture = projected.fixture;
     const key = JSON.stringify({
       items: fixture.items.map((item) => ({
         id: item.id,

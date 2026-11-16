@@ -22,6 +22,7 @@ import { useItemDependencyLinks } from './use-item-dependency-links';
 import { ProjectCanvasViewport, type ProjectCanvasViewportHandle } from './project-canvas-viewport';
 import { ProjectCanvasTooltip, type ProjectCanvasTooltipHandle } from './project-canvas-tooltip';
 import { useProjectCanvasMotion } from './project-canvas-motion';
+import { ProjectItemPresentation } from './project-item-presentation';
 import { relationshipHighlights, stages } from './geometry';
 import type {
   Box,
@@ -36,14 +37,9 @@ import {
   CanvasContext,
   Icon,
   Identity,
-  Fields,
-  Labels,
-  ParentTag,
-  Status,
   StackSummary,
   statusAppearance,
   CanvasThread,
-  CanvasEvidence,
 } from './canvas-presentation';
 import { actionLabel, retryExplanation } from './presentation';
 import './canvas.css';
@@ -112,10 +108,13 @@ export function Canvas({
     published.current = { input: dependencyInput, geometry: targetScene.geometry };
   const geometry = published.current?.geometry ?? targetScene.geometry;
   const fixture = useMemo(
-    () => ({
-      ...targetScene.layout.fixture,
-      metadata: { ...geometry.fixture.metadata, ...targetScene.layout.fixture.metadata },
-    }),
+    () =>
+      geometry.fixture === targetScene.layout.fixture
+        ? targetScene.layout.fixture
+        : {
+            ...targetScene.layout.fixture,
+            metadata: { ...geometry.fixture.metadata, ...targetScene.layout.fixture.metadata },
+          },
     [geometry, targetScene.layout.fixture]
   );
   const data = useMemo(() => bindProjectCanvasScene(geometry, fixture), [geometry, fixture]);
@@ -360,43 +359,14 @@ export function Canvas({
           } as CSSProperties
         }
       >
-        {item.pr ? (
-          <>
-            <div className="cc-pr-top">
-              <Identity item={item} />
-              {<CanvasThread item={item} />}
-              {title(meta.title, `issue:${item.id}`)}
-              <Status status={itemStatus} active={item.active} />
-              <Fields id={item.id} />
-            </div>
-            <div className="cc-pr-bottom">
-              <Labels id={item.id} />
-              <ParentTag
-                parent={item.parent}
-                nameKey={`badge:${item.id}`}
-                mode={titleMode}
-                expanded={expandedName(`badge:${item.id}`)}
-                highlighted={!!item.parent && highlightedParents.has(item.parent)}
-              />
-              <CanvasEvidence item={item} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="cc-issue-top">
-              <Identity item={item} />
-              {<CanvasThread item={item} />}
-              <Status status={itemStatus} active={item.active} />
-              <Fields id={item.id} />
-            </div>
-            {title(meta.title, `issue:${item.id}`)}
-            {(!!meta.labels.length || !meta.labelsKnown) && (
-              <div className="cc-issue-bottom">
-                <Labels id={item.id} />
-              </div>
-            )}
-          </>
-        )}
+        <ProjectItemPresentation
+          item={item}
+          metadata={meta}
+          titleMode={titleMode}
+          titleExpanded={expandedName(`issue:${item.id}`)}
+          parentExpanded={expandedName(`badge:${item.id}`)}
+          parentHighlighted={!!item.parent && highlightedParents.has(item.parent)}
+        />
       </div>
     );
   }

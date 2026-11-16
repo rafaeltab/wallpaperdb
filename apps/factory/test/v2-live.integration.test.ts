@@ -27,92 +27,99 @@ const job = {
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
 
-it('reports manual worker activity without rewinding its retained factory stage or accepting old-head checks', async () => {
-  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
-  const pull = pullObservation(2, {
-    head: 'c'.repeat(40),
-    evidenceHead: 'a'.repeat(40),
-    ci: 'PENDING',
-  });
-  const input = { ...parkedSnapshot(pull, true) };
-  const source = input.jobs[0];
-  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
-  input.jobs = [
-    {
-      ...source,
-      resume: undefined,
-      execution: { ...source.execution, status: 'running', manual: { runId: 'manual-9' } },
-      delivery: {
-        stage: 'ci',
-        commit: 'a'.repeat(40),
-        ready: false,
-        landed: false,
-        pr: { kind: 'found', url: pull.url, commit: pull.head, ready: false, landed: false },
+it.each(['implementation', 'review', 'publication', 'babysitting', 'ci'] as const)(
+  'reports manual worker activity without rewinding $stage or accepting old-head checks: %s',
+  async (stage) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2, {
+      head: 'c'.repeat(40),
+      evidenceHead: 'a'.repeat(40),
+      ci: 'PENDING',
+    });
+    const input = { ...parkedSnapshot(pull, true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'running', manual: { runId: 'manual-9' } },
+        delivery: {
+          stage,
+          commit: 'a'.repeat(40),
+          ready: false,
+          landed: false,
+          pr: { kind: 'found', url: pull.url, commit: pull.head, ready: false, landed: false },
+        },
       },
-    },
-  ];
-  input.localWork = [];
-  const board = await liveBoard({ scopeId: 'manual-worker', initial: input });
-  const snapshot = board.snapshot();
-  expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject({
-    code: 'worker-active',
-    active: true,
-  });
-  expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1'].stage).toBe('ci');
-  expect(snapshot.entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].readiness.state).toBe(
-    'unknown'
-  );
-  input.jobs = [
-    {
-      ...source,
-      resume: undefined,
-      execution: { ...source.execution, status: 'completed', manual: { runId: 'manual-9' } },
-      delivery: {
-        stage: 'ci',
-        commit: 'a'.repeat(40),
-        ready: false,
-        landed: false,
-        pr: { kind: 'found', url: pull.url, commit: pull.head, ready: false, landed: false },
+    ];
+    input.localWork = [];
+    const board = await liveBoard({ scopeId: 'manual-worker', initial: input });
+    const snapshot = board.snapshot();
+    expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject({
+      code: 'worker-active',
+      active: true,
+    });
+    expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1'].stage).toBe(stage);
+    expect(snapshot.entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].readiness.state).toBe(
+      'unknown'
+    );
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'completed', manual: { runId: 'manual-9' } },
+        delivery: {
+          stage,
+          commit: 'a'.repeat(40),
+          ready: false,
+          landed: false,
+          pr: { kind: 'found', url: pull.url, commit: pull.head, ready: false, landed: false },
+        },
       },
-    },
-  ];
-  await board.publish({ ...input, observations: { ...input.observations, observedAt: 3000 } });
-  expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject({
-    code: 'awaiting-verification',
-    active: false,
-  });
-  const current = {
-    ...input,
-    observations: {
-      ...input.observations,
-      observedAt: 4000,
-      facts: {
-        issues: input.observations.facts?.issues ?? [],
-        pullRequests: [{ ...pull, evidenceHead: pull.head }],
+    ];
+    await board.publish({ ...input, observations: { ...input.observations, observedAt: 3000 } });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject(
+      {
+        code: 'awaiting-verification',
+        active: false,
+      }
+    );
+    const current = {
+      ...input,
+      observations: {
+        ...input.observations,
+        observedAt: 4000,
+        facts: {
+          issues: input.observations.facts?.issues ?? [],
+          pullRequests: [{ ...pull, evidenceHead: pull.head }],
+        },
       },
-    },
-  };
-  await board.publish(current);
-  expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
-    'ci-running'
-  );
-  await board.publish({
-    ...current,
-    observations: {
-      ...current.observations,
-      observedAt: 5000,
-      facts: {
-        ...current.observations.facts,
-        pullRequests: [{ ...pull, mergeability: 'CONFLICTING' }],
+    };
+    await board.publish(current);
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+      'ci-running'
+    );
+    await board.publish({
+      ...current,
+      observations: {
+        ...current.observations,
+        observedAt: 5000,
+        facts: {
+          ...current.observations.facts,
+          pullRequests: [{ ...pull, mergeability: 'CONFLICTING' }],
+        },
       },
-    },
-  });
-  expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject({
-    code: 'conflict',
-    active: false,
-  });
-  expect(board.snapshot().entities.jobs['job:rafaeltab/wallpaperdb/1'].stage).toBe('ci');
-});
+    });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status).toMatchObject(
+      {
+        code: 'conflict',
+        active: false,
+      }
+    );
+    expect(board.snapshot().entities.jobs['job:rafaeltab/wallpaperdb/1'].stage).toBe(stage);
+  }
+);
 
 it.each(
   (['implementation', 'review', 'publication', 'babysitting', 'ci'] as const).flatMap((stage) =>

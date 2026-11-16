@@ -2,6 +2,37 @@ import { Deferred, Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { completionFixture as fixture } from './fixtures/completion.js';
 import { controlledStore } from './fixtures/store.js';
+import { Unavailable } from '../src/capabilities/job/index.js';
+
+it.each([false, true])(
+  'interrupts cancelled work when provisional reporting fails %s',
+  async (failed) => {
+    let reportingFailed = false;
+    const f = await fixture(3, controlledStore(), undefined, {
+      begin: () => Effect.succeed(1),
+      accepted: () => Effect.void,
+      failed: () => Effect.void,
+      observed: () =>
+        reportingFailed
+          ? Effect.fail(new Unavailable({ operation: 'report-observation', cause: 'buffer flush' }))
+          : Effect.void,
+    });
+    try {
+      const intent = await Effect.runPromise(f.store.read());
+      if (!intent) throw new Error('Missing job');
+      reportingFailed = failed;
+      if (failed)
+        await expect(f.cancel(intent.id)).rejects.toMatchObject({
+          operation: 'report-observation',
+        });
+      else expect(await f.cancel(intent.id)).toMatchObject({ delivery: { activity: 'cancelled' } });
+      expect(f.interrupts).toEqual(['owner']);
+      expect(await Effect.runPromise(f.store.readControl())).toMatchObject({ cancelled: true });
+    } finally {
+      await f.close();
+    }
+  }
+);
 
 it.each([false, true])(
   'cancels during publication outage with retained PR %s',

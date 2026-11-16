@@ -11,7 +11,8 @@ export function factoryStatus(
   jobs: readonly Job[],
   maintenance: readonly Maintenance[],
   question: boolean,
-  pr?: PullRequest
+  pr?: PullRequest,
+  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown'
 ): StatusCode | undefined {
   if (
     maintenance.some((m) => m.phase === 'manual-recovery') ||
@@ -32,6 +33,7 @@ export function factoryStatus(
         ['finished', 'interrupted'].includes(j.execution.value.state)
     )
   ) {
+    if (providerStatus(pr, mergeability) === 'conflict') return 'conflict';
     if (
       jobs[0]?.stage === 'ci' &&
       pr?.metadata.state === 'known' &&
@@ -46,10 +48,19 @@ export function factoryStatus(
   if (jobs.some((j) => j.activity === 'repairing')) return 'repairing-ci';
   return jobs[0] ? stageStatus[jobs[0].stage] : undefined;
 }
-export function providerStatus(pr: PullRequest | undefined): StatusCode | undefined {
+export function providerStatus(
+  pr: PullRequest | undefined,
+  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown'
+): StatusCode | undefined {
   if (!pr) return undefined;
-  if (pr.readiness.state === 'ready') return 'ready';
   if (pr.readiness.state === 'landed') return 'landed';
+  if (
+    (mergeability ??
+      (pr.metadata.state === 'known' ? pr.metadata.value.mergeability : undefined)) ===
+    'conflicting'
+  )
+    return 'conflict';
+  if (pr.readiness.state === 'ready') return 'ready';
   if (pr.checks.state === 'known' && pr.checks.value.state === 'failed') return 'ci-failed';
   if (
     pr.reviews.state === 'known' &&
@@ -58,8 +69,6 @@ export function providerStatus(pr: PullRequest | undefined): StatusCode | undefi
     !pr.metadata.value.draft
   )
     return 'needs-review';
-  if (pr.metadata.state === 'known' && pr.metadata.value.mergeability === 'conflicting')
-    return 'conflict';
   if (pr.checks.state === 'known' && pr.checks.value.state === 'pending') return 'ci-running';
   return undefined;
 }

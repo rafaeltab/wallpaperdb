@@ -390,6 +390,8 @@ export type PullRequestObservation =
       readonly owningHeads?: readonly string[];
       readonly parent?: string;
       readonly base?: string;
+      /** Current provider mergeability for this exact PR head and target branch. Reporting only. */
+      readonly mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown';
       readonly ci?: { readonly failed: boolean; readonly progress: string };
       readonly ready: boolean;
       readonly landed: boolean;

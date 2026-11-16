@@ -52,6 +52,14 @@ export function publication(
           url: pr.url,
           commit: pr.headRefOid,
           base: pr.baseRefName,
+          mergeability:
+            pr.mergeable === 'MERGEABLE'
+              ? ('clean' as const)
+              : pr.mergeable === 'CONFLICTING'
+                ? ('conflicting' as const)
+                : pr.mergeable === 'UNKNOWN'
+                  ? ('pending' as const)
+                  : ('unknown' as const),
           ci: {
             failed: ciFailed(pr),
             progress,

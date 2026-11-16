@@ -42,6 +42,13 @@ it('requires a unique matching PR and mandatory current checks while ignoring ad
       kind: 'found',
       ready: true,
       landed: false,
+      mergeability: 'clean',
+    });
+    await host.save({ prs: [{ ...pr, mergeable: 'CONFLICTING' }] });
+    expect(await Effect.runPromise(adapter.pullRequest(intent))).toMatchObject({
+      kind: 'found',
+      ready: false,
+      mergeability: 'conflicting',
     });
     for (const patch of [
       {

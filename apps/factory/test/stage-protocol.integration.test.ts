@@ -175,8 +175,9 @@ it.each([
           { role: 'assistant', text: JSON.stringify({ ...state(intent, host.base), ...change }) },
         ],
       });
-      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).not.toMatchObject({
-        accepted: true,
+      expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
+        accepted: false,
+        responseObserved: true,
       });
     })
 );
@@ -465,6 +466,7 @@ it.each([
     await host.save({ overrides, messages: [...messages, malformed] });
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
       accepted: false,
+      responseObserved: true,
       idle: true,
     });
     await host.save({ overrides, messages: [...messages, malformed, success] });

@@ -76,46 +76,56 @@ it('selects the configured development Clerk issuer from the explicit domain or 
   expect(() => developmentIssuer({ CLERK_PUBLISHABLE_KEY: 'invalid' })).toThrow();
 });
 
-it('adds explicitly configured origins to both services without losing existing origins or credentials', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'asset-dev-origins-'));
-  const options = {
-    issuer: 'https://selected.clerk.accounts.dev',
-    ingress: 'http://localhost:8970',
-  };
-  try {
-    await configureDevelopment(directory, options);
-    const path = join(directory, 'apps/asset/.authority.json');
-    const initial = readAuthority(path);
-    await configureDevelopment(directory, {
-      ...options,
-      additionalAuthorizedOrigins: ['http://zerotwo:8970', 'http://wallpaperdb-http.test:8970/'],
-    });
-    await configureDevelopment(directory, {
-      ...options,
-      additionalAuthorizedOrigins: ['http://zerotwo:8970'],
-    });
-    await configureDevelopment(directory, options);
-    const configured = readAuthority(path);
-    const expected = [
-      'http://localhost:8970',
-      'http://127.0.0.1:8970',
-      'http://zerotwo:8970',
-      'http://wallpaperdb-http.test:8970',
-    ];
-    expect(configured.identityProviders.clerk?.authorizedParties).toEqual(expected);
-    expect(configured.broker).toEqual(initial.broker);
-    expect(configured.applications).toEqual(initial.applications);
-    expect(configured.identityProviders.clerk?.requireAuthorizedParty).toBe(
-      initial.identityProviders.clerk?.requireAuthorizedParty
-    );
-    const workflow = JSON.parse(
-      await readFile(join(directory, 'apps/wallpaper/.workflow.json'), 'utf8')
-    );
-    expect(workflow.identityProviders[0].authorizedParties).toEqual(expected);
-  } finally {
-    await rm(directory, { recursive: true, force: true });
+it.each([false, true])(
+  'adds explicitly configured origins to both services with duplicate existing origins: %s',
+  async (duplicateExistingOrigins) => {
+    const directory = await mkdtemp(join(tmpdir(), 'asset-dev-origins-'));
+    const options = {
+      issuer: 'https://selected.clerk.accounts.dev',
+      ingress: 'http://localhost:8970',
+    };
+    try {
+      await configureDevelopment(directory, options);
+      const path = join(directory, 'apps/asset/.authority.json');
+      const initial = readAuthority(path);
+      if (duplicateExistingOrigins) {
+        const existing = JSON.parse(await readFile(path, 'utf8'));
+        existing.identityProviders.clerk.authorizedParties.push(
+          ...existing.identityProviders.clerk.authorizedParties
+        );
+        await writeFile(path, JSON.stringify(existing));
+      }
+      await configureDevelopment(directory, {
+        ...options,
+        additionalAuthorizedOrigins: ['http://zerotwo:8970', 'http://wallpaperdb-http.test:8970/'],
+      });
+      await configureDevelopment(directory, {
+        ...options,
+        additionalAuthorizedOrigins: ['http://zerotwo:8970'],
+      });
+      await configureDevelopment(directory, options);
+      const configured = readAuthority(path);
+      const expected = [
+        'http://localhost:8970',
+        'http://127.0.0.1:8970',
+        'http://zerotwo:8970',
+        'http://wallpaperdb-http.test:8970',
+      ];
+      expect(configured.identityProviders.clerk?.authorizedParties).toEqual(expected);
+      expect(configured.broker).toEqual(initial.broker);
+      expect(configured.applications).toEqual(initial.applications);
+      expect(configured.identityProviders.clerk?.requireAuthorizedParty).toBe(
+        initial.identityProviders.clerk?.requireAuthorizedParty
+      );
+      const workflow = JSON.parse(
+        await readFile(join(directory, 'apps/wallpaper/.workflow.json'), 'utf8')
+      );
+      expect(workflow.identityProviders[0].authorizedParties).toEqual(expected);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
-});
+);
 
 it.each([
   '*',

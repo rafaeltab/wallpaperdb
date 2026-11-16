@@ -132,7 +132,9 @@ export async function configureDevelopment(
     const provider = authority.identityProviders.clerk;
     if (!provider) throw new Error('Development Clerk identity provider is required');
     const origins = [...new Set([...provider.authorizedParties, ...additionalOrigins])];
-    originsChanged = origins.length !== provider.authorizedParties.length;
+    originsChanged =
+      origins.length !== provider.authorizedParties.length ||
+      origins.some((origin, index) => origin !== provider.authorizedParties[index]);
     raw.identityProviders.clerk.authorizedParties = origins;
     authority = parseAuthority(raw);
   }

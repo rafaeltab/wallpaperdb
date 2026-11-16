@@ -21,6 +21,23 @@ import { watchdog } from './watchdog.js';
 import { stageDeliveryIndex } from './delivery.js';
 import { adoptManualRepair, recoverManualRepair, retainManualRepair } from './manual-repair.js';
 
+export function retainInitialStage(
+  store: JobStore,
+  intent: Intent,
+  index: number,
+  threadId: string
+) {
+  return store.saveStage({
+    index,
+    receiptProtocol: intent.receiptProtocol,
+    ...(index > 0 ? { ordinal: 1, deliveryIndex: 0 } : {}),
+    stage: 'implementation',
+    threadId,
+    commit: intent.base,
+    previousRunId: null,
+  });
+}
+
 export function reconcileStages(
   store: JobStore,
   execution: Execution,
@@ -36,15 +53,7 @@ export function reconcileStages(
     const initialIndex = authority.restart?.index ?? 0;
     if (observation.kind !== 'found') return undefined;
     if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
-    yield* store.saveStage({
-      index: initialIndex,
-      receiptProtocol: intent.receiptProtocol,
-      ...(initialIndex > 0 ? { ordinal: 1, deliveryIndex: 0 } : {}),
-      stage: 'implementation',
-      threadId: observation.threadId,
-      commit: intent.base,
-      previousRunId: null,
-    });
+    yield* retainInitialStage(store, intent, initialIndex, observation.threadId);
     yield* recoverManualRepair(store);
     yield* recoverReconciliation(store);
     const waiting = yield* currentStage(store);

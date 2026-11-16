@@ -825,6 +825,7 @@ it('manually retries incomplete implementation in a fresh original-base worktree
       await writeFile(`${prior.worktreePath}/unfinished.txt`, 'Uncommitted evidence');
       await writeFile(resourcePath, JSON.stringify({ ...prior, status: 'completed' }));
       await save({
+        omitThreadList: true,
         messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
       });
       const request = {

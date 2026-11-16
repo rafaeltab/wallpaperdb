@@ -3,6 +3,38 @@ import { expect, it } from 'vitest';
 import { t3Execution } from '../src/adapters/t3/index.js';
 import type { Intent } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
+it('returns the confirmed owning thread from a successful launch', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({ lost: false });
+    const adapter = t3Execution({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    expect(
+      await Effect.runPromise(
+        adapter.launch({
+          id: 'known-launch',
+          issue: 576,
+          issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
+          base: host.base,
+          context: 'Only this issue',
+          branch: 'factory/known-launch',
+          createdAt: 100,
+          expectedStage: 'implementation',
+        })
+      )
+    ).toEqual({ kind: 'submitted', threadId: 'thread-live' });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it('reconciles a lost launch using real isolated Git binding and rejects contradictory observations', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

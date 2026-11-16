@@ -1331,7 +1331,11 @@ export async function runProtocol(
         })
       );
       if (config.lost) process.exit(1);
-      reply({ threadId: 'thread-live', projectId: 'project-id', runId: 'run-1' });
+      reply({
+        threadId: config.parallel ? flag('--branch') : 'thread-live',
+        projectId: 'project-id',
+        runId: 'run-1',
+      });
     } else if (args[1] === 'send') {
       const path = join(
         config.directory,
@@ -1393,13 +1397,15 @@ export async function runProtocol(
       if (config.malformed) console.log('{broken');
       else if (args[1] === 'list')
         reply(
-          config.parallel
-            ? parallelResources
-            : resource
-              ? config.duplicate
-                ? [resource, resource]
-                : [resource]
-              : []
+          config.omitThreadList
+            ? []
+            : config.parallel
+              ? parallelResources
+              : resource
+                ? config.duplicate
+                  ? [resource, resource]
+                  : [resource]
+                : []
         );
       else if (args[1] === 'show')
         reply({

@@ -1,6 +1,6 @@
 import { chromium, firefox, expect as browserExpect, type Page } from '@playwright/test';
 import { build, preview } from 'vite';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -165,6 +165,9 @@ const expected: Expected[] = JSON.parse(expectedText);
 const fixtureSha256 = createHash('sha256').update(expectedText).digest('hex');
 const source = resolve(option('--source') ?? 'frontend');
 const compareSource = option('--compare-source');
+const demoDirectory = process.env.FACTORY_DEMO_DIRECTORY
+  ? resolve(process.env.FACTORY_DEMO_DIRECTORY)
+  : undefined;
 type VariantName = 'current' | 'reference';
 type VariantResource = {
   directory: string;
@@ -194,6 +197,7 @@ async function prepareVariant(variant: VariantName, frontendSource: string) {
   return { variant, origin };
 }
 try {
+  if (demoDirectory) await mkdir(demoDirectory, { recursive: true });
   const variants = [await prepareVariant('current', source)];
   if (compareSource) variants.push(await prepareVariant('reference', resolve(compareSource)));
   type Sample = {
@@ -287,6 +291,10 @@ try {
             viewport: { width: 1600, height: 1000 },
             expectation: 'Pinned predecessor routing and geometry, no real backend',
             fixtureSha256,
+            recording: !!demoDirectory,
+            timingWarning: demoDirectory
+              ? 'Recording is enabled; these timings are demonstration data, not acceptance benchmarks.'
+              : undefined,
           })
         );
       for (const scenario of scenarios) {
@@ -304,7 +312,12 @@ try {
           // Pair both sources in one host-load window and counterbalance their order.
           const order = round % 2 ? [...variants].reverse() : variants;
           for (const { variant, origin } of order) {
-            const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+            const page = await browser.newPage({
+              viewport: { width: 1600, height: 1000 },
+              ...(demoDirectory
+                ? { recordVideo: { dir: demoDirectory, size: { width: 1600, height: 1000 } } }
+                : {}),
+            });
             const errors: string[] = [];
             page.on('pageerror', (error) => errors.push(error.message));
             let board = makeInitial(scenario.fixture),
@@ -380,7 +393,25 @@ try {
               );
               throw error;
             } finally {
+              const video = page.video();
               await page.close();
+              if (demoDirectory && video) {
+                const path = join(
+                  demoDirectory,
+                  `${browserName}-${variant}-${scenario.name}-${round}.webm`
+                );
+                await rename(await video.path(), path);
+                console.log(
+                  JSON.stringify({
+                    event: 'demonstration',
+                    browser: browserName,
+                    variant,
+                    scenario: scenario.name,
+                    round,
+                    path,
+                  })
+                );
+              }
             }
           }
         }

@@ -43,3 +43,19 @@ make test-integration PACKAGE=factory
 The [browser integration journey](../apps/factory/frontend/test/canvas.integration.test.ts) exercises the actual Vite proxy and fake HTTP server. Set `FACTORY_DEMO_DIRECTORY` to an outside-repository directory when running it to retain a recording and screenshot.
 
 The [factory build script](../apps/factory/package.json) places Vite output in `apps/factory/dist/frontend`. [Installation](../apps/factory/scripts/install.ts) includes it in the pinned release alongside the backend. The backend serves `/` and hashed `/assets` paths from that release, without GitHub/T3 calls or a Vite server. Production activation remains an explicit host operation using the existing installation contract.
+
+## Measure canvas expansion
+
+Run the [expansion budget check](../apps/factory/frontend/scripts/benchmark-project-canvas-expansion.ts) separately from coverage-instrumented correctness checks:
+
+```sh
+make run PACKAGE=factory SCRIPT=bench:project-canvas-expansion ARGS='--rounds 5'
+```
+
+The check builds the production frontend and runs Chromium and Firefox against controlled HTTP responses. It uses three fixed synthetic 100-item scenes, including a 75-link scene, without connecting to a running backend. It measures both the first expansion of previously uncomputed routes and repeat expansion from all collapsed. Timing starts at the Expand all click and includes matching expanded placement and dependency-link paths plus the next animation-frame boundary. Every measured current sample must be below the default 100 ms budget; a failure exits nonzero. The output retains individual samples and observed ranges rather than hiding slow runs.
+
+The [saved expectations](../apps/factory/frontend/test/fixtures/canvas/expansion100.json) preserve original placement and link geometry. Keep these expectations fixed when optimizing. The existing [routing suite](../apps/factory/frontend/test/item-dependency-links.unit.test.ts) checks additional title modes, collapsed scenes, and routing failures.
+
+Use `--report-only` to capture a failing performance baseline while still enforcing output correctness. Use `--compare-source /path/to/frozen/frontend` to alternate the current and reference production builds within each round; the timing budget applies to the current build and correctness applies to both. These measurements describe the selected host, browsers, workload, and build mode, rather than a hardware-independent latency guarantee.
+
+Set `FACTORY_DEMO_DIRECTORY` to retain a video of each expansion scenario for a demonstration. Recorded runs label their timings as demonstration data; use an unrecorded run for performance acceptance.

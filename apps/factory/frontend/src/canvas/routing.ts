@@ -37,11 +37,17 @@ function lowerBound(values: number[], value: number) {
 class Queue {
   length = 0;
   score = 0;
-  private keys = new Float64Array(1024);
+  private keys: Int32Array | Float64Array;
   private scores = new Float64Array(1024);
+  constructor(maximumKey: number) {
+    this.keys = maximumKey <= 2_147_483_647 ? new Int32Array(1024) : new Float64Array(1024);
+  }
   push(key: number, score: number) {
     if (this.length === this.keys.length) {
-      const keys = new Float64Array(this.length * 2),
+      const keys =
+          this.keys instanceof Int32Array
+            ? new Int32Array(this.length * 2)
+            : new Float64Array(this.length * 2),
         scores = new Float64Array(this.length * 2);
       keys.set(this.keys);
       scores.set(this.scores);
@@ -333,7 +339,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
       }
       const costs = new Float64Array(cols * rows * 3).fill(Infinity),
         previous = new Int32Array(costs.length).fill(-1),
-        queue = new Queue(),
+        queue = new Queue(costs.length - 1),
         initial = encode(sx, sy, 2);
       costs[initial] = 0;
       queue.push(initial, 0);

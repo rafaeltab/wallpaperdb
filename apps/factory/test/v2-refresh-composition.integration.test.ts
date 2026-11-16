@@ -1,7 +1,9 @@
 import { Effect } from 'effect';
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
-import { fileScheduleStore } from '../src/adapters/store/index.js';
+import { fileScheduleStore, fileStore } from '../src/adapters/store/index.js';
 import type { FactoryV2Snapshot } from '../src/http/index.js';
 import { protocol } from './fixtures/setup.js';
 
@@ -95,7 +97,130 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
   }
 });
 
-it('paces empty automatic discovery by cycle cost while continuing scheduler reconciliation', async () => {
+it('plans with free capacity after retained CI observation has incurred quota cost', async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+  vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
+  const host = await protocol({ origin: true });
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    const state = host.directory + '/state';
+    const intent = {
+      id: 'retained-ci',
+      issue: 579,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/579',
+      base: host.base,
+      branch: 'factory/retained-ci',
+      context: 'Retained work',
+      createdAt: Date.now(),
+      expectedStage: 'implementation' as const,
+    };
+    const store = fileStore(state);
+    await Effect.runPromise(store.reserve(intent));
+    await Effect.runPromise(store.claimLaunch());
+    for (const [index, stage] of (
+      ['implementation', 'review', 'publication', 'ci'] as const
+    ).entries())
+      await Effect.runPromise(
+        store.saveStage({
+          index,
+          stage,
+          threadId: 'thread-retained',
+          commit: host.base,
+          previousRunId: index ? 'run-1' : null,
+        })
+      );
+    await Effect.runPromise(
+      fileScheduleStore(state).save({
+        revision: 0,
+        concurrency: 3,
+        allowance: 15,
+        paused: false,
+        admissions: [{ issue: intent.issue, base: intent.base, context: intent.context }],
+      })
+    );
+    const worktree = host.directory + '/retained-worktree';
+    execFileSync('git', ['worktree', 'add', '-b', intent.branch, worktree, host.base], {
+      cwd: host.repository,
+    });
+    await writeFile(
+      host.directory + '/resource.json',
+      JSON.stringify({
+        threadId: 'thread-retained',
+        projectId: 'project-id',
+        title: 'Factory retained-ci',
+        providerInstanceId: 'codex',
+        model: 'gpt-6.1-sol',
+        branch: intent.branch,
+        worktreePath: worktree,
+        status: 'running',
+        latestRunId: 'run-1',
+        runCount: 1,
+        pendingRequestCount: 0,
+      })
+    );
+    await host.save({
+      githubRate: { limit: 1000, remaining: 1000, reset: Date.now() / 1000 + 3600 },
+      planning: {
+        candidates: [580],
+        issues: [
+          {
+            number: 579,
+            title: 'Retained CI work',
+            body: intent.context,
+            state: 'OPEN',
+            url: intent.issueUrl,
+            author: { login: 'rafaeltab' },
+            labels: [],
+            comments: [],
+          },
+          {
+            number: 580,
+            title: 'Available work',
+            body: 'Only this issue',
+            state: 'OPEN',
+            url: 'https://github.com/rafaeltab/wallpaperdb/issues/580',
+            author: { login: 'rafaeltab' },
+            labels: [{ name: 'ready-for-agent' }],
+            comments: [],
+          },
+        ],
+      },
+      planner: { proposal: { selected: [], deferred: [] } },
+    });
+    running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: state,
+      FACTORY_PORT: '0',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(
+      async () =>
+        expect(JSON.parse(await readFile(host.directory + '/planner.json', 'utf8'))).toHaveProperty(
+          'prompt'
+        ),
+      { timeout: 8000, interval: 20 }
+    );
+    const snapshot = (await running.app.inject('/api/scheduler')).json();
+    expect(snapshot.state.concurrency).toBe(3);
+    expect(snapshot.state.admissions).toHaveLength(1);
+  } finally {
+    await running?.close();
+    vi.useRealTimers();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
+it('paces whole automatic ticks by cycle cost', async () => {
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
   const host = await protocol(),
@@ -126,17 +251,18 @@ it('paces empty automatic discovery by cycle cost while continuing scheduler rec
       timeout: 5000,
       interval: 20,
     });
+    await vi.waitFor(async () =>
+      expect(
+        (await running!.app.inject('/api/scheduler')).json().observations.jobsObservedAt
+      ).toBeDefined()
+    );
+    const observedAt = (await running.app.inject('/api/scheduler')).json().observations
+      .jobsObservedAt;
     for (let tick = 0; tick < 3; tick++) {
-      const target = Date.now() + 1000;
       await vi.advanceTimersByTimeAsync(1000);
-      await vi.waitFor(
-        async () => {
-          const snapshot = (await running!.app.inject('/api/scheduler')).json();
-          expect(snapshot.observations.jobsObservedAt).toBeGreaterThanOrEqual(target);
-          expect(snapshot.state.admissions).toEqual([]);
-        },
-        { timeout: 5000, interval: 20 }
-      );
+      const snapshot = (await running.app.inject('/api/scheduler')).json();
+      expect(snapshot.observations.jobsObservedAt).toBe(observedAt);
+      expect(snapshot.state.admissions).toEqual([]);
     }
     expect(await discoveries()).toHaveLength(1);
     // The next collection follows its actual quota cost, without a fixed

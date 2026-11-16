@@ -27,6 +27,199 @@ const job = {
   cancel: () => Effect.succeed({ kind: 'rejected' as const }),
 };
 
+it.each(
+  (['implementation', 'review', 'publication', 'babysitting', 'ci'] as const).flatMap((stage) =>
+    ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].map((status) => ({
+      stage,
+      status,
+    }))
+  )
+)(
+  'reports a terminal $stage worker with $status without implying accepted completion or active execution',
+  async ({ stage, status }) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const input = { ...parkedSnapshot(pullObservation(2), true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status },
+        delivery: {
+          stage,
+          commit: source.intent.base,
+          ready: false,
+          landed: false,
+          active: true,
+          pr: {
+            kind: 'found',
+            url: pullObservation(2).url,
+            commit: pullObservation(2).head,
+            ready: false,
+            landed: false,
+          },
+        },
+      },
+    ];
+    input.localWork = [];
+    const board = await liveBoard({ scopeId: 'terminal-reporting', initial: input });
+    const item = board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'];
+    expect(item.status.code).toBe('completion-unverified');
+    expect(item.status.active).toBe(false);
+    expect(
+      board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].readiness.state
+    ).not.toBe('ready');
+  }
+);
+
+it('shows accepted ready CI without requiring historical parent metadata', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const pull = pullObservation(2, { ci: 'SUCCESS', review: 'REVIEW_REQUIRED' });
+  const input = { ...parkedSnapshot(pull, true) };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      prerequisite: { url: pull.url, commit: pull.head, base: 'main' },
+      execution: { ...source.execution, status: 'completed' },
+      delivery: {
+        stage: 'ci',
+        commit: pull.head,
+        ready: true,
+        landed: false,
+        active: false,
+        pr: { kind: 'found', url: pull.url, commit: pull.head, ready: true, landed: false },
+      },
+    },
+  ];
+  input.localWork = [];
+  const board = await liveBoard({ scopeId: 'ready-reporting', initial: input });
+  expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+    'ready'
+  );
+});
+
+it('keeps a repair on its durably owned PR when provider associations are unavailable', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const pull = pullObservation(2, { linkedIssues: [1], ci: 'FAILURE', review: 'REVIEW_REQUIRED' });
+  const input = { ...parkedSnapshot(pull, false) };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  const owner = { threadId: source.execution.threadId, prUrl: pull.url };
+  input.localWork = [
+    {
+      intent: source.intent,
+      control: { revision: 1, cancelled: false, claimed: [], ownership: owner },
+    },
+  ];
+  input.threads = {
+    state: 'current',
+    stale: false,
+    facts: { environmentId: 'installed', projectId: 'project', threads: [] },
+  };
+  input.jobs = [
+    {
+      ...source,
+      execution: { kind: 'ambiguous' },
+      delivery: {
+        stage: 'babysitting',
+        commit: pull.head,
+        ready: false,
+        landed: false,
+        active: true,
+        activity: 'repairing',
+      },
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'repair-binding', initial: input });
+  const snapshot = board.snapshot();
+  expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1'].pullRequestId).toBe(
+    'pr:rafaeltab/wallpaperdb/2'
+  );
+  expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1'].threadId).toBe(
+    'thread:installed/t1'
+  );
+  expect(snapshot.entities.items['item:issue:rafaeltab/wallpaperdb/1']).toBeUndefined();
+  expect(snapshot.entities.items['item:pr:rafaeltab/wallpaperdb/2'].jobIds).toEqual([
+    'job:rafaeltab/wallpaperdb/1',
+  ]);
+});
+
+it('prioritizes failed CI over a provider review request on an unmanaged PR', async () => {
+  const { pullObservation } = await import('./fixtures/v2.js');
+  const board = await liveBoard({
+    scopeId: 'failed-ci',
+    initial: {
+      ...initial,
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 2000,
+        facts: {
+          issues: [],
+          pullRequests: [pullObservation(2, { ci: 'FAILURE', review: 'REVIEW_REQUIRED' })],
+        },
+      },
+    },
+  });
+  expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+    'ci-failed'
+  );
+});
+
+it.each(['running', 'completed'])(
+  'reports an observation failure honestly after a cached %s execution',
+  async (status) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const source = parkedSnapshot(pullObservation(2), true);
+    const worker = source.jobs[0];
+    if (worker.kind !== 'job' || worker.execution.kind !== 'found')
+      throw new Error('Missing worker');
+    const board = await liveBoard({
+      scopeId: 'observation-failure',
+      initial: {
+        ...source,
+        localWork: [],
+        jobs: [
+          {
+            ...worker,
+            execution: { ...worker.execution, status },
+            delivery: {
+              ...worker.delivery,
+              stage: 'implementation',
+              commit: worker.intent.base,
+              ready: false,
+              landed: false,
+              question: undefined,
+            },
+          },
+        ],
+        observations: {
+          ...source.observations,
+          items: {
+            [`job:${worker.intent.id}`]: {
+              generation: 1,
+              sequence: 2,
+              attemptedAt: 30,
+              observedAt: 20,
+              failedAt: 30,
+              error: 'inspect-stage',
+            },
+          },
+        },
+      },
+    });
+    expect(
+      board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status
+    ).toMatchObject({
+      code: status === 'completed' ? 'completion-unverified' : 'unknown',
+      active: false,
+    });
+  }
+);
+
 it.each(['controlled', 'sqlite'] as const)(
   'releases a Retry rejected before execution without losing replay or uncertain protection in %s',
   async (backend) => {

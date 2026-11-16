@@ -271,6 +271,43 @@ export function reportingStoreContract(
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { execution: { run: { id: 'replacement-8', ordinal: 8 } }, delivery: { ready: false } },
       ]);
+      await Effect.runPromise(
+        store.publish(latest, [
+          {
+            kind: 'job',
+            value: { ...job, execution: { ...execution, status: 'completed' } },
+            sequence: 3,
+            at: 46,
+          },
+        ])
+      );
+      const delayed = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(delayed, [
+          {
+            kind: 'job',
+            value: { ...job, execution },
+            sequence: 1,
+            at: 47,
+          },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { status: 'completed', run: { id: 'run-8' } } },
+      ]);
+      await Effect.runPromise(
+        store.publish(delayed, [
+          {
+            kind: 'job',
+            value: { ...job, execution: { ...execution, run: { id: 'run-9', ordinal: 9 } } },
+            sequence: 2,
+            at: 48,
+          },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { status: 'running', run: { id: 'run-9' } } },
+      ]);
       await Effect.runPromise(store.jobs([], 50));
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { intent: { id: 'job-one' } },

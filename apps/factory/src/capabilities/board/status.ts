@@ -10,7 +10,8 @@ const stageStatus: Record<Job['stage'], StatusCode> = {
 export function factoryStatus(
   jobs: readonly Job[],
   maintenance: readonly Maintenance[],
-  question: boolean
+  question: boolean,
+  pr?: PullRequest
 ): StatusCode | undefined {
   if (
     maintenance.some((m) => m.phase === 'manual-recovery') ||
@@ -21,8 +22,26 @@ export function factoryStatus(
   if (jobs.some((j) => j.cancelled)) return 'cancelled';
   if (maintenance.some((m) => m.phase === 'unknown')) return 'unknown';
   if (maintenance.length) return 'restacking';
+  if (jobs.some((j) => j.activity === 'observation-unavailable')) return 'unknown';
   if (jobs.some((j) => j.activity === 'continuation-pending' || j.activity === 'resume-pending'))
     return 'continuation-pending';
+  if (
+    jobs.some(
+      (j) =>
+        j.execution.state === 'known' &&
+        ['finished', 'interrupted'].includes(j.execution.value.state)
+    )
+  ) {
+    if (
+      jobs[0]?.stage === 'ci' &&
+      pr?.metadata.state === 'known' &&
+      pr?.checks.state === 'known' &&
+      pr.checks.value.comparison.headOid === pr.metadata.value.comparison.headOid &&
+      pr.checks.value.state === 'pending'
+    )
+      return 'ci-running';
+    return 'completion-unverified';
+  }
   if (jobs.some((j) => j.execution.state === 'unknown')) return 'launching';
   if (jobs.some((j) => j.activity === 'repairing')) return 'repairing-ci';
   return jobs[0] ? stageStatus[jobs[0].stage] : undefined;
@@ -31,6 +50,7 @@ export function providerStatus(pr: PullRequest | undefined): StatusCode | undefi
   if (!pr) return undefined;
   if (pr.readiness.state === 'ready') return 'ready';
   if (pr.readiness.state === 'landed') return 'landed';
+  if (pr.checks.state === 'known' && pr.checks.value.state === 'failed') return 'ci-failed';
   if (
     pr.reviews.state === 'known' &&
     pr.reviews.value.state === 'required' &&
@@ -40,7 +60,6 @@ export function providerStatus(pr: PullRequest | undefined): StatusCode | undefi
     return 'needs-review';
   if (pr.metadata.state === 'known' && pr.metadata.value.mergeability === 'conflicting')
     return 'conflict';
-  if (pr.checks.state === 'known' && pr.checks.value.state === 'failed') return 'ci-failed';
   if (pr.checks.state === 'known' && pr.checks.value.state === 'pending') return 'ci-running';
   return undefined;
 }
@@ -73,6 +92,7 @@ export function attention(code: StatusCode): Attention {
         reasons: [{ code: 'needs-review', message: 'Human review is required.', actionIds: [] }],
       };
     case 'unknown':
+    case 'completion-unverified':
     case 'ci-failed':
     case 'conflict':
     case 'launching':

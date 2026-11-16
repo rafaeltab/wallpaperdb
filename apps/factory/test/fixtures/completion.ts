@@ -8,6 +8,7 @@ import {
   JobStore,
   Time,
   Unavailable,
+  JobReporting,
   type StageRequest,
   type StageEvidence,
 } from '../../src/capabilities/job/index.js';
@@ -16,7 +17,8 @@ import { controlledStore } from './store.js';
 export async function completionFixture(
   limit = 3,
   store: JobStore = controlledStore(),
-  verified?: () => Effect.Effect<void>
+  verified?: () => Effect.Effect<void>,
+  reporting?: JobReporting
 ) {
   let base: string | undefined;
   let unexpectedBase = false;
@@ -34,11 +36,13 @@ export async function completionFixture(
   let dependencyResult: 'valid' | 'invalid' | 'cycle' = 'valid';
   let handbackVerified = false;
   let lost = false;
+  let inspectFailed = false;
   const sends: StageRequest[] = [];
   const runtime = ManagedRuntime.make(
     JobLive.pipe(
       Layer.provide(
         Layer.mergeAll(
+          reporting ? Layer.succeed(JobReporting, reporting) : Layer.empty,
           Layer.succeed(JobStore, store),
           Layer.succeed(Time, { now: () => Effect.succeed(100) }),
           Layer.succeed(AgentReconciliationPolicy, { limit }),
@@ -83,20 +87,24 @@ export async function completionFixture(
                 model: 'gpt-6.1-sol',
               }),
             inspectStage: (_intent, stage) =>
-              Effect.succeed({
-                base,
-                unexpectedBase,
-                runId: `run-${run}`,
-                ordinal: run,
-                stageIndex: stage.index,
-                commit,
-                accepted,
-                idle,
-                migrationRequired,
-                dependencies,
-                worktreeClean: clean,
-                linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
-              } satisfies StageEvidence),
+              inspectFailed
+                ? Effect.fail(
+                    new Unavailable({ operation: 'inspect-stage', cause: 'controlled outage' })
+                  )
+                : Effect.succeed({
+                    base,
+                    unexpectedBase,
+                    runId: `run-${run}`,
+                    ordinal: run,
+                    stageIndex: stage.index,
+                    commit,
+                    accepted,
+                    idle,
+                    migrationRequired,
+                    dependencies,
+                    worktreeClean: clean,
+                    linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
+                  } satisfies StageEvidence),
             sendStage: (_intent, stage) =>
               Effect.sync(() => {
                 sends.push(stage);
@@ -145,6 +153,7 @@ export async function completionFixture(
       failed?: boolean;
       clean?: boolean;
       lost?: boolean;
+      inspectFailed?: boolean;
       run?: number;
       observationStatus?: string;
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
@@ -164,6 +173,7 @@ export async function completionFixture(
       failed = change.failed ?? failed;
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;
+      inspectFailed = change.inspectFailed ?? inspectFailed;
       run = change.run ?? run;
       observationStatus = change.observationStatus ?? observationStatus;
     },

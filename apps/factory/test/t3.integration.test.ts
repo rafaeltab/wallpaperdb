@@ -53,6 +53,17 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
     expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'ambiguous' });
     await host.save({ duplicate: true });
     expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'ambiguous' });
+    expect(
+      await Effect.runPromise(
+        adapter.observe(intent, {
+          index: 0,
+          stage: 'implementation',
+          threadId: 'thread-live',
+          commit: intent.base,
+          previousRunId: null,
+        })
+      )
+    ).toMatchObject({ kind: 'found', threadId: 'thread-live' });
     for (const overrides of [
       { model: 'wrong' },
       { projectId: 'wrong' },
@@ -62,6 +73,18 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
       await host.save({ overrides });
       expect(await Effect.runPromise(adapter.observe(intent))).toEqual({ kind: 'ambiguous' });
     }
+    await host.save({ overrides: { branch: 'wrong', status: 'completed' } });
+    expect(
+      await Effect.runPromise(
+        adapter.observe(intent, {
+          index: 0,
+          stage: 'implementation',
+          threadId: 'thread-live',
+          commit: intent.base,
+          previousRunId: null,
+        })
+      )
+    ).toMatchObject({ kind: 'unverified', threadId: 'thread-live', status: 'completed' });
     await host.save({ malformed: true });
     await expect(Effect.runPromise(adapter.observe(intent))).rejects.toMatchObject({
       _tag: 'Unavailable',

@@ -102,9 +102,11 @@ ${receiptInstructions(intent, 'implementation')}`,
     observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({
         try: async (signal): Promise<Observation> => {
-          const matches = listing
-            .parse(await call(['list', '--project', config.projectId], signal))
-            .filter((item) => matchesTitle(item.title, intent));
+          const matches = repair
+            ? [{ threadId: repair.threadId, title: title(intent) }]
+            : listing
+                .parse(await call(['list', '--project', config.projectId], signal))
+                .filter((item) => matchesTitle(item.title, intent));
           if (matches.length === 0) return { kind: 'absent' };
           if (matches.length !== 1) return { kind: 'ambiguous' };
           const match = matches[0];
@@ -112,6 +114,17 @@ ${receiptInstructions(intent, 'implementation')}`,
           const { thread } = detail.parse(
             await call(['show', match.threadId, '--messages', '1'], signal)
           );
+          const unverified: Observation = repair
+            ? {
+                kind: 'unverified',
+                threadId: repair.threadId,
+                status: thread.status,
+                run:
+                  thread.latestRunId && thread.runCount > 0
+                    ? { id: thread.latestRunId, ordinal: thread.runCount }
+                    : undefined,
+              }
+            : { kind: 'ambiguous' };
           const binding = z
             .object({
               projectId: z.literal(config.projectId),
@@ -126,23 +139,29 @@ ${receiptInstructions(intent, 'implementation')}`,
                 .refine((path) => path !== config.project),
             })
             .safeParse(thread);
-          if (!binding.success) return { kind: 'ambiguous' };
+          if (!binding.success) return unverified;
           const worktree = binding.data.worktreePath;
-          const branch = (
-            await command('git', ['branch', '--show-current'], worktree, signal)
-          ).trim();
-          await verifyObservedHead(worktree, intent, thread.threadId, repair, signal);
-          if (branch !== intent.branch) return { kind: 'ambiguous' };
-          const questions = await questionObservation(config, thread, signal);
-          return {
-            ...questions,
-            kind: 'found',
-            threadId: thread.threadId,
-            status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
-            worktree,
-            branch,
-            model: thread.model,
-          };
+          try {
+            const branch = (
+              await command('git', ['branch', '--show-current'], worktree, signal)
+            ).trim();
+            await verifyObservedHead(worktree, intent, thread.threadId, repair, signal);
+            if (branch !== intent.branch) return unverified;
+            const questions = await questionObservation(config, thread, signal);
+            return {
+              ...questions,
+              kind: 'found',
+              threadId: thread.threadId,
+              status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
+              worktree,
+              branch,
+              model: thread.model,
+            };
+          } catch (error) {
+            // Checkout/receipt verification cannot erase a known worker lifecycle.
+            if (repair && !signal.aborted) return unverified;
+            throw error;
+          }
         },
         catch: (cause) => new Unavailable({ operation: 'observe', cause }),
       }).pipe(

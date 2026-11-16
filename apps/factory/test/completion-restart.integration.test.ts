@@ -6,6 +6,33 @@ import { expect, it } from 'vitest';
 import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { completionFixture } from './fixtures/completion.js';
 
+it.each(['publication', 'babysitting'])(
+  'retains ownership during %s without requiring readiness, through a store reopen',
+  async (stage) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-ownership-restart-'));
+    const store = fileStore(directory);
+    const f = await completionFixture(3, store);
+    try {
+      for (let index = 0; index < (stage === 'publication' ? 2 : 3); index++) {
+        f.state({ accepted: true, idle: true });
+        await f.status();
+      }
+      f.state({ accepted: stage !== 'publication', idle: stage !== 'publication', failed: true });
+      await f.status();
+      await f.close();
+      expect(await Effect.runPromise(fileStore(directory).readControl())).toMatchObject({
+        ownership: {
+          threadId: 'owner',
+          prUrl: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+        },
+      });
+    } finally {
+      await f.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 it('recovers the pending reconciliation once and retains exhaustion across fresh runtimes and stores', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-completion-restart-'));
   let f = await completionFixture(1, fileStore(directory));

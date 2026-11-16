@@ -1,5 +1,5 @@
 import { holdsSlot } from '../plan/index.js';
-import { type ProjectionContext, gh, local } from './context.js';
+import { type ProjectionContext, gh, local, t3 } from './context.js';
 import { entity, jobId, known, pullId, threadId, timestamp, unknown } from './values.js';
 export function populateJobs(context: ProjectionContext) {
   const { tables, input, at, ensureIssue } = context;
@@ -18,7 +18,8 @@ export function populateJobs(context: ProjectionContext) {
     const iid = ensureIssue(admission.issue),
       id = jobId(admission.issue);
     const boundPr = delivery?.pr?.kind === 'found' ? delivery.pr : current?.prerequisite;
-    const prNumber = boundPr ? Number(boundPr.url.split('/').at(-1)) : undefined;
+    const prUrl = boundPr?.url ?? control?.ownership?.prUrl ?? control?.prerequisite?.url;
+    const prNumber = prUrl ? Number(prUrl.split('/').at(-1)) : undefined;
     const pid = prNumber && tables.pullRequests[pullId(prNumber)] ? pullId(prNumber) : null;
     if (pid) {
       const rid = `relationship:binding/${admission.issue}/${prNumber}` as const;
@@ -31,15 +32,13 @@ export function populateJobs(context: ProjectionContext) {
         ownership: 'confirmed' as const,
       });
       const pr = tables.pullRequests[pid];
-      const verified = current?.prerequisite;
+      const verified = delivery?.pr?.kind === 'found' ? delivery.pr : current?.prerequisite;
       if (
         (delivery?.ready || delivery?.landed) &&
-        verified?.parent &&
-        verified.base &&
+        verified &&
         pr.metadata.state === 'known' &&
         verified.commit === pr.metadata.value.comparison.headOid &&
-        verified.parent === pr.metadata.value.comparison.baseOid &&
-        verified.base === pr.metadata.value.comparison.baseRef
+        (!verified.base || verified.base === pr.metadata.value.comparison.baseRef)
       )
         tables.pullRequests[pid] = entity({
           ...pr,
@@ -52,10 +51,36 @@ export function populateJobs(context: ProjectionContext) {
         });
     }
     const execution = current?.execution;
-    const tid =
-      execution?.kind === 'found' && threadFacts
-        ? threadId(threadFacts.environmentId, execution.threadId)
-        : null;
+    const observationFailed =
+      observation?.failedAt !== undefined && observation.failedAt >= (observation.observedAt ?? 0);
+    const unavailable =
+      (observationFailed ||
+        execution?.kind === 'unverified' ||
+        (execution?.kind !== 'found' && !!control?.ownership)) &&
+      !(
+        (execution?.kind === 'found' || execution?.kind === 'unverified') &&
+        ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+          execution.status
+        )
+      );
+    const owner =
+      execution?.kind === 'found' || execution?.kind === 'unverified'
+        ? execution.threadId
+        : control?.ownership?.threadId;
+    const tid = owner && threadFacts ? threadId(threadFacts.environmentId, owner) : null;
+    if (tid) {
+      const prior = tables.threads[tid];
+      tables.threads[tid] = entity({
+        id: tid,
+        metadata: prior?.metadata ?? unknown(t3, 'Owning thread metadata unavailable.'),
+        association: {
+          state: 'confirmed' as const,
+          issueIds: [iid],
+          pullRequestIds: pid ? [pid] : [],
+          evidence: 'factory-binding' as const,
+        },
+      });
+    }
     const safeTid = tid && tables.threads[tid] ? tid : null;
     const resuming = (input.state.resuming ?? []).some((r) => r.issue === admission.issue);
     tables.jobs[id] = entity({
@@ -69,22 +94,27 @@ export function populateJobs(context: ProjectionContext) {
       stage: delivery?.stage ?? 'unknown',
       activity: control?.cancelled
         ? 'cancelled'
-        : (delivery?.activity ?? delivery?.stage ?? 'unknown'),
+        : unavailable
+          ? 'observation-unavailable'
+          : (delivery?.activity ?? delivery?.stage ?? 'unknown'),
       activityStartedAt: null,
       deadline: timestamp(delivery?.deadline),
       progress: delivery?.progress ?? '',
       execution:
-        execution?.kind === 'found'
+        (execution?.kind === 'found' || execution?.kind === 'unverified') && !unavailable
           ? known(
               {
                 runId: execution.run?.id ?? null,
-                state:
-                  execution.status === 'running'
-                    ? ('running' as const)
-                    : execution.status === 'waiting'
-                      ? ('waiting' as const)
-                      : execution.status === 'completed'
-                        ? ('finished' as const)
+                state: ['running', 'preparing', 'queued', 'starting'].includes(execution.status)
+                  ? ('running' as const)
+                  : execution.status === 'waiting'
+                    ? ('waiting' as const)
+                    : ['completed', 'idle'].includes(execution.status)
+                      ? ('finished' as const)
+                      : ['interrupted', 'failed', 'cancelled', 'rolled_back'].includes(
+                            execution.status
+                          )
+                        ? ('interrupted' as const)
                         : ('unknown' as const),
               },
               local,

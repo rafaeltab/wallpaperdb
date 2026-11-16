@@ -17,7 +17,7 @@ export function populateCards(context: ProjectionContext) {
       input.recoveries?.some(
         (r) => r.question && pr.metadata.state === 'known' && r.pr === pr.metadata.value.url
       );
-    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion),
+    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion, pr),
       provider = providerStatus(pr);
     const terminal =
       (provider === 'ready' || provider === 'landed') &&
@@ -58,7 +58,10 @@ export function populateCards(context: ProjectionContext) {
       status: {
         code,
         label: code.replaceAll('-', ' '),
-        active: jobs.some((j) => j.occupiesCapacity) || maintenance.some((m) => m.occupiesCapacity),
+        active:
+          code !== 'completion-unverified' &&
+          code !== 'unknown' &&
+          (jobs.some((j) => j.occupiesCapacity) || maintenance.some((m) => m.occupiesCapacity)),
         since: null,
       },
       attention: attention(code),

@@ -54,10 +54,34 @@ export const JobLive = Layer.effect(
             return status;
           }
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
-          const observation = yield* execution.observe(
-            activeIntent,
-            (yield* currentStage(store)) ?? undefined
-          );
+          const owningStage = yield* currentStage(store);
+          const observation = yield* execution.observe(activeIntent, owningStage ?? undefined);
+          // Execution is an observed fact even if subsequent receipt validation fails.
+          // Publish it before any external validation or continuation can fail.
+          if (reporting) {
+            const stage = yield* currentStage(store);
+            yield* reporting.observed(generation, {
+              kind: 'job',
+              intent,
+              execution: observation,
+              stageIndex: stage?.index,
+              elapsedMs: Math.max(0, (yield* time.now()) - intent.createdAt),
+              delivery: stage
+                ? { stage: stage.stage, commit: stage.commit, ready: false, landed: false }
+                : undefined,
+            });
+          }
+          // Backfill existing publications from the issue adapter, including failed CI.
+          // This association is ownership evidence and does not assert readiness.
+          let observedPublication: string | undefined;
+          if (
+            owningStage &&
+            ['publication', 'babysitting', 'ci'].includes(owningStage.stage) &&
+            !(yield* store.readControl()).ownership?.prUrl
+          ) {
+            const publication = yield* issues.pullRequest(activeIntent);
+            if (publication.kind === 'found') observedPublication = publication.url;
+          }
           if ((yield* store.readControl()).cancelled && observation.kind === 'found')
             yield* execution.interrupt(activeIntent, observation.threadId);
           let delivery: Delivery | undefined = yield* reconcileStages(
@@ -72,6 +96,14 @@ export const JobLive = Layer.effect(
             policy?.limit ?? defaultAgentReconciliationLimit
           );
           yield* retainPrerequisite(store, delivery);
+          const owner = observation.kind === 'found' ? observation.threadId : owningStage?.threadId;
+          // Verified handback retains its exact revision until admission release.
+          if (owner && delivery?.activity !== 'dependency-handback')
+            yield* retainOwnership(
+              store,
+              owner,
+              delivery?.pr?.kind === 'found' ? delivery.pr.url : observedPublication
+            );
           const control = yield* store.readControl();
           if (control.released) {
             const status = releasedStatus(intent, control, yield* time.now());
@@ -445,6 +477,26 @@ function retainPrerequisite(
 function verifiedPublication(delivery: Delivery | undefined) {
   if (!(delivery?.ready || delivery?.landed)) return null;
   return delivery.pr?.kind === 'found' ? delivery.pr : null;
+}
+
+function retainOwnership(
+  store: import('./contract.js').JobStore,
+  threadId: string,
+  prUrl?: string
+) {
+  return Effect.gen(function* () {
+    for (;;) {
+      const control = yield* store.readControl();
+      if (control.released) return;
+      const ownership = {
+        threadId,
+        prUrl: prUrl ?? control.ownership?.prUrl ?? control.prerequisite?.url,
+      };
+      if (JSON.stringify(ownership) === JSON.stringify(control.ownership)) return;
+      if (yield* store.saveControl({ ...control, revision: control.revision + 1, ownership }))
+        return;
+    }
+  });
 }
 
 export function trustedAuthor(author: string) {

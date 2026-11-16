@@ -64,6 +64,10 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    ownership: z
+      .object({ threadId: z.string().min(1), prUrl: z.string().url().optional() })
+      .strict()
+      .optional(),
     released: z.boolean().optional(),
     dependencyRecovery: z
       .object({

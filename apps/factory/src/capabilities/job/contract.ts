@@ -40,6 +40,14 @@ export interface Intent {
 export type Observation =
   | { readonly kind: 'absent' }
   | { readonly kind: 'ambiguous' }
+  /** A journal-owned worker's lifecycle is known but its checkout is unverified.
+   * Reporting only; never authorizes a stage or continuation. */
+  | {
+      readonly kind: 'unverified';
+      readonly threadId: string;
+      readonly status: string;
+      readonly run?: { readonly id: string; readonly ordinal: number };
+    }
   | {
       readonly kind: 'found';
       readonly threadId: string;
@@ -90,6 +98,8 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** Reporting ownership, independent of readiness. Retained across repair and restart. */
+  readonly ownership?: { readonly threadId: string; readonly prUrl?: string };
   /** Terminal ownership fence, committed atomically with dependency-admission release. */
   readonly released?: boolean;
   readonly dependencyRecovery?: {

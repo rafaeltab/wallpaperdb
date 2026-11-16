@@ -132,6 +132,25 @@ it('retains a later unaffected route even when an earlier distant route changes'
   expect(after).toEqual(computeItemDependencyLinks(changed));
 });
 
+it('invalidates a later route when an earlier nearby path changes its occupied lanes', () => {
+  const route = createItemDependencyLinkRouter();
+  const input = {
+    ...separated,
+    nodes: separated.nodes.map((node) =>
+      node.id === 3 || node.id === 4 ? { ...node, y: 200 } : node
+    ),
+  };
+  const before = [...route(input)];
+  const changed = {
+    ...input,
+    nodes: input.nodes.map((node) => (node.id === 1 ? { ...node, x: 180 } : node)),
+  };
+  const after = [...route(changed)];
+  expect(after[0].points).not.toEqual(before[0].points);
+  expect(after[1]).not.toBe(before[1]);
+  expect(after).toEqual(computeItemDependencyLinks(changed));
+});
+
 it('invalidates a shared source fan when a future dependency changes its terminal', () => {
   const route = createItemDependencyLinkRouter();
   const before = [...route(separated)];

@@ -121,6 +121,47 @@ it.each(['implementation', 'review', 'publication', 'babysitting', 'ci'] as cons
   }
 );
 
+it.each([
+  { observedAt: 3000, base: 'main', expected: 'awaiting-verification' },
+  { observedAt: 1000, base: 'main', expected: 'ci-running' },
+  { observedAt: 3000, base: 'other', expected: 'ci-running' },
+])(
+  'uses only fresh matching publication heads to fence old CI: $observedAt/$base',
+  async ({ observedAt, base, expected }) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const pull = pullObservation(2, { ci: 'PENDING' });
+    const input = { ...parkedSnapshot(pull, true), localWork: [] };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        resume: undefined,
+        execution: { ...source.execution, status: 'completed', manual: { runId: 'manual-9' } },
+        delivery: {
+          stage: 'ci',
+          commit: 'c'.repeat(40),
+          ready: false,
+          landed: false,
+          pr: {
+            kind: 'found',
+            url: pull.url,
+            commit: 'c'.repeat(40),
+            base,
+            ready: false,
+            landed: false,
+          },
+        },
+      },
+    ];
+    input.observations = { ...input.observations, jobsObservedAt: observedAt };
+    const board = await liveBoard({ scopeId: 'manual-stale-metadata', initial: input });
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
+      expected
+    );
+  }
+);
+
 it.each(
   (['implementation', 'review', 'publication', 'babysitting', 'ci'] as const).flatMap((stage) =>
     ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].map((status) => ({

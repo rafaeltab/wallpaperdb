@@ -12,7 +12,8 @@ export function factoryStatus(
   maintenance: readonly Maintenance[],
   question: boolean,
   pr?: PullRequest,
-  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown'
+  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown',
+  head = pr?.metadata.state === 'known' ? pr.metadata.value.comparison.headOid : undefined
 ): StatusCode | undefined {
   if (
     maintenance.some((m) => m.phase === 'manual-recovery') ||
@@ -42,12 +43,12 @@ export function factoryStatus(
         ['finished', 'interrupted'].includes(j.execution.value.state)
     )
   ) {
-    if (providerStatus(pr, mergeability) === 'conflict') return 'conflict';
+    if (providerStatus(pr, mergeability, head) === 'conflict') return 'conflict';
     if (
       (jobs[0]?.stage === 'ci' || jobs.some((j) => j.activity === 'manual-continuation')) &&
       pr?.metadata.state === 'known' &&
       pr?.checks.state === 'known' &&
-      pr.checks.value.comparison.headOid === pr.metadata.value.comparison.headOid &&
+      pr.checks.value.comparison.headOid === head &&
       pr.checks.value.state === 'pending'
     )
       return 'ci-running';
@@ -61,28 +62,30 @@ export function factoryStatus(
 }
 export function providerStatus(
   pr: PullRequest | undefined,
-  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown'
+  mergeability?: 'clean' | 'conflicting' | 'pending' | 'unknown',
+  head = pr?.metadata.state === 'known' ? pr.metadata.value.comparison.headOid : undefined
 ): StatusCode | undefined {
   if (!pr) return undefined;
-  if (pr.readiness.state === 'landed') return 'landed';
+  if (pr.readiness.state === 'landed' && pr.readiness.comparison.headOid === head) return 'landed';
   if (
     (mergeability ??
-      (pr.metadata.state === 'known' ? pr.metadata.value.mergeability : undefined)) ===
-    'conflicting'
+      (pr.metadata.state === 'known' && pr.metadata.value.comparison.headOid === head
+        ? pr.metadata.value.mergeability
+        : undefined)) === 'conflicting'
   )
     return 'conflict';
-  if (pr.readiness.state === 'ready') return 'ready';
+  if (pr.readiness.state === 'ready' && pr.readiness.comparison.headOid === head) return 'ready';
   const currentChecks =
     pr.metadata.state === 'known' &&
     pr.checks.state === 'known' &&
-    pr.checks.value.comparison.headOid === pr.metadata.value.comparison.headOid;
+    pr.checks.value.comparison.headOid === head;
   if (currentChecks && pr.checks.state === 'known' && pr.checks.value.state === 'failed')
     return 'ci-failed';
   if (
     pr.reviews.state === 'known' &&
     pr.reviews.value.state === 'required' &&
     pr.metadata.state === 'known' &&
-    pr.reviews.value.comparison.headOid === pr.metadata.value.comparison.headOid &&
+    pr.reviews.value.comparison.headOid === head &&
     !pr.metadata.value.draft
   )
     return 'needs-review';

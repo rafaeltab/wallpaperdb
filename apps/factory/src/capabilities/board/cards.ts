@@ -17,9 +17,16 @@ export function populateCards(context: ProjectionContext) {
       input.recoveries?.some(
         (r) => r.question && pr.metadata.state === 'known' && r.pr === pr.metadata.value.url
       );
-    const mergeability = currentMergeability(context, pr);
-    const automatic = factoryStatus(jobs, maintenance, !!recoveryQuestion, pr, mergeability),
-      provider = providerStatus(pr, mergeability);
+    const current = currentPublication(context, pr);
+    const automatic = factoryStatus(
+        jobs,
+        maintenance,
+        !!recoveryQuestion,
+        pr,
+        current?.mergeability,
+        current?.head
+      ),
+      provider = providerStatus(pr, current?.mergeability, current?.head);
     const terminal =
       (provider === 'ready' || provider === 'landed') &&
       jobs.every((j) => !j.occupiesCapacity) &&
@@ -152,11 +159,11 @@ export function populateCards(context: ProjectionContext) {
   }
 }
 
-function currentMergeability(context: ProjectionContext, pr: PullRequest | undefined) {
+function currentPublication(context: ProjectionContext, pr: PullRequest | undefined) {
   if (pr?.metadata.state !== 'known') return undefined;
   const metadata = pr.metadata.value;
   const observedAt = Date.parse(pr.metadata.observedAt);
-  return context.input.jobs
+  const publications = context.input.jobs
     .flatMap((job) => {
       if (job.kind !== 'job' || job.delivery?.pr?.kind !== 'found') return [];
       const publication = job.delivery.pr;
@@ -167,11 +174,19 @@ function currentMergeability(context: ProjectionContext, pr: PullRequest | undef
       return at !== undefined &&
         at >= observedAt &&
         publication.url === metadata.url &&
-        publication.commit === metadata.comparison.headOid &&
-        publication.base === metadata.comparison.baseRef &&
-        publication.mergeability !== undefined
-        ? [{ at, mergeability: publication.mergeability }]
+        publication.base === metadata.comparison.baseRef
+        ? [{ at, publication }]
         : [];
     })
-    .sort((a, b) => b.at - a.at)[0]?.mergeability;
+    .sort((a, b) => b.at - a.at);
+  const head = publications[0]?.publication.commit ?? metadata.comparison.headOid;
+  return {
+    head,
+    mergeability:
+      head === metadata.comparison.headOid
+        ? publications.find(
+            (p) => p.publication.commit === head && p.publication.mergeability !== undefined
+          )?.publication.mergeability
+        : undefined,
+  };
 }

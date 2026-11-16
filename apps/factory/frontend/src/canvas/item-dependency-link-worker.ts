@@ -25,7 +25,8 @@ self.addEventListener('message', (event: MessageEvent<ItemDependencyLinkRequest>
         publishedAt = now;
       }
     }
-    if (progress.length) self.postMessage({ id, progress } satisfies ItemDependencyLinkResponse);
+    // The complete result includes the final unfinished batch. Publishing it
+    // twice would add a redundant main-thread render just before completion.
     response = { id, links };
   } catch (error) {
     response = { id, error: error instanceof Error ? error.message : String(error) };

@@ -160,6 +160,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let worktreeClean = true;
   let stageIndex: number | undefined;
   let manual = false;
+  let responseObserved = false;
   let question: { id: string; text: string } | undefined;
   const baseDeps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
@@ -236,6 +237,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
                 waitingForGitHub: waiting,
                 worktreeClean,
                 stageIndex: stageIndex ?? request.index,
+                responseObserved,
               }
         ),
       sendStage: (_intent, request) =>
@@ -275,6 +277,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
     change: (value: {
       runningAfterSend?: boolean;
       manual?: boolean;
+      responseObserved?: boolean;
       loseSend?: boolean;
       ambiguous?: boolean;
       missingEvidence?: boolean;
@@ -303,6 +306,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
     }) => {
       runningAfterSend = value.runningAfterSend ?? runningAfterSend;
       manual = value.manual ?? manual;
+      responseObserved = value.responseObserved ?? responseObserved;
       loseSend = value.loseSend ?? loseSend;
       ambiguous = value.ambiguous ?? ambiguous;
       missingEvidence = value.missingEvidence ?? missingEvidence;
@@ -410,6 +414,29 @@ it('keeps the accepted CI stage across manual work and restart, verifying its ne
   expect(await job.status()).toMatchObject({
     stageIndex: 3,
     delivery: { stage: 'ci', commit: 'c'.repeat(40), ready: true },
+  });
+  expect((await Effect.runPromise(job.store.readControl())).prerequisite?.commit).toBe(
+    'c'.repeat(40)
+  );
+  job.change({ runId: 'manual-10', ordinal: 10, accepted: false, status: 'running' });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', ready: false },
+  });
+  job.change({ status: 'completed' });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', commit: 'c'.repeat(40), ready: true },
+  });
+  job.change({ responseObserved: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+  job.change({ responseObserved: false, worktreeClean: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'ci', ready: false } });
+  job.change({ worktreeClean: true });
+  job.change({ runId: 'manual-11', ordinal: 11, commit: 'd'.repeat(40), prCommit: 'd'.repeat(40) });
+  expect(await job.status()).toMatchObject({
+    stageIndex: 3,
+    delivery: { stage: 'ci', ready: false },
   });
   expect(await Effect.runPromise(job.store.readStage(3))).toEqual(before);
   expect(await Effect.runPromise(job.store.readStage(4))).toBeNull();

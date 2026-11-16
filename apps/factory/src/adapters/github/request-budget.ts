@@ -5,7 +5,11 @@ import type { RateResponse } from './request-process.js';
 
 const number = z.number().nonnegative().finite().safe();
 const sample = z.object({ limit: number, remaining: number, reset: number });
-const resource = z.object({ nextAt: number, samples: z.array(sample).max(8) });
+const resource = z.object({
+  nextAt: number,
+  samples: z.array(sample).max(8),
+  used: z.boolean().optional(),
+});
 const stateSchema = z.object({
   version: z.literal(1),
   blockedUntil: number,
@@ -77,7 +81,7 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
     if (!Object.hasOwn(state.resources, name)) {
       if (Object.keys(state.resources).length >= 16 || !/^[a-z][a-z_]{0,47}$/.test(name))
         throw new Error('Unsupported GitHub quota resource');
-      state.resources[name] = { nextAt: 0, samples: [] };
+      state.resources[name] = { nextAt: 0, samples: [], used: false };
     }
     return state.resources[name];
   };
@@ -95,14 +99,20 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
           .map((s) => s.reset + 1000),
       ])
     );
+  // Older records predate explicit usage. Only these resources can be dispatched
+  // by this request owner; other bootstrap entries are metadata, not responsibility.
+  const cycleResources = () =>
+    Object.entries(state.resources)
+      .filter(([name, value]) => value.used ?? ['core', 'graphql', 'search'].includes(name))
+      .map(([name]) => name);
   return {
     cycleReady() {
-      return due(Object.keys(state.resources), clock.now(), true) <= clock.now();
+      return due(cycleResources(), clock.now(), true) <= clock.now();
     },
     async waitForCycle(signal: AbortSignal) {
       for (;;) {
         signal.throwIfAborted();
-        const delay = due(Object.keys(state.resources), clock.now(), true) - clock.now();
+        const delay = due(cycleResources(), clock.now(), true) - clock.now();
         if (delay <= 0) return;
         await clock.wait(delay, signal);
       }
@@ -127,10 +137,12 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
       const charges = new Map(
         names.map((name) => [name, interval(name, now) ? interval(name, now) * cost : 60_000])
       );
-      for (const name of names)
+      for (const name of names) {
+        get(name).used = true;
         get(name).nextAt =
           Math.max(now, get(name).nextAt) +
           (interval(name, now) ? interval(name, now) * cost : 60_000);
+      }
       if (mutation) state.mutationAt = Math.max(now, state.mutationAt) + 1000;
       save();
       return { at: now, previous, charges };
@@ -185,7 +197,7 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
       if (accounted.size) {
         // Reconcile only this reservation. Concurrent requests retain their charges.
         for (const [name, charge] of reservation.charges)
-          get(name).nextAt = Math.max(now, get(name).nextAt - charge);
+          if (accounted.has(name)) get(name).nextAt = Math.max(now, get(name).nextAt - charge);
         for (const name of accounted) {
           const current = get(name),
             cost = costs.get(name) ?? 2,

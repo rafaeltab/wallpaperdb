@@ -9,15 +9,8 @@ import {
 } from 'react';
 import type { Action, WorkItem } from '../../../src/http/index.js';
 import type { Board } from './model';
-import {
-  createProjectCanvasScene,
-  bindProjectCanvasScene,
-  type ProjectCanvasGeometry,
-} from './project-canvas-scene';
-import {
-  createItemDependencyLinkInput,
-  type ItemDependencyLinkInput,
-} from './item-dependency-links';
+import { createProjectCanvasScene } from './project-canvas-scene';
+import { createItemDependencyLinkInput } from './item-dependency-links';
 import { useItemDependencyLinks } from './use-item-dependency-links';
 import { ProjectCanvasViewport, type ProjectCanvasViewportHandle } from './project-canvas-viewport';
 import { ProjectCanvasTooltip, type ProjectCanvasTooltipHandle } from './project-canvas-tooltip';
@@ -101,24 +94,9 @@ export function Canvas({
     [targetScene.geometry]
   );
   const routing = useItemDependencyLinks(dependencyInput);
-  const published = useRef<
-    { input: ItemDependencyLinkInput; geometry: ProjectCanvasGeometry } | undefined
-  >(undefined);
-  if (routing.input === dependencyInput)
-    published.current = { input: dependencyInput, geometry: targetScene.geometry };
-  const geometry = published.current?.geometry ?? targetScene.geometry;
-  const fixture = useMemo(
-    () =>
-      geometry.fixture === targetScene.layout.fixture
-        ? targetScene.layout.fixture
-        : {
-            ...targetScene.layout.fixture,
-            metadata: { ...geometry.fixture.metadata, ...targetScene.layout.fixture.metadata },
-          },
-    [geometry, targetScene.layout.fixture]
-  );
-  const data = useMemo(() => bindProjectCanvasScene(geometry, fixture), [geometry, fixture]);
-  const routingMatchesGeometry = routing.input === published.current?.input;
+  const data = targetScene.layout;
+  const fixture = data.fixture;
+  const routingMatchesGeometry = routing.input === dependencyInput;
   const routes = useMemo(() => {
     if (!routingMatchesGeometry) return [];
     // Deleted Project items disappear immediately; remove their links in the same render.
@@ -468,7 +446,6 @@ export function Canvas({
           onNavigate={hideTooltip}
           suppressCanvasClick={suppressCanvasClick}
           pending={routing.pending}
-          initializing={!published.current && routing.pending}
           empty={
             !records.length && (
               <p className="cc-empty">

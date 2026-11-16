@@ -30,7 +30,6 @@ export const ProjectCanvasViewport = forwardRef<
     overlay?: ReactNode;
     empty?: ReactNode;
     pending?: boolean;
-    initializing?: boolean;
     onCollapse: () => void;
     onExpand: () => void;
     onNavigate: () => void;
@@ -46,7 +45,6 @@ export const ProjectCanvasViewport = forwardRef<
     overlay,
     empty,
     pending: loading,
-    initializing,
     onCollapse,
     onExpand,
     onNavigate,
@@ -219,17 +217,11 @@ export const ProjectCanvasViewport = forwardRef<
         style={{
           width,
           height,
-          visibility: initializing ? 'hidden' : undefined,
           transform: `translate(${view.x}px,${view.y}px) scale(${view.scale})`,
         }}
       >
         {children}
       </div>
-      {initializing && (
-        <p className="cc-empty" role="status">
-          Preparing Project canvas…
-        </p>
-      )}
       {empty}
       <nav className="cc-controls" aria-label="Canvas navigation">
         <button type="button" aria-label="Collapse all sections" onClick={onCollapse}>

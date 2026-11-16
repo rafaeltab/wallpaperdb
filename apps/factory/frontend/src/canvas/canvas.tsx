@@ -119,7 +119,15 @@ export function Canvas({
     [geometry, targetScene.layout.fixture]
   );
   const data = useMemo(() => bindProjectCanvasScene(geometry, fixture), [geometry, fixture]);
-  const routes = routing.input === published.current?.input ? routing.links : [];
+  const routingMatchesGeometry = routing.input === published.current?.input;
+  const routes = useMemo(() => {
+    if (!routingMatchesGeometry) return [];
+    // Deleted Project items disappear immediately; remove their links in the same render.
+    const endpoints = new Set(
+      [...data.boxes, ...data.headerNodes, ...data.aggregateNodes].map((node) => node.id)
+    );
+    return routing.links.filter((link) => endpoints.has(link.source) && endpoints.has(link.target));
+  }, [routingMatchesGeometry, routing.links, data.boxes, data.headerNodes, data.aggregateNodes]);
   const issueMetadata = fixture.metadata;
   const candidateFocus = locked ?? hovered;
   const focus =

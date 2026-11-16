@@ -163,24 +163,39 @@ if (process.argv.includes('--record-baseline')) {
 const expectedText = await readFile(fixturePath, 'utf8');
 const expected: Expected[] = JSON.parse(expectedText);
 const fixtureSha256 = createHash('sha256').update(expectedText).digest('hex');
-const directory = await mkdtemp(join(tmpdir(), 'project-canvas-expansion-'));
 const source = resolve(option('--source') ?? 'frontend');
-let server: Awaited<ReturnType<typeof preview>> | undefined;
-try {
+const compareSource = option('--compare-source');
+type VariantName = 'current' | 'reference';
+type VariantResource = {
+  directory: string;
+  server?: Awaited<ReturnType<typeof preview>>;
+};
+const resources: VariantResource[] = [];
+async function prepareVariant(variant: VariantName, frontendSource: string) {
+  const resource: VariantResource = {
+    directory: await mkdtemp(join(tmpdir(), `project-canvas-expansion-${variant}-`)),
+  };
+  // Register ownership before either startup step can fail.
+  resources.push(resource);
   await build({
     configFile: 'frontend/vite.config.ts',
-    root: source,
+    root: frontendSource,
     logLevel: 'error',
-    build: { outDir: directory, emptyOutDir: true },
+    build: { outDir: resource.directory, emptyOutDir: true },
   });
-  server = await preview({
+  resource.server = await preview({
     configFile: false,
-    root: source,
-    build: { outDir: directory },
+    root: frontendSource,
+    build: { outDir: resource.directory },
     preview: { host: '127.0.0.1', port: 0 },
   });
-  const origin = server.resolvedUrls?.local[0];
-  if (!origin) throw new Error('Expansion benchmark origin unavailable');
+  const origin = resource.server.resolvedUrls?.local[0];
+  if (!origin) throw new Error(`Expansion benchmark ${variant} origin unavailable`);
+  return { variant, origin };
+}
+try {
+  const variants = [await prepareVariant('current', source)];
+  if (compareSource) variants.push(await prepareVariant('reference', resolve(compareSource)));
   type Sample = {
     durationMs: number;
     workerDurationsMs: number[];
@@ -189,6 +204,7 @@ try {
   };
   const failures: string[] = [];
   const results: {
+    variant: VariantName;
     browser: string;
     scenario: string;
     round: number;
@@ -257,20 +273,22 @@ try {
   ] as const) {
     const browser = await engine.launch({ headless: true });
     try {
-      console.log(
-        JSON.stringify({
-          event: 'environment',
-          browser: browserName,
-          version: browser.version(),
-          build: 'production',
-          items: 100,
-          rounds,
-          budgetMs: budget,
-          viewport: { width: 1600, height: 1000 },
-          expectation: 'Pinned predecessor routing and geometry, no real backend',
-          fixtureSha256,
-        })
-      );
+      for (const { variant } of variants)
+        console.log(
+          JSON.stringify({
+            event: 'environment',
+            variant,
+            browser: browserName,
+            version: browser.version(),
+            build: 'production',
+            items: 100,
+            rounds,
+            budgetMs: budget,
+            viewport: { width: 1600, height: 1000 },
+            expectation: 'Pinned predecessor routing and geometry, no real backend',
+            fixtureSha256,
+          })
+        );
       for (const scenario of scenarios) {
         const golden = expected.find((value) => value.name === scenario.name);
         if (!golden) throw new Error(`Missing ${scenario.name} baseline`);
@@ -283,19 +301,22 @@ try {
           })
         );
         for (let round = 0; round < rounds; round++) {
-          const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
-          const errors: string[] = [];
-          page.on('pageerror', (error) => errors.push(error.message));
-          let board = makeInitial(scenario.fixture),
-            delivered: FactoryV2Snapshot | undefined;
-          await page.route('**/api/**', (route) => {
-            if (!route.request().url().endsWith('/api/v2/board'))
-              return route.fulfill({ status: 404 });
-            if (board === delivered) return route.fulfill({ status: 304 });
-            delivered = board;
-            return route.fulfill({ json: board });
-          });
-          await page.addInitScript(`
+          // Pair both sources in one host-load window and counterbalance their order.
+          const order = round % 2 ? [...variants].reverse() : variants;
+          for (const { variant, origin } of order) {
+            const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+            const errors: string[] = [];
+            page.on('pageerror', (error) => errors.push(error.message));
+            let board = makeInitial(scenario.fixture),
+              delivered: FactoryV2Snapshot | undefined;
+            await page.route('**/api/**', (route) => {
+              if (!route.request().url().endsWith('/api/v2/board'))
+                return route.fulfill({ status: 404 });
+              if (board === delivered) return route.fulfill({ status: 304 });
+              delivered = board;
+              return route.fulfill({ json: board });
+            });
+            await page.addInitScript(`
             window.__expansionWorkers = []; window.__expansionBoardReads = 0;
             const NativeWorker=window.Worker;
             window.Worker=class extends NativeWorker {
@@ -305,56 +326,62 @@ try {
             const nativeFetch=window.fetch;
             window.fetch=async function(...args) {const response=await nativeFetch.apply(this,args);if(String(args[0])==='/api/v2/board'&&response.status===200){const json=response.json.bind(response);response.json=async()=>{const value=await json();window.__expansionBoardReads++;return value;};}return response;};
           `);
-          try {
-            await page.goto(origin);
-            await waitSnapshot(page, golden.initial);
-            await page.getByRole('button', { name: 'Collapse all sections', exact: true }).click();
-            await waitCollapsed(page);
-            const reads = await page.evaluate('window.__expansionBoardReads');
-            board = scenarioBoard(seed, scenario.fixture);
-            await page.waitForFunction(`window.__expansionBoardReads > ${reads}`);
-            await browserExpect(
-              page
-                .getByRole('group', {
-                  name: `Select ${scenario.fixture.metadata[scenario.fixture.parentIds[0]].title}`,
-                  exact: true,
-                })
-                .first()
-            ).toBeVisible();
-            await waitCollapsed(page);
-            const uncached = await measureExpand(page, golden.expanded);
-            await page.getByRole('button', { name: 'Collapse all sections', exact: true }).click();
-            await waitCollapsed(page);
-            const repeat = await measureExpand(page, golden.expanded);
-            if (errors.length) throw new Error(errors.join('\n'));
-            const result = {
-              browser: browserName,
-              scenario: scenario.name,
-              round,
-              uncached,
-              repeat,
-            };
-            results.push(result);
-            console.log(JSON.stringify({ event: 'sample', ...result }));
-            for (const [phase, sample] of [
-              ['uncached', uncached],
-              ['repeat', repeat],
-            ] as const)
-              if (sample.durationMs >= budget)
-                failures.push(
-                  `${browserName}/${scenario.name}/${phase}/${round}: ${sample.durationMs.toFixed(2)} ms`
-                );
-          } catch (error) {
-            console.error(
-              JSON.stringify(
-                await page.evaluate(
-                  `({ event: 'failed-page-state', reads: window.__expansionBoardReads, busy: document.querySelector('.cc-viewport')?.getAttribute('aria-busy'), groups: [...document.querySelectorAll('.cc-parent-head')].map(element=>element.getAttribute('aria-label')), text: document.body.innerText.slice(0,1500) })`
+            try {
+              await page.goto(origin);
+              await waitSnapshot(page, golden.initial);
+              await page
+                .getByRole('button', { name: 'Collapse all sections', exact: true })
+                .click();
+              await waitCollapsed(page);
+              const reads = await page.evaluate('window.__expansionBoardReads');
+              board = scenarioBoard(seed, scenario.fixture);
+              await page.waitForFunction(`window.__expansionBoardReads > ${reads}`);
+              await browserExpect(
+                page
+                  .getByRole('group', {
+                    name: `Select ${scenario.fixture.metadata[scenario.fixture.parentIds[0]].title}`,
+                    exact: true,
+                  })
+                  .first()
+              ).toBeVisible();
+              await waitCollapsed(page);
+              const uncached = await measureExpand(page, golden.expanded);
+              await page
+                .getByRole('button', { name: 'Collapse all sections', exact: true })
+                .click();
+              await waitCollapsed(page);
+              const repeat = await measureExpand(page, golden.expanded);
+              if (errors.length) throw new Error(errors.join('\n'));
+              const result = {
+                variant,
+                browser: browserName,
+                scenario: scenario.name,
+                round,
+                uncached,
+                repeat,
+              };
+              results.push(result);
+              console.log(JSON.stringify({ event: 'sample', ...result }));
+              for (const [phase, sample] of [
+                ['uncached', uncached],
+                ['repeat', repeat],
+              ] as const)
+                if (variant === 'current' && sample.durationMs >= budget)
+                  failures.push(
+                    `${browserName}/${scenario.name}/${phase}/${round}: ${sample.durationMs.toFixed(2)} ms`
+                  );
+            } catch (error) {
+              console.error(
+                JSON.stringify(
+                  await page.evaluate(
+                    `({ event: 'failed-page-state', reads: window.__expansionBoardReads, busy: document.querySelector('.cc-viewport')?.getAttribute('aria-busy'), groups: [...document.querySelectorAll('.cc-parent-head')].map(element=>element.getAttribute('aria-label')), text: document.body.innerText.slice(0,1500) })`
+                  )
                 )
-              )
-            );
-            throw error;
-          } finally {
-            await page.close();
+              );
+              throw error;
+            } finally {
+              await page.close();
+            }
           }
         }
       }
@@ -363,26 +390,33 @@ try {
     }
   }
   for (const browser of ['chromium', 'firefox'])
-    for (const scenario of scenarios)
-      for (const phase of ['uncached', 'repeat'] as const) {
-        const samples = results
-          .filter((value) => value.browser === browser && value.scenario === scenario.name)
-          .map((value) => value[phase].durationMs)
-          .sort((a, b) => a - b);
-        console.log(
-          JSON.stringify({
-            event: 'summary',
-            browser,
-            scenario: scenario.name,
-            phase,
-            samplesMs: samples,
-            minMs: samples[0],
-            medianMs: samples[Math.floor(samples.length / 2)],
-            maxMs: samples.at(-1),
-            budgetMs: budget,
-          })
-        );
-      }
+    for (const { variant } of variants)
+      for (const scenario of scenarios)
+        for (const phase of ['uncached', 'repeat'] as const) {
+          const samples = results
+            .filter(
+              (value) =>
+                value.variant === variant &&
+                value.browser === browser &&
+                value.scenario === scenario.name
+            )
+            .map((value) => value[phase].durationMs)
+            .sort((a, b) => a - b);
+          console.log(
+            JSON.stringify({
+              event: 'summary',
+              variant,
+              browser,
+              scenario: scenario.name,
+              phase,
+              samplesMs: samples,
+              minMs: samples[0],
+              medianMs: samples[Math.floor(samples.length / 2)],
+              maxMs: samples.at(-1),
+              budgetMs: budget,
+            })
+          );
+        }
   if (failures.length) {
     console.error(
       `Expansion budget exceeded in ${failures.length} samples:\n${failures.join('\n')}`
@@ -390,14 +424,22 @@ try {
     if (!process.argv.includes('--report-only')) process.exitCode = 1;
   }
 } finally {
-  try {
-    if (server) {
-      const owned = server;
-      await new Promise<void>((resolveClose, reject) =>
-        owned.httpServer.close((error) => (error ? reject(error) : resolveClose()))
-      );
-    }
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
+  const cleanup = await Promise.allSettled(
+    resources.map(async ({ directory, server }) => {
+      try {
+        if (server)
+          await new Promise<void>((resolveClose, reject) =>
+            server.httpServer.close((error) => (error ? reject(error) : resolveClose()))
+          );
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    })
+  );
+  const failed = cleanup.filter((result) => result.status === 'rejected');
+  if (failed.length)
+    throw new AggregateError(
+      failed.map((result) => result.reason),
+      'Expansion benchmark cleanup failed'
+    );
 }

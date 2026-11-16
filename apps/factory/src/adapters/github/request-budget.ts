@@ -22,6 +22,7 @@ const stateSchema = z.object({
 type State = z.infer<typeof stateSchema>;
 type Resource = z.infer<typeof resource>;
 type Sample = z.infer<typeof sample>;
+type Reservation = { at: number; charges: Map<string, { start: number; end: number }> };
 const targetFraction = 0.5;
 const period = (name: string) => (['search', 'code_search'].includes(name) ? 60_000 : 3_600_000);
 const sampleInterval = (name: string, now: number, value: Sample) =>
@@ -67,6 +68,7 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
     value === undefined
       ? { version: 1, blockedUntil: 0, secondaryFailures: 0, mutationAt: 0, resources: {} }
       : stateSchema.parse(value);
+  const pending = new Set<Reservation>();
   const save = () => {
     state = stateSchema.parse(state);
     stateConnection(directory, (db) =>
@@ -133,87 +135,106 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
     },
     reserve(names: readonly string[], cost: number, mutation = false) {
       const now = clock.now();
-      const previous = new Map(names.map((name) => [name, get(name).nextAt]));
-      const charges = new Map(
-        names.map((name) => [name, interval(name, now) ? interval(name, now) * cost : 60_000])
-      );
+      const reservation: Reservation = { at: now, charges: new Map() };
       for (const name of names) {
-        get(name).used = true;
-        get(name).nextAt =
-          Math.max(now, get(name).nextAt) +
-          (interval(name, now) ? interval(name, now) * cost : 60_000);
+        const current = get(name);
+        current.used = true;
+        const start = Math.max(now, current.nextAt);
+        const end = start + (interval(name, now) ? interval(name, now) * cost : 60_000);
+        reservation.charges.set(name, { start, end });
+        current.nextAt = end;
       }
       if (mutation) state.mutationAt = Math.max(now, state.mutationAt) + 1000;
       save();
-      return { at: now, previous, charges };
+      pending.add(reservation);
+      return reservation;
     },
     complete(
-      reservation: { at: number; previous: Map<string, number>; charges: Map<string, number> },
+      reservation: Reservation,
       responses: readonly RateResponse[],
       costs: ReadonlyMap<string, number>,
       success: boolean
     ) {
-      const now = clock.now();
-      const accounted = new Set<string>();
-      for (const response of responses) {
-        const parsed = sample.safeParse(response);
-        if (response.resource && parsed.success) {
-          const name = response.resource,
-            current = get(name),
-            value = parsed.data;
-          const previous = current.samples.find((s) => s.reset === value.reset);
-          if (previous) value.remaining = Math.min(previous.remaining, value.remaining);
-          const remaining = current.samples.filter((s) => s.reset > now && s.reset !== value.reset);
-          current.samples = [...remaining, value].slice(-8);
-          if (remaining.length >= 8)
-            state.blockedUntil = Math.max(
-              state.blockedUntil,
-              Math.max(...remaining.map((s) => s.reset))
+      try {
+        const now = clock.now();
+        const accounted = new Set<string>();
+        for (const response of responses) {
+          const parsed = sample.safeParse(response);
+          if (response.resource && parsed.success) {
+            const name = response.resource,
+              current = get(name),
+              value = parsed.data;
+            const previous = current.samples.find((s) => s.reset === value.reset);
+            if (previous) value.remaining = Math.min(previous.remaining, value.remaining);
+            const remaining = current.samples.filter(
+              (s) => s.reset > now && s.reset !== value.reset
             );
-          accounted.add(name);
+            current.samples = [...remaining, value].slice(-8);
+            if (remaining.length >= 8)
+              state.blockedUntil = Math.max(
+                state.blockedUntil,
+                Math.max(...remaining.map((s) => s.reset))
+              );
+            accounted.add(name);
+          }
+          if (response.retryAfter !== undefined || [403, 429].includes(response.status)) {
+            if (
+              response.retryAfter === undefined &&
+              response.remaining === 0 &&
+              response.reset &&
+              response.reset > now
+            )
+              continue;
+            state.secondaryFailures = Math.min(32, state.secondaryFailures + 1);
+            const after = response.retryAfter;
+            const retry =
+              after === undefined
+                ? NaN
+                : /^\d+(?:\.\d+)?$/.test(after)
+                  ? now + Number(after) * 1000
+                  : Date.parse(after);
+            const until = Number.isFinite(retry)
+              ? retry
+              : now + 60_000 * 2 ** Math.min(6, state.secondaryFailures - 1);
+            state.blockedUntil = Math.max(state.blockedUntil, until);
+          }
         }
-        if (response.retryAfter !== undefined || [403, 429].includes(response.status)) {
-          if (
-            response.retryAfter === undefined &&
-            response.remaining === 0 &&
-            response.reset &&
-            response.reset > now
-          )
-            continue;
-          state.secondaryFailures = Math.min(32, state.secondaryFailures + 1);
-          const after = response.retryAfter;
-          const retry =
-            after === undefined
-              ? NaN
-              : /^\d+(?:\.\d+)?$/.test(after)
-                ? now + Number(after) * 1000
-                : Date.parse(after);
-          const until = Number.isFinite(retry)
-            ? retry
-            : now + 60_000 * 2 ** Math.min(6, state.secondaryFailures - 1);
-          state.blockedUntil = Math.max(state.blockedUntil, until);
+        if (accounted.size) {
+          // Refund only this reservation's unpaid interval. Expired estimates have
+          // already paced traffic and cannot erase a later uncertain operation.
+          for (const [name, window] of reservation.charges) {
+            if (!accounted.has(name)) continue;
+            const refund = Math.max(0, window.end - Math.max(now, window.start));
+            get(name).nextAt = Math.max(now, get(name).nextAt - refund);
+            for (const other of pending) {
+              const later = other.charges.get(name);
+              if (other !== reservation && later && later.start >= window.end) {
+                later.start -= refund;
+                later.end -= refund;
+              }
+            }
+          }
+          for (const name of accounted) {
+            const current = get(name),
+              cost = costs.get(name) ?? 2,
+              at = Math.max(now, current.nextAt);
+            // Completed costs belong to their observed quota windows. Earlier uncertain
+            // reservations and independent secondary backoff keep their own deadlines.
+            current.nextAt = Math.max(
+              at,
+              ...current.samples
+                .filter((s) => s.reset > now)
+                .map((s) => Math.min(s.reset + 1000, at + sampleInterval(name, now, s) * cost))
+            );
+          }
         }
+        if (success && state.blockedUntil <= now) state.secondaryFailures = 0;
+        save();
+      } finally {
+        // Unaccounted responsibility remains in durable nextAt. It is no longer
+        // refundable once this operation has settled, including after restart.
+        pending.delete(reservation);
       }
-      if (accounted.size) {
-        // Reconcile only this reservation. Concurrent requests retain their charges.
-        for (const [name, charge] of reservation.charges)
-          if (accounted.has(name)) get(name).nextAt = Math.max(now, get(name).nextAt - charge);
-        for (const name of accounted) {
-          const current = get(name),
-            cost = costs.get(name) ?? 2,
-            at = Math.max(now, current.nextAt);
-          // Completed costs belong to their observed quota windows. Earlier uncertain
-          // reservations and independent secondary backoff keep their own deadlines.
-          current.nextAt = Math.max(
-            at,
-            ...current.samples
-              .filter((s) => s.reset > now)
-              .map((s) => Math.min(s.reset + 1000, at + sampleInterval(name, now, s) * cost))
-          );
-        }
-      }
-      if (success && state.blockedUntil <= now) state.secondaryFailures = 0;
-      save();
     },
   };
 }

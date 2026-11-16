@@ -7,6 +7,14 @@ it('publishes Project canvas geometry and item dependency links together after r
   const fake = fakeV2Server({ epoch: 'generation-browser' });
   const board = (await fake.inject('/api/v2/board')).json<FactoryV2Snapshot>();
   await fake.close();
+  const blocker = board.entities.relationships['relationship:blocker'];
+  if (blocker.kind !== 'prerequisite') throw new Error('Expected a prerequisite relationship');
+  board.entities.relationships['relationship:unrelated'] = {
+    ...blocker,
+    id: 'relationship:unrelated',
+    prerequisiteIssueId: 'issue:1001',
+    dependantIssueId: 'issue:1005',
+  };
   let served = board;
   const vite = await createServer({ configFile: 'frontend/vite.config.ts', server: { port: 0 } });
   const browser = await chromium.launch({ headless: true });
@@ -146,16 +154,39 @@ it('publishes Project canvas geometry and item dependency links together after r
     await waitForResult();
     await release();
     await browserExpect(viewport).toHaveAttribute('aria-busy', 'false');
-    await page.locator('.cc-item').first().click();
+    const removedItem = page.getByRole('group', {
+      name: 'Select Implement the command centre',
+      exact: true,
+    });
+    const removedId = await removedItem.getAttribute('data-card');
+    if (!removedId) throw new Error('Expected Project item identity');
+    const incident = page.locator(
+      `.cc-line[data-edge^="${removedId}-"],.cc-line[data-edge$="-${removedId}"]`
+    );
+    expect(await incident.count()).toBeGreaterThan(0);
+    const surviving = await page.locator('.cc-line[data-edge]').evaluateAll((paths, id) => {
+      const path = paths.find((value) => !value.getAttribute('data-edge')?.split('-').includes(id));
+      return path ? { key: path.getAttribute('data-edge'), d: path.getAttribute('d') } : undefined;
+    }, removedId);
+    if (!surviving?.key || !surviving.d)
+      throw new Error('Expected an unrelated item dependency link');
+    await removedItem.click();
     await browserExpect(page.getByRole('toolbar', { name: 'Selected item actions' })).toBeVisible();
-    served = { ...served, entities: { ...served.entities, items: {} } };
+    const retainedItems = { ...served.entities.items };
+    delete retainedItems['item:1002'];
+    served = { ...served, entities: { ...served.entities, items: retainedItems } };
     await waitForResult();
+    await browserExpect(incident).toHaveCount(0);
+    await browserExpect(page.locator(`.cc-line[data-edge="${surviving.key}"]`)).toHaveAttribute(
+      'd',
+      surviving.d
+    );
     await browserExpect(page.getByRole('toolbar', { name: 'Selected item actions' })).toHaveCount(
       0
     );
     await release();
     await browserExpect(viewport).toHaveAttribute('aria-busy', 'false');
-    await browserExpect(page.locator('.cc-item')).toHaveCount(0);
+    await browserExpect(page.locator('.cc-item')).toHaveCount(count - 1);
     expect(errors).toEqual([]);
   } finally {
     await browser.close();

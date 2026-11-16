@@ -85,6 +85,20 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
         })
       )
     ).toMatchObject({ kind: 'unverified', threadId: 'thread-live', status: 'completed' });
+    for (const overrides of [{ threadId: 'another-worker' }, { projectId: 'wrong' }]) {
+      await host.save({ overrides });
+      expect(
+        await Effect.runPromise(
+          adapter.observe(intent, {
+            index: 0,
+            stage: 'implementation',
+            threadId: 'thread-live',
+            commit: intent.base,
+            previousRunId: null,
+          })
+        )
+      ).toEqual({ kind: 'ambiguous' });
+    }
     await host.save({ malformed: true });
     await expect(Effect.runPromise(adapter.observe(intent))).rejects.toMatchObject({
       _tag: 'Unavailable',

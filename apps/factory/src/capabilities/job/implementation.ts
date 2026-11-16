@@ -54,7 +54,9 @@ export const JobLive = Layer.effect(
             return status;
           }
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
-          const owningStage = yield* currentStage(store);
+          const latestStage = yield* currentStage(store);
+          const owningStage =
+            latestStage && latestStage.index >= (before.restart?.index ?? 0) ? latestStage : null;
           const observation = yield* execution.observe(activeIntent, owningStage ?? undefined);
           // Execution is an observed fact even if subsequent receipt validation fails.
           // Publish it before any external validation or continuation can fail.

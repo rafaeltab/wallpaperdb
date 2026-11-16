@@ -308,6 +308,44 @@ export function reportingStoreContract(
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { execution: { status: 'running', run: { id: 'run-9' } } },
       ]);
+      const failed = { ...execution, status: 'failed', run: { id: 'run-9', ordinal: 9 } };
+      await Effect.runPromise(
+        store.publish(delayed, [
+          {
+            kind: 'job',
+            value: {
+              ...job,
+              controlRevision: 3,
+              execution: failed,
+              resume: { index: 1, runId: 'run-9', revision: 3 },
+            },
+            sequence: 3,
+            at: 49,
+          },
+        ])
+      );
+      const provisional = await Effect.runPromise(store.begin());
+      await Effect.runPromise(
+        store.publish(provisional, [
+          { kind: 'job', value: { ...job, execution: failed }, sequence: 1, at: 49 },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { status: 'failed' }, resume: { runId: 'run-9', revision: 3 } },
+      ]);
+      await Effect.runPromise(
+        store.publish(provisional, [
+          {
+            kind: 'job',
+            value: { ...job, execution: { ...failed, status: 'completed' } },
+            sequence: 2,
+            at: 49,
+          },
+        ])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        { execution: { status: 'completed' } },
+      ]);
       await Effect.runPromise(store.jobs([], 50));
       expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
         { intent: { id: 'job-one' } },

@@ -114,6 +114,8 @@ ${receiptInstructions(intent, 'implementation')}`,
           const { thread } = detail.parse(
             await call(['show', match.threadId, '--messages', '1'], signal)
           );
+          if (thread.threadId !== match.threadId || thread.projectId !== config.projectId)
+            return { kind: 'ambiguous' };
           const unverified: Observation = repair
             ? {
                 kind: 'unverified',

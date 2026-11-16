@@ -45,9 +45,22 @@ export function controlledObservations(
             const before = priorJob?.execution;
             const after = item.value.execution;
             if (
+              priorJob?.controlRevision !== undefined &&
+              item.value.controlRevision === undefined &&
+              priorJob.stageIndex === item.value.stageIndex &&
+              before?.kind === after.kind &&
+              (before?.kind === 'found' || before?.kind === 'unverified') &&
+              (after.kind === 'found' || after.kind === 'unverified') &&
+              before.threadId === after.threadId &&
+              before.run?.id === after.run?.id &&
+              before.status === after.status
+            )
+              continue;
+            if (
               priorJob?.stageIndex === item.value.stageIndex &&
               (before?.kind === 'found' || before?.kind === 'unverified') &&
               (after.kind === 'found' || after.kind === 'unverified') &&
+              before.threadId === after.threadId &&
               before.run?.id &&
               before.run.id === after.run?.id &&
               ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
@@ -60,6 +73,7 @@ export function controlledObservations(
               priorJob?.stageIndex === item.value.stageIndex &&
               (before?.kind === 'found' || before?.kind === 'unverified') &&
               (after.kind === 'found' || after.kind === 'unverified') &&
+              before.threadId === after.threadId &&
               before.run &&
               after.run &&
               before.run.ordinal > after.run.ordinal

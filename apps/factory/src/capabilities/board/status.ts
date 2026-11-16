@@ -44,7 +44,7 @@ export function factoryStatus(
   ) {
     if (providerStatus(pr, mergeability) === 'conflict') return 'conflict';
     if (
-      jobs[0]?.stage === 'ci' &&
+      (jobs[0]?.stage === 'ci' || jobs.some((j) => j.activity === 'manual-continuation')) &&
       pr?.metadata.state === 'known' &&
       pr?.checks.state === 'known' &&
       pr.checks.value.comparison.headOid === pr.metadata.value.comparison.headOid &&

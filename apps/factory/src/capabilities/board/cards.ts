@@ -61,9 +61,15 @@ export function populateCards(context: ProjectionContext) {
         label: code.replaceAll('-', ' '),
         active:
           code !== 'completion-unverified' &&
-          code !== 'conflict' &&
           code !== 'unknown' &&
-          (jobs.some((j) => j.occupiesCapacity) || maintenance.some((m) => m.occupiesCapacity)),
+          (jobs.some(
+            (j) =>
+              j.occupiesCapacity &&
+              (code !== 'conflict' ||
+                (j.execution.state === 'known' &&
+                  ['running', 'waiting'].includes(j.execution.value.state)))
+          ) ||
+            maintenance.some((m) => m.occupiesCapacity)),
         since: null,
       },
       attention: attention(code),

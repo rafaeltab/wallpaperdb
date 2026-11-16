@@ -46,12 +46,16 @@ export type Observation =
       readonly kind: 'unverified';
       readonly threadId: string;
       readonly status: string;
+      /** Authenticated manual message boundary, reporting and receipt freshness only. */
+      readonly manual?: { readonly runId: string };
       readonly run?: { readonly id: string; readonly ordinal: number };
     }
   | {
       readonly kind: 'found';
       readonly threadId: string;
       readonly status: string;
+      /** A fresh state must follow this maintainer-initiated run. Never rewinds a stage. */
+      readonly manual?: { readonly runId: string };
       readonly answeredQuestions?: readonly string[];
       readonly run?: { readonly id: string; readonly ordinal: number };
       readonly question?: { readonly id: string; readonly text: string };
@@ -358,6 +362,8 @@ export interface StageRequest {
   readonly previousRunId: string | null;
 }
 export interface StageEvidence {
+  /** A current structured response exists, including malformed or negative state. */
+  readonly responseObserved?: boolean;
   readonly base?: string;
   readonly unexpectedBase?: boolean;
   readonly idle?: boolean;

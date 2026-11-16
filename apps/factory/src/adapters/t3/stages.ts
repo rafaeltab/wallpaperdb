@@ -119,6 +119,20 @@ export function stageExecution(
               signal
             );
             const detail = stageDetail.parse(raw);
+            if (binding.run && binding.run.id !== detail.thread.latestRunId) return null;
+            // A manual instruction starts new work, not a new factory stage.
+            // Keep the factory boundary while excluding receipts from before that work.
+            if (binding.manual) {
+              const instruction = instructionBoundary(detail.messages, intent, request);
+              const message = [...detail.messages]
+                .reverse()
+                .find((m) => m.role === 'user' && m.runId === binding.manual?.runId);
+              const manual = message ? detail.messages.indexOf(message) : -1;
+              detail.messages = [
+                ...detail.messages.slice(0, instruction + 1),
+                ...(manual > instruction ? detail.messages.slice(manual) : []),
+              ];
+            }
             if (
               !['idle', 'completed', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
                 detail.thread.status
@@ -129,16 +143,16 @@ export function stageExecution(
             const activity = await inactive(request.threadId, detail.thread.latestRunId, signal);
             if (activity !== 'idle') {
               if (activity !== 'waiting') return null;
-              const pending = pendingRun(raw, request, intent);
+              const pending = pendingRun(detail, request, intent);
               return pendingWorktree(
                 pending ? { ...pending, idle: false, waitingForGitHub: true } : null,
                 binding,
                 signal
               );
             }
-            const observed = outcome(raw, intent, request);
+            const observed = outcome(detail, intent, request);
             if (!observed) {
-              const pending = pendingRun(raw, request, intent);
+              const pending = pendingRun(detail, request, intent);
               return pendingWorktree(pending, binding, signal);
             }
             const { thread, result } = observed;
@@ -150,7 +164,7 @@ export function stageExecution(
             ).trim();
             if (result.kind !== 'state' || result.checked !== commit || dirty) {
               // Rejecting success must not erase the exact owning run's evidence.
-              const pending = pendingRun(raw, request, intent);
+              const pending = pendingRun(detail, request, intent);
               return pending ? { ...pending, commit, worktreeClean: !dirty } : null;
             }
             const comparison = await verifiedComparison(
@@ -163,7 +177,7 @@ export function stageExecution(
               signal
             );
             if (!comparison) {
-              const pending = pendingRun(raw, request, intent);
+              const pending = pendingRun(detail, request, intent);
               return pending
                 ? { ...pending, commit, worktreeClean: true, unexpectedBase: true }
                 : null;
@@ -356,10 +370,11 @@ function pendingResponse(
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return {};
   const value = responseValue(message.text);
-  if (value === undefined) return {};
+  if (value === undefined) return { responseObserved: true };
   const parsed = receiptSchema.safeParse(value);
   const version = z.object({ version: z.unknown().optional() }).safeParse(value);
   return {
+    responseObserved: true,
     migrationRequired:
       boundary >= 0 && parsed.success
         ? false

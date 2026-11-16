@@ -144,13 +144,14 @@ export function currentStage(store: JobStore) {
 function publicationMatches(
   evidence: StageEvidence | null,
   accepted: StageRequest,
-  pr: PullRequestObservation
+  pr: PullRequestObservation,
+  manual = false
 ) {
   if (!evidence?.accepted || pr.kind !== 'found') return false;
   return (
     evidence.stageIndex === accepted.index - 1 &&
-    evidence.commit === accepted.commit &&
-    reviewedAssociation(pr, accepted.commit) &&
+    (evidence.commit === accepted.commit || manual) &&
+    reviewedAssociation(pr, evidence.commit) &&
     Boolean(evidence.linked?.includes(pr.url))
   );
 }
@@ -169,8 +170,29 @@ function readiness(
     const pr = yield* issues.pullRequest(intent);
     const retained = (yield* store.readControl()).prerequisite;
     const cached = retainedAssociation(retained, pr);
-    const matches = publicationMatches(evidence, accepted, pr) || cached;
-    if (manualReplay(pr, accepted.commit, cached))
+    const fresh = publicationMatches(evidence, accepted, pr, !!observation?.manual);
+    // A fresh fully checked/reviewed/published state can update readiness after
+    // manual work. The accepted stage journal remains immutable and never rewinds.
+    const commit = fresh && evidence ? evidence.commit : accepted.commit;
+    const unchanged =
+      observation?.manual &&
+      evidence?.worktreeClean === true &&
+      evidence.idle !== false &&
+      !evidence.responseObserved &&
+      evidence.commit === accepted.commit &&
+      pr.kind === 'found' &&
+      pr.commit === accepted.commit &&
+      ['completed', 'idle'].includes(observation.status);
+    const ownerActive =
+      observation &&
+      !['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+        observation.status
+      );
+    const matches = fresh || !!unchanged || (!observation?.manual && !ownerActive && cached);
+    if (
+      (pr.kind === 'found' && pr.manualRecovery) ||
+      (manualReplay(pr, commit, cached) && !observation?.manual)
+    )
       return {
         stage: 'ci' as const,
         commit: accepted.commit,
@@ -180,7 +202,7 @@ function readiness(
         activity: 'manual-recovery' as const,
         pr,
       };
-    if (!matches && publication && evidence?.migrationRequired) {
+    if (!observation?.manual && !matches && publication && evidence?.migrationRequired) {
       // Older installations already entered CI using legacy publication receipts.
       // Retain that history and append migration after the current CI record.
       const migration = yield* requestReconciliation(
@@ -201,8 +223,8 @@ function readiness(
         pr,
       };
     }
-    const pending = maintenanceDelivery(pr, accepted.commit);
-    return pending ?? observedReadiness(pr, matches, accepted.commit);
+    const pending = maintenanceDelivery(pr, commit);
+    return pending ?? observedReadiness(pr, matches, commit);
   });
 }
 

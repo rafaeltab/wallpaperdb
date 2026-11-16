@@ -96,7 +96,12 @@ export function populateJobs(context: ProjectionContext) {
         ? 'cancelled'
         : unavailable
           ? 'observation-unavailable'
-          : (delivery?.activity ?? delivery?.stage ?? 'unknown'),
+          : execution?.kind === 'found' &&
+              execution.manual &&
+              (!delivery?.activity ||
+                ['repairing', 'waiting-for-github'].includes(delivery.activity))
+            ? 'manual-continuation'
+            : (delivery?.activity ?? delivery?.stage ?? 'unknown'),
       activityStartedAt: null,
       deadline: timestamp(delivery?.deadline),
       progress: delivery?.progress ?? '',

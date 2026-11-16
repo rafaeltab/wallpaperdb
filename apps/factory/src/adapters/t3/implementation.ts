@@ -151,7 +151,7 @@ ${receiptInstructions(intent, 'implementation')}`,
             ).trim();
             await verifyObservedHead(worktree, intent, thread.threadId, repair, signal);
             if (branch !== intent.branch) return unverified;
-            const questions = await questionObservation(config, thread, signal);
+            const questions = await questionObservation(config, thread, signal, intent.id);
             return {
               ...questions,
               kind: 'found',
@@ -244,11 +244,12 @@ ${receiptInstructions(intent, 'implementation')}`,
 async function questionObservation(
   config: Parameters<typeof t3Execution>[0],
   thread: z.infer<typeof detail>['thread'],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  jobId?: string
 ) {
   if (config.mcpEndpoint && config.mcpAuthorizationFile)
     return {
-      ...(await pendingQuestion(config, thread.threadId, thread.latestRunId, signal)),
+      ...(await pendingQuestion(config, thread.threadId, thread.latestRunId, signal, jobId)),
       run: currentRun(thread),
     };
   if (thread.pendingRequestCount > 0)

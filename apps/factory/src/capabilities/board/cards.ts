@@ -61,6 +61,7 @@ export function populateCards(context: ProjectionContext) {
         label: code.replaceAll('-', ' '),
         active:
           code !== 'completion-unverified' &&
+          code !== 'awaiting-verification' &&
           code !== 'unknown' &&
           (jobs.some(
             (j) =>

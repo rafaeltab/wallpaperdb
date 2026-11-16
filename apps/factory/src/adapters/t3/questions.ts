@@ -59,6 +59,9 @@ const activity = z.object({
       text: z.string().nullable(),
       sourceThreadId: z.string(),
       visibility: z.string(),
+      position: z.number().optional(),
+      createdBy: z.string().nullable().optional(),
+      creationSource: z.string().nullable().optional(),
     })
   ),
   hasMore: z.boolean(),
@@ -68,11 +71,13 @@ export async function pendingQuestion(
   config: Configuration,
   threadId: string,
   expectedRunId: string | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  jobId?: string
 ) {
-  let afterPosition: number | undefined;
+  let afterPosition: number | undefined = -1;
   let question: { id: string; text: string } | undefined;
   const answeredQuestions: string[] = [];
+  const messages: z.infer<typeof activity>['items'] = [];
   for (;;) {
     const page = activity.parse(
       await mcpCall(
@@ -90,11 +95,37 @@ export async function pendingQuestion(
       )
     );
     verifyRun(page, expectedRunId);
+    messages.push(...page.items);
     question = questionOnPage(page, threadId) ?? question;
     answeredQuestions.push(...answeredOnPage(page, threadId));
-    if (!page.hasMore) return { question, answeredQuestions };
+    if (!page.hasMore)
+      return { question, answeredQuestions, manual: manualBoundary(messages, threadId, jobId) };
     afterPosition = followingPosition(page, afterPosition);
   }
+}
+
+function manualBoundary(
+  items: z.infer<typeof activity>['items'],
+  threadId: string,
+  jobId?: string
+) {
+  const initiating = items
+    .filter(
+      (item) =>
+        item.sourceThreadId === threadId &&
+        item.visibility === 'local' &&
+        item.type === 'user_message' &&
+        (item.createdBy === 'user' ||
+          (jobId &&
+            item.createdBy === 'agent' &&
+            item.creationSource === 'mcp' &&
+            item.text?.includes(`Factory instruction ${jobId}:`)))
+    )
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .at(-1);
+  return initiating?.createdBy === 'user' && initiating.runId
+    ? { runId: initiating.runId }
+    : undefined;
 }
 
 function isCurrentQuestion(

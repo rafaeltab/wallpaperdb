@@ -4,6 +4,7 @@ const thread = z.object({
   threadId: z.string(),
   parentThreadId: z.string().nullable(),
 });
+const pullRequests = z.array(z.object({ watching: z.boolean() }));
 const snapshot = z.object({
   thread: z.object({
     threadId: z.string(),
@@ -13,7 +14,7 @@ const snapshot = z.object({
     pendingRequestCount: z.number().int().nonnegative(),
     blockedOnThreadWait: z.boolean(),
     pendingBackgroundTasks: z.array(z.unknown()),
-    pullRequests: z.array(z.object({ watching: z.boolean() })),
+    pullRequests: pullRequests.optional(),
   }),
   items: z.array(
     z.object({ status: z.string(), sourceThreadId: z.string(), visibility: z.string() })
@@ -22,7 +23,7 @@ const snapshot = z.object({
   nextPosition: z.number().nullable(),
 });
 /** A complete supported-system snapshot, including descendants below finished parents.
- * Missing optional protocol enrichments cannot establish inactivity. */
+ * Resolve omitted watcher enrichment through authoritative PR metadata. */
 export async function inactiveLineage(
   call: (tool: string, args: object, signal?: AbortSignal) => Promise<unknown>,
   root: string,
@@ -75,6 +76,7 @@ async function inactiveThread(
   signal?: AbortSignal
 ): Promise<'idle' | 'waiting' | 'busy'> {
   let waiting = false;
+  let authoritativeWaiting: boolean | undefined;
   let afterPosition = -1;
   const positions = new Set<number>();
   for (;;) {
@@ -104,11 +106,34 @@ async function inactiveThread(
       )
     )
       return 'busy';
-    waiting ||= thread.blockedOnThreadWait || thread.pullRequests.some((pr) => pr.watching);
+    if (!thread.pullRequests && authoritativeWaiting === undefined)
+      authoritativeWaiting = await watchedPullRequests(call, owner, signal);
+    waiting ||=
+      thread.blockedOnThreadWait ||
+      (thread.pullRequests?.some((pr) => pr.watching) ?? authoritativeWaiting === true);
     if (!hasMore) return waiting ? 'waiting' : 'idle';
     if (nextPosition === null || positions.has(nextPosition) || nextPosition <= afterPosition)
       return 'busy';
     positions.add(nextPosition);
     afterPosition = nextPosition;
+  }
+}
+
+async function watchedPullRequests(
+  call: (tool: string, args: object, signal?: AbortSignal) => Promise<unknown>,
+  threadId: string,
+  signal?: AbortSignal
+) {
+  let cursor: string | undefined;
+  const cursors = new Set<string>();
+  for (;;) {
+    const page = z
+      .object({ pullRequests, nextCursor: z.string().nullable() })
+      .parse(await call('list_thread_pull_requests', { threadId, cursor }, signal));
+    if (page.pullRequests.some((pr) => pr.watching)) return true;
+    if (page.nextCursor === null) return false;
+    if (cursors.has(page.nextCursor)) throw new Error('T3 PR pagination did not advance');
+    cursors.add(page.nextCursor);
+    cursor = page.nextCursor;
   }
 }

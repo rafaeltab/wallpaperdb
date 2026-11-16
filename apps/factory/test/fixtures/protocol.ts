@@ -1205,6 +1205,15 @@ export async function runProtocol(
         });
     } else if (args[0] === 'acp-mcp-call') {
       if (args[1] === 'list_thread_pull_requests') {
+        const input = JSON.parse(args[2]);
+        if (config.watcherPages) {
+          reply(config.watcherPages[input.cursor ?? 'first']);
+          process.exit(0);
+        }
+        if (config.watcherReplies?.[input.threadId]) {
+          reply(config.watcherReplies[input.threadId]);
+          process.exit(0);
+        }
         reply(config.associationReply ?? { structuredContent: { pullRequests: [] } });
         process.exit(0);
       }
@@ -1263,6 +1272,7 @@ export async function runProtocol(
                 watching: false,
                 ...pr,
               })),
+              ...(config.omitActivityPullRequests ? { pullRequests: undefined } : {}),
               ...(config.descendantSnapshots?.[input.threadId] ?? {}),
               threadId: input.threadId,
               latestRunId:

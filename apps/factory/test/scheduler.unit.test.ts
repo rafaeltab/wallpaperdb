@@ -481,13 +481,13 @@ it('recovers a reservation made before launch and does not charge another admiss
     await f.runtime.dispose();
   }
 });
-it('rejects proposals made stale by changing requirements', async () => {
+it('launches from the planning snapshot when external requirements change during planning', async () => {
   const f = fixture();
   try {
     f.duringPlan(() => f.setIssues([{ ...issue(1), body: 'Changed authorized scope' }]));
     await f.run((s) => s.tick(base));
-    expect(f.launches).toEqual([]);
-    expect(f.snapshot().admissions).toEqual([]);
+    expect(f.launches).toEqual([1]);
+    expect(f.snapshot().admissions.map((a) => a.issue)).toEqual([1]);
   } finally {
     await f.runtime.dispose();
   }
@@ -1044,7 +1044,7 @@ it('does not pass the preflight discovery clock as a model deadline', async () =
   }
 });
 
-it('hands freshly gathered cycle inputs to the planner once, retaining post-model freshness reads', async () => {
+it('collects once to plan and launch a complete batch', async () => {
   let reads = 0;
   const f = fixture({
     read: () => {
@@ -1055,15 +1055,16 @@ it('hands freshly gathered cycle inputs to the planner once, retaining post-mode
     },
   });
   try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 3, allowance: 3, paused: false }));
     await f.run((s) => s.tick(base));
-    expect(f.launches).toEqual([1]);
-    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(f.launches).toEqual([1, 2, 3]);
+    expect(reads).toBe(1);
   } finally {
     await f.runtime.dispose();
   }
 });
 
-it('retains the accepted batch through restart and preparation without another planner call', async () => {
+it('retains the accepted batch through restart and preparation without another collection or planner call', async () => {
   let plans = 0;
   const f = fixture({
     read: () => {},
@@ -1075,6 +1076,7 @@ it('retains the accepted batch through restart and preparation without another p
   try {
     await f.run((s) => s.tick(base));
     expect(f.snapshot().cycle?.selected?.map((s) => s.issue)).toEqual([5]);
+    f.failDiscovery();
     await f.reopen();
     f.prepareSucceeds();
     await f.run((s) => s.tick(base));
@@ -1199,7 +1201,7 @@ it('keeps recovery authorization reserved until an active owning journal is obse
   }
 });
 
-it('automatically replans a retained selection when its issue title changes the authorized task', async () => {
+it('retains a planned selection when its external title changes during preparation', async () => {
   let plans = 0;
   const f = fixture({
     read: () => {},
@@ -1215,9 +1217,7 @@ it('automatically replans a retained selection when its issue title changes the 
     ]);
     f.prepareSucceeds();
     await f.run((s) => s.tick(base));
-    expect(f.launches).toEqual([]);
-    await f.run((s) => s.tick(base));
-    expect(plans).toBe(2);
+    expect(plans).toBe(1);
     expect(f.launches).toEqual([5]);
   } finally {
     await f.runtime.dispose();
@@ -1225,7 +1225,7 @@ it('automatically replans a retained selection when its issue title changes the 
 });
 
 it.each([false, true])(
-  'retains prepared work across join evidence while detecting scope edits=%s',
+  'retains prepared work without recollecting join comments or scope edits=%s',
   async (scopeEdit) => {
     let plans = 0;
     const f = fixture({
@@ -1255,13 +1255,8 @@ it.each([false, true])(
       ]);
       f.prepareSucceeds();
       await f.run((s) => s.tick(base));
-      expect(f.launches).toEqual(scopeEdit ? [] : [5]);
+      expect(f.launches).toEqual([5]);
       expect(plans).toBe(1);
-      if (scopeEdit) {
-        await f.run((s) => s.tick(base));
-        expect(plans).toBe(2);
-        expect(f.launches).toEqual([5]);
-      }
     } finally {
       await f.runtime.dispose();
     }

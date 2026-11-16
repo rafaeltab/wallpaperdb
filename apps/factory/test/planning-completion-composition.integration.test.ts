@@ -104,7 +104,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
   }
 });
 
-it('keeps discovery and freshness outside the bound model deadline across restart', async () => {
+it('collects once before model handoff and retains completion across restart', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
   const host = await protocol({ origin: true });
@@ -185,10 +185,6 @@ it('keeps discovery and freshness outside the bound model deadline across restar
     expect(deadline).toBeLessThanOrEqual(Date.now() + 600_000);
     vi.setSystemTime(Date.now() + 9 * 60_000);
     await release('planner-observation');
-    await held('planning-freshness');
-    expect(await details()).toMatchObject({ phase: 'freshness', deadline });
-    vi.setSystemTime(Date.now() + 11 * 60_000);
-    await release('planning-freshness');
     await vi.waitFor(
       async () => {
         expect(await details()).toMatchObject({
@@ -210,6 +206,12 @@ it('keeps discovery and freshness outside the bound model deadline across restar
       { timeout: 5000, interval: 20 }
     );
     expect((await running.app.inject('/api/scheduler')).json().state.admissions).toEqual([]);
+    expect(
+      (await host.calls()).filter(
+        (call) => call.binary === 'gh' && call.args[0] === 'issue' && call.args[1] === 'list'
+      )
+    ).toHaveLength(1);
+    vi.setSystemTime(Date.now() + 11 * 60_000);
     await running.close();
     running = await startFactory(configuration);
     expect(await details()).toMatchObject({ phase: 'succeeded', deadline });

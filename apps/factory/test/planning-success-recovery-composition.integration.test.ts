@@ -8,7 +8,7 @@ import type { FactoryV2Snapshot } from '../src/http/index.js';
 import { protocol } from './fixtures/setup.js';
 
 it.each([false, true])(
-  'recovers a planning success write without reusing changed inputs, changed=%s',
+  'recovers a planning success write using its retained snapshot, changed=%s',
   async (changed) => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.UTC(2026, 10, 9, 12));
@@ -193,7 +193,7 @@ it.each([false, true])(
         async () =>
           expect((await board()).meta.factory).toMatchObject({
             paused: false,
-            admission: { consumed: changed ? 0 : 1 },
+            admission: { consumed: 1 },
             planning: {
               consecutiveModelDeadlineFailures: 0,
               pendingNoticeCount: 1,
@@ -206,17 +206,7 @@ it.each([false, true])(
         timeout: 6000,
         interval: 20,
       });
-      expect((await starts()).filter((call) => call.args.includes('--worktree'))).toHaveLength(
-        changed ? 0 : 1
-      );
-      if (changed)
-        await vi.waitFor(
-          async () =>
-            expect(
-              (await host.calls()).filter((call) => call.args[1] === 't3_thread_organize')
-            ).toHaveLength(3),
-          { timeout: 6000, interval: 20 }
-        );
+      expect((await starts()).filter((call) => call.args.includes('--worktree'))).toHaveLength(1);
     } finally {
       database?.close();
       await running?.close();

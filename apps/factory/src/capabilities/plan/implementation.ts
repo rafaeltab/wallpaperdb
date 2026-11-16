@@ -200,7 +200,7 @@ export const PlanLive = Layer.effect(
                       'Inputs changed; the previous bound planner was reconciled. Gather and replan.',
                   },
                 ],
-                input: boundedInput(yield* source.read()),
+                input,
               };
             }
             const ownership = attempt?.automatic ? yield* planner.ownership(false) : undefined;
@@ -218,20 +218,6 @@ export const PlanLive = Layer.effect(
                 )
               : [];
             if (attempt) yield* attempt.progress('freshness');
-            const currentObserved = yield* source.read();
-            const current = boundedInput({
-              ...currentObserved,
-              maximumSelections: attempt?.maximumSelections ?? currentObserved.maximumSelections,
-            });
-            if (JSON.stringify(comparable(input)) !== JSON.stringify(comparable(current)))
-              return {
-                kind: 'stale' as const,
-                selected: [],
-                rejected: [
-                  { issue: 0, reason: 'Inputs changed during planning. Request a fresh preview.' },
-                ],
-                input: current,
-              };
             if (unavailable.some(Boolean))
               return {
                 kind: 'preview' as const,

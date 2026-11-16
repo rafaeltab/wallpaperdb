@@ -524,6 +524,26 @@ it.each([
   })
 );
 
+it('accepts idle state when activity omits PR enrichment and authoritative watchers are empty', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const messages = [instruction(intent, request), response(intent, host.base)];
+    await host.save({ overrides: { status: 'completed' }, messages });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+    await host.save({
+      overrides: { status: 'completed' },
+      messages,
+      omitActivityPullRequests: true,
+      watcherReplies: {
+        'thread-live': { structuredContent: { pullRequests: [], nextCursor: null } },
+      },
+    });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
+      accepted: true,
+    });
+  }));
+
 it('traverses a completed child to reject an active grandchild and rejects missing inactivity evidence', () =>
   stageFixture(async ({ host, adapter, intent, request }) => {
     const messages = [

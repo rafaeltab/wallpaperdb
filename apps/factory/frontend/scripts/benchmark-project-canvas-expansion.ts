@@ -174,6 +174,7 @@ type VariantResource = {
   server?: Awaited<ReturnType<typeof preview>>;
 };
 const resources: VariantResource[] = [];
+let cleanupFailures: unknown[] = [];
 async function prepareVariant(variant: VariantName, frontendSource: string) {
   const resource: VariantResource = {
     directory: await mkdtemp(join(tmpdir(), `project-canvas-expansion-${variant}-`)),
@@ -467,10 +468,9 @@ try {
       }
     })
   );
-  const failed = cleanup.filter((result) => result.status === 'rejected');
-  if (failed.length)
-    throw new AggregateError(
-      failed.map((result) => result.reason),
-      'Expansion benchmark cleanup failed'
-    );
+  cleanupFailures = cleanup
+    .filter((result) => result.status === 'rejected')
+    .map((result) => result.reason);
 }
+if (cleanupFailures.length)
+  throw new AggregateError(cleanupFailures, 'Expansion benchmark cleanup failed');

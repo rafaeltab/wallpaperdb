@@ -4,13 +4,14 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
   type CSSProperties,
   type ReactNode,
 } from 'react';
 import type { Action, WorkItem } from '../../../src/http/index.js';
 import type { Board } from './model';
 import { createProjectCanvasScene } from './project-canvas-scene';
-import { createItemDependencyLinkInput } from './item-dependency-links';
+import { createItemDependencyLinkInput, type ItemDependencyLink } from './item-dependency-links';
 import { useItemDependencyLinks } from './use-item-dependency-links';
 import { ProjectCanvasViewport, type ProjectCanvasViewportHandle } from './project-canvas-viewport';
 import { ProjectCanvasTooltip, type ProjectCanvasTooltipHandle } from './project-canvas-tooltip';
@@ -36,6 +37,50 @@ import {
 } from './canvas-presentation';
 import { actionLabel, retryExplanation } from './presentation';
 import './canvas.css';
+
+const DependencyLinkMarker = memo(function DependencyLinkMarker({
+  link,
+}: {
+  link: ItemDependencyLink;
+}) {
+  return (
+    <marker
+      id={`cc-arrow-${link.key}`}
+      viewBox="0 0 10 10"
+      refX="8"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+    >
+      <path d="m2 2 6 3-6 3" fill="none" stroke={link.color} strokeWidth="1.8" />
+    </marker>
+  );
+});
+
+const DependencyLinkPath = memo(function DependencyLinkPath({
+  link,
+  className,
+}: {
+  link: ItemDependencyLink;
+  className: string;
+}) {
+  return (
+    <g className={className}>
+      <path className="cc-line-halo" d={link.d} />
+      <path
+        className="cc-line"
+        data-edge={link.key}
+        data-points={JSON.stringify(link.points)}
+        data-failed={link.failed}
+        d={link.d}
+        stroke={link.color}
+        markerStart={`url(#cc-arrow-${link.key})`}
+      />
+    </g>
+  );
+});
+
 export function Canvas({
   board,
   native,
@@ -96,9 +141,7 @@ export function Canvas({
   const routing = useItemDependencyLinks(dependencyInput);
   const data = targetScene.layout;
   const fixture = data.fixture;
-  const routingMatchesGeometry = routing.input === dependencyInput;
   const routes = useMemo(() => {
-    if (!routingMatchesGeometry) return [];
     // Deleted Project items disappear immediately; remove their links in the same render.
     const endpoints = new Set(
       [...data.boxes, ...data.headerNodes, ...data.aggregateNodes].map((node) => node.id)
@@ -113,7 +156,6 @@ export function Canvas({
           ?.some((dependency) => items.has(dependency.source) && items.has(dependency.target))
     );
   }, [
-    routingMatchesGeometry,
     routing.links,
     data.boxes,
     data.headerNodes,
@@ -721,38 +763,17 @@ export function Canvas({
           <svg className="cc-lines" width={data.width} height={data.height} aria-hidden="true">
             <defs>
               {routes.map((r) => (
-                <marker
-                  id={`cc-arrow-${r.key}`}
-                  key={r.key}
-                  viewBox="0 0 10 10"
-                  refX="8"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto-start-reverse"
-                >
-                  <path d="m2 2 6 3-6 3" fill="none" stroke={r.color} strokeWidth="1.8" />
-                </marker>
+                <DependencyLinkMarker key={r.key} link={r} />
               ))}
             </defs>
             {[...routes]
               .sort((a, b) => Number(isActiveRoute(a)) - Number(isActiveRoute(b)))
               .map((r) => (
-                <g
+                <DependencyLinkPath
                   key={r.key}
+                  link={r}
                   className={attentionOnly || active ? (isActiveRoute(r) ? 'active' : 'muted') : ''}
-                >
-                  <path className="cc-line-halo" d={r.d} />
-                  <path
-                    className="cc-line"
-                    data-edge={r.key}
-                    data-points={JSON.stringify(r.points)}
-                    data-failed={r.failed}
-                    d={r.d}
-                    stroke={r.color}
-                    markerStart={`url(#cc-arrow-${r.key})`}
-                  />
-                </g>
+                />
               ))}
           </svg>
           {data.boxes.map(itemCard)}

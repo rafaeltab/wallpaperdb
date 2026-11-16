@@ -12,7 +12,6 @@ import {
   ObservationStore,
   ObservationSource,
   LocalSnapshot,
-  observationRefreshIntervalMs,
 } from '../capabilities/observe/index.js';
 import { resolve } from 'node:path';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -341,10 +340,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               )
           );
           const issueSource = githubIssues(githubConfig());
-          let automaticAt = 0;
           const read = () =>
             Effect.gen(function* () {
-              automaticAt = Date.now() + observationRefreshIntervalMs;
               yield* Effect.sync(() => planningDemand());
               const input = yield* source.read();
               const state = yield* scheduleStore.read();
@@ -378,7 +375,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             verify: source.verify,
             read,
             poll: () =>
-              Effect.suspend(() => (Date.now() < automaticAt ? Effect.succeed(undefined) : read())),
+              Effect.suspend(() => (!github.cycleReady() ? Effect.succeed(undefined) : read())),
           };
         })
       ),
@@ -482,10 +479,13 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     };
     const refreshes = observationWorker(() =>
       runtime.runPromise(
-        Effect.all([observations.refresh(), threads.refresh()], { concurrency: 2 }).pipe(
-          Effect.asVoid,
-          Effect.catch(Effect.logError)
-        ),
+        Effect.all(
+          [
+            Effect.suspend(() => (github.cycleReady() ? observations.refresh() : Effect.void)),
+            threads.refresh(),
+          ],
+          { concurrency: 2 }
+        ).pipe(Effect.asVoid, Effect.catch(Effect.logError)),
         { signal: requests.signal }
       )
     );

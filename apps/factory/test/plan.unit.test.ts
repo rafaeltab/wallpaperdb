@@ -71,6 +71,50 @@ it('shows a semantic proposal without dispatch', async () => {
 });
 
 it.each([false, true])(
+  'reuses cycle discovery but still independently rejects changed inputs=%s',
+  async (changed) => {
+    const input: PlanningInput = {
+      issues: [issue],
+      job: { kind: 'empty' },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    let reads = 0;
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSource, {
+              verify: () => Effect.succeed(undefined),
+              read: () =>
+                Effect.sync(() => {
+                  reads++;
+                  return { ...input, issues: changed ? [] : input.issues };
+                }),
+            }),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: () => Effect.succeed(proposal),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const result = await runtime.runPromise(
+        Effect.flatMap(Plan, (plan) =>
+          plan.preview({ input, automatic: true, progress: () => Effect.void })
+        )
+      );
+      expect(reads).toBe(1);
+      expect(result.kind).toBe(changed ? 'stale' : 'preview');
+      expect(result.selected).toEqual(changed ? [] : proposal.selected);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
+
+it.each([false, true])(
   'waits for brief cycle ownership without bypassing a retained batch=%s',
   async (retained) => {
     const store = controlledScheduleStore();

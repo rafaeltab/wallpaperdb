@@ -422,6 +422,7 @@ export const SchedulerLive = Layer.effect(
           cycle = undefined;
         }
         if (!available(snapshot)) return snapshot;
+        let gathered: PlanningInput | undefined;
         if (!cycle) {
           const gatheredAt = yield* time.now();
           const input = yield* source.poll?.() ?? source.read();
@@ -435,6 +436,9 @@ export const SchedulerLive = Layer.effect(
             allowance: snapshot.state.allowance,
           };
           if (!(yield* saveCycle(snapshot.state, cycle))) return yield* status();
+          // Only the cycle reservation changed this revision. Preserve the gathered
+          // requirements and controls; post-model discovery still verifies them.
+          gathered = { ...input, scheduleRevision: snapshot.state.revision + 1 };
         }
         const free = Math.min(
           snapshot.state.concurrency === -1
@@ -448,6 +452,7 @@ export const SchedulerLive = Layer.effect(
         );
         const preview = yield* plan
           .preview({
+            input: gathered,
             maximumSelections: Number.isFinite(free) ? Math.max(0, free) : undefined,
             requestId: cycle.requestId,
             automatic: true,

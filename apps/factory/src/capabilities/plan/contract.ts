@@ -110,6 +110,8 @@ export interface Preview {
 }
 export interface Plan {
   preview(attempt?: {
+    /** Fresh discovery gathered by this scheduler invocation, never retained across cycles. */
+    input?: PlanningInput;
     maximumSelections?: number;
     requestId?: string;
     automatic?: boolean;

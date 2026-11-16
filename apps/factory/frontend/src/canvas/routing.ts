@@ -361,16 +361,18 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           const nx = x + dx,
             ny = y + dy;
           if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || blocked[cell(nx, ny)]) continue;
-          const p = { x: xs[x], y: ys[y] },
-            q = { x: xs[nx], y: ys[ny] };
+          const px = xs[x],
+            py = ys[y],
+            qx = xs[nx],
+            qy = ys[ny];
           const overlapCache = d === 0 ? horizontalOverlap : verticalOverlap,
             segment = d === 0 ? cell(Math.min(x, nx), y) : cell(x, Math.min(y, ny));
           if (overlapCache[segment]) continue;
           const next = encode(nx, ny, d),
             cost =
               costs[current] +
-              Math.abs(p.x - q.x) +
-              Math.abs(p.y - q.y) +
+              Math.abs(px - qx) +
+              Math.abs(py - qy) +
               (d !== dir ? 5 : 0) +
               (d === 0
                 ? horizontalCrowding[cell(Math.min(x, nx), y)]
@@ -378,7 +380,7 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           if (cost >= costs[next]) continue;
           costs[next] = cost;
           previous[next] = current;
-          queue.push(next, cost + Math.abs(q.x - end.x) + Math.abs(q.y - end.y));
+          queue.push(next, cost + Math.abs(qx - end.x) + Math.abs(qy - end.y));
         }
       }
       const grid: Point[] = [];

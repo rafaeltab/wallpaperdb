@@ -1024,70 +1024,63 @@ it('retains an interrupted request reservation beyond its quota reset after reop
     expect(clock.now()).toBeGreaterThanOrEqual(startedAt + 14_400_000);
   }));
 
-it('serves admitted-work observations before already queued background collections', async () =>
+it('serves admitted work before queued background collections when a slot opens', async () =>
   withGithub(async (host, stop) => {
-    await host.save({
-      hold: 'github-bootstrap',
-      planning: {
-        candidates: [],
-        issues: [
-          {
-            number: 577,
-            title: 'Controlled issue',
-            body: '',
-            state: 'OPEN',
-            url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
-            author: { login: 'rafaeltab' },
-            labels: [],
-            comments: [],
-          },
-        ],
-        openPulls: [],
-      },
-    });
+    await host.nodeCommand(
+      'gh',
+      `
+      const fs = require('node:fs'); const directory = ${JSON.stringify(host.directory)};
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: { graphql: {
+          limit:1000000,remaining:1000000,reset:Math.ceil(Date.now()/1000)+3600
+        } } }));
+      } else {
+        const id = process.argv[4];
+        fs.writeFileSync(directory + '/started-' + id, 'ready');
+        const timer = setInterval(() => {
+          if (!fs.existsSync(directory + '/release-' + id)) return;
+          clearInterval(timer); console.log('{}');
+        }, 10);
+      }
+    `
+    );
     const requests = githubRequests({
       project: host.repository,
       directory: host.directory + '/state',
       signal: stop.signal,
     });
-    const metadata = (args: string[], signal?: AbortSignal) => requests(args, signal, 'background');
-    const source = githubObservations(
-      host.repository,
-      () => Effect.succeed([]),
-      undefined,
-      metadata
+    const request = (id: string, priority: 'work' | 'background') => {
+      const pending = requests(['issue', 'view', id], undefined, priority);
+      void pending.catch(() => undefined);
+      return pending;
+    };
+    const started = async (id: string) =>
+      vi.waitFor(
+        async () => expect(await readFile(host.directory + '/started-' + id, 'utf8')).toBe('ready'),
+        { timeout: 5000, interval: 20 }
+      );
+    // Occupy every shared slot, including both background slots, before queuing
+    // the competitors. Child-process startup order is not dispatch order.
+    const active = [
+      request('background-1', 'background'),
+      request('background-2', 'background'),
+      request('work-1', 'work'),
+      request('work-2', 'work'),
+    ];
+    await Promise.all(['background-1', 'background-2', 'work-1', 'work-2'].map(started));
+    const background = request('background-3', 'background');
+    const work = request('work-3', 'work');
+    await writeFile(host.directory + '/release-background-1', 'continue');
+    await started('work-3');
+    await expect(readFile(host.directory + '/started-background-3', 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await Promise.all(
+      ['background-2', 'background-3', 'work-1', 'work-2', 'work-3'].map((id) =>
+        writeFile(host.directory + '/release-' + id, 'continue')
+      )
     );
-    const first = Effect.runPromise(source.read());
-    void first.catch(() => undefined);
-    await vi.waitFor(
-      async () => expect(await readFile(host.directory + '/held', 'utf8')).toBe('github-bootstrap'),
-      { timeout: 5000, interval: 20 }
-    );
-    const second = Effect.runPromise(source.read());
-    void second.catch(() => undefined);
-    const issues = githubIssues(
-      { project: host.repository, base: host.base, prerequisites: [] },
-      requests
-    );
-    const work = Effect.runPromise(issues.inspect(577));
-    void work.catch(() => undefined);
-    await writeFile(host.directory + '/release', 'continue');
-    const [, , result] = await Promise.all([first, second, work]);
-    expect(result).toMatchObject({ open: true });
-    const received = await host.githubRequests();
-    const issueView = received.findIndex(
-      (call) => call.args[0] === 'issue' && call.args[1] === 'view'
-    );
-    const indexes = received.flatMap((call, index) =>
-      call.args[0] === 'api' &&
-      call.args[1] === 'graphql' &&
-      call.args.some((a: string) => a.includes('projectV2(number:7)'))
-        ? [index]
-        : []
-    );
-    expect(indexes).toHaveLength(2);
-    expect(issueView).toBeGreaterThan(indexes[0]);
-    expect(issueView).toBeLessThan(indexes[1]);
+    await Promise.all([...active, background, work]);
   }));
 
 it('creates fresh shared prerequisite evidence once per metadata collection', async () =>

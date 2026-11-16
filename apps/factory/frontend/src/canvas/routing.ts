@@ -24,12 +24,6 @@ const colors = [
   '#c9a0cc',
   '#c0b293',
 ];
-const directions = [
-  [1, 0, 0],
-  [-1, 0, 0],
-  [0, 1, 1],
-  [0, -1, 1],
-];
 function lowerBound(values: number[], value: number) {
   let low = 0,
     high = values.length;
@@ -357,26 +351,30 @@ export function routeCanvas(nodes: Rect[], edges: Edge[], width: number, height:
           final = current;
           break;
         }
-        for (const [dx, dy, d] of directions) {
-          const nx = x + dx,
-            ny = y + dy;
-          if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || blocked[cell(nx, ny)]) continue;
+        // Keep the established +x, -x, +y, -y order without tuple iterators.
+        for (let move = 0; move < 4; move++) {
+          const horizontal = move < 2,
+            forward = move % 2 === 0,
+            step = forward ? 1 : -1,
+            nx = horizontal ? x + step : x,
+            ny = horizontal ? y : y + step,
+            nextCell = at + (horizontal ? step : step * cols),
+            d = horizontal ? 0 : 1;
+          if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || blocked[nextCell]) continue;
           const px = xs[x],
             py = ys[y],
             qx = xs[nx],
             qy = ys[ny];
-          const overlapCache = d === 0 ? horizontalOverlap : verticalOverlap,
-            segment = d === 0 ? cell(Math.min(x, nx), y) : cell(x, Math.min(y, ny));
+          const overlapCache = horizontal ? horizontalOverlap : verticalOverlap,
+            segment = forward ? at : nextCell;
           if (overlapCache[segment]) continue;
-          const next = encode(nx, ny, d),
+          const next = nextCell * 3 + d,
             cost =
               costs[current] +
               Math.abs(px - qx) +
               Math.abs(py - qy) +
               (d !== dir ? 5 : 0) +
-              (d === 0
-                ? horizontalCrowding[cell(Math.min(x, nx), y)]
-                : verticalCrowding[cell(x, Math.min(y, ny))]);
+              (horizontal ? horizontalCrowding[segment] : verticalCrowding[segment]);
           if (cost >= costs[next]) continue;
           costs[next] = cost;
           previous[next] = current;

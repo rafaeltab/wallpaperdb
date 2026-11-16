@@ -396,9 +396,13 @@ it.each([false, true])(
     })
 );
 
-it.each([false, true])(
-  'retains unaccounted resource responsibility across reopen, core known=%s',
-  async (coreKnown) =>
+it.each([
+  { coreKnown: false, mutation: true },
+  { coreKnown: true, mutation: true },
+  { coreKnown: true, mutation: false },
+])(
+  'retains reserved and observed resource cost across reopen: core=$coreKnown mutation=$mutation',
+  async ({ coreKnown, mutation }) =>
     withGithub(async (host, stop) => {
       const startedAt = Date.UTC(2026, 10, 7, 12);
       let now = startedAt;
@@ -437,7 +441,11 @@ it.each([false, true])(
         signal: stop.signal,
         clock,
       };
-      await githubRequests(config)(['pr', 'edit', '999', '--body', 'Controlled mutation']);
+      await githubRequests(config)(
+        mutation
+          ? ['pr', 'edit', '999', '--body', 'Controlled mutation']
+          : ['pr', 'view', '999', '--json', 'number']
+      );
       const reopened = githubRequests(config);
       await reopened.waitForCycle(stop.signal);
       expect(now - startedAt).toBe(coreKnown ? 360_000 : 720_000);

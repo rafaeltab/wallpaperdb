@@ -218,6 +218,9 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
             const current = get(name),
               cost = costs.get(name) ?? 2,
               at = Math.max(now, current.nextAt);
+            // CLI calls may use a different resource than their estimate. A paid
+            // response establishes usage; zero-cost bootstrap metadata does not.
+            if (cost > 0) current.used = true;
             // Completed costs belong to their observed quota windows. Earlier uncertain
             // reservations and independent secondary backoff keep their own deadlines.
             current.nextAt = Math.max(

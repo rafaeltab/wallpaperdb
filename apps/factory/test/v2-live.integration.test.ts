@@ -167,6 +167,9 @@ it.each([
     expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
       expected
     );
+    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.active).toBe(
+      false
+    );
     expect(
       board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].metadata
     ).toMatchObject({
@@ -338,6 +341,10 @@ it.each(['question', 'manual-recovery', 'cancelled', 'running'] as const)(
     expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
       expected[guard]
     );
+    if (guard === 'running')
+      expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.active).toBe(
+        true
+      );
   }
 );
 

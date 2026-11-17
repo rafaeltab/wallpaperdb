@@ -1,0 +1,62 @@
+--- a/lib/src/node_transport.js
++++ b/lib/src/node_transport.js
+@@ -112,6 +112,7 @@
+             d.resolve(socket);
+             socket.removeAllListeners();
+         });
++        this.socket = socket;
+         socket.on("error", (err) => {
+             dialError = err;
+         });
+@@ -241,12 +242,16 @@
+                     return Promise.reject(new nats_base_client_1.NatsError(err.message, nats_base_client_1.ErrorCode.Tls, err));
+                 }
+             }
++            if (this.done) {
++                throw nats_base_client_1.NatsError.errorForCode(nats_base_client_1.ErrorCode.ConnectionClosed);
++            }
+             const d = (0, nats_base_client_1.deferred)();
+             try {
+                 const tlsSocket = (0, tls_1.connect)(hp.port, hp.hostname, tlsOpts, () => {
+                     tlsSocket.removeAllListeners();
+                     d.resolve(tlsSocket);
+                 });
++                this.socket = tlsSocket;
+                 tlsSocket.on("error", (err) => {
+                     tlsError = err;
+                 });
+@@ -289,12 +294,16 @@
+                     return Promise.reject(new nats_base_client_1.NatsError(err.message, nats_base_client_1.ErrorCode.Tls, err));
+                 }
+             }
++            if (this.done) {
++                throw nats_base_client_1.NatsError.errorForCode(nats_base_client_1.ErrorCode.ConnectionClosed);
++            }
+             const d = (0, nats_base_client_1.deferred)();
+             try {
+                 const tlsSocket = (0, tls_1.connect)(tlsOpts, () => {
+                     tlsSocket.removeAllListeners();
+                     d.resolve(tlsSocket);
+                 });
++                this.socket = tlsSocket;
+                 tlsSocket.on("error", (err) => {
+                     tlsError = err;
+                 });
+@@ -420,9 +429,15 @@
+     }
+     _closed(err_1) {
+         return __awaiter(this, arguments, void 0, function* (err, internal = true) {
+-            // if this connection didn't succeed, then ignore it.
+-            if (!this.connected)
++            // A handshake timeout still owns a native socket. Let its close
++            // handlers reject pending dial/INFO promises before normal setup.
++            if (!this.connected) {
++                this.done = true;
++                if (this.socket) {
++                    this.socket.destroy();
++                }
+                 return;
++            }
+             if (this.done)
+                 return;
+             this.closeError = err;

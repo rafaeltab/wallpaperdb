@@ -4,6 +4,7 @@ import {
   type Execution,
   type Intent,
   type StageRequest,
+  type ReconciliationReason,
   stageDeliveryIndex,
   Unavailable,
 } from '../../capabilities/job/index.js';
@@ -165,7 +166,16 @@ export function stageExecution(
             if (result.kind !== 'state' || result.checked !== commit || dirty) {
               // Rejecting success must not erase the exact owning run's evidence.
               const pending = pendingRun(detail, request, intent);
-              return pending ? { ...pending, commit, worktreeClean: !dirty } : null;
+              return pending
+                ? {
+                    ...pending,
+                    commit,
+                    worktreeClean: !dirty,
+                    rejection: {
+                      kind: dirty ? ('checkout-dirty' as const) : ('head-mismatch' as const),
+                    },
+                  }
+                : null;
             }
             const comparison = await verifiedComparison(
               binding.worktree,
@@ -179,7 +189,13 @@ export function stageExecution(
             if (!comparison) {
               const pending = pendingRun(detail, request, intent);
               return pending
-                ? { ...pending, commit, worktreeClean: true, unexpectedBase: true }
+                ? {
+                    ...pending,
+                    commit,
+                    worktreeClean: true,
+                    unexpectedBase: true,
+                    rejection: { kind: 'comparison-unverified' as const },
+                  }
                 : null;
             }
             return {
@@ -368,13 +384,14 @@ function pendingResponse(
 ) {
   const boundary = instructionBoundary(messages, intent, request);
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
-  if (!message) return {};
+  if (!message) return { rejection: { kind: 'response-missing' as const } };
   const value = responseValue(message.text);
-  if (value === undefined) return { responseObserved: true };
+  if (value === undefined) return { responseObserved: true, rejection: { kind: 'invalid-response' as const } };
   const parsed = receiptSchema.safeParse(value);
   const version = z.object({ version: z.unknown().optional() }).safeParse(value);
   return {
     responseObserved: true,
+    rejection: rejectedState(parsed.success ? parsed.data : null, boundary, intent, request),
     migrationRequired:
       boundary >= 0 && parsed.success
         ? false
@@ -389,6 +406,31 @@ function pendingResponse(
         ? parsed.data.requireUnimplementedIssues
         : undefined,
   };
+}
+
+function rejectedState(
+  result: z.infer<typeof receiptSchema> | null,
+  boundary: number,
+  intent: Intent,
+  request: StageRequest
+): ReconciliationReason | undefined {
+  if (boundary < 0) return { kind: 'instruction-unavailable' };
+  if (!result) return { kind: 'invalid-response' };
+  if (
+    result.jobId !== intent.id ||
+    (result.kind === 'state' && result.implemented !== String(intent.issue))
+  )
+    return { kind: 'receipt-mismatch' };
+  if (result.kind !== 'state') return undefined;
+  const checks = (['format', 'lint', 'tests', 'crap', 'coverage'] as const).filter(
+    (check) => !result.checks[check]
+  );
+  if (checks.length) return { kind: 'checks-incomplete', checks };
+  if (request.stage !== 'implementation' && result.reviewed !== result.checked)
+    return { kind: 'review-unverified' };
+  if (['publication', 'babysitting'].includes(request.stage) && result.published !== result.checked)
+    return { kind: 'publication-unverified' };
+  return undefined;
 }
 
 function instructionBoundary(

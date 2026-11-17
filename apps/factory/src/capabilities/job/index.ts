@@ -31,6 +31,8 @@ export type {
   Stage,
   StageRequest,
   StageEvidence,
+  ReconciliationReason,
+  RequiredCheck,
   PullRequestObservation,
   Delivery,
 } from './contract.js';

@@ -361,9 +361,27 @@ export interface StageRequest {
   readonly commit: string;
   readonly previousRunId: string | null;
 }
+export type RequiredCheck = keyof Extract<AgentResponse, { kind: 'state' }>['checks'];
+export type ReconciliationReason =
+  | { readonly kind: 'checks-incomplete'; readonly checks: readonly RequiredCheck[] }
+  | {
+      readonly kind:
+        | 'response-missing'
+        | 'invalid-response'
+        | 'receipt-mismatch'
+        | 'instruction-unavailable'
+        | 'review-unverified'
+        | 'publication-unverified'
+        | 'checkout-dirty'
+        | 'head-mismatch'
+        | 'comparison-unverified'
+        | 'publication-mismatch';
+    };
 export interface StageEvidence {
   /** A current structured response exists, including malformed or negative state. */
   readonly responseObserved?: boolean;
+  /** Actionable stage-verification outcome, not an execution failure or readiness grant. */
+  readonly rejection?: ReconciliationReason;
   readonly base?: string;
   readonly unexpectedBase?: boolean;
   readonly idle?: boolean;

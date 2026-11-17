@@ -428,7 +428,8 @@ function pendingResponse(
   const message = latestStructured(boundary >= 0 ? messages.slice(boundary + 1) : messages);
   if (!message) return { rejection: { kind: 'response-missing' as const } };
   const value = responseValue(message.text);
-  if (value === undefined) return { responseObserved: true, rejection: { kind: 'invalid-response' as const } };
+  if (value === undefined)
+    return { responseObserved: true, rejection: { kind: 'invalid-response' as const } };
   const parsed = receiptSchema.safeParse(value);
   const version = z.object({ version: z.unknown().optional() }).safeParse(value);
   return {

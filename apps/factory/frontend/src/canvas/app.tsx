@@ -50,7 +50,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
     .find((a) => a?.kind === 'configure');
   const panels = (
     <>
-      {factory.error && (
+      {factory.error && factory.activityRefresh.failures >= 3 && (
         <div className="fc-banner" role="alert">
           {factory.error}.{' '}
           {board
@@ -175,6 +175,7 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
     <Canvas
       key={board.scopeId}
       board={board}
+      activityRefresh={factory.activityRefresh}
       native={native}
       titleMode={titleMode}
       reach={reach}

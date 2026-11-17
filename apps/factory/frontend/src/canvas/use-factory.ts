@@ -8,6 +8,10 @@ import type { FactoryClient, CommandInput } from './client';
 export function useFactory(client: FactoryClient) {
   const [board, setBoard] = useState<FactoryV2Snapshot>();
   const [error, setError] = useState('');
+  const [activityRefresh, setActivityRefresh] = useState<{
+    failures: number;
+    lastSuccess: number | null;
+  }>({ failures: 0, lastSuccess: null });
   const [commandError, setCommandError] = useState('');
   const [receipt, setReceipt] = useState<FactoryV2CommandReceipt>();
   const [busy, setBusy] = useState(false);
@@ -28,6 +32,7 @@ export function useFactory(client: FactoryClient) {
       timer: ReturnType<typeof setTimeout>;
     let controller = new AbortController();
     let pageActive = true;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
     let interval = 1000;
     let generation = 0;
     async function poll() {
@@ -35,20 +40,32 @@ export function useFactory(client: FactoryClient) {
       const ownController = new AbortController();
       controller = ownController;
       try {
-        const next = await client.board(ownController.signal);
+        const next = await Promise.race([
+          client.board(ownController.signal),
+          new Promise<never>((_resolve, reject) => {
+            deadline = setTimeout(() => {
+              reject(new Error('Board refresh timed out'));
+              ownController.abort();
+            }, 2500);
+          }),
+        ]);
         if (!active || ownGeneration !== generation) return;
         if (next) {
           setBoard(next);
-          interval = Math.max(1000, Math.min(30000, next.meta.transport.suggestedPollMs));
+          interval = Math.max(1000, Math.min(2000, next.meta.transport.suggestedPollMs));
         }
         fresh.current = true;
         setError('');
+        setActivityRefresh({ failures: 0, lastSuccess: Date.now() });
       } catch (e) {
-        if (active && ownGeneration === generation && !ownController.signal.aborted) {
+        if (active && ownGeneration === generation) {
           fresh.current = false;
+          interval = 1000;
+          setActivityRefresh((prior) => ({ ...prior, failures: prior.failures + 1 }));
           setError(e instanceof Error ? e.message : 'Board unavailable');
         }
       } finally {
+        clearTimeout(deadline);
         if (active && ownGeneration === generation) timer = setTimeout(poll, interval);
       }
     }
@@ -57,6 +74,7 @@ export function useFactory(client: FactoryClient) {
       generation++;
       fresh.current = false;
       clearTimeout(timer);
+      clearTimeout(deadline);
       controller.abort();
     }
     function show() {
@@ -141,6 +159,7 @@ export function useFactory(client: FactoryClient) {
     commandsBlocked,
     board,
     error,
+    activityRefresh,
     commandError,
     receipt,
     busy: pending,

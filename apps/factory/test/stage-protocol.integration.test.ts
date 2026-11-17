@@ -121,6 +121,39 @@ it.each(['manual-run', 'run-1'])(
     })
 );
 
+it.each([
+  { complete: false, expected: ['tests', 'coverage'] },
+  { complete: true, expected: [] },
+])(
+  'reports implementation validation separately from review/publication: $complete',
+  ({ complete, expected }) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({
+        overrides: { status: 'completed' },
+        messages: [
+          instruction(intent, request),
+          {
+            role: 'assistant',
+            runId: 'run-1',
+            text: JSON.stringify({
+              version: 1,
+              kind: 'state',
+              jobId: intent.id,
+              base: intent.base,
+              implemented: String(intent.issue),
+              checked: host.base,
+              checks: { format: true, lint: true, tests: complete, crap: true, coverage: complete },
+            }),
+          },
+        ],
+      });
+      const evidence = await Effect.runPromise(adapter.inspectStage(intent, request));
+      expect(evidence?.accepted).toBe(complete);
+      if (!complete)
+        expect(evidence?.rejection).toEqual({ kind: 'checks-incomplete', checks: expected });
+    })
+);
+
 it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
   'accepts %s state after its instruction despite later turns',
   (stage) =>

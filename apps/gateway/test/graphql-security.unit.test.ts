@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import type { FastifyInstance } from 'fastify';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import type { HttpConfig } from '../src/http/index.js';
 import type { HttpTestServices } from './unit/http-fixture.js';
@@ -307,34 +307,47 @@ describe('GraphQL security driving contract', () => {
     expect(result.headers['x-ratelimit-cost-remaining']).toBe('999579');
     expect(result.headers['x-ratelimit-cost-reset']).toBeDefined();
   });
-  it('shares the client quota across changing spoofed forwarded-IP headers', async () => {
-    const app = await build({ quotaCapacity: 842 });
-    const responses = [];
-    for (const forwardedIp of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) {
-      responses.push(
-        await app.inject({
-          method: 'POST',
-          url: '/graphql',
-          remoteAddress: '127.0.0.1',
-          headers: {
-            'user-agent': 'quota-contract',
-            'x-forwarded-for': forwardedIp,
-            forwarded: `for=${forwardedIp}`,
-          },
-          payload: { query },
-        })
-      );
+  it.each([
+    { elapsedMs: 0, remaining: '0' },
+    { elapsedMs: 100, remaining: '1' },
+  ])(
+    'shares the client quota across changing spoofed forwarded-IP headers after $elapsedMs ms',
+    async ({ elapsedMs, remaining }) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(0);
+      try {
+        const app = await build({ quotaCapacity: 842 });
+        const responses = [];
+        for (const forwardedIp of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) {
+          if (responses.length === 1) vi.setSystemTime(elapsedMs);
+          responses.push(
+            await app.inject({
+              method: 'POST',
+              url: '/graphql',
+              remoteAddress: '127.0.0.1',
+              headers: {
+                'user-agent': 'quota-contract',
+                'x-forwarded-for': forwardedIp,
+                forwarded: `for=${forwardedIp}`,
+              },
+              payload: { query },
+            })
+          );
+        }
+        expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 429]);
+        expect(responses.slice(0, 2).map((response) => response.json().errors)).toEqual([
+          undefined,
+          undefined,
+        ]);
+        expect(
+          responses.slice(0, 2).map((response) => response.headers['x-ratelimit-cost-remaining'])
+        ).toEqual(['421', remaining]);
+        expect(responses[2]?.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
+      } finally {
+        vi.useRealTimers();
+      }
     }
-    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 429]);
-    expect(responses.slice(0, 2).map((response) => response.json().errors)).toEqual([
-      undefined,
-      undefined,
-    ]);
-    expect(
-      responses.slice(0, 2).map((response) => response.headers['x-ratelimit-cost-remaining'])
-    ).toEqual(['421', '0']);
-    expect(responses[2]?.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
-  });
+  );
   it('accepts forwarded client identity only through configured proxy peers', async () => {
     const app = await build({
       quotaCapacity: 421,

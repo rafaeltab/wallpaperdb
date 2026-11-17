@@ -14,7 +14,7 @@ test.use({ video: "on" });
 test("owner can recover older work and replace a Source after more than 100 creations", async ({
   page,
 }, testInfo) => {
-  test.setTimeout(180000);
+  test.setTimeout(60000);
   const uuidErrors: string[] = [];
   page.on("pageerror", (error) => {
     if (error.message.includes("randomUUID")) uuidErrors.push(error.message);
@@ -101,7 +101,7 @@ test("owner can recover older work and replace a Source after more than 100 crea
   await expect(page.getByTestId("retry-failed-button")).toHaveCount(0);
   // Arrange older pending work and 100 newer durable creations through the
   // authenticated public API. All recovery and management uses the real UI.
-  const pendingId = await page.evaluate(
+  const createdIds = await page.evaluate(
     async (creationKeys) => {
       const clerk: unknown = Reflect.get(window, "Clerk");
       if (typeof clerk !== "object" || clerk === null || !("session" in clerk))
@@ -114,8 +114,8 @@ test("owner can recover older work and replace a Source after more than 100 crea
         typeof session.getToken !== "function"
       )
         throw new Error("Missing session");
-      let pending: string | undefined;
-      for (const [i, key] of creationKeys.entries()) {
+      const ids: string[] = [];
+      for (const key of creationKeys) {
         const token: unknown = await session.getToken();
         if (typeof token !== "string") throw new Error("Missing token");
         const response = await fetch("/wallpaper/wallpapers", {
@@ -138,12 +138,94 @@ test("owner can recover older work and replace a Source after more than 100 crea
           typeof receipt.wallpaperId !== "string"
         )
           throw new Error("Missing Wallpaper receipt");
-        if (i === 0) pending = receipt.wallpaperId;
+        ids.push(receipt.wallpaperId);
       }
-      if (!pending) throw new Error("Missing pending creation");
-      return pending;
+      return ids;
     },
     Array.from({ length: 101 }, () => randomUUID()),
+  );
+  const pendingId = createdIds[0];
+  await test.step(
+    "All 101 creations receive their Assets within 10 seconds",
+    async () => {
+      await expect
+        .poll(
+          () =>
+            page.evaluate(async (ids) => {
+              const clerk: unknown = Reflect.get(window, "Clerk");
+              if (
+                typeof clerk !== "object" ||
+                clerk === null ||
+                !("session" in clerk)
+              )
+                throw new Error("Missing Owner");
+              const session = clerk.session;
+              if (
+                typeof session !== "object" ||
+                session === null ||
+                !("getToken" in session) ||
+                typeof session.getToken !== "function"
+              )
+                throw new Error("Missing session");
+              const token: unknown = await session.getToken();
+              if (typeof token !== "string") throw new Error("Missing token");
+              const pending = new Set(ids);
+              let cursor: string | undefined;
+              do {
+                const response = await fetch(
+                  `/wallpaper/wallpapers${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+                  { headers: { Authorization: `Bearer ${token}` } },
+                );
+                if (response.status !== 200)
+                  throw new Error(`Creation readiness HTTP ${response.status}`);
+                const body: unknown = await response.json();
+                if (
+                  typeof body !== "object" ||
+                  body === null ||
+                  !("wallpapers" in body) ||
+                  !Array.isArray(body.wallpapers)
+                )
+                  throw new Error("Missing Wallpaper list");
+                const wallpapers: unknown[] = body.wallpapers;
+                for (const wallpaper of wallpapers) {
+                  if (
+                    typeof wallpaper !== "object" ||
+                    wallpaper === null ||
+                    !("wallpaperId" in wallpaper) ||
+                    typeof wallpaper.wallpaperId !== "string" ||
+                    !("state" in wallpaper) ||
+                    !("assetId" in wallpaper)
+                  )
+                    throw new Error("Invalid Wallpaper readiness response");
+                  if (pending.has(wallpaper.wallpaperId)) {
+                    if (wallpaper.state === "failed")
+                      throw new Error(
+                        `Creation failed: ${wallpaper.wallpaperId}`,
+                      );
+                    if (
+                      typeof wallpaper.assetId === "string" &&
+                      wallpaper.assetId.length > 0
+                    )
+                      pending.delete(wallpaper.wallpaperId);
+                  }
+                }
+                cursor =
+                  "nextCursor" in body && typeof body.nextCursor === "string"
+                    ? body.nextCursor
+                    : undefined;
+              } while (pending.size > 0 && cursor);
+              return [...pending];
+            }, createdIds),
+          {
+            message:
+              "Every fixture Wallpaper has a confirmed Asset; remaining IDs",
+            timeout: 10000,
+            intervals: [100, 250, 500],
+          },
+        )
+        .toEqual([]);
+    },
+    { timeout: 10000 },
   );
   await page.reload();
   await expect(

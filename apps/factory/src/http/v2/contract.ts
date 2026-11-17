@@ -489,7 +489,41 @@ export interface Coverage {
   readonly reasons: readonly Reason[];
   readonly unresolvedIssueIds: readonly IssueId[];
 }
+export type ActivityCategory =
+  | 'publishing'
+  | 'reviewing'
+  | 'implementing'
+  | 'restacking'
+  | 'recovering'
+  | 'planning'
+  | 'gathering-planning-context'
+  | 'checking-plan-freshness'
+  | 'refreshing-github'
+  | 'refreshing-t3'
+  | 'waiting-for-ci'
+  | 'waiting-for-answers';
+export interface FactoryActivity {
+  readonly observedAt: Timestamp;
+  readonly coverage: readonly {
+    readonly category: ActivityCategory;
+    readonly state: 'complete' | 'unknown';
+    readonly reason: string | null;
+  }[];
+  readonly items: readonly {
+    readonly id: string;
+    readonly category: ActivityCategory;
+    readonly lifecycle: 'current';
+    readonly issue: number | null;
+    readonly pullRequest: number | null;
+    readonly startedAt: Timestamp | null;
+    readonly reason: string;
+  }[];
+  readonly uncertainty: readonly string[];
+  readonly admissionReasons: readonly Reason[];
+}
+
 export interface BoardMeta {
+  readonly activity?: FactoryActivity;
   readonly dataMode: 'fake' | 'live';
   readonly coverage: Coverage;
   readonly diagnostics: readonly Reason[];

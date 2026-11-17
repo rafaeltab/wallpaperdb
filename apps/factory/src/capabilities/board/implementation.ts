@@ -480,7 +480,7 @@ function stable(input: ScheduleSnapshot) {
   return {
     ...input,
     jobs: input.jobs.map((j) => (j.kind === 'job' ? { ...j, elapsedMs: undefined } : j)),
-    observations: { ...input.observations, ageMs: undefined, stale: undefined, state: undefined },
+    observations: { ...input.observations, ageMs: undefined, state: undefined },
     threads: input.threads
       ? { ...input.threads, ageMs: undefined, stale: undefined, state: undefined }
       : undefined,

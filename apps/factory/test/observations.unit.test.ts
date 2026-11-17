@@ -413,3 +413,50 @@ reportingStoreContract('controlled observations', async () => ({
   store: controlledObservations(),
   close: async () => undefined,
 }));
+
+it('distinguishes a live refresh from an interrupted persisted attempt', async () => {
+  const store = controlledObservations({ startedAt: 50 });
+  let finish: () => void = () => {};
+  const runtime = ManagedRuntime.make(
+    ObservationsLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+          Layer.succeed(LocalSnapshot, {
+            read: () =>
+              Effect.succeed({
+                state: { revision: 0, concurrency: 1, allowance: 1, paused: true, admissions: [] },
+                entries: [],
+              }),
+          }),
+          Layer.succeed(ObservationStore, store),
+          Layer.succeed(ObservationSource, {
+            read: () =>
+              Effect.promise(
+                () =>
+                  new Promise<void>((resolve) => {
+                    finish = resolve;
+                  })
+              ).pipe(Effect.as({ issues: [], pullRequests: [] })),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const observer = await runtime.runPromise(Observations);
+    expect((await runtime.runPromise(observer.snapshot())).refreshActive).toBe(false);
+    const pending = runtime.runPromise(observer.refresh());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(await runtime.runPromise(observer.snapshot())).toMatchObject({
+      refreshActive: true,
+      startedAt: 100,
+    });
+    finish();
+    await pending;
+    expect((await runtime.runPromise(observer.snapshot())).refreshActive).toBe(false);
+  } finally {
+    finish();
+    await runtime.dispose();
+  }
+});

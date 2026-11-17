@@ -15,6 +15,16 @@ export function includePlan(
       activity: snapshot.meta.activity
         ? {
             ...snapshot.meta.activity,
+            coverage: snapshot.meta.activity.coverage.map((entry) =>
+              entry.category !== 'refreshing-github' &&
+              ['discovery', 'handoff', 'freshness', 'uncertain'].includes(detail.attempt.phase)
+                ? {
+                    ...entry,
+                    state: 'unknown',
+                    reason: 'Planning activity coverage is incomplete.',
+                  }
+                : entry
+            ),
             uncertainty: [
               ...snapshot.meta.activity.uncertainty,
               ...(['discovery', 'handoff', 'freshness', 'uncertain'].includes(detail.attempt.phase)

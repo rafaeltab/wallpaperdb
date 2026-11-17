@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Action, WorkItem } from '../../../src/http/index.js';
+import { FactoryActivity } from './activity';
 import { FactoryClient } from './client';
 import { useFactory } from './use-factory';
 import { Canvas } from './canvas';
@@ -213,6 +214,10 @@ export function FactoryApp({ client: provided }: { client?: FactoryClient }) {
     </Canvas>
   ) : (
     <main className="cc-app">
+      <header className="cc-toolbar">
+        <strong>Factory</strong>
+        <FactoryActivity paused={false} refresh={factory.activityRefresh} />
+      </header>
       <p className="cc-empty" role="status">
         Loading factory board…
       </p>

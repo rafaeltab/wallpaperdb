@@ -160,14 +160,15 @@ it('shows planning exhaustion on open, reports acknowledgement failure and keeps
     await browserExpect(
       page.getByRole('heading', { name: 'Seen planning failures' })
     ).toBeVisible();
-    await browserExpect(page.getByText('Paused', { exact: true })).toBeVisible();
+    await browserExpect(page.getByRole('img', { name: 'Admissions paused' })).toBeVisible();
     expect(resumed).toBe(false);
     await browserExpect(page.getByRole('button', { name: 'Acknowledged' })).toBeFocused();
     await page.getByText('Inspect seen failure details').click();
     await browserExpect(page.getByText(/Model elapsed: 660.0 seconds/).first()).toBeVisible();
     await page.getByText('Inspect seen failure details').click();
     await page.getByRole('button', { name: /Resume/ }).click();
-    await browserExpect(page.getByText('Running', { exact: true })).toBeVisible();
+    await browserExpect(page.getByRole('button', { name: 'Ⅱ Pause', exact: true })).toBeVisible();
+    await browserExpect(page.getByRole('img', { name: 'Admissions paused' })).toHaveCount(0);
     expect(resumed).toBe(true);
     expect(errors).toEqual([]);
   } finally {

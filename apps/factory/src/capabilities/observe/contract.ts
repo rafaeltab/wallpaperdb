@@ -180,6 +180,8 @@ export const observationRefreshIntervalMs = 300_000;
 // Freshness is independent of whether demand or provider capacity permits a refresh.
 export const observationStaleAfterMs = 240_000;
 export type ObservationSnapshot = ObservationState & {
+  /** Live owner evidence, never restored from persistence. */
+  refreshActive?: boolean;
   ageMs?: number;
   stale: boolean;
   state: 'initial' | 'loading' | 'current' | 'stale' | 'error';

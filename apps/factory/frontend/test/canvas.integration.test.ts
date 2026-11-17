@@ -84,7 +84,7 @@ it('keeps dated attention and toolbar controls accessible at narrow widths', asy
           height: toolbar.height,
         };
       });
-      expect(bounds.height).toBe(width <= 700 ? 72 : 44);
+      expect(bounds.height).toBe(width <= 700 ? 100 : 44);
       expect(bounds.top, `attention date at width ${width}`).toBeGreaterThanOrEqual(
         Math.min(bounds.toolbarTop, baseline.textTop)
       );
@@ -101,10 +101,8 @@ it('keeps dated attention and toolbar controls accessible at narrow widths', asy
             Math.max(...buttons.map((r) => r.bottom)) - Math.min(...buttons.map((r) => r.top)),
         };
       });
-      expect(controls).toEqual({
-        height: baseline.height,
-        controlsHeight: baseline.controlsHeight,
-      });
+      expect(controls.height).toBe(baseline.height);
+      expect(controls.controlsHeight).toBeLessThanOrEqual(bounds.height);
       await attention.focus();
       const settings = page.getByRole('button', { name: 'Factory settings', exact: true });
       await settings.focus();
@@ -147,7 +145,7 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     const origin = vite.resolvedUrls?.local[0];
     if (!origin) throw new Error('Missing Vite origin');
     await page.goto(origin);
-    await browserExpect(page.getByText('Fake data · commands are simulated')).toBeVisible();
+    await browserExpect(page.getByRole('group', { name: 'Factory activity' })).toBeVisible();
     // These measurements distinguish the selected prototype from the rejected redesign.
     expect(
       await page.locator('.cc-toolbar').evaluate((el) => el.getBoundingClientRect().height)

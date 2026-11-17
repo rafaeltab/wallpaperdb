@@ -26,7 +26,12 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     const work = input.localWork.find((w) => w.intent?.issue === admission.issue);
     if (work?.control.cancelled) return false;
     const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
-    return job?.kind !== 'job' || !(job.delivery?.ready || job.delivery?.landed);
+    return (
+      job?.kind !== 'job' ||
+      !(job.delivery?.ready || job.delivery?.landed) ||
+      job.execution.kind !== 'found' ||
+      !['completed', 'idle', 'cancelled', 'rolled_back'].includes(job.execution.status)
+    );
   });
   if (
     unfinished ||
@@ -35,12 +40,14 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     input.recoveries?.some((r) => r.phase !== 'complete')
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
+  if (
+    input.threads?.startedAt !== undefined &&
+    input.threads.startedAt > Math.max(input.threads.observedAt ?? -1, input.threads.failedAt ?? -1)
+  )
+    uncertainty.push('Thread refresh activity coverage is incomplete.');
   const items: FactoryActivity['items'][number][] = [];
   const source = input.observations;
-  if (
-    source.startedAt !== undefined &&
-    source.startedAt > Math.max(source.observedAt ?? -1, source.failedAt ?? -1)
-  )
+  if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
       id: `github-refresh:${source.startedAt}`,
       category: 'refreshing-github',

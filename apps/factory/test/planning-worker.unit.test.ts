@@ -77,3 +77,35 @@ it('returns existing ownership and observation without queuing an unaccepted req
   }
   expect(executed).toEqual([]);
 });
+
+it('cannot establish inactivity while a planning submission is in flight', async () => {
+  let complete: () => void = () => {};
+  const worker = await planningWorker({
+    attempts: {
+      pending: () => Effect.succeed(undefined),
+      submit: () =>
+        Effect.promise(
+          () =>
+            new Promise<void>((resolve) => {
+              complete = resolve;
+            })
+        ).pipe(
+          Effect.as({
+            kind: 'blocked' as const,
+            requestId: 'retained',
+            reason: 'reconciliation-required' as const,
+          })
+        ),
+      observe: () => Effect.succeed(undefined),
+      execute: () => Effect.void,
+    },
+    run: Effect.runPromise,
+  });
+  expect(worker.isIdle()).toBe(true);
+  const request = worker.submit();
+  expect(worker.isIdle()).toBe(false);
+  complete();
+  await request;
+  expect(worker.isIdle()).toBe(true);
+  await worker.close();
+});

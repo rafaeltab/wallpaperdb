@@ -133,7 +133,9 @@ it('retains last-known items when refresh fails and disables command controls', 
     window.dispatchEvent(new Event('pagehide'));
     window.dispatchEvent(new Event('pageshow'));
   });
-  await screen.findByText(/Showing last-known board/);
+  await user.hover(screen.getByRole('button', { name: /Status unknown/ }));
+  await screen.findByText('Refresh failed 1/3');
+  expect(screen.queryByText(/Showing last-known board/)).toBeNull();
   expect(screen.getByText('Implement the command centre')).toBeTruthy();
   await user.click(screen.getByRole('button', { name: 'Factory settings' }));
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Apply controls' }).disabled).toBe(

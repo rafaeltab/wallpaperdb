@@ -77,3 +77,46 @@ it('distinguishes incomplete evidence, idle and disconnected, preserving known a
     '2m 1s'
   );
 });
+
+it('selects each category ahead of every lower priority category', () => {
+  const order = [
+    'publishing',
+    'reviewing',
+    'implementing',
+    'restacking',
+    'recovering',
+    'planning',
+    'gathering-planning-context',
+    'checking-plan-freshness',
+    'refreshing-github',
+    'refreshing-t3',
+    'waiting-for-ci',
+    'waiting-for-answers',
+  ] as const;
+  const labels = [
+    'Publishing 1 issue',
+    'Reviewing 1 issue',
+    'Implementing 1 issue',
+    'Restacking 1 PR',
+    'Reconciling',
+    'Planning',
+    'Gathering planning context',
+    'Checking plan freshness',
+    'Refreshing GitHub',
+    'Refreshing T3 information',
+    'Waiting for CI 1 PR',
+    'Waiting for answers 1 issue',
+  ];
+  order.forEach((_category, index) => {
+    const items = order.slice(index).map((category) => ({
+      id: category,
+      category,
+      lifecycle: 'current' as const,
+      issue: 1,
+      pullRequest: 2,
+      startedAt: null,
+      reason: 'Current managed work',
+    }));
+    expect(activityView({ ...facts, items }, 0).summary).toBe(labels[index]);
+  });
+});

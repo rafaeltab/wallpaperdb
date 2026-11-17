@@ -39,14 +39,16 @@ export function useFactory(client: FactoryClient) {
       const ownGeneration = ++generation;
       const ownController = new AbortController();
       controller = ownController;
+      let ownDeadline: ReturnType<typeof setTimeout> | undefined;
       try {
         const next = await Promise.race([
           client.board(ownController.signal),
           new Promise<never>((_resolve, reject) => {
-            deadline = setTimeout(() => {
+            ownDeadline = setTimeout(() => {
               reject(new Error('Board refresh timed out'));
               ownController.abort();
             }, 2500);
+            deadline = ownDeadline;
           }),
         ]);
         if (!active || ownGeneration !== generation) return;
@@ -65,7 +67,7 @@ export function useFactory(client: FactoryClient) {
           setError(e instanceof Error ? e.message : 'Board unavailable');
         }
       } finally {
-        clearTimeout(deadline);
+        clearTimeout(ownDeadline);
         if (active && ownGeneration === generation) timer = setTimeout(poll, interval);
       }
     }

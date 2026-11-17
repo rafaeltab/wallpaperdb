@@ -555,11 +555,16 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           schedule: observations.schedule(),
           threads: threads.snapshot(),
           safety: planningSafety.status(),
+          planningOwner: planner.ownership(false),
         }).pipe(
-          Effect.map(({ schedule, threads, safety, executionCatalog }) => ({
+          Effect.map(({ schedule, threads, safety, executionCatalog, planningOwner }) => ({
             executionCatalog,
             ...schedule,
-            coordinationIdle: !observing && !recoveringPlanner && attempts.isIdle(),
+            coordinationIdle:
+              !observing &&
+              !recoveringPlanner &&
+              attempts.isIdle() &&
+              (!planningOwner || planningOwner.retired === true),
             state: safety.schedule,
             planningSafety: safety.planning,
             threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },

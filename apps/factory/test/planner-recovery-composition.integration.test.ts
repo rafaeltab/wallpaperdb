@@ -115,6 +115,9 @@ it.each(['expired-model', 'slow-settlement', 'blocked-discovery'])(
           { timeout: 5000, interval: 20 }
         );
         expect((await Effect.runPromise(planner.ownership(false)))?.retired).not.toBe(true);
+        expect(
+          (await running.app.inject('/api/v2/board')).json().meta.activity.uncertainty
+        ).toContain('Coordination activity coverage is incomplete.');
         await host.save({
           planner: { status: 'interrupted', proposal: { selected: [], deferred: [] } },
         });

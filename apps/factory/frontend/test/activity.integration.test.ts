@@ -135,6 +135,7 @@ it('provides keyboard and hover details, live switching and approved D layout at
     offline = false;
     served = idle;
     await browserExpect(trigger).toContainText('Idle', { timeout: 5000 });
+    await trigger.hover();
     await browserExpect(panel).not.toContainText('last known data');
     await page.screenshot({ path: join(evidence, 'activity-recovered.png') });
     await context.close();

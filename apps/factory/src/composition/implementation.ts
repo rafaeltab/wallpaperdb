@@ -510,6 +510,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
         })),
     };
+    let observing: Promise<unknown> | undefined;
+    let recoveringPlanner: Promise<unknown> | undefined;
     let automaticCycles = 0;
     let metadataAfterCycle = -1;
     const refreshes = observationWorker(() =>
@@ -557,6 +559,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           Effect.map(({ schedule, threads, safety, executionCatalog }) => ({
             executionCatalog,
             ...schedule,
+            coordinationIdle: !observing && !recoveringPlanner,
             state: safety.schedule,
             planningSafety: safety.planning,
             threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
@@ -588,8 +591,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       ).pipe(Effect.withSpan('factory.startup'))
     );
 
-    let observing: Promise<unknown> | undefined;
-    let recoveringPlanner: Promise<unknown> | undefined;
     // Owned model deadlines and terminal cleanup continue independently of admissions
     // and quota-paced GitHub discovery. This worker can only reconcile an existing run.
     const plannerTimer = setInterval(() => {

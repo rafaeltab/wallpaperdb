@@ -3,6 +3,8 @@ export type { BoardInput, BoardRecord, CommandRecord, RetryTarget } from './cont
 export { makeBoard } from './implementation.js';
 export type { Board } from './implementation.js';
 export type {
+  ActivityCategory,
+  FactoryActivity,
   Action,
   ActionId,
   ActionKind,

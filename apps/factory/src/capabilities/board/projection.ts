@@ -1,6 +1,7 @@
 import { legacyExecutionSettings } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import { capacityOccupied, emptyPlanningSafety, type PlanningSafetyView } from '../plan/index.js';
+import { activityFacts } from './activity.js';
 import { populateCards } from './cards.js';
 import { limit, projectionContext } from './context.js';
 import { coverageFor } from './coverage.js';
@@ -44,6 +45,7 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
     cursor,
     committedAt: at,
     meta: {
+      activity: activityFacts(input, at),
       coverage,
       diagnostics: topology.diagnostics,
       factory,

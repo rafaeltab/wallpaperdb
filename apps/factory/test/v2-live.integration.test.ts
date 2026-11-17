@@ -3852,3 +3852,67 @@ it.each([
     }
   }
 );
+
+it('reports routine refresh facts without selecting a summary or confusing missing coverage with inactivity', async () => {
+  const input: ScheduleSnapshot = { ...initial, coordinationIdle: true };
+  const board = await liveBoard({ scopeId: 'activity', initial: input });
+  expect(board.snapshot().meta.activity).toMatchObject({ items: [], uncertainty: [] });
+  await board.publish({
+    ...input,
+    observations: { state: 'loading', stale: false, startedAt: 2000 },
+  });
+  expect(board.snapshot().meta.activity).toMatchObject({
+    items: [
+      {
+        id: 'github-refresh:2000',
+        category: 'refreshing-github',
+        lifecycle: 'current',
+        startedAt: '1970-01-01T00:00:02.000Z',
+      },
+    ],
+    admissionReasons: expect.arrayContaining([
+      { code: 'paused', message: 'Admissions paused' },
+      { code: 'eligibility-unknown', message: 'Eligibility unknown' },
+    ]),
+  });
+  await board.publish({ ...input, coordinationIdle: false });
+  expect(board.snapshot().meta.activity?.uncertainty.length).toBeGreaterThan(0);
+  expect(board.snapshot().meta.activity).not.toHaveProperty('summary');
+  board.close();
+});
+
+it('removes completed or failed refreshes and reports all independent admission restrictions', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: true,
+    state: { ...initial.state, concurrency: 0, allowance: 0 },
+    observations: {
+      state: 'current',
+      stale: false,
+      startedAt: 1000,
+      observedAt: 1000,
+      facts: { issues: [], pullRequests: [] },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'activity-reasons', initial: input });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  expect(board.snapshot().meta.activity?.admissionReasons.map((r) => r.code)).toEqual([
+    'paused',
+    'concurrency-full',
+    'allowance-exhausted',
+    'no-ready-matches',
+    'eligibility-unknown',
+  ]);
+  await board.publish({
+    ...input,
+    observations: {
+      ...input.observations,
+      startedAt: 2000,
+      failedAt: 2100,
+      state: 'error',
+      error: 'offline',
+    },
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});

@@ -3,6 +3,7 @@ import type { BoardMeta as WireMeta, FactoryV2Problem } from './contract.js';
 
 export function boardMeta(meta: BoardMeta): WireMeta {
   return {
+    activity: meta.activity,
     coverage: meta.coverage,
     diagnostics: meta.diagnostics,
     factory: meta.factory,

@@ -122,12 +122,14 @@ it.each(['implementation', 'review', 'publication', 'babysitting', 'ci'] as cons
 );
 
 it.each([
-  { observedAt: 3000, base: 'main', expected: 'awaiting-verification' },
-  { observedAt: 1000, base: 'main', expected: 'ci-running' },
-  { observedAt: 3000, base: 'other', expected: 'ci-running' },
-])(
+  { observedAt: 3000, base: 'main', mergeability: undefined, expected: 'awaiting-verification' },
+  { observedAt: 3000, base: 'main', mergeability: 'conflicting', expected: 'conflict' },
+  { observedAt: 3000, base: 'main', mergeability: 'clean', expected: 'awaiting-verification' },
+  { observedAt: 1000, base: 'main', mergeability: 'conflicting', expected: 'ci-running' },
+  { observedAt: 3000, base: 'other', mergeability: 'conflicting', expected: 'ci-running' },
+] as const)(
   'uses only fresh matching publication heads to fence old CI: $observedAt/$base',
-  async ({ observedAt, base, expected }) => {
+  async ({ observedAt, base, mergeability, expected }) => {
     const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
     const pull = pullObservation(2, { ci: 'PENDING' });
     const input = { ...parkedSnapshot(pull, true), localWork: [] };
@@ -148,6 +150,7 @@ it.each([
             url: pull.url,
             commit: 'c'.repeat(40),
             base,
+            mergeability,
             ready: false,
             landed: false,
           },
@@ -156,9 +159,9 @@ it.each([
     ];
     input.observations = { ...input.observations, jobsObservedAt: observedAt };
     const board = await liveBoard({ scopeId: 'manual-stale-metadata', initial: input });
-    expect(board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status.code).toBe(
-      expected
-    );
+    const status = board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2'].status;
+    expect(status.code).toBe(expected);
+    if (expected === 'conflict') expect(status.active).toBe(false);
   }
 );
 
@@ -223,7 +226,7 @@ it.each([
     head: 'c'.repeat(40),
     base: 'main',
     observedAt: 3000,
-    expected: 'completion-unverified',
+    expected: 'conflict',
   },
   {
     reported: 'conflicting' as const,

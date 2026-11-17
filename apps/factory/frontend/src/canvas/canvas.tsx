@@ -26,6 +26,7 @@ import type {
   RelationshipMode,
   RelationshipDirection,
 } from './geometry-types';
+import { FactoryActivity } from './activity';
 import { AttentionControl } from './sources';
 import {
   CanvasContext,
@@ -97,6 +98,7 @@ export function Canvas({
   canConfigure,
   children,
   notice,
+  activityRefresh,
 }: {
   board: Board;
   native: boolean;
@@ -113,6 +115,7 @@ export function Canvas({
   canConfigure: boolean;
   children?: ReactNode;
   notice?: ReactNode;
+  activityRefresh?: { failures: number; lastSuccess: number | null };
 }) {
   const [scene] = useState(createProjectCanvasScene);
   const motionRoot = useProjectCanvasMotion();
@@ -424,17 +427,7 @@ export function Canvas({
       >
         <header className="cc-toolbar">
           <strong>Factory</strong>
-          <span
-            className={`cc-runtime ${paused ? 'cc-amber' : 'cc-green'}`}
-            data-tip={
-              paused
-                ? 'New admissions are paused. Existing jobs continue.'
-                : 'The factory can accept eligible work within its concurrency and admission limits.'
-            }
-          >
-            <i />
-            {paused ? 'Paused' : 'Running'}
-          </span>
+          <FactoryActivity facts={board.meta.activity} paused={paused} refresh={activityRefresh} />
           <AttentionControl
             board={board}
             count={attentionIds.size}

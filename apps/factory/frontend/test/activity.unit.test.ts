@@ -1,0 +1,79 @@
+import { expect, it } from 'vitest';
+import { activityView, activityDuration } from '../src/canvas/activity-model';
+import type { FactoryV2Snapshot } from '../../src/http/index.js';
+type Facts = NonNullable<FactoryV2Snapshot['meta']['activity']>;
+const facts: Facts = {
+  observedAt: '2026-11-17T12:00:00Z',
+  coverage: [],
+  uncertainty: [],
+  admissionReasons: [],
+  items: [],
+};
+it('uses the fixed priority, distinct current associations and newest remaining start', () => {
+  const items: Facts['items'] = [
+    {
+      id: 'a',
+      category: 'implementing',
+      lifecycle: 'current',
+      issue: 1,
+      pullRequest: null,
+      startedAt: '2026-11-17T11:58:00Z',
+      reason: 'Building',
+    },
+    {
+      id: 'b',
+      category: 'implementing',
+      lifecycle: 'current',
+      issue: 2,
+      pullRequest: null,
+      startedAt: '2026-11-17T11:59:00Z',
+      reason: 'Building',
+    },
+    {
+      id: 'c',
+      category: 'refreshing-github',
+      lifecycle: 'current',
+      issue: null,
+      pullRequest: null,
+      startedAt: null,
+      reason: 'Refreshing',
+    },
+  ];
+  expect(activityView({ ...facts, items }, 0).summary).toBe('Implementing 2 issues');
+  expect(activityView({ ...facts, items }, 0).selected?.startedAt).toBe('2026-11-17T11:59:00Z');
+  expect(
+    activityView({ ...facts, items: items.filter((i) => i.id !== 'b') }, 0).selected?.startedAt
+  ).toBe('2026-11-17T11:58:00Z');
+  expect(
+    activityView(
+      { ...facts, items: [...items, { ...items[0], id: 'd', category: 'publishing' }] },
+      0
+    ).summary
+  ).toBe('Publishing 1 issue');
+  expect(activityView(facts, 0).groups.map((g) => g.name)).toEqual([
+    'Publishing',
+    'Reviewing',
+    'Implementing',
+    'Restacking',
+    'Recovering',
+    'Planning',
+    'Gathering planning context',
+    'Checking plan freshness',
+    'Refreshing GitHub',
+    'Refreshing T3 information',
+    'Waiting for CI',
+    'Waiting for answers',
+  ]);
+});
+it('distinguishes incomplete evidence, idle and disconnected, preserving known activity', () => {
+  expect(activityView(undefined, 0).summary).toBe('Status unknown');
+  expect(activityView(facts, 0).summary).toBe('Idle');
+  expect(activityView({ ...facts, uncertainty: ['Unknown execution'] }, 0).summary).toBe(
+    'Status unknown'
+  );
+  expect(activityView(facts, 3).summary).toBe('Disconnected');
+  expect(activityDuration(null, 0)).toBe('-s');
+  expect(activityDuration('2026-11-17T11:58:00Z', Date.parse('2026-11-17T12:00:01Z'))).toBe(
+    '2m 1s'
+  );
+});

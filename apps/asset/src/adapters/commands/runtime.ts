@@ -276,7 +276,7 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
       .update(JSON.stringify([alert.id, alert.notificationOccurrence]))
       .digest('hex');
     const connection = connections.get(alert.applicationId);
-    if (!connection) return false;
+    if (!connection) return { healthy: false, handled: false };
     yield* observeWorkflow(
       'asset.commands.notify-result-quarantine',
       alert.context,
@@ -309,7 +309,7 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
       })
     );
   }
-  return healthy;
+  return { healthy, handled: publications.length > 0 || alerts.length > 0 };
 });
 export function protectedCommandsLayer(
   options: ProtectedCommandOptions
@@ -430,15 +430,15 @@ export function protectedCommandsLayer(
       workers.push(
         yield* Effect.gen(function* () {
           while (yield* Ref.get(accepting)) {
-            const healthy = yield* dispatch(connections, outbox).pipe(
+            const result = yield* dispatch(connections, outbox).pipe(
               Effect.catch((error) =>
                 Effect.logError('Asset result dispatcher unavailable', {
                   operation: error.operation,
-                }).pipe(Effect.as(false))
+                }).pipe(Effect.as({ healthy: false, handled: false }))
               )
             );
-            yield* Ref.set(publishingHealthy, healthy);
-            yield* Effect.sleep(options.pollMs);
+            yield* Ref.set(publishingHealthy, result.healthy);
+            if (!result.healthy || !result.handled) yield* Effect.sleep(options.pollMs);
           }
         }).pipe(Effect.ensuring(Ref.set(dispatcherAlive, false)), Effect.forkScoped)
       );

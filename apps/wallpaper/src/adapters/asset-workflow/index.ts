@@ -74,21 +74,21 @@ export function assetWorkflowLayer(options: Options) {
       const alive = yield* Ref.make(2);
       const worker = (
         name: string,
-        work: Effect.Effect<void, WorkflowFailure>,
+        work: Effect.Effect<boolean, WorkflowFailure>,
         healthy: Ref.Ref<boolean>
       ) =>
         Effect.gen(function* () {
           while (yield* Ref.get(accepting)) {
-            yield* work.pipe(
+            const handled = yield* work.pipe(
               Effect.tap(() => Ref.set(healthy, true)),
               Effect.catch((error) =>
                 Effect.logError('Wallpaper workflow iteration failed', {
                   worker: name,
                   operation: error.operation,
-                }).pipe(Effect.andThen(Ref.set(healthy, false)))
+                }).pipe(Effect.andThen(Ref.set(healthy, false)), Effect.as(false))
               )
             );
-            yield* Effect.sleep(options.pollMs);
+            if (!handled) yield* Effect.sleep(options.pollMs);
           }
         }).pipe(
           Effect.catchCause((cause) =>
@@ -102,14 +102,16 @@ export function assetWorkflowLayer(options: Options) {
       const sending = yield* worker(
         'outbox',
         Effect.gen(function* () {
-          for (const p of yield* delivery.claim()) {
+          const publications = yield* delivery.claim();
+          let succeeded = true;
+          for (const p of publications) {
             const connection: NatsConnection =
               p.destination === 'asset-create' ? protectedConnection : publicationConnection;
             const subject =
               p.destination === 'asset-create'
                 ? 'asset.commands.wallpaper.create'
                 : 'wallpaper.published';
-            yield* observeWorkflow(
+            const outcome = yield* observeWorkflow(
               'wallpaper.workflow.publish',
               p.event,
               {
@@ -133,8 +135,10 @@ export function assetWorkflowLayer(options: Options) {
                 return stored ? 'published' : 'retry-recorded';
               })
             );
+            succeeded = succeeded && outcome === 'published';
           }
-          for (const alert of yield* delivery.alerts()) {
+          const alerts = yield* delivery.alerts();
+          for (const alert of alerts) {
             const id = createHash('sha256')
               .update(
                 alert.scope === 'outbox'
@@ -168,6 +172,7 @@ export function assetWorkflowLayer(options: Options) {
             });
             yield* delivery.alerted(alert);
           }
+          return succeeded && (publications.length > 0 || alerts.length > 0);
         }),
         sendingHealthy
       );
@@ -175,7 +180,7 @@ export function assetWorkflowLayer(options: Options) {
         'confirmations',
         Effect.gen(function* () {
           const message = yield* attempt('fetch', () => consumer.next({ expires: 1000 }));
-          if (!message) return;
+          if (!message) return false;
           const identity = createHash('sha256').update(message.data).digest('hex');
           const decoded =
             message.subject === 'asset.results.wallpaper'
@@ -231,6 +236,7 @@ export function assetWorkflowLayer(options: Options) {
             Effect.tap(() => Effect.sync(() => message.ack())),
             Effect.tapError(() => Effect.sync(() => message.nak(options.retryDelayMs)))
           );
+          return true;
         }),
         receivingHealthy
       );

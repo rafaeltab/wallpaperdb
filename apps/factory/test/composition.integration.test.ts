@@ -48,6 +48,90 @@ it('validates host configuration before serving and composes the real driving an
     await host.cleanup();
   }
 });
+it('recovers incomplete implementation checks and then follows implement, review-loop and publish exactly once', async () => {
+  const host = await protocol({ origin: true });
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = `${host.directory}:${previous.path}`;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  await host.save({ base: host.base });
+  const running = await startFactory({
+    FACTORY_PROJECT: host.repository,
+    ...host.mcpEnvironment,
+    FACTORY_T3_PROJECT_ID: 'project-id',
+    FACTORY_BASE: host.base,
+    FACTORY_T3_BINARY: host.binary,
+    FACTORY_STATE: `${host.directory}/state`,
+    FACTORY_PORT: '0',
+  });
+  try {
+    const started = await running.app.inject({
+      method: 'POST',
+      url: '/api/job',
+      payload: { issue: 577 },
+    });
+    expect(started.statusCode).toBe(202);
+    const jobId = started.json().intent.id;
+    await host.save({
+      base: host.base,
+      holdImplementation: true,
+      overrides: { status: 'completed' },
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'run-1',
+          text: JSON.stringify({
+            version: 1,
+            kind: 'state',
+            jobId,
+            base: host.base,
+            implemented: '577',
+            checked: host.base,
+            checks: { format: true, lint: true, tests: false, crap: true, coverage: false },
+          }),
+        },
+      ],
+    });
+    const sent = async () =>
+      (await host.calls())
+        .filter((c) => c.args[1] === 't3_thread_send')
+        .map((c) => JSON.parse(c.args[2]).message);
+    await vi.waitFor(async () => expect(await sent()).toHaveLength(1), {
+      timeout: 10000,
+      interval: 30,
+    });
+    const first = (await sent())[0];
+    expect(first).toContain('$implement');
+    expect(first).toContain('tests, coverage');
+    expect(first).not.toContain('Inspect and reuse the intended linked PR');
+    expect((await running.app.inject('/api/job')).json()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
+    await vi.waitFor(
+      async () =>
+        expect((await running.app.inject('/api/job')).json()).toMatchObject({
+          delivery: { stage: 'ci', ready: true },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
+    const messages = await sent();
+    expect(messages).toHaveLength(3);
+    expect(messages[1]).toContain('$review-loop');
+    expect(messages[2]).toContain('$publish-pr');
+    expect(
+      (await host.calls()).filter(
+        (c) => c.binary === 't3' && c.args[1] === 'start' && !c.args.includes('--help')
+      )
+    ).toHaveLength(1);
+  } finally {
+    await running.close();
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
 it('continues admitted work through publication without an operations-page observer', async () => {
   const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };

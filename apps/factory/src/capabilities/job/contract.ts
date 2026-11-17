@@ -336,6 +336,8 @@ export interface StageRequest {
   readonly acceptedBase?: string;
   readonly handback?: readonly string[];
   readonly reconciliation?: 'state' | 'migration';
+  /** Exact verification gap retained with the durable recovery instruction. */
+  readonly reconciliationReason?: ReconciliationReason;
   readonly receiptProtocol?: 'delivery-v1';
   /** Original verified recovery stage authorizing this manually started continuation. */
   readonly repairOrigin?: number;

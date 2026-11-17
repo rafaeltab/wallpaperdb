@@ -74,6 +74,10 @@ export function storeContract(
         previousRunId: 'run-12',
         ordinal: 13,
         reconciliation: 'state' as const,
+        reconciliationReason: {
+          kind: 'checks-incomplete' as const,
+          checks: ['tests', 'coverage'] as const,
+        },
       };
       const reconciliation = { attempts: 3, migrated: true, pending };
       expect(

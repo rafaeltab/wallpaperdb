@@ -374,7 +374,49 @@ async function pendingWorktree(
   return { ...pending, commit, worktreeClean: !dirty };
 }
 function reconciliationPrompt(intent: Intent, request: StageRequest, scope: string) {
-  return `Stage ${request.index} of factory job ${intent.id}; reconcile the existing ${request.stage} stage in this owning agent and checkout. ${request.reconciliation === 'migration' ? 'Your response format is obsolete or unsupported. Migrate once to version 1 and verify the current state.' : 'The reported state, required local checks, independent review, local Git or intended PR do not agree. Reconcile them before reporting completion.'} ${scope}. Do not launch another worker or create a duplicate PR. Inspect and reuse the intended linked PR. Decide which authorized changes belong in it; never blindly publish local HEAD. Preserve unrelated extra commits on another branch if necessary and restore the correct owning checkout. Necessary publication commits are allowed, but rerun applicable local checks and fresh independent Standards, Spec and Defects reviews at the final checked commit. Preserve the expected comparison and existing cancellation and uncertain-effect safeguards. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
+  const workflow = {
+    implementation:
+      'Use $implement to finish the existing implementation and required local validation. No PR is expected in this stage. Stop before independent review and publication; the factory requests review-loop after it accepts implementation. If an unrelated check failure or scope decision blocks completion, ask the maintainer an accurate question in this thread and wait without claiming success or expanding scope.',
+    review:
+      'Use $review-loop for the existing implementation and pinned comparison. Run its independent read-only reviewers for Standards, Spec and Defects, and perform authorized repairs and validation. Stop before publication. Report reviewed equal to checked only after all required review evidence applies.',
+    publication:
+      'Use $publish-pr after verifying the current validation and independent reviews. Inspect and reuse the intended PR if one exists. If no PR exists, create the first PR for this issue after the publication prerequisites are satisfied. Never create a duplicate or blindly publish local HEAD. Necessary publication code repairs require applicable local checks and fresh independent review before publication.',
+    babysitting:
+      'Use $babysit-pr for the existing publication. Verify current-head CI and repair required failures within scope. Code repairs require applicable validation and independent re-review. Do not merge or close the issue.',
+    ci: 'Use $babysit-pr for the existing publication. Verify current-head CI and retain the accepted publication. Required code repairs need applicable validation and independent re-review. Do not merge or close the issue.',
+  };
+  const migration =
+    request.reconciliation === 'migration'
+      ? 'Your response format is obsolete or unsupported. Migrate once to version 1 and verify the current state. '
+      : '';
+  return `Stage ${request.index} of factory job ${intent.id}; reconcile the existing ${request.stage} stage in this owning agent and checkout. ${migration}${rejectionDescription(request.reconciliationReason)} ${workflow[request.stage]} ${scope}. Continue in this owning worker and checkout. Do not launch a replacement implementation worker or create another worktree. Independent read-only reviewers required by the selected workflow are allowed. Preserve unrelated work, accepted stage history, the expected comparison, and cancellation and uncertain-effect safeguards. Reuse applicable existing evidence for an unchanged comparison; do not repeat completed stages merely to correct the response format. ${receiptInstructions(intent, request.stage, deliveryIdentity(intent, request))}`;
+}
+
+function rejectionDescription(reason: ReconciliationReason | undefined) {
+  if (!reason)
+    return 'The current stage has no accepted verified state. Inspect its actual validation and state before continuing.';
+  if (reason.kind === 'checks-incomplete')
+    return `The current state reports incomplete required checks: ${reason.checks.join(', ')}. These checks must pass before this stage can complete.`;
+  const descriptions = {
+    'response-missing':
+      'No supported current state response was observed after the factory instruction.',
+    'invalid-response': 'The latest state response does not match the supported receipt protocol.',
+    'receipt-mismatch': 'The state response identifies another job or issue.',
+    'instruction-unavailable':
+      'The retained factory instruction could not be verified in the available history.',
+    'review-unverified':
+      'Independent review evidence does not match the checked commit for this stage.',
+    'publication-unverified':
+      'Publication evidence does not match the checked commit for this stage.',
+    'checkout-dirty':
+      'The owning checkout has uncommitted changes; completion requires a clean checked commit.',
+    'head-mismatch': 'The reported checked commit does not match the current owning HEAD.',
+    'comparison-unverified':
+      'The reported comparison could not be verified against the allowed boundary.',
+    'publication-mismatch':
+      'The intended PR could not be verified at the checked commit with its owning thread association.',
+  };
+  return descriptions[reason.kind];
 }
 
 function pendingResponse(

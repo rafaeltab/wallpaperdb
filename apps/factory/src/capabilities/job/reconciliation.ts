@@ -26,6 +26,12 @@ export function requestReconciliation(
 ): Effect.Effect<Delivery | null, Unavailable> {
   return Effect.gen(function* () {
     if (!evidence?.idle) return null;
+    const detail =
+      evidence.rejection?.kind === 'checks-incomplete'
+        ? ` Required checks incomplete: ${evidence.rejection.checks.join(', ')}.`
+        : evidence.rejection
+          ? ` Verification: ${evidence.rejection.kind.replaceAll('-', ' ')}.`
+          : '';
     const control = yield* store.readControl();
     if (expectedRevision !== undefined && control.revision !== expectedRevision) return null;
     if (
@@ -84,6 +90,7 @@ export function requestReconciliation(
     }
     const request: StageRequest = {
       ...waiting,
+      reconciliationReason: evidence.rejection,
       index: waiting.index + 1,
       previousRunId: evidence.runId,
       ordinal: evidence.ordinal + 1,
@@ -129,7 +136,7 @@ export function requestReconciliation(
       active: true,
       progress: migration
         ? 'Migrating agent response to version 1.'
-        : `Agent reconciliation attempt ${state.attempts + 1} of ${limit}.`,
+        : `Agent reconciliation attempt ${state.attempts + 1} of ${limit}.${detail}`,
     } satisfies Delivery;
   });
 }

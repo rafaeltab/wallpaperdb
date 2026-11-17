@@ -21,6 +21,33 @@ export const intentSchema = z
     expectedStage: z.literal('implementation'),
   })
   .strict();
+const reconciliationReasonSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('checks-incomplete'),
+      checks: z
+        .array(z.enum(['format', 'lint', 'tests', 'crap', 'coverage']))
+        .min(1)
+        .max(5),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.enum([
+        'response-missing',
+        'invalid-response',
+        'receipt-mismatch',
+        'instruction-unavailable',
+        'review-unverified',
+        'publication-unverified',
+        'checkout-dirty',
+        'head-mismatch',
+        'comparison-unverified',
+        'publication-mismatch',
+      ]),
+    })
+    .strict(),
+]);
 const stageSchema = z
   .object({
     acceptedBase: z
@@ -30,6 +57,7 @@ const stageSchema = z
     receiptProtocol: z.literal('delivery-v1').optional(),
     handback: z.array(z.string()).optional(),
     reconciliation: z.enum(['state', 'migration']).optional(),
+    reconciliationReason: reconciliationReasonSchema.optional(),
     repairOrigin: z.number().int().nonnegative().optional(),
     ordinal: z.number().int().positive().optional(),
     comparison: z

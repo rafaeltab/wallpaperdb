@@ -368,7 +368,9 @@ function reconcileStage(
       const reconciliation = yield* requestReconciliation(
         store,
         waiting,
-        evidence,
+        verified && !publicationValid
+          ? { ...verified, rejection: { kind: 'publication-mismatch' as const } }
+          : evidence,
         reconciliationLimit
       );
       if (reconciliation) return reconciliation;

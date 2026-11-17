@@ -50,3 +50,31 @@ it('ignores an earlier client lifetime completing after replacement', async () =
   });
   expect(result.current.activityRefresh).toEqual({ failures: 0, lastSuccess: at });
 });
+
+it('keeps resumed hanging attempts bounded when the abandoned request rejects after resumption', async () => {
+  vi.useFakeTimers();
+  const client = new FactoryClient(
+    (_path, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true }
+        );
+      })
+  );
+  const { result, unmount } = renderHook(() => useFactory(client));
+  await act(async () => {
+    window.dispatchEvent(new Event('pagehide'));
+    window.dispatchEvent(new Event('pageshow'));
+    await Promise.resolve();
+  });
+  await act(() => vi.advanceTimersByTimeAsync(9500));
+  expect(result.current.activityRefresh.failures).toBe(3);
+  expect(result.current.activityRefresh.lastSuccess).toBeNull();
+  unmount();
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(vi.getTimerCount()).toBe(0);
+});

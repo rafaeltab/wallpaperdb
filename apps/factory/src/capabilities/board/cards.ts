@@ -182,11 +182,8 @@ function currentPublication(context: ProjectionContext, pr: PullRequest | undefi
   const head = publications[0]?.publication.commit ?? metadata.comparison.headOid;
   return {
     head,
-    mergeability:
-      head === metadata.comparison.headOid
-        ? publications.find(
-            (p) => p.publication.commit === head && p.publication.mergeability !== undefined
-          )?.publication.mergeability
-        : undefined,
+    mergeability: publications.find(
+      (p) => p.publication.commit === head && p.publication.mergeability !== undefined
+    )?.publication.mergeability,
   };
 }

@@ -559,7 +559,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           Effect.map(({ schedule, threads, safety, executionCatalog }) => ({
             executionCatalog,
             ...schedule,
-            coordinationIdle: !observing && !recoveringPlanner,
+            coordinationIdle: !observing && !recoveringPlanner && attempts.isIdle(),
             state: safety.schedule,
             planningSafety: safety.planning,
             threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },

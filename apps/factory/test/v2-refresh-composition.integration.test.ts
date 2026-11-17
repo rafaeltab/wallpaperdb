@@ -45,6 +45,12 @@ it('keeps cached reads and durable controls usable while GitHub requests are bac
     );
     const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
     expect(board.entities.sources['source:github'].observedAt).toBeNull();
+    expect(board.meta.activity?.items).toEqual([]);
+    expect(board.meta.activity?.admissionReasons).toContainEqual({
+      code: 'paused',
+      message: 'Admissions paused',
+    });
+    expect(board.meta.activity).not.toHaveProperty('status');
     for (let i = 0; i < 5; i++) {
       expect((await running.app.inject('/api/v2/board')).statusCode).toBe(200);
       expect((await running.app.inject('/health')).statusCode).toBe(200);
@@ -544,6 +550,72 @@ it('exposes acknowledged delivery through local HTTP while the provider observat
   } finally {
     await running?.close();
     await pending;
+    process.env.PATH = previous.path;
+    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous.fixture;
+    await host.cleanup();
+  }
+});
+
+it('publishes the real routine GitHub refresh lifetime while local reads remain independent', async () => {
+  const host = await protocol();
+  const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
+  process.env.PATH = host.directory + ':' + previous.path;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    await host.save({
+      planning: { candidates: [], issues: [], openPulls: [] },
+      hold: 'github-observation',
+    });
+    await Effect.runPromise(
+      fileScheduleStore(host.directory + '/state').save({
+        revision: 0,
+        concurrency: 1,
+        allowance: 1,
+        paused: true,
+        admissions: [],
+      })
+    );
+    running = await startFactory({
+      FACTORY_PROJECT: host.repository,
+      ...host.mcpEnvironment,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: host.base,
+      FACTORY_T3_BINARY: host.binary,
+      FACTORY_STATE: host.directory + '/state',
+      FACTORY_PORT: '0',
+    });
+    await vi.waitFor(
+      async () => {
+        const board = (await running!.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.meta.activity?.items).toMatchObject([
+          { category: 'refreshing-github', lifecycle: 'current' },
+        ]);
+        expect(await readFile(host.directory + '/held', 'utf8')).toBe('github-observation');
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    const before = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(before.meta.activity?.items[0].startedAt).toBe(
+      before.entities.sources['source:github'].lastAttemptAt
+    );
+    const requests = await host.githubRequests();
+    for (let i = 0; i < 5; i++)
+      expect((await running.app.inject('/api/v2/board')).statusCode).toBe(200);
+    expect(await host.githubRequests()).toEqual(requests);
+    await writeFile(host.directory + '/release', 'release');
+    await vi.waitFor(
+      async () => {
+        const board = (await running!.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+        expect(board.entities.sources['source:github'].observedAt).not.toBeNull();
+        expect(board.meta.activity?.items).toEqual([]);
+      },
+      { timeout: 5000, interval: 20 }
+    );
+  } finally {
+    await writeFile(host.directory + '/release', 'release');
+    await running?.close();
     process.env.PATH = previous.path;
     if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous.fixture;

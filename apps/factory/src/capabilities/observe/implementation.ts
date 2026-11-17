@@ -17,12 +17,13 @@ export const ObservationsLive = Layer.effect(
     const time = yield* Time;
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(Reporting));
     const lock = yield* Semaphore.make(1);
+    let refreshActive = false;
     return {
       snapshot: () =>
         Effect.gen(function* () {
           const value = yield* store.read();
           const now = yield* time.now();
-          return dated(value, now);
+          return { ...dated(value, now), refreshActive };
         }),
       schedule: () =>
         Effect.gen(function* () {
@@ -63,7 +64,7 @@ export const ObservationsLive = Layer.effect(
           return {
             state,
             jobs,
-            observations: dated(retained, now),
+            observations: { ...dated(retained, now), refreshActive },
             recoveries: retained.recoveries,
             localWork: entries,
             relationships: retained.facts?.issues.map((i) => ({
@@ -76,6 +77,9 @@ export const ObservationsLive = Layer.effect(
         Effect.gen(function* () {
           const startedAt = yield* time.now();
           yield* store.refresh({ startedAt });
+          yield* Effect.sync(() => {
+            refreshActive = true;
+          });
           const generation = reporting ? yield* reporting.begin() : 0;
           let sequence = 0;
           yield* source
@@ -111,7 +115,15 @@ export const ObservationsLive = Layer.effect(
               )
             );
           if (reporting) yield* reporting.flush();
-        }).pipe(lock.withPermits(1), Effect.withSpan('factory.observations.refresh')),
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              refreshActive = false;
+            })
+          ),
+          lock.withPermits(1),
+          Effect.withSpan('factory.observations.refresh')
+        ),
     } satisfies Observations;
   })
 );

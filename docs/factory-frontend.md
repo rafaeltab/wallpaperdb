@@ -48,6 +48,12 @@ The [browser integration journey](../apps/factory/frontend/test/canvas.integrati
 
 The [factory build script](../apps/factory/package.json) places Vite output in `apps/factory/dist/frontend`. [Installation](../apps/factory/scripts/install.ts) includes it in the pinned release alongside the backend. The backend serves `/` and hashed `/assets` paths from that release, without GitHub/T3 calls or a Vite server. Production activation remains an explicit host operation using the existing installation contract.
 
+## Factory activity
+
+The [activity display](../apps/factory/frontend/src/canvas/activity.tsx) replaces the admissions indicator. Hover or keyboard focus opens its details; click pins them, and Escape or an outside click dismisses them. Admission controls and needs attention remain separate. [Frontend calculations](../apps/factory/frontend/src/canvas/activity-model.ts) own category order, summary priority, distinct current-item counts and newest-current-item durations. Unknown lifecycle coverage cannot establish Idle. Paused admissions change the summary dot without changing the activity label.
+
+The [request lifetime](../apps/factory/frontend/src/canvas/use-factory.ts) polls local board facts independently of external discovery, bounds attempts, retains the display for two failures and reports Disconnected after three. Successful responses reset the failure count and date the last successful refresh. The display advances elapsed time locally and releases its timers and listeners on unmount. The [browser integration journey](../apps/factory/frontend/test/activity.integration.test.ts) covers live switching, focus, hover, narrow layouts and reduced motion. Set `FACTORY_ACTIVITY_EVIDENCE` to retain its recording and screenshots outside the repository.
+
 ## Project item and dependency link publication
 
 The [Project canvas](../apps/factory/frontend/src/canvas/canvas.tsx) publishes the current Project item placement immediately. Initial rendering, collapse and expansion do not wait for Item dependency links. Navigation, selection and current item actions remain available while the viewport reports routing activity through `aria-busy`.

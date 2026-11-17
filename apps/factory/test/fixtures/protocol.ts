@@ -199,6 +199,13 @@ export async function runProtocol(
       );
       process.exit(code);
     }
+    if (
+      basename(process.argv[1]) === 'gh' &&
+      args[0] === 'api' &&
+      args[1] === 'graphql' &&
+      args.join(' ').includes('projectV2(number:7)')
+    )
+      await hold('github-observation');
     if (basename(process.argv[1]) === 'gh' && process.env.GH_DEBUG === 'api') {
       appendFileSync(
         join(config.directory, 'github-requests.jsonl'),

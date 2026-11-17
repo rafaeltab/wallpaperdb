@@ -8,6 +8,7 @@ export async function planningWorker(config: {
   run: <A>(effect: Effect.Effect<A, Unavailable>) => Promise<A>;
 }) {
   let work: Promise<void> | undefined;
+  let submitting = 0;
   const queue: { id: string; parent?: Tracer.Span }[] = [];
   const pump = () => {
     if (work) return;
@@ -42,13 +43,19 @@ export async function planningWorker(config: {
   const pending = await config.run(config.attempts.pending());
   if (pending) start(pending.id);
   return {
+    isIdle: () => !work && !queue.length && submitting === 0,
     submit: async (parent?: Tracer.Span) => {
-      const operation = config.attempts.submit(randomUUID());
-      const result = await config.run(
-        parent ? operation.pipe(Effect.withParentSpan(parent)) : operation
-      );
-      if (result.kind === 'accepted') start(result.id, parent);
-      return result;
+      submitting++;
+      try {
+        const operation = config.attempts.submit(randomUUID());
+        const result = await config.run(
+          parent ? operation.pipe(Effect.withParentSpan(parent)) : operation
+        );
+        if (result.kind === 'accepted') start(result.id, parent);
+        return result;
+      } finally {
+        submitting--;
+      }
     },
     observe: (id: string, parent?: Tracer.Span) => {
       const operation = config.attempts.observe(id);

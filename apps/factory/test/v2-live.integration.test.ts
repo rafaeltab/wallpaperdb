@@ -3859,7 +3859,7 @@ it('reports routine refresh facts without selecting a summary or confusing missi
   expect(board.snapshot().meta.activity).toMatchObject({ items: [], uncertainty: [] });
   await board.publish({
     ...input,
-    observations: { state: 'loading', stale: false, startedAt: 2000 },
+    observations: { state: 'loading', stale: false, startedAt: 2000, refreshActive: true },
   });
   expect(board.snapshot().meta.activity).toMatchObject({
     items: [
@@ -3903,6 +3903,10 @@ it('removes completed or failed refreshes and reports all independent admission 
     'no-ready-matches',
     'eligibility-unknown',
   ]);
+  await board.publish({ ...input, observations: { ...input.observations, stale: true } });
+  expect(
+    board.snapshot().meta.activity?.admissionReasons.some((r) => r.code === 'no-ready-matches')
+  ).toBe(false);
   await board.publish({
     ...input,
     observations: {
@@ -3914,5 +3918,126 @@ it('removes completed or failed refreshes and reports all independent admission 
     },
   });
   expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});
+
+it('translates complete activity facts through the sole board endpoint without external work', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: true,
+    observations: { state: 'loading', stale: false, refreshActive: true, startedAt: 2000 },
+  };
+  const board = await liveBoard({ scopeId: 'activity-http', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    const activity = response.json<FactoryV2Snapshot>().meta.activity;
+    expect(activity).toMatchObject({
+      observedAt: '1970-01-01T00:00:01.000Z',
+      items: [
+        {
+          category: 'refreshing-github',
+          startedAt: '1970-01-01T00:00:02.000Z',
+          issue: null,
+          pullRequest: null,
+          reason: 'Reading repository and managed PR metadata',
+        },
+      ],
+    });
+    expect(activity?.coverage).toHaveLength(12);
+    expect(activity).not.toHaveProperty('status');
+    expect((await app.inject('/api/v2/board')).json().meta.activity).toEqual(activity);
+  } finally {
+    board.close();
+    await app.close();
+  }
+});
+
+it('does not mistake retained completed jobs or unmanaged CI for current responsibility', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const retained = parkedSnapshot(pullObservation(2, { ci: 'PENDING' }), true);
+  const current = retained.jobs[0];
+  if (current.kind !== 'job' || !current.delivery || current.execution.kind !== 'found')
+    throw new Error('Expected retained job');
+  const input: ScheduleSnapshot = {
+    ...retained,
+    coordinationIdle: true,
+    jobs: [
+      {
+        ...current,
+        execution: { ...current.execution, status: 'completed' },
+        delivery: { ...current.delivery, ready: true },
+      },
+    ],
+  };
+  const board = await liveBoard({ scopeId: 'activity-retained', initial: input });
+  expect(board.snapshot().meta.activity).toMatchObject({ items: [], uncertainty: [] });
+  await board.publish({ ...input, jobs: [] });
+  expect(board.snapshot().meta.activity?.uncertainty).toContain(
+    'Managed execution or wait coverage is incomplete.'
+  );
+  board.close();
+});
+
+it('keeps pending planning coverage unknown and uses only a current completed planner assessment', async () => {
+  const input: ScheduleSnapshot = { ...initial, coordinationIdle: true };
+  const id = '00000000-0000-4000-8000-000000000718';
+  const attempt: PlanningAttempt = {
+    id,
+    revision: 0,
+    startedAt: 1000,
+    deadline: 10000,
+    phase: 'discovery',
+  };
+  const board = await liveBoard({
+    scopeId: 'activity-planner',
+    initial: input,
+    initialPlan: attempt,
+    commands: {
+      execute: () =>
+        Effect.succeed({ state: 'succeeded', result: { planId: `plan:${id}` }, reasons: [] }),
+    },
+  });
+  expect(
+    board.snapshot().meta.activity?.coverage.find((c) => c.category === 'planning')?.state
+  ).toBe('unknown');
+  await board.publish(input, { ...attempt, phase: 'failed', finishedAt: 1500 });
+  const action = Object.values(board.snapshot().entities.actions).find(
+    (a) => a.kind === 'preview-plan'
+  );
+  if (action?.availability.state !== 'available') throw new Error('Expected preview action');
+  await board.submit({
+    commandId: '10000000-0000-4000-8000-000000000718',
+    actionId: action.id,
+    precondition: action.availability.precondition,
+    kind: 'preview-plan',
+    payload: {},
+  });
+  await board.idle();
+  const complete: PlanningAttempt = {
+    ...attempt,
+    phase: 'succeeded',
+    finishedAt: 2000,
+    result: {
+      kind: 'preview',
+      selected: [],
+      rejected: [],
+      input: { issues: [] },
+    },
+  };
+  await board.publish(input, complete);
+  expect(board.snapshot().meta.activity?.admissionReasons).toContainEqual({
+    code: 'planner-no-eligible',
+    message: 'No eligible issues found by planner',
+  });
+  expect(
+    board.snapshot().meta.activity?.admissionReasons.some((r) => r.code === 'eligibility-unknown')
+  ).toBe(false);
+  await board.publish({ ...input, state: { ...input.state, concurrency: 2 } }, complete);
+  expect(board.snapshot().meta.activity?.admissionReasons).toContainEqual({
+    code: 'eligibility-unknown',
+    message: 'Eligibility unknown',
+  });
   board.close();
 });

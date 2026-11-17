@@ -31,8 +31,8 @@ export function FactoryActivity({
       }
     };
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && anchor.current?.contains(document.activeElement)) {
-        trigger.current?.focus();
+      if (event.key === 'Escape') {
+        if (anchor.current?.contains(document.activeElement)) trigger.current?.focus();
         setPinned(false);
         setDismissed(true);
       }

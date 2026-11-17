@@ -109,6 +109,33 @@ it('publishes observed terminal execution before receipt inspection fails', asyn
   }
 });
 
+it('retains the exact incomplete checks in the owning implementation reconciliation without advancing to review', async () => {
+  const f = await fixture();
+  try {
+    f.state({
+      idle: true,
+      rejection: { kind: 'checks-incomplete', checks: ['tests', 'coverage'] },
+    });
+    expect(await f.status()).toMatchObject({
+      delivery: { progress: expect.stringContaining('tests, coverage') },
+    });
+    await f.status();
+    expect(f.sends).toHaveLength(1);
+    expect(f.sends[0]).toMatchObject({
+      stage: 'implementation',
+      reconciliationReason: { kind: 'checks-incomplete', checks: ['tests', 'coverage'] },
+    });
+    expect((await Effect.runPromise(f.store.readControl())).reconciliation?.pending).toMatchObject({
+      reconciliationReason: { kind: 'checks-incomplete', checks: ['tests', 'coverage'] },
+    });
+    f.state({ accepted: true, idle: true, rejection: undefined });
+    await f.status();
+    expect(f.sends.at(-1)?.stage).toBe('review');
+  } finally {
+    await f.close();
+  }
+});
+
 it('reconciles a failed idle state in the same job and spends a durable budget across stages', async () => {
   const f = await fixture(2);
   try {

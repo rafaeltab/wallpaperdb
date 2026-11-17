@@ -183,21 +183,27 @@ it.each(['implementation', 'review', 'publication', 'babysitting'] as const)(
     })
 );
 it.each([
-  { version: 2 },
-  { version: undefined },
-  { jobId: 'other' },
-  { implemented: '999' },
-  { base: 'f'.repeat(40) },
-  { checked: 'f'.repeat(40) },
-  { reviewed: 'f'.repeat(40) },
-  { published: 'f'.repeat(40) },
-  { checks: { format: true, lint: true, tests: true, coverage: true } },
+  { change: { version: 2 }, reason: { kind: 'invalid-response' } },
+  { change: { version: undefined }, reason: { kind: 'invalid-response' } },
+  { change: { jobId: 'other' }, reason: { kind: 'receipt-mismatch' } },
+  { change: { implemented: '999' }, reason: { kind: 'receipt-mismatch' } },
+  { change: { base: 'f'.repeat(40) }, reason: { kind: 'comparison-unverified' } },
+  { change: { checked: 'f'.repeat(40) }, reason: { kind: 'review-unverified' } },
+  { change: { reviewed: 'f'.repeat(40) }, reason: { kind: 'review-unverified' } },
+  { change: { published: 'f'.repeat(40) }, reason: { kind: 'publication-unverified' } },
+  {
+    change: { checks: { format: true, lint: true, tests: true, coverage: true } },
+    reason: { kind: 'invalid-response' },
+  },
   ...['format', 'lint', 'tests', 'coverage', 'crap'].map((check) => ({
-    checks: { format: true, lint: true, tests: true, coverage: true, crap: true, [check]: false },
+    change: {
+      checks: { format: true, lint: true, tests: true, coverage: true, crap: true, [check]: false },
+    },
+    reason: { kind: 'checks-incomplete', checks: [check] },
   })),
 ])(
   'rejects a newer incompatible publication response rather than restoring older success: %j',
-  (change) =>
+  ({ change, reason }) =>
     stageFixture(async ({ host, adapter, intent, request }) => {
       const current = { ...request, stage: 'publication' as const };
       await host.save({
@@ -211,6 +217,7 @@ it.each([
       expect(await Effect.runPromise(adapter.inspectStage(intent, current))).toMatchObject({
         accepted: false,
         responseObserved: true,
+        rejection: reason,
       });
     })
 );
@@ -814,6 +821,40 @@ it('leaves a running-to-idle snapshot transition unverified until its completed 
       accepted: true,
     });
   }));
+it.each([
+  { stage: 'implementation' as const, skill: '$implement' },
+  { stage: 'review' as const, skill: '$review-loop' },
+  { stage: 'publication' as const, skill: '$publish-pr' },
+  { stage: 'babysitting' as const, skill: '$babysit-pr' },
+])('reconciles $stage with its own workflow and concrete validation reason', ({ stage, skill }) =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    await host.save({ overrides: { status: 'completed' } });
+    await Effect.runPromise(
+      adapter.sendStage(intent, {
+        ...request,
+        stage,
+        index: 1,
+        previousRunId: 'run-1',
+        ordinal: 2,
+        resume: true,
+        reconciliation: 'state',
+        reconciliationReason: { kind: 'checks-incomplete', checks: ['tests', 'coverage'] },
+      })
+    );
+    const sends = (await host.calls()).filter((c) => c.args[1] === 't3_thread_send');
+    expect(sends).toHaveLength(1);
+    const message = JSON.parse(sends[0].args[2]).message;
+    expect(message).toContain(skill);
+    expect(message).toContain('tests, coverage');
+    if (stage === 'implementation') {
+      expect(message).not.toContain('Inspect and reuse the intended linked PR');
+      expect(message).not.toContain('fresh independent Standards, Spec and Defects reviews');
+    }
+    if (stage === 'review') expect(message).toContain('independent read-only reviewers');
+    if (stage === 'publication') expect(message).toContain('If no PR exists');
+  })
+);
+
 it.each(['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'])(
   'delivers reconciliation from a verified %s owning predecessor',
   (status) =>

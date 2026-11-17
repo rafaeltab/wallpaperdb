@@ -27,6 +27,7 @@ export async function completionFixture(
   let idle = false;
   let observationStatus: string | undefined;
   let migrationRequired: boolean | undefined = false;
+  let rejection: StageEvidence['rejection'];
   let dependencies: readonly string[] | undefined;
   let clean = true;
   let run = 1;
@@ -114,6 +115,7 @@ export async function completionFixture(
                     accepted,
                     idle,
                     migrationRequired,
+                    rejection,
                     dependencies,
                     worktreeClean: clean,
                     linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
@@ -166,6 +168,7 @@ export async function completionFixture(
       ready?: boolean;
       failed?: boolean;
       clean?: boolean;
+      rejection?: StageEvidence['rejection'];
       lost?: boolean;
       inspectFailed?: boolean;
       publicationUnavailable?: boolean;
@@ -181,6 +184,7 @@ export async function completionFixture(
       accepted = change.accepted ?? accepted;
       idle = change.idle ?? idle;
       if ('migrationRequired' in change) migrationRequired = change.migrationRequired;
+      if ('rejection' in change) rejection = change.rejection;
       dependencies = change.dependencies ?? dependencies;
       commit = change.commit ?? commit;
       prCommit = change.prCommit ?? prCommit;

@@ -20,6 +20,14 @@ After the factory performs external work newer than a backup, restoring that bac
 
 The installed service's lock does not protect against direct development launches. Keep those launches away from the service's state directory.
 
+## Stage reconciliation
+
+A supported state response can report incomplete work. False required checks keep implementation pending; they do not mean the response format is obsolete or that review or publication has happened. The [receipt adapter](src/adapters/t3/stages.ts) distinguishes incomplete checks, unsupported or mismatched responses, checkout/comparison failures and missing review/publication evidence. The [reconciliation policy](src/capabilities/job/reconciliation.ts) retains that reason with the bounded same-stage instruction across restart.
+
+Implementation reconciliation continues the existing implement workflow and local validation. No PR or independent-review completion is expected at that stage. Accepted implementation advances to review-loop, and accepted reviewed state advances to publish-pr. Review workflows may use their required independent read-only reviewers; the prohibition on replacement implementation workers and worktrees does not prohibit those reviewers. Publication reuses an intended PR when present and may create the first PR when publication prerequisites are satisfied. A genuine unrelated validation or scope blocker requires an accurate maintainer question, not a fabricated successful state or an invented PR requirement.
+
+The existing cancellation, parked-question, uncertainty and reconciliation-budget guards still apply. Reconciliation does not resume cancelled work, change admission controls, release admission, or merge work. New instructions carry an optional reason in the existing journal records; rollback requires a compatible reader as described above.
+
 ## Operator-attested recovery
 
 A missing thread search result cannot prove that a launch failed. Retiring an uncertain planner claim requires explicit server evidence of non-launch. For the supported T3 `-32602` rejection recovery, the supervising operator must stop the service, retain a complete backup and supply the evidence reference and timestamp to the [reconciliation command](src/main.ts). Deployment and this attestation remain supervisor actions.

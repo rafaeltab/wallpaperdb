@@ -424,6 +424,46 @@ it('releases a parked slot without satisfying its dependent and admits unrelated
     await f.runtime.dispose();
   }
 });
+it('captures execution settings at admission and preserves them across configuration changes', async () => {
+  const f = fixture();
+  const execution = {
+    model: 'gpt-6.2-sol',
+    effort: 'high',
+    mode: 'fast' as const,
+    permissionLevel: 'auto' as const,
+  };
+  try {
+    expect(
+      await f.run((s) =>
+        s.configure({ revision: -1, concurrency: 1, allowance: 2, paused: false, execution })
+      )
+    ).toBe('saved');
+    await f.reopen();
+    await f.run((s) => s.tick(base));
+    expect(f.snapshot().admissions[0]).toMatchObject({ execution });
+    const revision = f.snapshot().revision;
+    expect(
+      await f.run((s) =>
+        s.configure({
+          revision,
+          concurrency: 1,
+          allowance: 2,
+          paused: false,
+          execution: { ...execution, model: 'gpt-6.1-sol', mode: 'standard' },
+        })
+      )
+    ).toBe('saved');
+    expect(f.snapshot().admissions[0]).toMatchObject({ execution });
+    expect(
+      await f.run((s) =>
+        s.configure({ revision, concurrency: 1, allowance: 2, paused: false, execution })
+      )
+    ).toBe('conflict');
+    expect(f.launches).toEqual([1]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
 it('persists pause and reductions without cancelling jobs; rejects stale control edits', async () => {
   const f = fixture();
   try {

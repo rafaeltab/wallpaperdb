@@ -4,6 +4,21 @@ The Software Factory coordinates trusted implementation issues through verified 
 
 ## Language
 
+**Factory agnostic**:
+Applicable independently of the particular Software Factory's project and workflow policies.
+
+**Factory specific**:
+Defined by the project and workflow policies of a particular Software Factory, here WallpaperDB's.
+
+**Eligible for factory management**:
+A Project item that satisfies the factory's policies for being picked up. Eligibility alone does not place the item under factory control.
+
+**Relevant for factory scope**:
+A Project item that matters to the planner's decisions about work the factory can pick up. Relevant items can be unmanaged and need not themselves be eligible for factory management.
+
+**Factory managed**:
+A Project item placed under factory control by the planner's decision to start it. The existence of an associated PR or agent activity alone does not establish factory management.
+
 **Project canvas**:
 The visual overview of Project items and their dependencies in the Software Factory.
 _Avoid_: Board view, canvas view

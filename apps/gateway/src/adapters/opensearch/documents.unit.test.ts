@@ -100,13 +100,13 @@ describe('OpenSearch color ranking response', () => {
   it.each([
     { first: 1.25, second: 0 },
     { first: -0.25, second: 0.75 },
-  ])('rejects an out-of-range utility even with a matching score and sort', async ({
-    first,
-    second,
-  }) => {
-    const score = Math.fround((2 * first + second) / 3);
-    await expect(
-      Effect.runPromise(wallpaperSearchResponse(selection, index)(response(score, first, second)))
-    ).rejects.toThrow();
-  });
+  ])(
+    'rejects an out-of-range utility even with a matching score and sort',
+    async ({ first, second }) => {
+      const score = Math.fround((2 * first + second) / 3);
+      await expect(
+        Effect.runPromise(wallpaperSearchResponse(selection, index)(response(score, first, second)))
+      ).rejects.toThrow();
+    }
+  );
 });

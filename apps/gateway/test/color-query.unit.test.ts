@@ -29,31 +29,30 @@ describe('Catalogue color query admission', () => {
       sortOrder: 'desc',
     });
   });
-  it.each([
-    'relaxed',
-    'favorite',
-    'strict',
-  ] as const)('preserves independent proportions with %s quality', async (quality) => {
-    for (const targets of [
-      [{ color: '#ff0000', percent: 0 }],
-      [{ color: '#ff0000', percent: 40 }],
-      [
-        { color: '#ff0000', percent: 80 },
-        { name: 'grayscale', percent: 80 },
-      ],
-    ]) {
-      const { read, catalogue } = await setup();
-      expect(
-        await Effect.runPromise(
-          catalogue.search({ color: { mode: 'proportions', quality, targets } })
-        )
-      ).toMatchObject({ _tag: 'Found' });
-      expect(read.selections[0]?.color?.targetCount).toBe(targets.length);
-      expect(read.selections[0]?.color?.utilities[0]?.key).toContain(
-        `_p${String(targets[0].percent).padStart(3, '0')}_`
-      );
+  it.each(['relaxed', 'favorite', 'strict'] as const)(
+    'preserves independent proportions with %s quality',
+    async (quality) => {
+      for (const targets of [
+        [{ color: '#ff0000', percent: 0 }],
+        [{ color: '#ff0000', percent: 40 }],
+        [
+          { color: '#ff0000', percent: 80 },
+          { name: 'grayscale', percent: 80 },
+        ],
+      ]) {
+        const { read, catalogue } = await setup();
+        expect(
+          await Effect.runPromise(
+            catalogue.search({ color: { mode: 'proportions', quality, targets } })
+          )
+        ).toMatchObject({ _tag: 'Found' });
+        expect(read.selections[0]?.color?.targetCount).toBe(targets.length);
+        expect(read.selections[0]?.color?.utilities[0]?.key).toContain(
+          `_p${String(targets[0].percent).padStart(3, '0')}_`
+        );
+      }
     }
-  });
+  );
   it.each(COLOR_FEATURE_NAMES)('admits the named target %s', async (name) => {
     const { read, catalogue } = await setup();
     expect(

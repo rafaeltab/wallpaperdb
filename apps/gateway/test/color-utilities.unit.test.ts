@@ -27,14 +27,14 @@ describe('Selected color utility encoder', () => {
       reference.anchorSha256
     );
   });
-  it.each(reference.cases)('preserves every frozen utility for $name', ({
-    descriptor,
-    utilities,
-  }) => {
-    const actual = encodeColorUtilities(descriptor);
-    expect(Object.keys(actual).sort()).toEqual(Object.keys(utilities).sort());
-    expect(Object.keys(actual)).toHaveLength(10044);
-    expect(actual).toEqual(utilities);
-    expect(colorUtilityFields).toEqual(Object.keys(utilities).sort());
-  });
+  it.each(reference.cases)(
+    'preserves every frozen utility for $name',
+    ({ descriptor, utilities }) => {
+      const actual = encodeColorUtilities(descriptor);
+      expect(Object.keys(actual).sort()).toEqual(Object.keys(utilities).sort());
+      expect(Object.keys(actual)).toHaveLength(10044);
+      expect(actual).toEqual(utilities);
+      expect(colorUtilityFields).toEqual(Object.keys(utilities).sort());
+    }
+  );
 });

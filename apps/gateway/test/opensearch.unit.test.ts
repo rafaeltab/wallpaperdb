@@ -78,44 +78,44 @@ describe('OpenSearch controlled HTTP contracts', () => {
     { label: 'indexed color occurrence order', field: 'colorOrder', replacement: { index: true } },
     { label: 'incompatible upload timestamps', field: 'uploadedAt', replacement: { type: 'long' } },
     { label: 'incompatible update timestamps', field: 'updatedAt', replacement: { type: 'long' } },
-  ])('rejects an existing wallpaper mapping with $label at startup', async ({
-    field,
-    replacement,
-  }) => {
-    const mapping = wallpaperMapping();
-    const supplied = {
-      ...mapping,
-      ...(field === '_source'
-        ? { _source: { ...mapping._source, ...replacement } }
-        : {
-            properties: {
-              ...mapping.properties,
-              [field]: { ...mapping.properties[field], ...replacement },
-            },
-          }),
-    };
-    await withSearchEndpoint(
-      (_request, response) => json(response, { error: 'Unexpected request' }, 500),
-      async (options) => {
-        const result = await Effect.runPromise(
-          Layer.build(openSearchLayer(options)).pipe(Effect.scoped, Effect.result)
-        );
-        expect(result._tag).toBe('Failure');
-        if (result._tag === 'Failure') {
-          expect(result.failure.diagnostic).toEqual({
-            dependency: 'opensearch',
-            operation: 'inspect-index',
-            code: 'IncompatibleWallpaperMapping',
-            index: 'wallpapers',
-            remediation:
-              'Use a fresh OPENSEARCH_INDEX with the current wallpaper mapping. Preserve the old index and review the service upgrade guide before rebuilding catalogue data.',
-          });
-          expect(result.failure.cause).toBeInstanceOf(Error);
-        }
-      },
-      supplied
-    );
-  });
+  ])(
+    'rejects an existing wallpaper mapping with $label at startup',
+    async ({ field, replacement }) => {
+      const mapping = wallpaperMapping();
+      const supplied = {
+        ...mapping,
+        ...(field === '_source'
+          ? { _source: { ...mapping._source, ...replacement } }
+          : {
+              properties: {
+                ...mapping.properties,
+                [field]: { ...mapping.properties[field], ...replacement },
+              },
+            }),
+      };
+      await withSearchEndpoint(
+        (_request, response) => json(response, { error: 'Unexpected request' }, 500),
+        async (options) => {
+          const result = await Effect.runPromise(
+            Layer.build(openSearchLayer(options)).pipe(Effect.scoped, Effect.result)
+          );
+          expect(result._tag).toBe('Failure');
+          if (result._tag === 'Failure') {
+            expect(result.failure.diagnostic).toEqual({
+              dependency: 'opensearch',
+              operation: 'inspect-index',
+              code: 'IncompatibleWallpaperMapping',
+              index: 'wallpapers',
+              remediation:
+                'Use a fresh OPENSEARCH_INDEX with the current wallpaper mapping. Preserve the old index and review the service upgrade guide before rebuilding catalogue data.',
+            });
+            expect(result.failure.cause).toBeInstanceOf(Error);
+          }
+        },
+        supplied
+      );
+    }
+  );
   it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
     let source: Record<string, unknown> = { wallpaperId: 'malformed', userId: 'malformed' };
     await withControlledSearch(
@@ -316,34 +316,34 @@ describe('OpenSearch controlled HTTP contracts', () => {
       }
     );
   });
-  it.each([
-    'mapper_parsing_exception',
-    'strict_dynamic_mapping_exception',
-  ])('translates supplied %s responses into permanent projection rejection', async (type) => {
-    await withControlledSearch(
-      (request, response) =>
-        json(
-          response,
-          request.method === 'GET' ? { found: false } : { error: { type }, status: 400 },
-          request.method === 'GET' ? 404 : 400
-        ),
-      async (adapter) => {
-        expect(
-          await Effect.runPromise(
-            adapter.projectionStore.apply({
-              _tag: 'WallpaperUploaded',
-              wallpaperId: 'rejected',
-              profileId: 'profile',
-              uploadedAt: '2026-01-01T00:00:00.000Z',
-              occurrence: {
-                source: 'wallpaperdb/test',
-                id: 'rejected',
-                occurredAt: '2026-01-01T00:00:00.000Z',
-              },
-            })
-          )
-        ).toEqual({ _tag: 'Rejected' });
-      }
-    );
-  });
+  it.each(['mapper_parsing_exception', 'strict_dynamic_mapping_exception'])(
+    'translates supplied %s responses into permanent projection rejection',
+    async (type) => {
+      await withControlledSearch(
+        (request, response) =>
+          json(
+            response,
+            request.method === 'GET' ? { found: false } : { error: { type }, status: 400 },
+            request.method === 'GET' ? 404 : 400
+          ),
+        async (adapter) => {
+          expect(
+            await Effect.runPromise(
+              adapter.projectionStore.apply({
+                _tag: 'WallpaperUploaded',
+                wallpaperId: 'rejected',
+                profileId: 'profile',
+                uploadedAt: '2026-01-01T00:00:00.000Z',
+                occurrence: {
+                  source: 'wallpaperdb/test',
+                  id: 'rejected',
+                  occurredAt: '2026-01-01T00:00:00.000Z',
+                },
+              })
+            )
+          ).toEqual({ _tag: 'Rejected' });
+        }
+      );
+    }
+  );
 });

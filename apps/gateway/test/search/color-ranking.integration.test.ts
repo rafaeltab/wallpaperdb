@@ -113,43 +113,42 @@ describe('Native wallpaper search port contract', () => {
     }
   });
 
-  it.each([
-    'relaxed',
-    'favorite',
-    'strict',
-  ] as const)('matches every complete frozen %s ordered ranking and score', async (quality) => {
-    for (const entry of references.filter((reference) => reference.quality === quality)) {
-      const query = referenceQuery(entry.body.query);
-      const reference = await client.search({
-        index: fixture.options.wallpaperIndex,
-        body: { ...entry.body, query: { bool: { ...query.bool, filter: filters } } },
-      });
-      expect(reference.body.timed_out).toBe(false);
-      expect(reference.body._shards.failed).toBe(0);
-      const expected = reference.body.hits.hits.map(
-        (hit: { fields: { wallpaperId: string[] }; _score: number }) => ({
-          id: hit.fields.wallpaperId[0],
-          score: hit._score,
-        })
-      );
-      const actual = await Effect.runPromise(
-        resource.adapter.read.search(selection(entry.ranking))
-      );
-      expect(
-        actual.entries.map((hit) => ({ id: hit.wallpaper.wallpaperId, score: hit.cursor[0] })),
-        entry.name
-      ).toEqual(expected);
-      expect(actual.total, entry.name).toBe(expected.length);
-      expect(expected.some((hit: { id: string }) => hit.id === 'zero-score')).toBe(true);
-      expect(
-        expected.some(
-          (hit: { id: string }) =>
-            hit.id.startsWith('outside') ||
-            ['incomplete', 'incompatible', 'missing-contributor'].includes(hit.id)
-        )
-      ).toBe(false);
+  it.each(['relaxed', 'favorite', 'strict'] as const)(
+    'matches every complete frozen %s ordered ranking and score',
+    async (quality) => {
+      for (const entry of references.filter((reference) => reference.quality === quality)) {
+        const query = referenceQuery(entry.body.query);
+        const reference = await client.search({
+          index: fixture.options.wallpaperIndex,
+          body: { ...entry.body, query: { bool: { ...query.bool, filter: filters } } },
+        });
+        expect(reference.body.timed_out).toBe(false);
+        expect(reference.body._shards.failed).toBe(0);
+        const expected = reference.body.hits.hits.map(
+          (hit: { fields: { wallpaperId: string[] }; _score: number }) => ({
+            id: hit.fields.wallpaperId[0],
+            score: hit._score,
+          })
+        );
+        const actual = await Effect.runPromise(
+          resource.adapter.read.search(selection(entry.ranking))
+        );
+        expect(
+          actual.entries.map((hit) => ({ id: hit.wallpaper.wallpaperId, score: hit.cursor[0] })),
+          entry.name
+        ).toEqual(expected);
+        expect(actual.total, entry.name).toBe(expected.length);
+        expect(expected.some((hit: { id: string }) => hit.id === 'zero-score')).toBe(true);
+        expect(
+          expected.some(
+            (hit: { id: string }) =>
+              hit.id.startsWith('outside') ||
+              ['incomplete', 'incompatible', 'missing-contributor'].includes(hit.id)
+          )
+        ).toBe(false);
+      }
     }
-  });
+  );
   it('pages an unchanged global ranking in either direction with stable score ties and near ties', async () => {
     const color = references.find(
       (reference) => reference.name === 'hex-#ff0000-vibe' && reference.quality === 'favorite'
@@ -479,52 +478,55 @@ describe('Native wallpaper search port contract', () => {
       ['interior', 'asc'],
       ['terminal', 'asc'],
       ['empty', 'asc'],
-    ] as const)('rejects an incomplete non-color %s cursor page in %s order', async (omission, sortOrder) => {
-      if (!proxied) throw new Error('Expected an acquired proxy fixture');
-      const uncolored: SearchSelection = {
-        profileId: 'ranking',
-        variantFilters: { width: 1920, height: 1080 },
-        size: 100,
-        sortOrder,
-      };
-      const full = await Effect.runPromise(resource.adapter.read.search(uncolored));
-      const cursor = full.entries.at(-5)?.cursor;
-      if (!cursor) throw new Error('Expected a complete non-color fixture');
-      const requested = { ...uncolored, size: 6, searchAfter: cursor };
-      expect(
-        (await Effect.runPromise(proxied.adapter.read.search(requested))).entries
-      ).toHaveLength(4);
-      try {
-        fault = `non-color-cursor-${omission}`;
+    ] as const)(
+      'rejects an incomplete non-color %s cursor page in %s order',
+      async (omission, sortOrder) => {
+        if (!proxied) throw new Error('Expected an acquired proxy fixture');
+        const uncolored: SearchSelection = {
+          profileId: 'ranking',
+          variantFilters: { width: 1920, height: 1080 },
+          size: 100,
+          sortOrder,
+        };
+        const full = await Effect.runPromise(resource.adapter.read.search(uncolored));
+        const cursor = full.entries.at(-5)?.cursor;
+        if (!cursor) throw new Error('Expected a complete non-color fixture');
+        const requested = { ...uncolored, size: 6, searchAfter: cursor };
         expect(
-          await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
-        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-      } finally {
-        fault = undefined;
-        firstHit = undefined;
+          (await Effect.runPromise(proxied.adapter.read.search(requested))).entries
+        ).toHaveLength(4);
+        try {
+          fault = `non-color-cursor-${omission}`;
+          expect(
+            await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
+          ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+        } finally {
+          fault = undefined;
+          firstHit = undefined;
+        }
       }
-    });
+    );
 
-    it.each([
-      'wrong-profile',
-      'split-variants',
-    ] as const)('rejects a non-color hit with %s despite a matching ID and cursor', async (selectedFault) => {
-      if (!proxied) throw new Error('Expected an acquired proxy fixture');
-      const uncolored: SearchSelection = {
-        profileId: 'ranking',
-        variantFilters: { width: 1920, height: 1080 },
-        size: 100,
-        sortOrder: 'asc',
-      };
-      try {
-        fault = selectedFault;
-        expect(
-          await Effect.runPromise(Effect.flip(proxied.adapter.read.search(uncolored)))
-        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-      } finally {
-        fault = undefined;
-        firstHit = undefined;
+    it.each(['wrong-profile', 'split-variants'] as const)(
+      'rejects a non-color hit with %s despite a matching ID and cursor',
+      async (selectedFault) => {
+        if (!proxied) throw new Error('Expected an acquired proxy fixture');
+        const uncolored: SearchSelection = {
+          profileId: 'ranking',
+          variantFilters: { width: 1920, height: 1080 },
+          size: 100,
+          sortOrder: 'asc',
+        };
+        try {
+          fault = selectedFault;
+          expect(
+            await Effect.runPromise(Effect.flip(proxied.adapter.read.search(uncolored)))
+          ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+        } finally {
+          fault = undefined;
+          firstHit = undefined;
+        }
       }
-    });
+    );
   });
 });

@@ -135,19 +135,19 @@ describe('Catalogue capability', () => {
     { values: ['0.8', 'wallpaper'], color: { targets: [{ color: '#FF0000' }] } },
     { values: [0.8, ''], color: { targets: [{ color: '#FF0000' }] } },
     { values: ['', 'extra'], color: undefined },
-  ])('rejects cursor values incompatible with the wallpaper sort: %j', async ({
-    values,
-    color,
-  }) => {
-    const { read, catalogue, cursors } = await setup();
-    const cursor = await Effect.runPromise(cursors.encode(values));
-    for (const pagination of [{ after: cursor }, { last: 2, before: cursor }]) {
-      expect(await Effect.runPromise(catalogue.search({ ...pagination, color }))).toEqual({
-        _tag: 'InvalidCursor',
-      });
+  ])(
+    'rejects cursor values incompatible with the wallpaper sort: %j',
+    async ({ values, color }) => {
+      const { read, catalogue, cursors } = await setup();
+      const cursor = await Effect.runPromise(cursors.encode(values));
+      for (const pagination of [{ after: cursor }, { last: 2, before: cursor }]) {
+        expect(await Effect.runPromise(catalogue.search({ ...pagination, color }))).toEqual({
+          _tag: 'InvalidCursor',
+        });
+      }
+      expect(read.selections).toEqual([]);
     }
-    expect(read.selections).toEqual([]);
-  });
+  );
   it('preserves score and wallpaper ID when paging by color in either direction', async () => {
     const { read, catalogue, cursors } = await setup();
     const cursor = await Effect.runPromise(cursors.encode([0.8, 'wallpaper']));
@@ -177,19 +177,19 @@ describe('Catalogue capability', () => {
     });
     expect(read.selections).toEqual([]);
   });
-  it.each([
-    'first',
-    'last',
-  ] as const)('accepts a maximum %s page with one lookahead result', async (direction) => {
-    const { read, catalogue, cursors } = await setup();
-    const cursor = await Effect.runPromise(cursors.encode(['boundary']));
-    const query =
-      direction === 'first' ? { first: 100, after: cursor } : { last: 100, before: cursor };
-    expect(await Effect.runPromise(catalogue.search(query))).toMatchObject({ _tag: 'Found' });
-    expect(read.selections).toEqual([
-      { size: 101, sortOrder: direction === 'first' ? 'asc' : 'desc', searchAfter: ['boundary'] },
-    ]);
-  });
+  it.each(['first', 'last'] as const)(
+    'accepts a maximum %s page with one lookahead result',
+    async (direction) => {
+      const { read, catalogue, cursors } = await setup();
+      const cursor = await Effect.runPromise(cursors.encode(['boundary']));
+      const query =
+        direction === 'first' ? { first: 100, after: cursor } : { last: 100, before: cursor };
+      expect(await Effect.runPromise(catalogue.search(query))).toMatchObject({ _tag: 'Found' });
+      expect(read.selections).toEqual([
+        { size: 101, sortOrder: direction === 'first' ? 'asc' : 'desc', searchAfter: ['boundary'] },
+      ]);
+    }
+  );
   it('preserves first precedence when both page sizes are valid', async () => {
     const { read, catalogue } = await setup();
     expect(await Effect.runPromise(catalogue.search({ first: 2, last: 100 }))).toMatchObject({
@@ -232,19 +232,16 @@ describe('Catalogue capability', () => {
     expect(await Effect.runPromise(catalogue.profileByHandle('h'))).toBeNull();
     expect(await Effect.runPromise(catalogue.profiles(['p', 'p']))).toEqual([null, null]);
   });
-  it.each([
-    0,
-    -1,
-    1.5,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-  ])('rejects invalid page size %s without reading', async (first) => {
-    const { read, catalogue } = await setup();
-    expect(await Effect.runPromise(catalogue.search({ first }))).toMatchObject({
-      _tag: 'InvalidSearch',
-    });
-    expect(read.selections).toEqual([]);
-  });
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid page size %s without reading',
+    async (first) => {
+      const { read, catalogue } = await setup();
+      expect(await Effect.runPromise(catalogue.search({ first }))).toMatchObject({
+        _tag: 'InvalidSearch',
+      });
+      expect(read.selections).toEqual([]);
+    }
+  );
   it('normalizes Handles and forwards single and batch Profile reads', async () => {
     const { read, catalogue } = await setup();
     const profile = {
@@ -347,32 +344,29 @@ describe('Profile discovery capability', () => {
     });
     expect(read.profileSelections[1]).toEqual({ query: 'aurora', size: 11, searchAfter: [6, 'b'] });
   });
-  it.each([
-    undefined,
-    1,
-    50,
-  ])('bounds Profile pages with one lookahead result: %s', async (first) => {
-    const { catalogue, read } = await setup();
-    expect(await Effect.runPromise(catalogue.searchProfiles({ query: 'a', first }))).toMatchObject({
-      _tag: 'Found',
-    });
-    expect(read.profileSelections).toEqual([{ query: 'a', size: (first ?? 10) + 1 }]);
-  });
-  it.each([
-    '',
-    '   ',
-    '@',
-    ' @ ',
-    'a'.repeat(101),
-    '😀'.repeat(101),
-  ])('rejects an invalid search before reading: %s', async (query) => {
-    const { catalogue, read } = await setup();
-    expect(await Effect.runPromise(catalogue.searchProfiles({ query }))).toEqual({
-      _tag: 'InvalidSearch',
-      reason: 'Profile search query must contain 1 to 100 characters',
-    });
-    expect(read.profileSelections).toEqual([]);
-  });
+  it.each([undefined, 1, 50])(
+    'bounds Profile pages with one lookahead result: %s',
+    async (first) => {
+      const { catalogue, read } = await setup();
+      expect(
+        await Effect.runPromise(catalogue.searchProfiles({ query: 'a', first }))
+      ).toMatchObject({
+        _tag: 'Found',
+      });
+      expect(read.profileSelections).toEqual([{ query: 'a', size: (first ?? 10) + 1 }]);
+    }
+  );
+  it.each(['', '   ', '@', ' @ ', 'a'.repeat(101), '😀'.repeat(101)])(
+    'rejects an invalid search before reading: %s',
+    async (query) => {
+      const { catalogue, read } = await setup();
+      expect(await Effect.runPromise(catalogue.searchProfiles({ query }))).toEqual({
+        _tag: 'InvalidSearch',
+        reason: 'Profile search query must contain 1 to 100 characters',
+      });
+      expect(read.profileSelections).toEqual([]);
+    }
+  );
   it('counts Unicode code points when accepting a maximum-length query', async () => {
     const { catalogue, read } = await setup();
     const query = '😀'.repeat(100);
@@ -381,23 +375,19 @@ describe('Profile discovery capability', () => {
     });
     expect(read.profileSelections).toEqual([{ query, size: 11 }]);
   });
-  it.each([
-    0,
-    -1,
-    1.5,
-    51,
-    Number.NaN,
-    Number.POSITIVE_INFINITY,
-  ])('rejects an unsupported Profile page size: %s', async (first) => {
-    const { catalogue, read } = await setup();
-    expect(
-      await Effect.runPromise(catalogue.searchProfiles({ query: 'a', first, after: 'tampered' }))
-    ).toEqual({
-      _tag: 'InvalidSearch',
-      reason: 'Profile search first must be between 1 and 50',
-    });
-    expect(read.profileSelections).toEqual([]);
-  });
+  it.each([0, -1, 1.5, 51, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects an unsupported Profile page size: %s',
+    async (first) => {
+      const { catalogue, read } = await setup();
+      expect(
+        await Effect.runPromise(catalogue.searchProfiles({ query: 'a', first, after: 'tampered' }))
+      ).toEqual({
+        _tag: 'InvalidSearch',
+        reason: 'Profile search first must be between 1 and 50',
+      });
+      expect(read.profileSelections).toEqual([]);
+    }
+  );
   it.each([
     ['user_a'],
     ['wallpapers', 'aurora', 6, 'a'],
@@ -416,17 +406,18 @@ describe('Profile discovery capability', () => {
     });
     expect(read.profileSelections).toEqual([]);
   });
-  it.each([
-    '',
-    'tampered',
-    'x'.repeat(2049),
-  ])('rejects malformed or oversized cursor input: %s', async (after) => {
-    const { catalogue, read } = await setup();
-    expect(await Effect.runPromise(catalogue.searchProfiles({ query: 'aurora', after }))).toEqual({
-      _tag: 'InvalidCursor',
-    });
-    expect(read.profileSelections).toEqual([]);
-  });
+  it.each(['', 'tampered', 'x'.repeat(2049)])(
+    'rejects malformed or oversized cursor input: %s',
+    async (after) => {
+      const { catalogue, read } = await setup();
+      expect(await Effect.runPromise(catalogue.searchProfiles({ query: 'aurora', after }))).toEqual(
+        {
+          _tag: 'InvalidCursor',
+        }
+      );
+      expect(read.profileSelections).toEqual([]);
+    }
+  );
   effectIt.effect('rejects an expired Profile search cursor before reading', () =>
     Effect.gen(function* () {
       const { catalogue, read, cursors } = yield* Effect.promise(() => setup());

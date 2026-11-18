@@ -188,79 +188,80 @@ describe('NATS projection adapter contract', () => {
     return JSON.parse(new TextDecoder().decode(message.data));
   }
 
-  it.each([
-    10000, 0,
-  ])('retains monochromatic coverage %i and duplicate occurrence identity through projection', async (coverage) => {
-    class Store implements ProjectionStore {
-      readonly changes: ProjectionChange[] = [];
-      readonly occurrences = new Set<string>();
-      apply(mutation: ProjectionChange): Effect.Effect<ProjectionWrite> {
-        return Effect.sync(() => {
-          this.changes.push(mutation);
-          const identity = JSON.stringify([mutation.occurrence.source, mutation.occurrence.id]);
-          if (this.occurrences.has(identity)) return { _tag: 'Unchanged' };
-          this.occurrences.add(identity);
-          return { _tag: 'Applied' };
-        });
+  it.each([10000, 0])(
+    'retains monochromatic coverage %i and duplicate occurrence identity through projection',
+    async (coverage) => {
+      class Store implements ProjectionStore {
+        readonly changes: ProjectionChange[] = [];
+        readonly occurrences = new Set<string>();
+        apply(mutation: ProjectionChange): Effect.Effect<ProjectionWrite> {
+          return Effect.sync(() => {
+            this.changes.push(mutation);
+            const identity = JSON.stringify([mutation.occurrence.source, mutation.occurrence.id]);
+            if (this.occurrences.has(identity)) return { _tag: 'Unchanged' };
+            this.occurrences.add(identity);
+            return { _tag: 'Applied' };
+          });
+        }
       }
+      const store = new Store();
+      const project = await Effect.runPromise(
+        ProjectCatalogue.pipe(
+          Effect.provide(projectionLayer.pipe(Layer.provide(Layer.succeed(ProjectionStore, store))))
+        )
+      );
+      await consumer(project);
+      const measured = measuredColors('duplicate-measurements', timestamp);
+      const change = {
+        ...measured,
+        descriptor: {
+          ...measured.descriptor,
+          named: {
+            ...measured.descriptor.named,
+            monochromatic: { coverage, quality: 1 },
+          },
+        },
+      };
+      const payload = JSON.stringify({
+        specversion: '1.0',
+        source: change.occurrence.source,
+        id: change.occurrence.id,
+        type: 'wallpaper.colors.extracted',
+        time: timestamp,
+        datacontenttype: 'application/json',
+        data: {
+          schemaVersion: 1,
+          wallpaperId: change.wallpaperId,
+          original: change.original,
+          provenance: change.provenance,
+          measurements: change.descriptor,
+        },
+      });
+      const js = await tester.nats.getJsClient();
+      await js.publish('wallpaper.colors.extracted', payload);
+      await js.publish('wallpaper.colors.extracted', payload);
+      await expect.poll(() => store.changes.length, { timeout: 10000 }).toBe(2);
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      await expect
+        .poll(
+          async () => {
+            const info = await manager.consumers.info(
+              'WALLPAPER',
+              'gateway-wallpaper-colors-extracted'
+            );
+            return [info.num_pending, info.num_ack_pending];
+          },
+          { timeout: 10000 }
+        )
+        .toEqual([0, 0]);
+      expect(store.occurrences.size).toBe(1);
+      expect(store.changes).toEqual(Array(2).fill(change));
+      const retained = await manager.streams.getMessage('WALLPAPER', {
+        last_by_subj: 'wallpaper.colors.extracted',
+      });
+      expect(new TextDecoder().decode(retained.data)).toBe(payload);
     }
-    const store = new Store();
-    const project = await Effect.runPromise(
-      ProjectCatalogue.pipe(
-        Effect.provide(projectionLayer.pipe(Layer.provide(Layer.succeed(ProjectionStore, store))))
-      )
-    );
-    await consumer(project);
-    const measured = measuredColors('duplicate-measurements', timestamp);
-    const change = {
-      ...measured,
-      descriptor: {
-        ...measured.descriptor,
-        named: {
-          ...measured.descriptor.named,
-          monochromatic: { coverage, quality: 1 },
-        },
-      },
-    };
-    const payload = JSON.stringify({
-      specversion: '1.0',
-      source: change.occurrence.source,
-      id: change.occurrence.id,
-      type: 'wallpaper.colors.extracted',
-      time: timestamp,
-      datacontenttype: 'application/json',
-      data: {
-        schemaVersion: 1,
-        wallpaperId: change.wallpaperId,
-        original: change.original,
-        provenance: change.provenance,
-        measurements: change.descriptor,
-      },
-    });
-    const js = await tester.nats.getJsClient();
-    await js.publish('wallpaper.colors.extracted', payload);
-    await js.publish('wallpaper.colors.extracted', payload);
-    await expect.poll(() => store.changes.length, { timeout: 10000 }).toBe(2);
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    await expect
-      .poll(
-        async () => {
-          const info = await manager.consumers.info(
-            'WALLPAPER',
-            'gateway-wallpaper-colors-extracted'
-          );
-          return [info.num_pending, info.num_ack_pending];
-        },
-        { timeout: 10000 }
-      )
-      .toEqual([0, 0]);
-    expect(store.occurrences.size).toBe(1);
-    expect(store.changes).toEqual(Array(2).fill(change));
-    const retained = await manager.streams.getMessage('WALLPAPER', {
-      last_by_subj: 'wallpaper.colors.extracted',
-    });
-    expect(new TextDecoder().decode(retained.data)).toBe(payload);
-  });
+  );
 
   it('continues acknowledging subsequent deliveries when metric recording fails', async () => {
     const project = new ControlledProjection();
@@ -693,76 +694,77 @@ describe('NATS projection adapter contract', () => {
     { bytes: 64 * 1024, certificateVersion: 1, accepted: true },
     { bytes: 64 * 1024 + 1, certificateVersion: undefined, accepted: false },
     { bytes: 64 * 1024 + 1, certificateVersion: 1, accepted: false },
-  ])('audits the complete retained message budget: $bytes bytes, certificate $certificateVersion', async ({
-    bytes,
-    certificateVersion,
-    accepted,
-  }) => {
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
-    const original = Buffer.alloc(8192, 0xff);
-    const messageHeaders = headers();
-    const headerOverhead = Buffer.byteLength('NATS/1.0\r\nX-Audit: \r\n\r\n');
-    messageHeaders.set('X-Audit', 'x'.repeat(bytes - original.byteLength - headerOverhead));
-    const published = await (await tester.nats.getJsClient()).publish(
-      'wallpaper.uploaded',
-      original,
-      { headers: messageHeaders }
-    );
-    const snapshot = await manager.streams.info('WALLPAPER');
-    await manager.streams.update('WALLPAPER', {
-      max_msg_size: 64 * 1024,
-      metadata:
-        certificateVersion === undefined
-          ? {}
-          : {
-              'wallpaperdb.gateway.quarantine-budget': JSON.stringify({
-                version: certificateVersion,
-                created: snapshot.created,
-                maxMessageBytes: 64 * 1024,
-                auditedThrough: snapshot.state.last_seq,
-              }),
-            },
-    });
-    const project = new ControlledProjection();
-    if (accepted) {
-      await consumer(project);
-      expect(await quarantine()).toMatchObject({ data: { original: original.toString('base64') } });
-      await acknowledged();
-      expect(
-        JSON.parse(
-          (await manager.streams.info('WALLPAPER')).config.metadata?.[
-            'wallpaperdb.gateway.quarantine-budget'
-          ] ?? '{}'
-        )
-      ).toMatchObject({ version: 2 });
-    } else {
-      await expect(consumer(project)).rejects.toMatchObject({
-        _tag: 'NatsProjectionStartupError',
-        cause: {
-          _tag: 'MessageBudgetError',
-          message: expect.stringContaining(`retains ${bytes} bytes`),
-          diagnostic: {
-            dependency: 'nats',
-            operation: 'audit-retained-message',
-            code: 'RETAINED_MESSAGE_TOO_LARGE',
-            stream: 'WALLPAPER',
-            sequence: published.seq,
-            payloadBytes: original.byteLength,
-            headerBytes: bytes - original.byteLength,
-            actualBytes: bytes,
-            limitBytes: 64 * 1024,
-            remediation: expect.stringContaining('Export and resolve'),
-          },
-        },
+  ])(
+    'audits the complete retained message budget: $bytes bytes, certificate $certificateVersion',
+    async ({ bytes, certificateVersion, accepted }) => {
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+      const original = Buffer.alloc(8192, 0xff);
+      const messageHeaders = headers();
+      const headerOverhead = Buffer.byteLength('NATS/1.0\r\nX-Audit: \r\n\r\n');
+      messageHeaders.set('X-Audit', 'x'.repeat(bytes - original.byteLength - headerOverhead));
+      const published = await (await tester.nats.getJsClient()).publish(
+        'wallpaper.uploaded',
+        original,
+        { headers: messageHeaders }
+      );
+      const snapshot = await manager.streams.info('WALLPAPER');
+      await manager.streams.update('WALLPAPER', {
+        max_msg_size: 64 * 1024,
+        metadata:
+          certificateVersion === undefined
+            ? {}
+            : {
+                'wallpaperdb.gateway.quarantine-budget': JSON.stringify({
+                  version: certificateVersion,
+                  created: snapshot.created,
+                  maxMessageBytes: 64 * 1024,
+                  auditedThrough: snapshot.state.last_seq,
+                }),
+              },
       });
-      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+      const project = new ControlledProjection();
+      if (accepted) {
+        await consumer(project);
+        expect(await quarantine()).toMatchObject({
+          data: { original: original.toString('base64') },
+        });
+        await acknowledged();
+        expect(
+          JSON.parse(
+            (await manager.streams.info('WALLPAPER')).config.metadata?.[
+              'wallpaperdb.gateway.quarantine-budget'
+            ] ?? '{}'
+          )
+        ).toMatchObject({ version: 2 });
+      } else {
+        await expect(consumer(project)).rejects.toMatchObject({
+          _tag: 'NatsProjectionStartupError',
+          cause: {
+            _tag: 'MessageBudgetError',
+            message: expect.stringContaining(`retains ${bytes} bytes`),
+            diagnostic: {
+              dependency: 'nats',
+              operation: 'audit-retained-message',
+              code: 'RETAINED_MESSAGE_TOO_LARGE',
+              stream: 'WALLPAPER',
+              sequence: published.seq,
+              payloadBytes: original.byteLength,
+              headerBytes: bytes - original.byteLength,
+              actualBytes: bytes,
+              limitBytes: 64 * 1024,
+              remediation: expect.stringContaining('Export and resolve'),
+            },
+          },
+        });
+        expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+      }
+      const retained = await manager.streams.getMessage('WALLPAPER', { seq: published.seq });
+      expect(Buffer.from(retained.data).equals(original)).toBe(true);
+      expect(retained.header.get('X-Audit')).toBe(messageHeaders.get('X-Audit'));
+      expect(project.changes).toEqual([]);
     }
-    const retained = await manager.streams.getMessage('WALLPAPER', { seq: published.seq });
-    expect(Buffer.from(retained.data).equals(original)).toBe(true);
-    expect(retained.header.get('X-Audit')).toBe(messageHeaders.get('X-Audit'));
-    expect(project.changes).toEqual([]);
-  });
+  );
 
   it('counts original header whitespace when auditing historical messages', async () => {
     const connection = await tester.nats.getConnection();
@@ -819,40 +821,40 @@ describe('NATS projection adapter contract', () => {
     expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
   });
 
-  it.each([
-    false,
-    true,
-  ])('preserves oversized historical messages and refuses startup (recreated stream: %s)', async (recreated) => {
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    const first = await consumer(new ControlledProjection());
-    await first.runtime.dispose();
-    const { config } = await manager.streams.info('WALLPAPER');
-    if (recreated) {
-      await manager.streams.delete('WALLPAPER');
-      await manager.streams.add({ ...config, max_msg_size: -1 });
-    } else {
-      await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+  it.each([false, true])(
+    'preserves oversized historical messages and refuses startup (recreated stream: %s)',
+    async (recreated) => {
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      const first = await consumer(new ControlledProjection());
+      await first.runtime.dispose();
+      const { config } = await manager.streams.info('WALLPAPER');
+      if (recreated) {
+        await manager.streams.delete('WALLPAPER');
+        await manager.streams.add({ ...config, max_msg_size: -1 });
+      } else {
+        await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+      }
+      const original = Buffer.alloc(800000, 0xff);
+      const published = await (await tester.nats.getJsClient()).publish(
+        'wallpaper.uploaded',
+        original
+      );
+      await manager.streams.update('WALLPAPER', { max_msg_size: 64 * 1024 });
+      await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
+        _tag: 'NatsProjectionStartupError',
+        cause: {
+          _tag: 'MessageBudgetError',
+          message: expect.stringContaining(`WALLPAPER sequence ${published.seq}`),
+        },
+      });
+      expect(
+        Buffer.from(
+          (await manager.streams.getMessage('WALLPAPER', { seq: published.seq })).data
+        ).equals(original)
+      ).toBe(true);
+      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
     }
-    const original = Buffer.alloc(800000, 0xff);
-    const published = await (await tester.nats.getJsClient()).publish(
-      'wallpaper.uploaded',
-      original
-    );
-    await manager.streams.update('WALLPAPER', { max_msg_size: 64 * 1024 });
-    await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
-      _tag: 'NatsProjectionStartupError',
-      cause: {
-        _tag: 'MessageBudgetError',
-        message: expect.stringContaining(`WALLPAPER sequence ${published.seq}`),
-      },
-    });
-    expect(
-      Buffer.from(
-        (await manager.streams.getMessage('WALLPAPER', { seq: published.seq })).data
-      ).equals(original)
-    ).toBe(true);
-    expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
-  });
+  );
 
   it('rejects a quarantine stream whose message limit cannot retain admitted originals', async () => {
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
@@ -918,43 +920,43 @@ describe('NATS projection adapter contract', () => {
     }
   });
 
-  it.each([
-    '{different invalid json',
-    '{invalid json',
-  ])('preserves and confirms a new quarantine occurrence after recreating its source stream: %s', async (replacement) => {
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    const { config } = await manager.streams.info('WALLPAPER');
-    await manager.streams.delete('WALLPAPER');
-    await manager.streams.add(config);
-    const first = await consumer(new ControlledProjection());
-    await publish('{invalid json');
-    const original = await quarantine();
-    await acknowledged();
-    await first.runtime.dispose();
-
-    await manager.streams.delete('WALLPAPER');
-    await manager.streams.add(config);
-    // Suppress the old one-way ACK if used, and fail the first confirmed ACK to force redelivery.
-    const unconfirmedAck = vi.spyOn(JsMsgImpl.prototype, 'ack').mockImplementation(() => {});
-    const interruptedConfirmation = vi
-      .spyOn(JsMsgImpl.prototype, 'ackAck')
-      .mockRejectedValueOnce(new Error('controlled missing ACK confirmation'));
-    try {
-      await consumer(new ControlledProjection());
-      await manager.consumers.update('WALLPAPER', 'gateway-wallpaper-uploaded', {
-        ack_wait: 2_000_000_000,
-      });
-      await publish(replacement);
-      const recreated = await quarantine(2);
+  it.each(['{different invalid json', '{invalid json'])(
+    'preserves and confirms a new quarantine occurrence after recreating its source stream: %s',
+    async (replacement) => {
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      const { config } = await manager.streams.info('WALLPAPER');
+      await manager.streams.delete('WALLPAPER');
+      await manager.streams.add(config);
+      const first = await consumer(new ControlledProjection());
+      await publish('{invalid json');
+      const original = await quarantine();
       await acknowledged();
-      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(2);
-      expect(recreated.id).not.toBe(original.id);
-      expect(recreated.data.original).toBe(Buffer.from(replacement).toString('base64'));
-    } finally {
-      unconfirmedAck.mockRestore();
-      interruptedConfirmation.mockRestore();
+      await first.runtime.dispose();
+
+      await manager.streams.delete('WALLPAPER');
+      await manager.streams.add(config);
+      // Suppress the old one-way ACK if used, and fail the first confirmed ACK to force redelivery.
+      const unconfirmedAck = vi.spyOn(JsMsgImpl.prototype, 'ack').mockImplementation(() => {});
+      const interruptedConfirmation = vi
+        .spyOn(JsMsgImpl.prototype, 'ackAck')
+        .mockRejectedValueOnce(new Error('controlled missing ACK confirmation'));
+      try {
+        await consumer(new ControlledProjection());
+        await manager.consumers.update('WALLPAPER', 'gateway-wallpaper-uploaded', {
+          ack_wait: 2_000_000_000,
+        });
+        await publish(replacement);
+        const recreated = await quarantine(2);
+        await acknowledged();
+        expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(2);
+        expect(recreated.id).not.toBe(original.id);
+        expect(recreated.data.original).toBe(Buffer.from(replacement).toString('base64'));
+      } finally {
+        unconfirmedAck.mockRestore();
+        interruptedConfirmation.mockRestore();
+      }
     }
-  });
+  );
 
   it('reuses the quarantine occurrence when a recreated consumer replays retained input', async () => {
     const first = await consumer(new ControlledProjection());

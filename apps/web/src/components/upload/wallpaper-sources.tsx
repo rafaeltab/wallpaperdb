@@ -135,7 +135,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
+          disabled={!snapshot.canIntake || managing}
           onChange={(event) => {
             select(event.target.files);
             event.target.value = '';
@@ -172,7 +172,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
             {(row.status === 'failed' || row.status === 'confirming') && (
               <button
                 type="button"
-                disabled={snapshot.busy || managing}
+                disabled={!snapshot.canIntake || managing}
                 className="underline"
                 onClick={() => {
                   batch.retry(row.id);
@@ -274,7 +274,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
+                    disabled={!snapshot.canIntake || managing}
                     onChange={(event) => {
                       select(event.target.files, undefined, source.sourceId);
                       event.target.value = '';
@@ -304,7 +304,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      disabled={snapshot.busy || managing}
+                      disabled={!snapshot.canIntake || managing}
                       onChange={(event) => {
                         select(event.target.files, candidate);
                         event.target.value = '';

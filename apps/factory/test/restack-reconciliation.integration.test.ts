@@ -3,6 +3,39 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { joinFixture } from './fixtures/join.js';
+it('retains configured recovery execution across restart and uses it for fresh independent reviews', async () => {
+  let execution = {
+    model: 'gpt-6.2-sol',
+    effort: 'high',
+    mode: 'fast' as const,
+    permissionLevel: 'auto' as const,
+  };
+  const original = execution;
+  const f = await joinFixture({
+    inProcess: true,
+    conflict: true,
+    restack: { outcome: 'SIMPLE', review: true },
+    readExecution: async () => execution,
+  });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    execution = { ...execution, model: 'gpt-6.1-sol' };
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    const calls = await f.host.calls();
+    const launches = calls.filter((c) => c.args[1] === 't3_thread_launch');
+    expect(launches).toHaveLength(1);
+    expect(JSON.parse(launches[0].args[2])).toMatchObject({
+      modelSelection: { model: original.model },
+      runtimeMode: 'auto',
+    });
+    const review = calls.find((c) => c.args[1] === 'send');
+    expect(review?.args[3]).toContain('Codex model gpt-6.2-sol');
+    expect(review?.args[3]).toContain("serviceTier: 'priority'");
+  } finally {
+    await f.close();
+  }
+});
 
 it('includes the actual shared fenced TypeScript union in initial and review recovery instructions', async () => {
   const f = await joinFixture({

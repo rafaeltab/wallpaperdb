@@ -282,6 +282,48 @@ it.each(['network', '503', '500'] as const)(
   }
 );
 
+it('edits supported factory execution controls and submits them with the captured control version', async () => {
+  const seed = await sample();
+  const board = {
+    ...seed,
+    meta: {
+      ...seed.meta,
+      factory: {
+        ...seed.meta.factory,
+        execution: { model: 'gpt-6.1-sol', effort: null, mode: null, permissionLevel: null },
+        executionCatalog: {
+          models: [
+            { id: 'gpt-6.1-sol', efforts: ['low'], modes: ['standard'] },
+            { id: 'gpt-6.2-sol', efforts: ['high'], modes: ['standard', 'fast'] },
+          ],
+          permissionLevels: ['auto', 'full-access'],
+        },
+      },
+    },
+  };
+  const bodies: string[] = [];
+  const client = new FactoryClient(async (_path, init) => {
+    if (init?.method !== 'POST') return json(board);
+    bodies.push(String(init.body));
+    return json({ commandId: JSON.parse(bodies[0]).commandId, state: 'succeeded', reasons: [] });
+  });
+  const user = userEvent.setup();
+  render(<FactoryApp client={client} />);
+  await screen.findByText('Implement the command centre');
+  await user.click(screen.getByRole('button', { name: 'Factory settings' }));
+  await user.selectOptions(screen.getByLabelText('Model', { exact: true }), 'gpt-6.2-sol');
+  await user.selectOptions(screen.getByLabelText('Reasoning effort', { exact: true }), 'high');
+  await user.selectOptions(screen.getByLabelText('Execution mode', { exact: true }), 'fast');
+  await user.selectOptions(screen.getByLabelText('Permission level', { exact: true }), 'auto');
+  await user.click(screen.getByRole('button', { name: 'Apply controls' }));
+  await screen.findByText('Command succeeded');
+  expect(JSON.parse(bodies[0])).toMatchObject({
+    kind: 'configure',
+    payload: {
+      execution: { model: 'gpt-6.2-sol', effort: 'high', mode: 'fast', permissionLevel: 'auto' },
+    },
+  });
+});
 it('allows a fresh command after a definitive stale-action rejection', async () => {
   const board = await sample(),
     bodies: string[] = [];

@@ -44,4 +44,5 @@ export type { AgentResponse } from './contract.js';
 
 export { AgentReconciliationPolicy, defaultAgentReconciliationLimit } from './contract.js';
 export { ExecutionConfiguration, legacyExecutionSettings } from './contract.js';
-export type { ExecutionSettings, ExecutionCatalog } from './contract.js';
+export type { ExecutionSettings, ExecutionCatalog, ObservedExecution } from './contract.js';
+export { supportsExecutionSettings } from './settings.js';

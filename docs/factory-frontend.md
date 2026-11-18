@@ -26,6 +26,10 @@ The [Start panel](../apps/factory/frontend/src/canvas/panels.tsx) keeps the exec
 
 ## Select a backend
 
+The Project canvas Settings panel edits the factory-wide model, reasoning effort, Standard/Fast mode and permission level alongside scheduling controls. Choices come from the live T3/Codex installation. Inherited/default selections remain explicit; unsupported saved values remain visible and need correction before saving them. If choices are unavailable, execution selectors are disabled while scheduling controls remain usable. The editor retains its captured values and version during refreshes and blocks stale saves. See the [controls](../apps/factory/frontend/src/canvas/execution-controls.tsx) and [configuration command](../apps/factory/src/http/v2/protocol.ts).
+
+Job and plan details show captured execution settings separately from observed T3 selections. Unknown values are not inferred from current factory settings. Changes apply to new executions; existing jobs and their retries retain their settings as described in [factory operations](../apps/factory/OPERATIONS.md#execution-settings).
+
 Set `FACTORY_BACKEND_URL` to the backend's private HTTP origin. No machine identity or credentials belong in frontend source. The [Vite configuration](../apps/factory/frontend/vite.config.ts) proxies `/api` to that origin. It translates requests from its own development page to the backend origin; other Origins remain unchanged. Production uses the backend's origin checks without a development proxy.
 
 For the existing v1 backend, use `?view=operations` and select its actual port, normally 9400. The canvas needs a v2 producer; it does not infer missing v2 data from v1 observations. Never start a development factory against copied production jobs, since observation can advance existing work. Backend setup and activation remain documented in [factory operations](../apps/factory/OPERATIONS.md).

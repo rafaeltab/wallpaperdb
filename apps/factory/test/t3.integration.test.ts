@@ -1,8 +1,115 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import { t3Execution } from '../src/adapters/t3/index.js';
+import { t3Execution, t3ExecutionConfiguration } from '../src/adapters/t3/index.js';
 import type { Intent } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
+it.each(['standard', 'fast'] as const)(
+  'launches configured %s execution controls through structured T3 requests',
+  async (mode) => {
+    const host = await protocol();
+    const previous = process.env.FACTORY_FIXTURE;
+    process.env.FACTORY_FIXTURE = host.configFile;
+    try {
+      await host.save({ lost: false });
+      const adapter = t3Execution({
+        ...host.mcp,
+        binary: host.binary,
+        project: host.repository,
+        projectId: 'project-id',
+      });
+      const intent: Intent = {
+        id: 'configured',
+        issue: 744,
+        issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/744',
+        base: host.base,
+        context: '',
+        branch: 'factory/configured',
+        createdAt: 100,
+        expectedStage: 'implementation',
+        execution: { model: 'gpt-6.2-sol', effort: 'high', mode, permissionLevel: 'auto' },
+      };
+      expect(await Effect.runPromise(adapter.launch(intent))).toEqual({
+        kind: 'submitted',
+        threadId: 'thread-live',
+      });
+      const request = (await host.calls()).find((call) => call.args[1] === 't3_thread_launch');
+      expect(request).toBeDefined();
+      expect(JSON.parse(request!.args[2])).toMatchObject({
+        modelSelection: {
+          instanceId: 'codex',
+          model: 'gpt-6.2-sol',
+          options: [
+            { id: 'reasoningEffort', value: 'high' },
+            { id: 'serviceTier', value: mode === 'fast' ? 'priority' : 'default' },
+          ],
+        },
+        runtimeMode: 'auto',
+        workspaceStrategy: {
+          type: 'worktree',
+          baseRef: host.base,
+          branch: 'factory/configured',
+          startFromOrigin: false,
+        },
+      });
+      expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
+        kind: 'found',
+        model: 'gpt-6.2-sol',
+        observedExecution: {
+          model: 'gpt-6.2-sol',
+          effort: 'high',
+          serviceTier: mode === 'fast' ? 'priority' : 'default',
+          permissionLevel: 'auto',
+        },
+      });
+    } finally {
+      if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous;
+      await host.cleanup();
+    }
+  }
+);
+it('derives effort, speed and permission choices from the configured installation and its permission ceiling', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({
+      executionCatalog: {
+        runtimeMode: 'auto',
+        providers: [
+          {
+            providerInstanceId: 'codex',
+            constraints: [],
+            runtimeModes: ['approval-required', 'auto', 'full-access'],
+            models: [
+              {
+                id: 'custom-model',
+                options: [
+                  { id: 'reasoningEffort', values: ['medium'] },
+                  { id: 'serviceTier', values: ['default'] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const adapter = t3ExecutionConfiguration({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    expect(await Effect.runPromise(adapter.catalog())).toEqual({
+      models: [{ id: 'custom-model', efforts: ['medium'], modes: ['standard'] }],
+      permissionLevels: ['approval-required', 'auto'],
+    });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it('returns the confirmed owning thread from a successful launch', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

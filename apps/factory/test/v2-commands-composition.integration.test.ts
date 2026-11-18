@@ -155,6 +155,56 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
   });
 }
 
+it('saves execution controls through HTTP, reloads them after restart and launches the selected worker', () =>
+  composed(
+    async ({ running, host, reopen }) => {
+      const execution = {
+        model: 'gpt-6.2-sol',
+        effort: 'high',
+        mode: 'fast',
+        permissionLevel: 'auto',
+      };
+      const command = {
+        ...(await action(running, 'configure')),
+        commandId: '00000000-0000-4000-8000-000000000074',
+        kind: 'configure',
+        payload: {
+          paused: false,
+          concurrency: { kind: 'limited', maximum: 1 },
+          admissionAllowance: { kind: 'limited', maximum: 1 },
+          execution,
+        },
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: command }))
+          .statusCode
+      ).toBe(202);
+      await receipt(running, command.commandId);
+      const restarted = await reopen();
+      const board = (await restarted.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+      expect(board.meta.factory).toMatchObject({
+        execution,
+        executionCatalog: {
+          models: expect.arrayContaining([expect.objectContaining({ id: 'gpt-6.2-sol' })]),
+        },
+      });
+      await start(restarted);
+      expect(
+        (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).admissions[0]
+      ).toMatchObject({ execution });
+      const worker = (await host.calls())
+        .filter((c) => c.args[1] === 't3_thread_launch')
+        .map((c) => JSON.parse(c.args[2]))
+        .find((r) => r.workspaceStrategy);
+      expect(worker).toMatchObject({
+        modelSelection: { model: execution.model },
+        runtimeMode: 'auto',
+      });
+    },
+    {},
+    { paused: true }
+  ));
+
 it.each(['missing receipt', 'dirty checkout', 'mismatched receipt commit'])(
   'requires attention and releases capacity when implementation ends without success: %s',
   (cause) =>

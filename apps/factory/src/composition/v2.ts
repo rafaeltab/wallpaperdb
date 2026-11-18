@@ -159,6 +159,7 @@ function commandAdapter(config: {
           const result = yield* config.scheduler.configure({
             revision: input.state.controlsRevision ?? input.state.revision,
             paused: command.payload.paused,
+            execution: command.payload.execution,
             concurrency:
               command.payload.concurrency.kind === 'unlimited'
                 ? -1
@@ -172,9 +173,11 @@ function commandAdapter(config: {
             ? { state: 'succeeded' as const, result: null, reasons: [] }
             : rejected(
                 result,
-                result === 'acknowledgement-required'
-                  ? 'Acknowledge the planning failures before resuming the factory.'
-                  : 'Controls changed or limits were rejected. Refresh the board.'
+                result === 'unsupported-execution'
+                  ? 'Execution settings are unsupported or unavailable. Refresh Factory settings and choose a supported model, effort, mode and permission level.'
+                  : result === 'acknowledgement-required'
+                    ? 'Acknowledge the planning failures before resuming the factory.'
+                    : 'Controls changed or limits were rejected. Refresh the board.'
               );
         }
         if (command.kind === 'preview-plan') {

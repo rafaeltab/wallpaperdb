@@ -1,3 +1,4 @@
+import { ExecutionConfiguration } from '../capabilities/job/index.js';
 import {
   Reporting,
   ReportingStore,
@@ -68,7 +69,12 @@ import {
   githubRequests,
   type VerifiedPrerequisite,
 } from '../adapters/github/index.js';
-import { t3Metadata, t3Execution, t3Planner } from '../adapters/t3/index.js';
+import {
+  t3Metadata,
+  t3Execution,
+  t3Planner,
+  t3ExecutionConfiguration,
+} from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
@@ -196,6 +202,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       readyPrerequisites: prerequisites,
       admitRecovery: (issue) => recoveryAdmission(issue),
       joins: {
+        readExecution: async () => (await runtime.runPromise(scheduleStore.read())).execution,
         reconciliationLimit: configuration.FACTORY_AGENT_RECONCILIATION_LIMIT,
         directory: resolve(configuration.FACTORY_STATE, 'joins'),
         binary: configuration.FACTORY_T3_BINARY,
@@ -293,7 +300,21 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         }),
     };
 
+    const executionConfiguration = t3ExecutionConfiguration({
+      project,
+      binary: configuration.FACTORY_T3_BINARY,
+      projectId: configuration.FACTORY_T3_PROJECT_ID,
+      mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+      mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+    });
+    const catalog = await Effect.runPromise(
+      Effect.cachedWithTTL(
+        executionConfiguration.catalog().pipe(Effect.catch(() => Effect.succeed(undefined))),
+        '30 seconds'
+      )
+    );
     const schedulerDeps = Layer.mergeAll(
+      Layer.succeed(ExecutionConfiguration, executionConfiguration),
       deps,
       PlanningSafetyLive.pipe(
         Layer.provide(
@@ -312,6 +333,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     );
     let planningDemand = () => {};
     const planner = t3Planner({
+      readExecution: async () => (await runtime.runPromise(scheduleStore.read())).execution,
       automaticPolicy: {
         mayLaunch: () =>
           runtime.runPromise(Effect.flatMap(PlanningSafety, (safety) => safety.mayLaunch())),
@@ -516,11 +538,13 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       planningSafety,
       read: () =>
         Effect.all({
+          executionCatalog: catalog,
           schedule: observations.schedule(),
           threads: threads.snapshot(),
           safety: planningSafety.status(),
         }).pipe(
-          Effect.map(({ schedule, threads, safety }) => ({
+          Effect.map(({ schedule, threads, safety, executionCatalog }) => ({
+            executionCatalog,
             ...schedule,
             state: safety.schedule,
             planningSafety: safety.planning,

@@ -228,7 +228,10 @@ export interface Scheduler {
     concurrency: number;
     allowance: number;
     paused: boolean;
-  }): Effect.Effect<'saved' | 'conflict' | 'rejected' | 'acknowledgement-required', Unavailable>;
+  }): Effect.Effect<
+    'saved' | 'conflict' | 'rejected' | 'acknowledgement-required' | 'unsupported-execution',
+    Unavailable
+  >;
   tick(base: string): Effect.Effect<ScheduleStatus, Unavailable>;
   start(
     command: import('../job/index.js').Start
@@ -241,6 +244,7 @@ export interface Scheduler {
 export const Scheduler = Context.Service<Scheduler>('wallpaperdb.factory.Scheduler');
 
 export interface PlannerOwnership {
+  readonly observedExecution?: import('../job/index.js').ObservedExecution;
   readonly execution?: import('../job/index.js').ExecutionSettings;
   requestId: string;
   revision: number;

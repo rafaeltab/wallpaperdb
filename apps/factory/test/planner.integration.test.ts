@@ -5,6 +5,51 @@ import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
 import type { PlanningInput } from '../src/capabilities/plan/index.js';
 import type { Status } from '../src/capabilities/job/index.js';
+it('captures planner execution settings and reconciles them after the factory configuration changes', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const execution = {
+    model: 'gpt-6.2-sol',
+    effort: 'high',
+    mode: 'fast' as const,
+    permissionLevel: 'auto' as const,
+  };
+  const config = {
+    binary: host.binary,
+    project: host.repository,
+    projectId: 'project-id',
+    ...host.mcp,
+    stateDirectory: `${host.directory}/planner-state`,
+  };
+  const input = {
+    issues: [],
+    job: { kind: 'empty' as const },
+    capacity: { concurrency: 1, admission: 1 },
+  };
+  try {
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    const adapter = t3Planner({ ...config, readExecution: async () => execution });
+    expect(
+      await Effect.runPromise(adapter.propose(input, { requestId: 'configured-preview' }))
+    ).toEqual({ selected: [], deferred: [] });
+    const reopened = t3Planner({
+      ...config,
+      readExecution: async () => ({ ...execution, model: 'gpt-6.1-sol' }),
+    });
+    expect(await Effect.runPromise(reopened.ownership(false))).toMatchObject({ execution });
+    expect(
+      await Effect.runPromise(reopened.propose(input, { requestId: 'configured-preview' }))
+    ).toEqual({ selected: [], deferred: [] });
+    expect((await host.calls()).filter((call) => call.args[1] === 't3_thread_launch')).toHaveLength(
+      1
+    );
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it('translates a bound assistant proposal and rejects malformed or user messages', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

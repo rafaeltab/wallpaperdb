@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { executionSettingsSchema } from './execution-schema.js';
+import { executionSettingsSchema, observedExecutionSchema } from './execution-schema.js';
 export const intentSchema = z
   .object({
     execution: executionSettingsSchema.optional(),
@@ -262,6 +262,7 @@ const scheduleSchema = z
 export { stageSchema, waitSchema, controlSchema, scheduleSchema };
 export const plannerSchema = z
   .object({
+    observedExecution: observedExecutionSchema.optional(),
     execution: executionSettingsSchema.optional(),
     revision: z.number().int().nonnegative(),
     requestId: z.string().min(1),

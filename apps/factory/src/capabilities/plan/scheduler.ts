@@ -1,5 +1,13 @@
 import { Effect, Layer, Option, Semaphore, Random } from 'effect';
-import { Issues, Time, Unavailable, type Start, type Status } from '../job/index.js';
+import {
+  Issues,
+  Time,
+  Unavailable,
+  ExecutionConfiguration,
+  supportsExecutionSettings,
+  type Start,
+  type Status,
+} from '../job/index.js';
 import {
   Plan,
   IPlanner,
@@ -61,6 +69,9 @@ export const SchedulerLive = Layer.effect(
     const source = yield* PlanningSource;
     const time = yield* Time;
     const planningSafety = yield* PlanningSafety;
+    const executionConfiguration = Option.getOrUndefined(
+      yield* Effect.serviceOption(ExecutionConfiguration)
+    );
     const writers = yield* Semaphore.make(1);
     const recoveryObservations = yield* Semaphore.make(1);
     let lastInput: string | undefined;
@@ -578,7 +589,20 @@ export const SchedulerLive = Layer.effect(
           const state = yield* store.read();
           if (command.revision !== state.revision && command.revision !== state.controlsRevision)
             return 'conflict' as const;
-          return yield* planningSafety.configure({ ...command, revision: state.revision });
+          if (
+            command.execution &&
+            (!executionConfiguration ||
+              !supportsExecutionSettings(
+                yield* executionConfiguration.catalog(),
+                command.execution
+              ))
+          )
+            return 'unsupported-execution' as const;
+          return yield* planningSafety.configure({
+            ...command,
+            execution: command.execution ?? state.execution,
+            revision: state.revision,
+          });
         }).pipe(Effect.withSpan('factory.scheduler.configure')),
       start: (command) =>
         Effect.gen(function* () {

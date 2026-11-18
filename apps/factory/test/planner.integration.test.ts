@@ -884,6 +884,8 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
       stateDirectory: `${host.directory}/planner-state`,
     };
     await Effect.runPromise(t3Planner(config).propose(input));
+    const launch = (await host.calls()).find((call) => call.args[1] === 'start');
+    expect(launch?.args[3]).toBe('-');
     const { prompt, requestId } = JSON.parse(
       await readFile(`${host.directory}/planner.json`, 'utf8')
     );

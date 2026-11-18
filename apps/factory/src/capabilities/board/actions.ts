@@ -119,9 +119,6 @@ export function actions(
         item.subject.kind === 'pull-request'
           ? snapshot.entities.pullRequests[item.subject.pullRequestId]
           : undefined;
-      const questions = input.localWork
-        .filter((w) => w.intent && item.jobIds.includes(jobId(w.intent.issue)))
-        .map((w) => w.control.parked?.question);
       return [
         item.id,
         {
@@ -130,7 +127,7 @@ export function actions(
           version: version({
             base: item.version,
             pr: pr?.version,
-            questions,
+            questions: details[item.id]?.questions,
             actionIds,
             checkRuns: details[item.id]?.checkRuns,
           }),

@@ -2621,6 +2621,38 @@ it.each(['delivery', 'retained-current-stage'] as const)(
   }
 );
 
+it('changes the Project item version when a continuation asks a new question', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42, { linkedIssues: [1] }), true);
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || !source.delivery) throw new Error('Missing job');
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const itemId = 'item:pr:rafaeltab/wallpaperdb/42';
+  const before = board.snapshot().entities.items[itemId];
+  expect(board.details(itemId)).toMatchObject({ questions: [{ id: 'q1' }] });
+  await board.publish({
+    ...input,
+    jobs: [
+      {
+        ...source,
+        stageIndex: 1,
+        resume: undefined,
+        delivery: {
+          ...source.delivery,
+          question: { id: 'q2', text: 'Choose the next behavior' },
+        },
+      },
+    ],
+  });
+  const after = board.snapshot().entities.items[itemId];
+  expect(after.status.code).toBe('awaiting-answer');
+  expect(after.version).not.toBe(before.version);
+  expect(board.details(itemId)).toMatchObject({
+    itemVersion: after.version,
+    questions: [{ id: 'q2', text: 'Choose the next behavior' }],
+  });
+});
+
 it('keeps a parked owning job visible when its bound PR is closed', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const input = parkedSnapshot(pullObservation(42, { state: 'CLOSED', linkedIssues: [1] }), true);

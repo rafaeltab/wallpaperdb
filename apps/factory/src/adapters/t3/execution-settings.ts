@@ -94,7 +94,7 @@ export async function launchExecution(
           'thread',
           'start',
           config.projectId,
-          request.message,
+          request.base ? request.message : '-',
           '--title',
           request.title,
           '--provider',
@@ -105,7 +105,9 @@ export async function launchExecution(
           '--json',
         ],
         config.project,
-        signal
+        signal,
+        undefined,
+        request.base ? undefined : request.message
       )
     );
   }

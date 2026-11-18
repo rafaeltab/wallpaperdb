@@ -8,13 +8,22 @@ export interface ObservationCheckpoint {
   readonly revision: number;
   readonly sequence: number;
   readonly value: string;
+  readonly entities?: readonly { readonly id: string; readonly value: string }[];
+}
+export interface ObservationCheckpointUpdate {
+  readonly sequence: number;
+  readonly value: string;
+  /** Apply entity changes and cursor in the same transaction. null removes an entity. */
+  readonly entities?: readonly { readonly id: string; readonly value: string | null }[];
+  /** Authoritative snapshots replace the prior entity set atomically. */
+  readonly replaceEntities?: boolean;
 }
 export interface ObservationCheckpoints {
   read: (stream: string) => Effect.Effect<ObservationCheckpoint | null, Unavailable>;
   publish: (
     stream: string,
     expectedRevision: number,
-    checkpoint: Omit<ObservationCheckpoint, 'revision'>
+    checkpoint: ObservationCheckpointUpdate
   ) => Effect.Effect<boolean, Unavailable>;
 }
 export interface ObservedUser {

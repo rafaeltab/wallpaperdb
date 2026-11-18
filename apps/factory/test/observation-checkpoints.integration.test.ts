@@ -1,10 +1,57 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { sqliteObservationCheckpoints } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
+
+it('rolls back the cursor and all entity changes when publication is interrupted', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-checkpoint-interruption-'));
+  try {
+    initializeState(directory);
+    const store = sqliteObservationCheckpoints(directory);
+    await Effect.runPromise(
+      store.publish('owner', 0, {
+        sequence: 10,
+        value: 'before',
+        entities: [{ id: 'activity', value: 'pending' }],
+      })
+    );
+    const database = new Database(join(directory, 'factory.sqlite'));
+    try {
+      database.exec(
+        "CREATE TRIGGER interrupt_observation BEFORE INSERT ON observation_entities WHEN NEW.id = 'interrupt' BEGIN SELECT RAISE(ABORT, 'controlled interrupted publication'); END"
+      );
+      await expect(
+        Effect.runPromise(
+          store.publish('owner', 1, {
+            sequence: 20,
+            value: 'after',
+            replaceEntities: true,
+            entities: [
+              { id: 'activity', value: 'complete' },
+              { id: 'interrupt', value: 'fail' },
+            ],
+          })
+        )
+      ).rejects.toBeDefined();
+      expect(
+        await Effect.runPromise(sqliteObservationCheckpoints(directory).read('owner'))
+      ).toEqual({
+        revision: 1,
+        sequence: 10,
+        value: 'before',
+        entities: [{ id: 'activity', value: 'pending' }],
+      });
+    } finally {
+      database.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 it('reopens applied observations with their cursor and rejects obsolete publishers', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-checkpoints-'));

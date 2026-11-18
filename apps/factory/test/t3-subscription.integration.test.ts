@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { z } from 'zod';
-import { t3Subscription } from '../src/adapters/t3/index.js';
+import { t3Subscription, t3ReadRpc } from '../src/adapters/t3/index.js';
 import { websocketProtocol } from './fixtures/websocket.js';
 
 it('authenticates with a separate bearer credential, applies a chunk before acknowledging it and resumes by cursor', async () => {
@@ -69,6 +69,35 @@ it('authenticates with a separate bearer credential, applies a chunk before ackn
     await running;
   } finally {
     abort.abort();
+    await host.close();
+  }
+});
+
+it('reads lightweight archived metadata through the installed single-response RPC', async () => {
+  const host = await websocketProtocol((raw, send) => {
+    const request = z
+      .object({ _tag: z.string(), id: z.string().optional(), tag: z.string().optional() })
+      .parse(raw);
+    if (request._tag === 'Request') {
+      expect(request.tag).toBe('orchestration.getArchivedShellSnapshot');
+      send({
+        _tag: 'Exit',
+        requestId: request.id,
+        exit: { _tag: 'Success', value: { snapshotSequence: 10, threads: [] } },
+      });
+    }
+  });
+  try {
+    expect(
+      await t3ReadRpc({
+        origin: host.origin,
+        token: 'controlled-observer',
+        signal: new AbortController().signal,
+        method: 'orchestration.getArchivedShellSnapshot',
+        payload: {},
+      })
+    ).toEqual({ snapshotSequence: 10, threads: [] });
+  } finally {
     await host.close();
   }
 });

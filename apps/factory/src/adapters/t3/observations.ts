@@ -2,7 +2,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import type { ObservationCheckpoints } from '../../capabilities/observe/index.js';
-import { t3Subscription } from './subscription.js';
+import { t3Subscription, t3ReadRpc } from './subscription.js';
+import { decodeObservation, observationEncoding } from './observation-checkpoint.js';
 import {
   applyObservedEvent,
   observedActivity,
@@ -51,22 +52,37 @@ export async function t3Observations(config: {
   if (saved) {
     metadataRevision = saved.revision;
     metadataSequence = saved.sequence;
-    for (const item of z.array(shell).parse(JSON.parse(saved.value))) {
+    for (const item of z.array(shell).parse(decodeObservation(saved))) {
       metadata.set(item.id, item);
       metadataVersions.set(item.id, saved.sequence);
     }
   }
-  const checkpoint = async (key: string, revision: number, sequence: number, value: unknown) => {
+  const encodings = new Map<string, ReturnType<typeof observationEncoding>>();
+  const checkpoint = async (
+    key: string,
+    revision: number,
+    sequence: number,
+    value: Projection | Shell[]
+  ) => {
+    let encode = encodings.get(key);
+    if (!encode) {
+      encode = observationEncoding();
+      encodings.set(key, encode);
+    }
+    const encoded = encode(value);
     if (
       !(await Effect.runPromise(
         config.checkpoints.publish(`${namespace}${key}`, revision, {
           sequence,
-          value: JSON.stringify(value),
+          value: encoded.value,
+          entities: encoded.entities,
+          replaceEntities: encoded.replaceEntities,
         })
       ))
     ) {
       throw new Error('Obsolete T3 observation publication');
     }
+    encoded.committed();
   };
   const loop = async (signal: AbortSignal, work: (credential: Credential) => Promise<void>) => {
     let replace = false;
@@ -115,7 +131,7 @@ export async function t3Observations(config: {
         details.set(id, {
           sequence: previous.sequence,
           revision: previous.revision,
-          value: projection.parse(JSON.parse(previous.value)),
+          value: projection.parse(decodeObservation(previous)),
           ready: false,
         });
       let forceSnapshot = false;
@@ -286,9 +302,30 @@ export async function t3Observations(config: {
               sequence = incoming;
               changed = true;
             } else if (item.kind === 'thread.removed') {
-              // A location change cannot erase managed lineage or prove termination.
+              // The installed shell reports archived changes as active removals.
+              // Refine that identity through metadata, never an unrelated transcript.
               const incoming = z.number().int().nonnegative().parse(item.sequence);
               if (incoming > sequence) {
+                const family = z
+                  .object({
+                    snapshotSequence: z.number().int().nonnegative(),
+                    threads: z.array(shell),
+                  })
+                  .parse(
+                    await t3ReadRpc({
+                      origin: config.origin,
+                      token: credential.token,
+                      signal: lifetime(credential, stop.signal),
+                      method: 'orchestration.getThreadFamily',
+                      payload: { threadId: z.string().parse(item.threadId) },
+                    })
+                  );
+                staged ??= new Map(metadata);
+                for (const row of family.threads)
+                  if (family.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
+                    staged.set(row.id, row);
+                    metadataVersions.set(row.id, family.snapshotSequence);
+                  }
                 sequence = incoming;
                 changed = true;
               }
@@ -317,8 +354,8 @@ export async function t3Observations(config: {
       metadataReady = false;
     }
   }).catch(config.report);
-  // The active shell excludes archived rows on bootstrap. One shared archived
-  // metadata stream supplies them without fetching any conversation.
+  // The installed runtime exposes archived bootstrap metadata as a single-response
+  // RPC. Incremental archived changes arrive on the shared shell as removals.
   const archived = (async () => {
     const previous = await Effect.runPromise(config.checkpoints.read(`${namespace}archive`));
     let revision = previous?.revision ?? 0;
@@ -333,53 +370,32 @@ export async function t3Observations(config: {
       select();
     };
     if (previous) {
-      for (const row of z.array(shell).parse(JSON.parse(previous.value))) rows.set(row.id, row);
+      for (const row of z.array(shell).parse(decodeObservation(previous))) rows.set(row.id, row);
       merge();
     }
     await loop(stop.signal, async (credential) => {
-      archiveReady = false;
-      try {
-        await t3Subscription({
-          origin: config.origin,
-          token: credential.token,
-          signal: lifetime(credential, stop.signal),
-          requests: [
-            { id: 'archive', method: 'orchestration.subscribeArchivedShell', payload: {} },
-          ],
-          apply: async (_id, values) => {
-            for (const raw of values) {
-              const item = z.object({ kind: z.string() }).passthrough().parse(raw);
-              if (item.kind === 'snapshot') {
-                const snapshot = z
-                  .object({
-                    snapshotSequence: z.number().int().nonnegative(),
-                    threads: z.array(shell),
-                  })
-                  .parse(item.snapshot);
-                if (snapshot.snapshotSequence < sequence)
-                  throw new ObservationUnknown('Obsolete T3 archive snapshot');
-                rows.clear();
-                for (const row of snapshot.threads) rows.set(row.id, row);
-                sequence = snapshot.snapshotSequence;
-              } else if (item.kind === 'thread.updated') {
-                const incoming = z.number().int().nonnegative().parse(item.sequence);
-                if (incoming <= sequence) continue;
-                const row = shell.parse(item.thread);
-                rows.set(row.id, row);
-                sequence = incoming;
-              } else if (item.kind === 'thread.removed') {
-                continue;
-              } else throw new ObservationUnknown('Unsupported T3 archived metadata');
-              await checkpoint('archive', revision, sequence, [...rows.values()]);
-              revision++;
-              merge();
-              archiveReady = true;
-            }
-          },
-        });
-      } finally {
-        archiveReady = false;
-      }
+      const nextAt = Date.now() + 900000;
+      const snapshot = z
+        .object({ snapshotSequence: z.number().int().nonnegative(), threads: z.array(shell) })
+        .parse(
+          await t3ReadRpc({
+            origin: config.origin,
+            token: credential.token,
+            signal: lifetime(credential, stop.signal),
+            method: 'orchestration.getArchivedShellSnapshot',
+            payload: {},
+          })
+        );
+      if (snapshot.snapshotSequence < sequence)
+        throw new ObservationUnknown('Obsolete T3 archive snapshot');
+      rows.clear();
+      for (const row of snapshot.threads) rows.set(row.id, row);
+      sequence = snapshot.snapshotSequence;
+      await checkpoint('archive', revision, sequence, [...rows.values()]);
+      revision++;
+      merge();
+      archiveReady = true;
+      await delay(Math.max(0, nextAt - Date.now() - 1000), undefined, { signal: stop.signal });
     });
   })().catch(config.report);
   const state = (id: string) => {

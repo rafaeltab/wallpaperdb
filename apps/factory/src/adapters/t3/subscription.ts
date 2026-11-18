@@ -5,6 +5,7 @@ interface Subscription {
   id: string;
   method: string;
   payload: object;
+  once?: boolean;
 }
 const chunk = z.object({
   _tag: z.literal('Chunk'),
@@ -84,12 +85,23 @@ export async function t3Subscription(config: {
             if (!finished && socket.readyState === WebSocket.OPEN)
               socket.send(JSON.stringify({ _tag: 'Ack', requestId: value.requestId }));
           } else if (message._tag === 'Exit' || message._tag === 'Defect') {
-            throw new Error('T3 observation subscription ended');
+            const request = config.requests.find((request) => request.id === message.requestId);
+            const success = z
+              .object({ _tag: z.literal('Success'), value: z.unknown() })
+              .safeParse(message.exit);
+            if (request?.once && success.success) {
+              await config.apply(request.id, [success.data.value]);
+              finish();
+              continue;
+            }
+            throw new Error('T3 observation subscription ended', {
+              cause: message.exit ?? message,
+            });
           }
         }
       });
-      void pending.catch(() =>
-        finish(new Error('T3 observer could not apply subscription update'))
+      void pending.catch((cause) =>
+        finish(new Error('T3 observer could not apply subscription update', { cause }))
       );
     });
     socket.addEventListener('error', () => finish(new Error('T3 observer WebSocket failed')));
@@ -101,4 +113,25 @@ export async function t3Subscription(config: {
       finish(config.signal.aborted ? undefined : new Error('T3 observer WebSocket disconnected'))
     );
   });
+}
+
+export async function t3ReadRpc(config: {
+  origin: string;
+  token: string;
+  signal: AbortSignal;
+  method: string;
+  payload: object;
+}): Promise<unknown> {
+  const signal = AbortSignal.any([config.signal, AbortSignal.timeout(30000)]);
+  let result: unknown;
+  await t3Subscription({
+    ...config,
+    signal,
+    requests: [{ id: 'read', method: config.method, payload: config.payload, once: true }],
+    apply: async (_id, values) => {
+      result = values[0];
+    },
+  });
+  signal.throwIfAborted();
+  return result;
 }

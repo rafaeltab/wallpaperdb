@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Effect, ManagedRuntime } from 'effect';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { postgresUploadsLayer } from '../src/adapters/postgres/index.js';
 import { IngestionStore, type UploadRecord } from '../src/capabilities/ingestion/index.js';
 import { ControlledStore, metadata } from './helpers/ingestion.js';
@@ -39,11 +39,12 @@ describe('PostgreSQL ingestion contract', () => {
   let container: StartedPostgreSqlContainer;
   let runtime: ManagedRuntime.ManagedRuntime<IngestionStore, unknown>;
   let databaseUrl: string;
-  let database: pg.Pool;
+  let database: pg.Client;
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
     databaseUrl = container.getConnectionUri().replace('localhost', '127.0.0.1');
-    database = new pg.Pool({ connectionString: databaseUrl });
+    database = new pg.Client({ connectionString: databaseUrl });
+    await database.connect();
     await migrate(drizzle(database), {
       migrationsFolder: new URL('../drizzle', import.meta.url).pathname,
     });
@@ -53,21 +54,37 @@ describe('PostgreSQL ingestion contract', () => {
     await database.query('TRUNCATE upload_outbox, wallpapers');
   });
   afterAll(async () => {
-    await runtime?.dispose();
-    await database?.end();
-    await container?.stop();
+    try {
+      await runtime?.dispose();
+      if (database) {
+        // The runtime's pool.end() can resolve before its sockets close. This
+        // container belongs to the fixture, so wait for every other session.
+        await vi.waitFor(async () => {
+          const sessions = await database.query(
+            "SELECT pid FROM pg_stat_activity WHERE backend_type = 'client backend' AND pid <> pg_backend_pid()"
+          );
+          expect(sessions.rows).toEqual([]);
+        });
+      }
+    } finally {
+      try {
+        // Client.end() awaits the observer socket closing, unlike Pool.end().
+        await database?.end();
+      } finally {
+        await container?.stop();
+      }
+    }
   });
 
   it('requires repair of incomplete stored originals before upgrading legacy records without duplicate occurrences', async () => {
-    const admin = new pg.Pool({ connectionString: databaseUrl });
-    await admin.query('CREATE DATABASE legacy_ingestion');
-    await admin.end();
+    await database.query('CREATE DATABASE legacy_ingestion');
     const url = new URL(databaseUrl);
     url.pathname = '/legacy_ingestion';
-    const pool = new pg.Pool({ connectionString: url.toString() });
+    const client = new pg.Client({ connectionString: url.toString() });
     const initial = await mkdtemp(join(tmpdir(), 'ingestor-migration-'));
     const migrationsFolder = new URL('../drizzle', import.meta.url).pathname;
     try {
+      await client.connect();
       await mkdir(join(initial, 'meta'));
       const journal = JSON.parse(
         await readFile(join(migrationsFolder, 'meta/_journal.json'), 'utf8')
@@ -80,7 +97,7 @@ describe('PostgreSQL ingestion contract', () => {
         join(initial, '0000_left_starjammers.sql'),
         await readFile(join(migrationsFolder, '0000_left_starjammers.sql'))
       );
-      await migrate(drizzle(pool), { migrationsFolder: initial });
+      await migrate(drizzle(client), { migrationsFolder: initial });
       const uploadedAt = '2026-01-02T03:04:05.678Z';
       const originals = [
         {
@@ -125,7 +142,7 @@ describe('PostgreSQL ingestion contract', () => {
         },
       ];
       for (const original of originals) {
-        await pool.query(
+        await client.query(
           `INSERT INTO wallpapers(id, user_id, content_hash, upload_state, file_type, mime_type, width, height, file_size_bytes, original_filename, storage_key, uploaded_at) VALUES ($1,$2,'hash',$3,'image',$4,1920,1080,3,'legacy-original',$5,$6)`,
           [
             original.id,
@@ -137,17 +154,17 @@ describe('PostgreSQL ingestion contract', () => {
           ]
         );
       }
-      await pool.query(
+      await client.query(
         "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-interrupted','owner','uploading'), ('legacy-initiated','owner','initiated')"
       );
-      await pool.query(
+      await client.query(
         "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-incomplete-stored','repair-owner','stored')"
       );
-      await expect(migrate(drizzle(pool), { migrationsFolder })).rejects.toMatchObject({
+      await expect(migrate(drizzle(client), { migrationsFolder })).rejects.toMatchObject({
         code: '23514',
         message: 'Committed upload metadata is incomplete; repair it before retrying migration',
       });
-      const unchanged = await pool.query(
+      const unchanged = await client.query(
         "SELECT id, upload_state FROM wallpapers WHERE id IN ('legacy-incomplete-stored', 'legacy-interrupted', 'legacy-initiated', 'legacy-duplicate') ORDER BY id"
       );
       expect(unchanged.rows).toEqual([
@@ -157,13 +174,13 @@ describe('PostgreSQL ingestion contract', () => {
         { id: 'legacy-interrupted', upload_state: 'uploading' },
       ]);
       expect(
-        (await pool.query("SELECT to_regclass('public.upload_outbox') AS relation")).rows
+        (await client.query("SELECT to_regclass('public.upload_outbox') AS relation")).rows
       ).toEqual([{ relation: null }]);
-      await pool.query(
+      await client.query(
         "UPDATE wallpapers SET content_hash = 'repaired-hash', file_type = 'image', mime_type = 'image/png', width = 1920, height = 1080, file_size_bytes = 3, original_filename = 'legacy.png', storage_key = 'legacy-incomplete-stored/original.png' WHERE id = 'legacy-incomplete-stored'"
       );
-      await migrate(drizzle(pool), { migrationsFolder });
-      const rows = await pool.query('SELECT * FROM wallpapers ORDER BY id');
+      await migrate(drizzle(client), { migrationsFolder });
+      const rows = await client.query('SELECT * FROM wallpapers ORDER BY id');
       for (const original of originals.filter(({ id }) => id !== 'legacy-duplicate')) {
         expect(rows.rows.find((row) => row.id === original.id)).toMatchObject({
           upload_state: original.state,
@@ -202,7 +219,7 @@ describe('PostgreSQL ingestion contract', () => {
           ingestion_snapshot: null,
         });
       }
-      const outbox = await pool.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id');
+      const outbox = await client.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id');
       expect(outbox.rows).toEqual(
         rows.rows
           .filter((row) => row.upload_state === 'stored')
@@ -214,19 +231,19 @@ describe('PostgreSQL ingestion contract', () => {
             quarantined_at: null,
           }))
       );
-      await pool.query(
+      await client.query(
         "INSERT INTO wallpapers(id, user_id, content_hash, upload_state, file_type, mime_type, width, height, file_size_bytes, original_filename) VALUES ('later-reservation','later-owner','later-hash','uploading','image','image/png',1920,1080,3,'later.png')"
       );
-      const beforeRerun = await pool.query('SELECT * FROM wallpapers ORDER BY id');
-      await migrate(drizzle(pool), { migrationsFolder });
-      expect((await pool.query('SELECT * FROM wallpapers ORDER BY id')).rows).toEqual(
+      const beforeRerun = await client.query('SELECT * FROM wallpapers ORDER BY id');
+      await migrate(drizzle(client), { migrationsFolder });
+      expect((await client.query('SELECT * FROM wallpapers ORDER BY id')).rows).toEqual(
         beforeRerun.rows
       );
-      expect((await pool.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id')).rows).toEqual(
-        outbox.rows
-      );
+      expect(
+        (await client.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id')).rows
+      ).toEqual(outbox.rows);
     } finally {
-      await pool.end();
+      await client.end();
       await rm(initial, { recursive: true, force: true });
     }
   });
@@ -256,14 +273,9 @@ describe('PostgreSQL ingestion contract', () => {
         })
       )
     );
-    const pool = new pg.Pool({ connectionString: databaseUrl });
-    try {
-      await expect(
-        pool.query("UPDATE wallpapers SET width = NULL WHERE id = 'wlpr_constraint'")
-      ).rejects.toMatchObject({ code: '23514' });
-    } finally {
-      await pool.end();
-    }
+    await expect(
+      database.query("UPDATE wallpapers SET width = NULL WHERE id = 'wlpr_constraint'")
+    ).rejects.toMatchObject({ code: '23514' });
   });
   it('rolls back stored state when its outbox occurrence cannot be committed', async () => {
     const first = record('wlpr_atomic_one', 'atomic-one');
@@ -282,73 +294,73 @@ describe('PostgreSQL ingestion contract', () => {
       )
     );
   });
-  it.each([
-    'PostgreSQL',
-    'controlled',
-  ])('%s releases failed uploads and preserves a lower retry limit quarantine', async (adapter) => {
-    const failed = record('wlpr_failed', 'failed-owner');
-    const quarantined = record('wlpr_quarantined', 'quarantined-owner');
-    await runtime.runPromise(
-      IngestionStore.use((postgres) => {
-        const store = adapter === 'controlled' ? new ControlledStore() : postgres;
-        return Effect.gen(function* () {
-          yield* store.reserve(failed, new Date());
-          yield* store.defer(failed, new Date(), 1);
-          expect(yield* store.assetDisposition(failed.wallpaper.id)).toBe('remove');
-          expect(
-            (yield* store.reserve(record('wlpr_replacement', 'failed-owner'), new Date()))._tag
-          ).toBe('Reserved');
-          yield* store.reserve(quarantined, new Date());
-          yield* store.stored(quarantined);
-          yield* store.defer({ ...quarantined, state: 'stored' }, new Date(), 1);
-          const later = new Date(Date.now() + 3600_000);
-          expect(
-            (yield* store.claim(later, later, later, 100)).some(
-              (entry) => entry.wallpaper.id === quarantined.wallpaper.id
-            )
-          ).toBe(false);
-          expect(yield* store.assetDisposition(quarantined.wallpaper.id)).toBe('retain');
-          expect(yield* store.assetDisposition('does-not-exist')).toBe('remove');
-        });
-      })
-    );
-  });
-  it.each([
-    'PostgreSQL',
-    'controlled',
-  ])('%s permits higher retry limits for uploads and publications', async (adapter) => {
-    await runtime.runPromise(
-      IngestionStore.use((postgres) => {
-        const store = adapter === 'controlled' ? new ControlledStore() : postgres;
-        return Effect.gen(function* () {
-          for (const state of ['uploading', 'stored'] as const) {
-            let candidate = record(`wlpr_${state}`, `owner-${state}`);
-            let now = new Date(Date.now() + 3600_000);
-            const maxAttempts = state === 'uploading' ? 4 : 11;
-            yield* store.reserve(candidate, now);
-            if (state === 'stored') {
-              yield* store.stored(candidate);
-              candidate = { ...candidate, state };
-            }
-            for (let attempts = 1; attempts < maxAttempts; attempts++) {
+  it.each(['PostgreSQL', 'controlled'])(
+    '%s releases failed uploads and preserves a lower retry limit quarantine',
+    async (adapter) => {
+      const failed = record('wlpr_failed', 'failed-owner');
+      const quarantined = record('wlpr_quarantined', 'quarantined-owner');
+      await runtime.runPromise(
+        IngestionStore.use((postgres) => {
+          const store = adapter === 'controlled' ? new ControlledStore() : postgres;
+          return Effect.gen(function* () {
+            yield* store.reserve(failed, new Date());
+            yield* store.defer(failed, new Date(), 1);
+            expect(yield* store.assetDisposition(failed.wallpaper.id)).toBe('remove');
+            expect(
+              (yield* store.reserve(record('wlpr_replacement', 'failed-owner'), new Date()))._tag
+            ).toBe('Reserved');
+            yield* store.reserve(quarantined, new Date());
+            yield* store.stored(quarantined);
+            yield* store.defer({ ...quarantined, state: 'stored' }, new Date(), 1);
+            const later = new Date(Date.now() + 3600_000);
+            expect(
+              (yield* store.claim(later, later, later, 100)).some(
+                (entry) => entry.wallpaper.id === quarantined.wallpaper.id
+              )
+            ).toBe(false);
+            expect(yield* store.assetDisposition(quarantined.wallpaper.id)).toBe('retain');
+            expect(yield* store.assetDisposition('does-not-exist')).toBe('remove');
+          });
+        })
+      );
+    }
+  );
+  it.each(['PostgreSQL', 'controlled'])(
+    '%s permits higher retry limits for uploads and publications',
+    async (adapter) => {
+      await runtime.runPromise(
+        IngestionStore.use((postgres) => {
+          const store = adapter === 'controlled' ? new ControlledStore() : postgres;
+          return Effect.gen(function* () {
+            for (const state of ['uploading', 'stored'] as const) {
+              let candidate = record(`wlpr_${state}`, `owner-${state}`);
+              let now = new Date(Date.now() + 3600_000);
+              const maxAttempts = state === 'uploading' ? 4 : 11;
+              yield* store.reserve(candidate, now);
+              if (state === 'stored') {
+                yield* store.stored(candidate);
+                candidate = { ...candidate, state };
+              }
+              for (let attempts = 1; attempts < maxAttempts; attempts++) {
+                yield* store.defer(candidate, now, maxAttempts);
+                now = new Date(now.getTime() + 1);
+                const claimed = yield* store.claim(now, now, now, 100);
+                expect(claimed).toHaveLength(1);
+                const next = claimed[0];
+                if (!next) throw new Error('Missing retry');
+                expect(next.wallpaper.id).toBe(candidate.wallpaper.id);
+                expect(next.attempts).toBe(attempts);
+                candidate = next;
+              }
               yield* store.defer(candidate, now, maxAttempts);
               now = new Date(now.getTime() + 1);
-              const claimed = yield* store.claim(now, now, now, 100);
-              expect(claimed).toHaveLength(1);
-              const next = claimed[0];
-              if (!next) throw new Error('Missing retry');
-              expect(next.wallpaper.id).toBe(candidate.wallpaper.id);
-              expect(next.attempts).toBe(attempts);
-              candidate = next;
+              expect(yield* store.claim(now, now, now, 100)).toEqual([]);
             }
-            yield* store.defer(candidate, now, maxAttempts);
-            now = new Date(now.getTime() + 1);
-            expect(yield* store.claim(now, now, now, 100)).toEqual([]);
-          }
-        });
-      })
-    );
-  });
+          });
+        })
+      );
+    }
+  );
   it('rejects stale transitions and obeys active leases and batch bounds', async () => {
     const candidate = record('wlpr_leased', 'leased-owner');
     const second = record('wlpr_leased_second', 'second-leased-owner');

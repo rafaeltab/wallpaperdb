@@ -3,6 +3,48 @@ import { expect, it } from 'vitest';
 import { t3Execution, t3ExecutionConfiguration } from '../src/adapters/t3/index.js';
 import type { Intent } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
+it('preserves inherited effort, mode and permissions on a configured model launch', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({ lost: false });
+    const adapter = t3Execution({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    expect(
+      await Effect.runPromise(
+        adapter.launch({
+          id: 'inherited',
+          issue: 744,
+          issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/744',
+          base: host.base,
+          context: '',
+          branch: 'factory/inherited',
+          createdAt: 100,
+          expectedStage: 'implementation',
+          execution: { model: 'gpt-6.2-sol', effort: null, mode: null, permissionLevel: null },
+        })
+      )
+    ).toEqual({ kind: 'submitted', threadId: 'thread-live' });
+    const launch = (await host.calls()).find((call) => call.args[1] === 't3_thread_launch');
+    if (!launch) throw new Error('Missing structured launch');
+    const request = JSON.parse(launch.args[2]);
+    expect(request.modelSelection).toEqual({
+      instanceId: 'codex',
+      model: 'gpt-6.2-sol',
+      options: [],
+    });
+    expect(request).not.toHaveProperty('runtimeMode');
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it('resolves a supported requested model omitted from the default capability list', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

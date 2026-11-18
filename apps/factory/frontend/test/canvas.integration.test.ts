@@ -187,7 +187,7 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     const settings = page.getByRole('dialog', { name: 'Factory controls' });
     await settings.getByLabel('Concurrency', { exact: true }).fill('5');
     await settings.getByLabel('Admission allowance', { exact: true }).fill('12');
-    await settings.getByLabel('Model', { exact: true }).selectOption('gpt-6.2-sol');
+    await settings.getByLabel('Model', { exact: true }).fill('gpt-6.2-sol');
     await settings.getByLabel('Reasoning effort', { exact: true }).selectOption('high');
     await settings.getByLabel('Execution mode', { exact: true }).selectOption('fast');
     await settings.getByLabel('Permission level', { exact: true }).selectOption('auto');

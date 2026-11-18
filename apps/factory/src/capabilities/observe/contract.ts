@@ -1,6 +1,22 @@
 import type { ScheduleStatus } from '../plan/index.js';
 import { Context, type Effect } from 'effect';
 import type { Unavailable, Status } from '../job/index.js';
+/** One applied observation and its resume position form an indivisible checkpoint.
+ * Revisions fence obsolete background work, including replacement snapshots.
+ * The serialized observation belongs to the external observation adapter. */
+export interface ObservationCheckpoint {
+  readonly revision: number;
+  readonly sequence: number;
+  readonly value: string;
+}
+export interface ObservationCheckpoints {
+  read: (stream: string) => Effect.Effect<ObservationCheckpoint | null, Unavailable>;
+  publish: (
+    stream: string,
+    expectedRevision: number,
+    checkpoint: Omit<ObservationCheckpoint, 'revision'>
+  ) => Effect.Effect<boolean, Unavailable>;
+}
 export interface ObservedUser {
   id: string;
   login: string;

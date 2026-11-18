@@ -26,3 +26,4 @@ export { JobReportingLive } from './jobs.js';
 export { jobObservationIsOlder } from './ordering.js';
 
 export type { CollectedObservation } from './contract.js';
+export type { ObservationCheckpoint, ObservationCheckpoints } from './contract.js';

@@ -224,29 +224,29 @@ describe('upload quota storage', () => {
     }
   });
 
-  it.each([
-    'invalid-counter',
-    'missing-expiry',
-  ])('falls back when Redis stores %s', async (name) => {
-    const runtime = distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
-    try {
-      const key = `wallpaperdb:ratelimit:user:${name}`;
-      if (name === 'invalid-counter') await control.lpush(key, 'invalid');
-      else await control.set(key, '1');
-      const quota = await runtime.runPromise(Quota);
-      expect(await Effect.runPromise(quota.take(name, 1, 60_000))).toMatchObject({
-        _tag: 'Allowed',
-        remaining: 0,
-      });
-      expect(await Effect.runPromise(quota.take(name, 1, 60_000))).toMatchObject({
-        _tag: 'Limited',
-      });
-    } finally {
-      control.disconnect();
-      await runtime.dispose();
+  it.each(['invalid-counter', 'missing-expiry'])(
+    'falls back when Redis stores %s',
+    async (name) => {
+      const runtime = distributed();
+      const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+      try {
+        const key = `wallpaperdb:ratelimit:user:${name}`;
+        if (name === 'invalid-counter') await control.lpush(key, 'invalid');
+        else await control.set(key, '1');
+        const quota = await runtime.runPromise(Quota);
+        expect(await Effect.runPromise(quota.take(name, 1, 60_000))).toMatchObject({
+          _tag: 'Allowed',
+          remaining: 0,
+        });
+        expect(await Effect.runPromise(quota.take(name, 1, 60_000))).toMatchObject({
+          _tag: 'Limited',
+        });
+      } finally {
+        control.disconnect();
+        await runtime.dispose();
+      }
     }
-  });
+  );
 
   it('recovers distributed protection after an initial connection outage', async () => {
     const bridge = await proxy();

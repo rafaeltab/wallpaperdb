@@ -47,13 +47,16 @@ describe('wallpaper upload policy', () => {
     ['excess pixels', 10001, 10000, 'jpeg', 'TooManyPixels'],
     ['excess width', 20001, 1, 'png', 'InvalidDimensions'],
     ['excess height', 1, 20001, 'png', 'InvalidDimensions'],
-  ] as const)('rejects %s before storing or publishing', async (_name, width, height, format, tag) => {
-    const { result, test } = await upload(await image(width, height, format));
-    expect(result).toMatchObject({ _tag: tag, width, height });
-    expect(test.store.records.size).toBe(0);
-    expect(test.objects).toEqual([]);
-    expect(test.published).toEqual([]);
-  });
+  ] as const)(
+    'rejects %s before storing or publishing',
+    async (_name, width, height, format, tag) => {
+      const { result, test } = await upload(await image(width, height, format));
+      expect(result).toMatchObject({ _tag: tag, width, height });
+      expect(test.store.records.size).toBe(0);
+      expect(test.objects).toEqual([]);
+      expect(test.published).toEqual([]);
+    }
+  );
 
   it('rejects a file one byte over the byte limit before storing or publishing', async () => {
     const bytes = new Uint8Array(50 * 1024 * 1024 + 1);
@@ -64,15 +67,15 @@ describe('wallpaper upload policy', () => {
     expect(test.published).toEqual([]);
   });
 
-  it.each([
-    'png',
-    'webp',
-  ] as const)('rejects animated %s before storing or publishing', async (format) => {
-    const bytes = await readFile(new URL(`./fixtures/animated.${format}`, import.meta.url));
-    const { result, test } = await upload(bytes, `animated.${format}`);
-    expect(result).toMatchObject({ _tag: 'UnsupportedAnimation' });
-    expect(test.store.records.size).toBe(0);
-    expect(test.objects).toEqual([]);
-    expect(test.published).toEqual([]);
-  });
+  it.each(['png', 'webp'] as const)(
+    'rejects animated %s before storing or publishing',
+    async (format) => {
+      const bytes = await readFile(new URL(`./fixtures/animated.${format}`, import.meta.url));
+      const { result, test } = await upload(bytes, `animated.${format}`);
+      expect(result).toMatchObject({ _tag: 'UnsupportedAnimation' });
+      expect(test.store.records.size).toBe(0);
+      expect(test.objects).toEqual([]);
+      expect(test.published).toEqual([]);
+    }
+  );
 });

@@ -152,54 +152,56 @@ describe('Wallpaper ingestion', () => {
     );
     expect(test.objects).toEqual([{ wallpaperId: 'wlpr_1', extension: 'png' }]);
   });
-  it.each([
-    'remove',
-    'disposition',
-  ] as const)('continues cleanup past an asset with a failing %s and retries it on later scans', async (operation) => {
-    let available = false;
-    const remaining = new Set([
-      'wlpr_uncertain',
-      ...Array.from({ length: 6 }, (_, index) => `wlpr_same_page_${index}`),
-      'wlpr_later_page',
-    ]);
-    const unavailable = new IngestionUnavailable({ operation, cause: 'asset unavailable' });
-    const test = fixture({
-      storage: {
-        list: (cursor) =>
-          Effect.sync(() => ({
-            assets: [...remaining]
-              .filter((id) => (cursor ? id === 'wlpr_later_page' : id !== 'wlpr_later_page'))
-              .map((wallpaperId) => ({ wallpaperId, extension: 'png' })),
-            ...(cursor ? {} : { cursor: 'next' }),
-          })),
-        remove: (asset) =>
-          Effect.suspend(() =>
-            operation === 'remove' && asset.wallpaperId === 'wlpr_uncertain' && !available
-              ? Effect.fail(unavailable)
-              : Effect.sync(() => {
-                  remaining.delete(asset.wallpaperId);
-                })
-          ),
-      },
-    });
-    if (operation === 'disposition')
-      test.store.assetDisposition = (id) =>
-        id === 'wlpr_uncertain' && !available ? Effect.fail(unavailable) : Effect.succeed('remove');
+  it.each(['remove', 'disposition'] as const)(
+    'continues cleanup past an asset with a failing %s and retries it on later scans',
+    async (operation) => {
+      let available = false;
+      const remaining = new Set([
+        'wlpr_uncertain',
+        ...Array.from({ length: 6 }, (_, index) => `wlpr_same_page_${index}`),
+        'wlpr_later_page',
+      ]);
+      const unavailable = new IngestionUnavailable({ operation, cause: 'asset unavailable' });
+      const test = fixture({
+        storage: {
+          list: (cursor) =>
+            Effect.sync(() => ({
+              assets: [...remaining]
+                .filter((id) => (cursor ? id === 'wlpr_later_page' : id !== 'wlpr_later_page'))
+                .map((wallpaperId) => ({ wallpaperId, extension: 'png' })),
+              ...(cursor ? {} : { cursor: 'next' }),
+            })),
+          remove: (asset) =>
+            Effect.suspend(() =>
+              operation === 'remove' && asset.wallpaperId === 'wlpr_uncertain' && !available
+                ? Effect.fail(unavailable)
+                : Effect.sync(() => {
+                    remaining.delete(asset.wallpaperId);
+                  })
+            ),
+        },
+      });
+      if (operation === 'disposition')
+        test.store.assetDisposition = (id) =>
+          id === 'wlpr_uncertain' && !available
+            ? Effect.fail(unavailable)
+            : Effect.succeed('remove');
 
-    await Effect.runPromise(
-      Ingestion.use((ingestion) =>
-        Effect.gen(function* () {
-          yield* ingestion.cleanup();
-          expect([...remaining]).toEqual(['wlpr_uncertain']);
-          yield* ingestion.cleanup();
-          expect([...remaining]).toEqual(['wlpr_uncertain']);
-          available = true;
-          yield* ingestion.cleanup();
-          expect([...remaining]).toEqual([]);
-        })
-      ).pipe(Effect.provide(test.layer))
-    );
-  });
+      await Effect.runPromise(
+        Ingestion.use((ingestion) =>
+          Effect.gen(function* () {
+            yield* ingestion.cleanup();
+            expect([...remaining]).toEqual(['wlpr_uncertain']);
+            yield* ingestion.cleanup();
+            expect([...remaining]).toEqual(['wlpr_uncertain']);
+            available = true;
+            yield* ingestion.cleanup();
+            expect([...remaining]).toEqual([]);
+          })
+        ).pipe(Effect.provide(test.layer))
+      );
+    }
+  );
   it('reports a listing failure and resumes cleanup from that page after recovery', async () => {
     let available = false;
     const cursors: Array<string | undefined> = [];

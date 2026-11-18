@@ -20,13 +20,18 @@ interface ThreadState {
   ready: boolean;
 }
 export class ObservationUnknown extends Error {}
+interface Credential {
+  token: string;
+  expiresAt: number;
+  replaced?: AbortSignal;
+}
 export type T3Observations = Awaited<ReturnType<typeof t3Observations>>;
 
 /** Shared local observations. Neither reads nor ownership registration performs external I/O. */
 export async function t3Observations(config: {
   origin: string;
   checkpoints: ObservationCheckpoints;
-  credential: (replace?: boolean) => Promise<{ token: string; expiresAt: number }>;
+  credential: (replace?: boolean, signal?: AbortSignal) => Promise<Credential>;
   report: (error: unknown) => void;
 }) {
   const stop = new AbortController();
@@ -63,14 +68,11 @@ export async function t3Observations(config: {
       throw new Error('Obsolete T3 observation publication');
     }
   };
-  const loop = async (
-    signal: AbortSignal,
-    work: (credential: { token: string; expiresAt: number }) => Promise<void>
-  ) => {
+  const loop = async (signal: AbortSignal, work: (credential: Credential) => Promise<void>) => {
     let replace = false;
     while (!signal.aborted) {
       try {
-        const credential = await config.credential(replace);
+        const credential = await config.credential(replace, signal);
         replace = false;
         await work(credential);
       } catch (error) {
@@ -85,11 +87,20 @@ export async function t3Observations(config: {
       }
     }
   };
-  const lifetime = (credential: { expiresAt: number }, signal: AbortSignal) =>
+  const lifetime = (credential: Credential, signal: AbortSignal) =>
     AbortSignal.any([
       signal,
+      ...(credential.replaced ? [credential.replaced] : []),
       AbortSignal.timeout(
-        Math.max(1000, Math.min(2_147_483_647, credential.expiresAt - Date.now() - 60_000))
+        Math.max(
+          1000,
+          Math.min(
+            2_147_483_647,
+            credential.expiresAt -
+              Date.now() -
+              Math.min(86400000, Math.max(60000, (credential.expiresAt - Date.now()) / 10))
+          )
+        )
       ),
     ]);
   const startThread = (id: string) => {

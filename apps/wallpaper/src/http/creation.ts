@@ -151,29 +151,41 @@ export async function registerCreationHttp<E>(
       return reply.code(400).type('application/problem+json').send(problem(400, 'invalid-request'));
     const [createdAt, id] = parsed.data.cursor?.split('~') ?? [];
     const before = createdAt && id ? { createdAt, id } : undefined;
-    const result = await runtime.runPromise(
-      Effect.gen(function* () {
-        const auth = yield* CreatorAuthentication;
-        const owner = yield* auth.verify(request.headers.authorization);
-        if (!owner) return { kind: 'unauthorized' as const };
-        const c = yield* Creation;
-        return { kind: 'list' as const, wallpapers: yield* c.list(owner, before) };
-      }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const })))
-    );
-    if (result.kind === 'list') {
-      const last = result.wallpapers.at(-1);
-      return {
-        wallpapers: result.wallpapers.map(publicWallpaper),
-        ...(result.wallpapers.length === 100 && last
-          ? { nextCursor: `${last.createdAt}~${last.id}` }
-          : {}),
-      };
+    const controller = new AbortController();
+    controllers.add(controller);
+    const abort = () => controller.abort();
+    request.raw.once('aborted', abort);
+    reply.raw.once('close', abort);
+    try {
+      const result = await runtime.runPromise(
+        Effect.gen(function* () {
+          const auth = yield* CreatorAuthentication;
+          const owner = yield* auth.verify(request.headers.authorization);
+          if (!owner) return { kind: 'unauthorized' as const };
+          const c = yield* Creation;
+          return { kind: 'list' as const, wallpapers: yield* c.list(owner, before) };
+        }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const }))),
+        { signal: controller.signal }
+      );
+      if (result.kind === 'list') {
+        const last = result.wallpapers.at(-1);
+        return {
+          wallpapers: result.wallpapers.map(publicWallpaper),
+          ...(result.wallpapers.length === 100 && last
+            ? { nextCursor: `${last.createdAt}~${last.id}` }
+            : {}),
+        };
+      }
+      const status = result.kind === 'unauthorized' ? 401 : 503;
+      return reply
+        .code(status)
+        .type('application/problem+json')
+        .send(problem(status, status === 401 ? 'unauthorized' : 'service-unavailable'));
+    } finally {
+      controllers.delete(controller);
+      request.raw.off('aborted', abort);
+      reply.raw.off('close', abort);
     }
-    const status = result.kind === 'unauthorized' ? 401 : 503;
-    return reply
-      .code(status)
-      .type('application/problem+json')
-      .send(problem(status, status === 401 ? 'unauthorized' : 'service-unavailable'));
   });
   app.post('/wallpapers', schemaOptions(z.object({}).strict()), (request, reply) => {
     const key = z

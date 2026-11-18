@@ -202,3 +202,81 @@ it('translates bounded list continuations using the verified owner and rejects m
     await app.close();
   }
 });
+
+it.each([
+  { stage: 'authentication', lifetime: 'disconnect' },
+  { stage: 'list', lifetime: 'disconnect' },
+  { stage: 'list', lifetime: 'shutdown' },
+] as const)(
+  'releases pending $stage work on real HTTP list $lifetime',
+  async ({ stage, lifetime }) => {
+    let entered = false;
+    let released = false;
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const pending = Effect.promise(() => gate).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          released = true;
+        })
+      )
+    );
+    const owner = { namespace: 'authors', subject: 'creator' };
+    const app = Fastify();
+    await registerCreationHttp(
+      app,
+      Layer.mergeAll(
+        Layer.succeed(CreatorAuthentication, {
+          verify: () =>
+            stage === 'authentication'
+              ? Effect.sync(() => {
+                  entered = true;
+                }).pipe(Effect.andThen(pending), Effect.as(owner))
+              : Effect.succeed(owner),
+        }),
+        Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) }),
+        Layer.succeed(Creation, {
+          list: () =>
+            Effect.sync(() => {
+              entered = true;
+            }).pipe(Effect.andThen(pending), Effect.as([])),
+          begin: () => Effect.succeed({ kind: 'unavailable' }),
+          get: () => Effect.succeed({ kind: 'unavailable' }),
+          expectSource: () => Effect.succeed({ kind: 'unavailable' }),
+          assetResult: () => Effect.succeed('ignored'),
+          sourceAccepted: () => Effect.succeed('ignored'),
+        })
+      )
+    );
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const controller = new AbortController();
+    const response = fetch(`${address}/wallpapers`, {
+      signal: controller.signal,
+      headers: { connection: 'close' },
+    }).then(
+      (response) => response.text(),
+      () => null
+    );
+    try {
+      await expect.poll(() => entered).toBe(true);
+      if (lifetime === 'disconnect') {
+        controller.abort();
+        await response;
+        await expect.poll(() => released, { timeout: 1000 }).toBe(true);
+      } else {
+        const closing = app.close();
+        await expect.poll(() => released, { timeout: 6500 }).toBe(true);
+        await closing;
+        await response;
+      }
+    } finally {
+      controller.abort();
+      finish();
+      await response;
+      await app.close();
+    }
+  },
+  10000
+);

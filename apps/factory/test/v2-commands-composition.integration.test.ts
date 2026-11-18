@@ -181,13 +181,18 @@ it('saves execution controls through HTTP, reloads them after restart and launch
       ).toBe(202);
       await receipt(running, command.commandId);
       const restarted = await reopen();
-      const board = (await restarted.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
-      expect(board.meta.factory).toMatchObject({
-        execution,
-        executionCatalog: {
-          models: expect.arrayContaining([expect.objectContaining({ id: 'gpt-6.2-sol' })]),
+      await vi.waitFor(
+        async () => {
+          const board = (await restarted.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.meta.factory).toMatchObject({
+            execution,
+            executionCatalog: {
+              models: expect.arrayContaining([expect.objectContaining({ id: 'gpt-6.2-sol' })]),
+            },
+          });
         },
-      });
+        { timeout: 10000, interval: 40 }
+      );
       await start(restarted);
       expect(
         (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).admissions[0]
@@ -331,6 +336,7 @@ it('continues an implementation repaired by an ordinary message in its existing 
       encoding: 'utf8',
     }).trim();
     await save({
+      holdReview: true,
       messages: [
         {
           role: 'assistant',

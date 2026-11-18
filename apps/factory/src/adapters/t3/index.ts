@@ -6,3 +6,4 @@ export { t3Restacker } from './restack.js';
 export { plannerState } from './planner-state.js';
 export { reconcileRejectedPlanner } from './planner-state.js';
 export { t3Metadata } from './metadata.js';
+export { t3Subscription } from './subscription.js';

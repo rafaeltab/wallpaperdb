@@ -330,7 +330,7 @@ it('continuously admits a validated semantic plan through production adapters wi
   }
 });
 
-it('refreshes on API demand while keeping idle metadata quiet and HTTP local', async () => {
+it('refreshes GitHub on API demand while T3 inventory runs independently every fifteen minutes', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(Date.UTC(2026, 10, 7, 12, 58));
   const host = await protocol({ origin: true });
@@ -377,8 +377,11 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
     expect((await running.app.inject('/')).statusCode).toBe(200);
     expect((await host.calls()).filter((c) => c.binary === 'gh')).toHaveLength(0);
     expect(
-      (await host.calls()).filter((c) => c.binary === 't3' && !c.args.includes('--help'))
+      (await host.calls()).filter(
+        (c) => c.binary === 't3' && c.args[0] === 'thread' && !c.args.includes('--help')
+      )
     ).toHaveLength(0);
+    expect((await host.calls()).filter((c) => c.args[1] === 't3_thread_list')).toHaveLength(1);
     expect((await running.app.inject('/api/v2/board')).json().meta.dataMode).toBe('live');
     await vi.waitFor(
       async () =>
@@ -398,6 +401,13 @@ it('refreshes on API demand while keeping idle metadata quiet and HTTP local', a
     for (const url of ['/', '/api/job', '/api/scheduler', '/api/observations'])
       expect((await running.app.inject(url)).statusCode).toBe(200);
     expect((await host.calls()).filter((c) => c.binary === 'gh').length).toBe(count);
+    expect((await host.calls()).filter((c) => c.args[1] === 't3_thread_list')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(600_000);
+    await vi.waitFor(
+      async () =>
+        expect((await host.calls()).filter((c) => c.args[1] === 't3_thread_list')).toHaveLength(2),
+      { timeout: 10000 }
+    );
   } finally {
     await running.close();
     vi.useRealTimers();

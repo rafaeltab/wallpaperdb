@@ -1,5 +1,27 @@
 import { observationRefreshIntervalMs } from '../capabilities/observe/index.js';
 
+/** Complete lightweight T3 link inventory has an independent service lifetime. */
+export function inventoryWorker(refresh: () => Promise<unknown>) {
+  let closed = false;
+  let pending: Promise<unknown> | undefined;
+  const run = () => {
+    if (closed || pending) return;
+    pending = refresh().finally(() => {
+      pending = undefined;
+    });
+    void pending.catch(() => undefined);
+  };
+  const timer = setInterval(run, 15 * 60 * 1000);
+  run();
+  return {
+    close: async () => {
+      closed = true;
+      clearInterval(timer);
+      await pending?.catch(() => undefined);
+    },
+  };
+}
+
 /** Composition owns metadata work independently of the HTTP request that asks for it. */
 export function observationWorker(refresh: () => Promise<void>) {
   let clients = 0,

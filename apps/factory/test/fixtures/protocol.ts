@@ -89,10 +89,24 @@ export async function runProtocol(
       }
       writeFileSync(join(config.directory, 'released'), boundary);
     };
-    appendFileSync(
-      join(config.directory, 'calls.jsonl'),
-      `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
-    );
+    if (!environment.FACTORY_WS_FIXTURE)
+      appendFileSync(
+        join(config.directory, 'calls.jsonl'),
+        `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
+      );
+    if (args[0] === 'auth' && args[1] === 'session') {
+      if (args[2] === 'issue')
+        console.log(
+          JSON.stringify({
+            sessionId: 'controlled-observer-session',
+            token: 'controlled-observer',
+            scopes: ['orchestration:read'],
+            method: 'bearer-access-token',
+            expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+          })
+        );
+      process.exit(0);
+    }
     if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_configure') {
       const { threadId } = JSON.parse(args[2]);
       const resource =
@@ -1518,8 +1532,15 @@ export async function runProtocol(
       reply(mcpSend ? { structuredContent: sent } : sent);
     } else {
       if (['list', 'show'].includes(args[1]) && config.delayObserve) {
-        writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));
-        await new Promise((resolve) => setTimeout(resolve, 30000));
+        writeFileSync(
+          join(
+            config.directory,
+            environment.FACTORY_WS_FIXTURE ? 'observing-websocket' : 'observing.pid'
+          ),
+          environment.FACTORY_WS_FIXTURE ? 'held' : String(process.pid)
+        );
+        const { setTimeout: delay } = await import('node:timers/promises');
+        await delay(30000, undefined, { signal });
       }
       const parallelResources = config.parallel
         ? readdirSync(config.directory)

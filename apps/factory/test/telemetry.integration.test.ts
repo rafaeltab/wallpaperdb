@@ -176,9 +176,9 @@ it.each([false, true])(
         await host.save({ delayObserve: true });
         await vi.waitFor(
           async () =>
-            expect(
-              Number(await readFile(join(host.directory, 'observing.pid'), 'utf8'))
-            ).toBeGreaterThan(0),
+            expect(await readFile(join(host.directory, 'observing-websocket'), 'utf8')).toBe(
+              'held'
+            ),
           { timeout: 5000 }
         );
       }

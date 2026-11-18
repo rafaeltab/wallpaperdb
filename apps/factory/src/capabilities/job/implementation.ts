@@ -21,6 +21,7 @@ import {
   type Delivery,
   Time,
   ContinuationAdmission,
+  Unavailable,
 } from './contract.js';
 export const JobLive = Layer.effect(
   Job,
@@ -32,9 +33,15 @@ export const JobLive = Layer.effect(
     const policy = Option.getOrUndefined(yield* Effect.serviceOption(AgentReconciliationPolicy));
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
-    const launchOwned = (intent: Intent, index: number) =>
+    const prepareLaunch = (intent: Intent) =>
+      (execution.prepareLaunch?.(intent) ?? Effect.succeed(execution.launch(intent))).pipe(
+        Effect.mapError(
+          (cause) => new Unavailable({ operation: 'prepare-launch', cause, launchNotSent: true })
+        )
+      );
+    const launchOwned = (intent: Intent, index: number, launch: ReturnType<Execution['launch']>) =>
       Effect.gen(function* () {
-        const result = yield* execution.launch(intent);
+        const result = yield* launch;
         if (result.kind === 'submitted' && result.threadId) {
           // This records delivery ownership, never receipt acceptance.
           yield* retainInitialStage(store, intent, index, result.threadId);
@@ -274,6 +281,8 @@ export const JobLive = Layer.effect(
           if (control.revision !== command.revision || stage?.index !== command.index)
             return { kind: 'rejected' as const };
           const index = stage.index + 1;
+          const active = attemptIntent(intent, index);
+          const prepared = yield* prepareLaunch(active);
           if (
             !(yield* store.saveControl({
               ...control,
@@ -287,8 +296,7 @@ export const JobLive = Layer.effect(
           if (yield* store.claimStage(index)) {
             const current = yield* store.readControl();
             if (!current.cancelled && !current.released && !current.dependencyRecovery) {
-              const active = attemptIntent(intent, index);
-              const launch = yield* launchOwned(active, index);
+              const launch = yield* launchOwned(active, index, prepared);
               if (launch.kind === 'submitted' && reporting)
                 yield* reporting.accepted({ ...active, id: intent.id }, 'implementation', index);
             }
@@ -376,9 +384,10 @@ export const JobLive = Layer.effect(
             expectedStage: 'implementation',
             receiptProtocol: 'delivery-v1',
           };
+          const prepared = yield* prepareLaunch(intent);
           if (!(yield* store.reserve(intent))) return { kind: 'occupied' as const };
           if (yield* store.claimLaunch()) {
-            const launch = yield* launchOwned(intent, 0);
+            const launch = yield* launchOwned(intent, 0, prepared);
             if (launch.kind === 'submitted' && reporting)
               yield* reporting.accepted(intent, 'implementation', 0);
           }

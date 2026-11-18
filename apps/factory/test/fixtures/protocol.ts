@@ -93,7 +93,7 @@ export async function runProtocol(
       join(config.directory, 'calls.jsonl'),
       `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
     );
-    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_configuration') {
+    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_configure') {
       const { threadId } = JSON.parse(args[2]);
       const resource =
         threadId === 'planner-thread'

@@ -3,6 +3,43 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { joinFixture } from './fixtures/join.js';
+it('retries recovery preparation after a capability failure without claiming an external launch', async () => {
+  const execution = {
+    model: 'gpt-6.2-sol',
+    effort: 'high',
+    mode: 'fast' as const,
+    permissionLevel: 'auto' as const,
+  };
+  const f = await joinFixture({
+    inProcess: true,
+    conflict: true,
+    restack: { outcome: 'SIMPLE', review: true },
+    readExecution: async () => execution,
+  });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const configuration = JSON.parse(await readFile(f.host.configFile, 'utf8'));
+    await f.host.save({
+      ...configuration,
+      executionCatalog: {
+        runtimeMode: 'full-access',
+        providers: [
+          { providerInstanceId: 'codex', constraints: ['Temporarily unavailable'], models: [] },
+        ],
+      },
+    });
+    await Effect.runPromise(
+      (f.reopen().prepare?.(5) ?? Effect.void).pipe(Effect.catch(() => Effect.void))
+    );
+    expect((await f.host.calls()).filter((c) => c.args[1] === 't3_thread_launch')).toHaveLength(0);
+    await f.host.save(configuration);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    expect((await f.host.calls()).filter((c) => c.args[1] === 't3_thread_launch')).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});
 it('retains configured recovery execution across restart and uses it for fresh independent reviews', async () => {
   let execution = {
     model: 'gpt-6.2-sol',

@@ -1,4 +1,8 @@
-import { launchExecution, retainedExecution, executionInstructions } from './execution-settings.js';
+import {
+  prepareExecution,
+  retainedExecution,
+  executionInstructions,
+} from './execution-settings.js';
 import type { ExecutionSettings } from '../../capabilities/job/index.js';
 import { z } from 'zod';
 import { Effect } from 'effect';
@@ -313,19 +317,23 @@ export function t3Restacker(
     let observed = await observe(signal);
     if (!observed) {
       if ((await discover(signal)).length) return null;
-      if (!(await journal.read('launch.json')) && !(await journal.read('execution.json'))) {
-        await journal.write('execution.json', {
-          execution: (await config.readExecution?.()) ?? null,
-        });
-      }
-      if (await journal.write('launch.json', operation)) {
-        await journal.write('receipt-protocol.json', { version: 1 });
-        await launchExecution(
+      if (!(await journal.read('launch.json'))) {
+        if (!(await journal.read('execution.json'))) {
+          await journal.write('execution.json', {
+            execution: (await config.readExecution?.()) ?? null,
+          });
+        }
+        const execution = await executionSettings();
+        const launch = await prepareExecution(
           config,
-          { title, message: prompt(await executionSettings()), base: operation.oldHead, branch },
-          await executionSettings(),
+          { title, message: prompt(execution), base: operation.oldHead, branch },
+          execution,
           signal
         );
+        if (await journal.write('launch.json', operation)) {
+          await journal.write('receipt-protocol.json', { version: 1 });
+          await launch();
+        }
       }
       observed = await observe(signal);
     }

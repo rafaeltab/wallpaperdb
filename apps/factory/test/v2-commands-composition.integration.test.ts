@@ -11,6 +11,7 @@ import type {
 import { protocol } from './fixtures/setup.js';
 import { fileScheduleStore, fileStore } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
+import type { ExecutionSettings } from '../src/capabilities/job/index.js';
 
 type Running = Awaited<ReturnType<typeof startFactory>>;
 async function composed(
@@ -21,7 +22,7 @@ async function composed(
     reopen: () => Promise<Running>;
   }) => Promise<void>,
   options: object = {},
-  initialControl?: { paused: boolean }
+  initialControl?: { paused: boolean; execution?: ExecutionSettings }
 ) {
   const host = await protocol({ origin: true });
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
@@ -61,6 +62,7 @@ async function composed(
           fileScheduleStore(`${host.directory}/state`).save({
             revision: 0,
             paused: initialControl.paused,
+            execution: initialControl.execution,
             concurrency: 1,
             allowance: 1,
             admissions: [],
@@ -155,6 +157,170 @@ async function stageMessages(host: Awaited<ReturnType<typeof protocol>>) {
   });
 }
 
+it('retains a reserved admission across worker preflight failure and launches once after capabilities recover', () =>
+  composed(
+    async ({ running, host, save, reopen }) => {
+      const execution = {
+        model: 'gpt-6.2-sol',
+        effort: 'high',
+        mode: 'fast',
+        permissionLevel: 'auto',
+      };
+      const configure = {
+        ...(await action(running, 'configure')),
+        commandId: '00000000-0000-4000-8000-000000000081',
+        kind: 'configure',
+        payload: {
+          paused: false,
+          concurrency: { kind: 'limited', maximum: 1 },
+          admissionAllowance: { kind: 'limited', maximum: 1 },
+          execution,
+        },
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: configure }))
+          .statusCode
+      ).toBe(202);
+      await receipt(running, configure.commandId);
+      await vi.waitFor(
+        async () => {
+          expect(
+            JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8')).requestId
+          ).toEqual(expect.any(String));
+          expect(
+            (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).cycle
+          ).toBeUndefined();
+        },
+        { timeout: 10000, interval: 40 }
+      );
+      await save({
+        executionCatalog: {
+          runtimeMode: 'full-access',
+          providers: [
+            { providerInstanceId: 'codex', constraints: ['Temporarily unavailable'], models: [] },
+          ],
+        },
+      });
+      const request = {
+        ...(await action(running, 'start', 'issue:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000082',
+        kind: 'start',
+        payload: { context: 'Only this issue' },
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: request }))
+          .statusCode
+      ).toBe(202);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await running.app.inject(`/api/v2/commands/${request.commandId}`)).json()
+          ).toMatchObject({ state: 'uncertain' }),
+        { timeout: 10000, interval: 40 }
+      );
+      expect(await Effect.runPromise(fileStore(`${host.directory}/state`).read())).toBeNull();
+      expect(
+        (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).admissions
+      ).toHaveLength(1);
+      await save({});
+      const restarted = await reopen();
+      await vi.waitFor(
+        async () => {
+          const board = (await restarted.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(board.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            executionSettings: execution,
+            execution: { state: 'known', value: { state: 'running' } },
+          });
+        },
+        { timeout: 10000, interval: 40 }
+      );
+      const workers = (await host.calls()).filter(
+        (c) => c.args[1] === 't3_thread_launch' && JSON.parse(c.args[2]).workspaceStrategy
+      );
+      expect(workers).toHaveLength(1);
+      expect(
+        (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).admissions
+      ).toHaveLength(1);
+    },
+    {},
+    { paused: true }
+  ));
+it('retains fresh retry availability when capability preflight fails before sending', () =>
+  composed(
+    async ({ running, host, save }) => {
+      await start(running);
+      const launch = (await host.calls()).find(
+        (call) => call.args[1] === 't3_thread_launch' && JSON.parse(call.args[2]).workspaceStrategy
+      );
+      if (!launch) throw new Error('Missing initial worker launch');
+      const branch = JSON.parse(launch.args[2]).workspaceStrategy.branch;
+      const path = `${host.directory}/resource-${branch.replaceAll('/', '-')}.json`;
+      const original = JSON.parse(await readFile(path, 'utf8'));
+      await writeFile(path, JSON.stringify({ ...original, status: 'completed' }));
+      const incomplete = {
+        messages: [{ role: 'assistant', runId: 'run-1', text: 'Implementation incomplete.' }],
+      };
+      await save({
+        ...incomplete,
+        executionCatalog: {
+          runtimeMode: 'full-access',
+          providers: [
+            { providerInstanceId: 'codex', constraints: ['Temporarily unavailable'], models: [] },
+          ],
+        },
+      });
+      const failed = {
+        ...(await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000083',
+        kind: 'retry',
+        payload: {},
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: failed }))
+          .statusCode
+      ).toBe(202);
+      await vi.waitFor(
+        async () =>
+          expect(
+            (await running.app.inject(`/api/v2/commands/${failed.commandId}`)).json()
+          ).toMatchObject({ state: 'uncertain' }),
+        { timeout: 10000, interval: 40 }
+      );
+      expect(
+        (await host.calls()).filter(
+          (c) => c.args[1] === 't3_thread_launch' && JSON.parse(c.args[2]).workspaceStrategy
+        )
+      ).toHaveLength(1);
+      expect(
+        (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).resuming ??
+          []
+      ).toHaveLength(0);
+      await save(incomplete);
+      const retry = {
+        ...failed,
+        ...(await action(running, 'retry', 'job:rafaeltab/wallpaperdb/577')),
+        commandId: '00000000-0000-4000-8000-000000000084',
+      };
+      expect(
+        (await running.app.inject({ method: 'POST', url: '/api/v2/commands', payload: retry }))
+          .statusCode
+      ).toBe(202);
+      await receipt(running, retry.commandId);
+      expect(
+        (await host.calls()).filter(
+          (c) => c.args[1] === 't3_thread_launch' && JSON.parse(c.args[2]).workspaceStrategy
+        )
+      ).toHaveLength(2);
+      expect(
+        (await Effect.runPromise(fileScheduleStore(`${host.directory}/state`).read())).admissions
+      ).toHaveLength(1);
+    },
+    { parallel: true },
+    {
+      paused: false,
+      execution: { model: 'gpt-6.2-sol', effort: 'high', mode: 'fast', permissionLevel: 'auto' },
+    }
+  ));
 it('saves execution controls through HTTP, reloads them after restart and launches the selected worker', () =>
   composed(
     async ({ running, host, reopen }) => {

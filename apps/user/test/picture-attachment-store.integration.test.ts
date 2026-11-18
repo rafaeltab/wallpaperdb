@@ -1,4 +1,7 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import postgres from 'postgres';
@@ -33,14 +36,13 @@ describe('PostgreSQL picture attachment contract', () => {
     return pictureAttachmentsLayer.pipe(Layer.provideMerge(store));
   };
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine').start();
+    container = await new PostgreSqlContainer('postgres:16-alpine')
+      .withCommand(['postgres', '-c', 'shared_preload_libraries=pg_stat_statements'])
+      .start();
     databaseUrl = container.getConnectionUri().replace('localhost', '127.0.0.1');
     sql = postgres(databaseUrl);
-    const migrations = new URL('../drizzle/', import.meta.url);
-    for (const name of readdirSync(migrations)
-      .filter((n) => n.endsWith('.sql'))
-      .sort())
-      await sql.unsafe(readFileSync(new URL(name, migrations), 'utf8'));
+    await sql`create extension pg_stat_statements`;
+    await migrate(drizzle(sql), { migrationsFolder: './drizzle' });
     runtime = ManagedRuntime.make(layer());
   });
   beforeEach(async () => {
@@ -168,27 +170,29 @@ describe('PostgreSQL picture attachment contract', () => {
     await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
     return first;
   };
-  it.each([
-    'pending',
-    'quarantined',
-  ])('ignores an earlier notification acknowledgement while renewed work is %s', async (phase) => {
-    const i = await begin();
-    await exhaustPublication(i.creationEventId);
-    const [alert] = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
-    if (!alert) throw new Error('Missing exhausted publication alert');
-    const stale: Parameters<AttachmentDelivery['alerted']> = [
-      alert.id,
-      alert.scope,
-      alert.quarantineId,
-    ];
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
-    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(alert.id)))).toBe(true);
-    if (phase === 'quarantined') await exhaustPublication(i.creationEventId);
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
-    if (phase === 'pending') await exhaustPublication(i.creationEventId);
-    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toHaveLength(1);
-    expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
-  });
+  it.each(['pending', 'quarantined'])(
+    'ignores an earlier notification acknowledgement while renewed work is %s',
+    async (phase) => {
+      const i = await begin();
+      await exhaustPublication(i.creationEventId);
+      const [alert] = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+      if (!alert) throw new Error('Missing exhausted publication alert');
+      const stale: Parameters<AttachmentDelivery['alerted']> = [
+        alert.id,
+        alert.scope,
+        alert.quarantineId,
+      ];
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(alert.id)))).toBe(
+        true
+      );
+      if (phase === 'quarantined') await exhaustPublication(i.creationEventId);
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
+      if (phase === 'pending') await exhaustPublication(i.creationEventId);
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toHaveLength(1);
+      expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+    }
+  );
   it('leaves a recovered confirmation closed when its delayed notification acknowledgement arrives', async () => {
     const i = await begin();
     await created(i);
@@ -267,93 +271,96 @@ describe('PostgreSQL picture attachment contract', () => {
     ['deletion', 'creation-outbox'],
     ['deletion', 'deletion-outbox'],
     ['deletion', 'confirmation'],
-  ])('preserves %s progress and independent %s attention until that duty actually closes', async (transition, duty) => {
-    const i = await begin();
-    if (!transition.includes('creation')) await created(i);
-    if (transition === 'source') await register(i);
-    if (transition === 'deletion')
-      await runtime.runPromise(
-        PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
-      );
-    const publicationId = duty === 'deletion-outbox' ? i.deletionEventId : i.creationEventId;
-    let original: AttachmentPublication | undefined;
-    if (duty === 'confirmation')
-      await runtime.runPromise(
-        AttachmentDelivery.use((d) =>
-          d.quarantine('retained-create', creationConfirmation(i), 'confirmation-exhausted', {
-            kind: 'intent',
-            id: i.id,
-          })
-        )
-      );
-    else original = await exhaustPublication(publicationId);
-    expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
-    expect(
-      transition === 'source'
-        ? await confirm(i)
-        : transition === 'creation'
-          ? await created(i)
-          : await runtime.runPromise(
-              PictureAttachments.use((s) =>
-                s.assetResult({
-                  attachmentId: i.id,
-                  commandId: transition === 'deletion' ? i.deleteCommandId : i.commandId,
-                  causationId: transition === 'deletion' ? i.deletionEventId : i.creationEventId,
-                  outcome: transition === 'deletion' ? 'deleted' : 'rejected',
-                  assetId: transition === 'deletion' ? 'asset-A' : null,
-                })
-              )
-            )
-    ).toBe('applied');
-    const completed = {
-      state:
-        transition === 'source'
-          ? 'attached'
-          : transition === 'deletion'
-            ? 'cancelled'
-            : transition === 'rejected-creation'
-              ? 'failed'
-              : 'awaiting-source',
-      ...(transition === 'deletion' ? { deletion: 'complete' } : {}),
-    };
-    expect(await status(i)).toMatchObject({
-      attachment: { ...completed, attentionRequired: true },
-    });
-    const alerts = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
-    const alert = alerts.find(
-      (a) => a.scope === (duty === 'confirmation' ? 'confirmation' : 'outbox')
-    );
-    if (!alert) throw new Error('Ordinary transition erased the retained duty');
-    expect(
-      await runAttachmentOperator(
-        [duty === 'confirmation' ? 'recover-confirmation' : 'recover-outbox', alert.id],
-        { databaseUrl, maxAttempts: 2, retryDelayMs: 1 }
-      )
-    ).toEqual({ recovered: true });
-    if (duty !== 'confirmation') {
-      if (transition === 'source') {
-        await runtime.dispose();
-        runtime = ManagedRuntime.make(layer());
-      }
+  ])(
+    'preserves %s progress and independent %s attention until that duty actually closes',
+    async (transition, duty) => {
+      const i = await begin();
+      if (!transition.includes('creation')) await created(i);
+      if (transition === 'source') await register(i);
+      if (transition === 'deletion')
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
+        );
+      const publicationId = duty === 'deletion-outbox' ? i.deletionEventId : i.creationEventId;
+      let original: AttachmentPublication | undefined;
+      if (duty === 'confirmation')
+        await runtime.runPromise(
+          AttachmentDelivery.use((d) =>
+            d.quarantine('retained-create', creationConfirmation(i), 'confirmation-exhausted', {
+              kind: 'intent',
+              id: i.id,
+            })
+          )
+        );
+      else original = await exhaustPublication(publicationId);
       expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
-      const recovered = await claimPublication(publicationId);
-      expect(recovered.event).toEqual(original?.event);
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(recovered)));
+      expect(
+        transition === 'source'
+          ? await confirm(i)
+          : transition === 'creation'
+            ? await created(i)
+            : await runtime.runPromise(
+                PictureAttachments.use((s) =>
+                  s.assetResult({
+                    attachmentId: i.id,
+                    commandId: transition === 'deletion' ? i.deleteCommandId : i.commandId,
+                    causationId: transition === 'deletion' ? i.deletionEventId : i.creationEventId,
+                    outcome: transition === 'deletion' ? 'deleted' : 'rejected',
+                    assetId: transition === 'deletion' ? 'asset-A' : null,
+                  })
+                )
+              )
+      ).toBe('applied');
+      const completed = {
+        state:
+          transition === 'source'
+            ? 'attached'
+            : transition === 'deletion'
+              ? 'cancelled'
+              : transition === 'rejected-creation'
+                ? 'failed'
+                : 'awaiting-source',
+        ...(transition === 'deletion' ? { deletion: 'complete' } : {}),
+      };
+      expect(await status(i)).toMatchObject({
+        attachment: { ...completed, attentionRequired: true },
+      });
+      const alerts = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+      const alert = alerts.find(
+        (a) => a.scope === (duty === 'confirmation' ? 'confirmation' : 'outbox')
+      );
+      if (!alert) throw new Error('Ordinary transition erased the retained duty');
+      expect(
+        await runAttachmentOperator(
+          [duty === 'confirmation' ? 'recover-confirmation' : 'recover-outbox', alert.id],
+          { databaseUrl, maxAttempts: 2, retryDelayMs: 1 }
+        )
+      ).toEqual({ recovered: true });
+      if (duty !== 'confirmation') {
+        if (transition === 'source') {
+          await runtime.dispose();
+          runtime = ManagedRuntime.make(layer());
+        }
+        expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+        const recovered = await claimPublication(publicationId);
+        expect(recovered.event).toEqual(original?.event);
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(recovered)));
+      }
+      expect(await status(i)).toMatchObject({
+        attachment: { ...completed, attentionRequired: false },
+      });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        {
+          picture_asset_id: transition === 'source' ? 'asset-A' : null,
+          version: transition === 'source' ? 2 : 1,
+        },
+      ]);
+      expect(await sql`select count(*)::int as count from outbox_events`).toEqual([
+        { count: transition === 'source' ? 1 : 0 },
+      ]);
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
     }
-    expect(await status(i)).toMatchObject({
-      attachment: { ...completed, attentionRequired: false },
-    });
-    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
-      {
-        picture_asset_id: transition === 'source' ? 'asset-A' : null,
-        version: transition === 'source' ? 2 : 1,
-      },
-    ]);
-    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([
-      { count: transition === 'source' ? 1 : 0 },
-    ]);
-    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
-  });
+  );
   it('atomically reserves command identity, replays through restart and attaches only after the required registered Source', async () => {
     const [a, b] = await Promise.all([begin(), begin()]);
     expect(a.id).toBe(b.id);
@@ -569,91 +576,90 @@ describe('PostgreSQL picture attachment contract', () => {
     expect(await sql`select id from picture_attachment_outbox`).toEqual([]);
     expect(await sql`select id from outbox_events`).toEqual([]);
   });
-  it.each([
-    'creating',
-    'awaiting-source',
-    'accepting-source',
-  ])('removes an empty Profile during %s and durably deletes a late-created Asset', async (state) => {
-    const first = await begin();
-    if (state !== 'creating') await created(first);
-    if (state === 'accepting-source') await register(first);
-    expect(await remove(1)).toMatchObject({
-      _tag: 'Success',
-      profile: { version: 2, pictureAssetId: null },
-    });
-    if (state === 'creating') expect(await created(first)).toBe('applied');
-    expect(await confirm(first)).toBe('ignored');
-    expect(
-      await runtime.runPromise(
-        PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
-      )
-    ).toMatchObject({
-      attachment: { state: 'conflicted', assetId: 'asset-A', deletion: 'pending' },
-    });
-    expect(
-      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
-    ).toMatchObject([
-      {
-        event: {
-          id: first.deletionEventId,
-          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
-        },
-      },
-    ]);
-    expect(await remove(2)).toMatchObject({
-      _tag: 'Success',
-      profile: { version: 2, pictureAssetId: null },
-    });
-  });
-  it.each([
-    'outbox_events',
-    'picture_attachment_outbox',
-  ])('rolls back unlink, intent and delete duty when %s cannot commit', async (table) => {
-    const first = await begin();
-    await created(first);
-    await register(first);
-    await confirm(first);
-    await sql.unsafe(
-      "create function reject_unlink_write() returns trigger language plpgsql as $$ begin raise exception 'intentional unlink write failure'; end $$"
-    );
-    await sql.unsafe(
-      `create trigger reject_unlink_write before insert on ${table} for each row execute function reject_unlink_write()`
-    );
-    try {
-      await expect(remove(2)).rejects.toMatchObject({ _tag: 'ProfileUnavailable' });
-      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
-        { picture_asset_id: 'asset-A', version: 2 },
-      ]);
+  it.each(['creating', 'awaiting-source', 'accepting-source'])(
+    'removes an empty Profile during %s and durably deletes a late-created Asset',
+    async (state) => {
+      const first = await begin();
+      if (state !== 'creating') await created(first);
+      if (state === 'accepting-source') await register(first);
+      expect(await remove(1)).toMatchObject({
+        _tag: 'Success',
+        profile: { version: 2, pictureAssetId: null },
+      });
+      if (state === 'creating') expect(await created(first)).toBe('applied');
+      expect(await confirm(first)).toBe('ignored');
       expect(
         await runtime.runPromise(
           PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
         )
       ).toMatchObject({
-        attachment: { state: 'attached', deletion: 'none' },
+        attachment: { state: 'conflicted', assetId: 'asset-A', deletion: 'pending' },
       });
       expect(
-        await sql`select id from picture_attachment_outbox where destination='asset-delete'`
-      ).toEqual([]);
-    } finally {
-      await sql.unsafe(
-        `drop trigger reject_unlink_write on ${table};drop function reject_unlink_write()`
-      );
-    }
-    expect(await remove(2)).toMatchObject({
-      _tag: 'Success',
-      profile: { version: 3, pictureAssetId: null },
-    });
-    expect(
-      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
-    ).toMatchObject([
-      {
-        event: {
-          id: first.deletionEventId,
-          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+      ).toMatchObject([
+        {
+          event: {
+            id: first.deletionEventId,
+            data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+          },
         },
-      },
-    ]);
-  });
+      ]);
+      expect(await remove(2)).toMatchObject({
+        _tag: 'Success',
+        profile: { version: 2, pictureAssetId: null },
+      });
+    }
+  );
+  it.each(['outbox_events', 'picture_attachment_outbox'])(
+    'rolls back unlink, intent and delete duty when %s cannot commit',
+    async (table) => {
+      const first = await begin();
+      await created(first);
+      await register(first);
+      await confirm(first);
+      await sql.unsafe(
+        "create function reject_unlink_write() returns trigger language plpgsql as $$ begin raise exception 'intentional unlink write failure'; end $$"
+      );
+      await sql.unsafe(
+        `create trigger reject_unlink_write before insert on ${table} for each row execute function reject_unlink_write()`
+      );
+      try {
+        await expect(remove(2)).rejects.toMatchObject({ _tag: 'ProfileUnavailable' });
+        expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+          { picture_asset_id: 'asset-A', version: 2 },
+        ]);
+        expect(
+          await runtime.runPromise(
+            PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
+          )
+        ).toMatchObject({
+          attachment: { state: 'attached', deletion: 'none' },
+        });
+        expect(
+          await sql`select id from picture_attachment_outbox where destination='asset-delete'`
+        ).toEqual([]);
+      } finally {
+        await sql.unsafe(
+          `drop trigger reject_unlink_write on ${table};drop function reject_unlink_write()`
+        );
+      }
+      expect(await remove(2)).toMatchObject({
+        _tag: 'Success',
+        profile: { version: 3, pictureAssetId: null },
+      });
+      expect(
+        await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+      ).toMatchObject([
+        {
+          event: {
+            id: first.deletionEventId,
+            data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+          },
+        },
+      ]);
+    }
+  );
   it('rolls back the intent and Profile together when its event cannot commit', async () => {
     const i = await begin();
     await created(i);
@@ -754,373 +760,55 @@ describe('PostgreSQL picture attachment contract', () => {
       attachment: { deletion: 'complete', attentionRequired: false },
     });
   });
-  it.each([
-    'exhaustion',
-    'recovery',
-  ])('serializes ordinary Source attachment with concurrent publication %s', async (operation) => {
-    const i = await begin();
-    await created(i);
-    await register(i);
-    const first = await claimPublication(i.creationEventId);
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
-    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
-    const second = await claimPublication(i.creationEventId);
-    if (operation === 'recovery') {
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
-      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(second.id)))).toBe(
-        true
-      );
-    }
-    const current = operation === 'recovery' ? await claimPublication(second.id) : second;
-    const [outcome] = await Promise.all([
-      confirm(i),
-      runtime.runPromise(
-        AttachmentDelivery.use((d) =>
-          operation === 'recovery' ? d.complete(current) : d.failed(current)
-        )
-      ),
-    ]);
-    expect(outcome).toBe('applied');
-    expect(await status(i)).toMatchObject({
-      attachment: { state: 'attached', attentionRequired: operation === 'exhaustion' },
-    });
-    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
-      { picture_asset_id: 'asset-A', version: 2 },
-    ]);
-    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([{ count: 1 }]);
-  });
-  it.each([
-    'source',
-    'deletion',
-  ])('recovers exhausted duplicate %s confirmation without leaving completed work in attention', async (kind) => {
-    const i = await begin();
-    await created(i);
-    if (kind === 'source') {
+  it.each(['exhaustion', 'recovery'])(
+    'serializes ordinary Source attachment with concurrent publication %s',
+    async (operation) => {
+      const i = await begin();
+      await created(i);
       await register(i);
-      expect(await confirm(i)).toBe('applied');
-    } else {
-      await runtime.runPromise(
-        PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
-      );
-      expect(
-        await runtime.runPromise(
-          PictureAttachments.use((s) =>
-            s.assetResult({
-              attachmentId: i.id,
-              commandId: i.deleteCommandId,
-              causationId: i.deletionEventId,
-              outcome: 'deleted',
-              assetId: 'asset-A',
-            })
-          )
-        )
-      ).toBe('applied');
-    }
-    const completed =
-      kind === 'source' ? { state: 'attached' } : { state: 'cancelled', deletion: 'complete' };
-    const source = sourceConfirmation();
-    const result = {
-      ...source,
-      type: 'asset.command.result',
-      causationsource: 'https://wallpaperdb/user',
-      causationid: i.deletionEventId,
-      data: {
-        commandId: i.deleteCommandId,
-        applicationReference: i.id,
-        outcome: 'deleted',
-        assetId: 'asset-A',
-      },
-    };
-    const payload = JSON.stringify(kind === 'source' ? source : result);
-    const quarantine = () =>
-      runtime.runPromise(
-        AttachmentDelivery.use((d) =>
-          d.quarantine(
-            'duplicate-source-A',
-            payload,
-            'confirmation-exhausted',
-            kind === 'source' ? { kind: 'asset', id: 'asset-A' } : { kind: 'intent', id: i.id }
-          )
-        )
-      );
-    const status = () =>
-      runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
-    await quarantine();
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { ...completed, attentionRequired: true },
-    });
-    const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
-      (a) => a.scope === 'confirmation'
-    );
-    if (!alert) throw new Error('Missing exhausted confirmation alert');
-    expect(
-      await Promise.all([
-        runAttachmentOperator(['recover-confirmation', alert.id], {
-          databaseUrl,
-          maxAttempts: 2,
-          retryDelayMs: 1,
-        }),
-        quarantine(),
-      ]).then(([recovered]) => recovered)
-    ).toEqual({ recovered: true });
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { ...completed, attentionRequired: false },
-    });
-    await quarantine();
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { ...completed, attentionRequired: false },
-    });
-    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
-    expect(
-      await runAttachmentOperator(['recover-confirmation', alert.id], {
-        databaseUrl,
-        maxAttempts: 2,
-        retryDelayMs: 1,
-      })
-    ).toEqual({ recovered: false });
-    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
-      {
-        picture_asset_id: kind === 'source' ? 'asset-A' : null,
-        version: kind === 'source' ? 2 : 1,
-      },
-    ]);
-    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([
-      { count: kind === 'source' ? 1 : 0 },
-    ]);
-  });
-  it.each([
-    'confirmation',
-    'outbox',
-    'deletion',
-  ])('preserves outstanding %s attention while recovering a completed creation result', async (remaining) => {
-    const i = await begin();
-    await created(i);
-    if (remaining === 'deletion') {
-      await runtime.runPromise(
-        PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
-      );
-      expect(
-        await runtime.runPromise(
-          PictureAttachments.use((s) =>
-            s.assetResult({
-              attachmentId: i.id,
-              commandId: i.deleteCommandId,
-              causationId: i.deletionEventId,
-              outcome: 'rejected',
-              assetId: 'asset-A',
-            })
-          )
-        )
-      ).toBe('requires-attention');
-    } else {
-      await register(i);
-      await confirm(i);
-    }
-    const payload = JSON.stringify({
-      ...sourceConfirmation(),
-      type: 'asset.command.result',
-      causationsource: 'https://wallpaperdb/user',
-      causationid: i.creationEventId,
-      data: {
-        commandId: i.commandId,
-        applicationReference: i.id,
-        outcome: 'created',
-        assetId: 'asset-A',
-      },
-    });
-    await runtime.runPromise(
-      AttachmentDelivery.use((d) =>
-        d.quarantine('old-create', payload, 'confirmation-exhausted', { kind: 'intent', id: i.id })
-      )
-    );
-    const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
-      (a) => a.scope === 'confirmation'
-    );
-    if (!alert) throw new Error('Missing creation confirmation alert');
-    if (remaining === 'confirmation') {
-      await runtime.runPromise(
-        AttachmentDelivery.use((d) =>
-          d.quarantine(
-            'source-confirmation',
-            JSON.stringify(sourceConfirmation()),
-            'confirmation-exhausted',
-            { kind: 'asset', id: 'asset-A' }
-          )
-        )
-      );
-    } else if (remaining === 'outbox') {
-      for (let n = 0; n < 2; n++) {
-        const claim = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim())))[0];
-        if (!claim) throw new Error('Missing real outbox claim');
-        await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(claim)));
-        await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${claim.id}`;
+      const first = await claimPublication(i.creationEventId);
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
+      await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
+      const second = await claimPublication(i.creationEventId);
+      if (operation === 'recovery') {
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+        expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(second.id)))).toBe(
+          true
+        );
       }
-    }
-    expect(
-      await runAttachmentOperator(['recover-confirmation', alert.id], {
-        databaseUrl,
-        maxAttempts: 2,
-        retryDelayMs: 1,
-      })
-    ).toEqual({ recovered: true });
-    const status = () =>
-      runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { attentionRequired: true },
-    });
-    if (remaining === 'confirmation') {
-      const publication = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).find(
-        (p) => p.id === i.creationEventId
-      );
-      if (!publication) throw new Error('Missing publication beside unresolved confirmation');
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
-      expect(await status()).toMatchObject({
-        kind: 'attachment',
-        attachment: { attentionRequired: true },
-      });
-      const other = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
-        (a) => a.scope === 'confirmation' && a.id !== alert.id
-      );
-      if (!other) throw new Error('Missing other unresolved confirmation');
-      expect(
-        await runAttachmentOperator(['recover-confirmation', other.id], {
-          databaseUrl,
-          maxAttempts: 2,
-          retryDelayMs: 1,
-        })
-      ).toEqual({ recovered: true });
-      expect(await status()).toMatchObject({
-        kind: 'attachment',
-        attachment: { state: 'attached', attentionRequired: false },
-      });
-    } else if (remaining === 'outbox') {
-      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toContainEqual({
-        id: i.creationEventId,
-        scope: 'outbox',
-        reason: 'exhausted',
-        quarantineId: expect.any(String),
-      });
-      expect(
-        await runAttachmentOperator(['recover-outbox', i.creationEventId], {
-          databaseUrl,
-          maxAttempts: 2,
-          retryDelayMs: 1,
-        })
-      ).toEqual({ recovered: true });
-      const publication = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).find(
-        (p) => p.id === i.creationEventId
-      );
-      if (!publication) throw new Error('Missing recovered publication');
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
-      expect(await status()).toMatchObject({
-        kind: 'attachment',
-        attachment: { state: 'attached', attentionRequired: false },
-      });
-    } else {
-      const publication = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).find(
-        (p) => p.id === i.creationEventId
-      );
-      if (!publication) throw new Error('Missing publication beside rejected deletion');
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
-      expect(await status()).toMatchObject({
-        kind: 'attachment',
-        attachment: { deletion: 'pending', attentionRequired: true },
-      });
-      expect(
-        await runtime.runPromise(
-          PictureAttachments.use((s) =>
-            s.assetResult({
-              attachmentId: i.id,
-              commandId: i.deleteCommandId,
-              causationId: i.deletionEventId,
-              outcome: 'deleted',
-              assetId: 'asset-A',
-            })
+      const current = operation === 'recovery' ? await claimPublication(second.id) : second;
+      const [outcome] = await Promise.all([
+        confirm(i),
+        runtime.runPromise(
+          AttachmentDelivery.use((d) =>
+            operation === 'recovery' ? d.complete(current) : d.failed(current)
           )
-        )
-      ).toBe('applied');
-      await runtime.runPromise(
-        AttachmentDelivery.use((d) =>
-          d.quarantine('old-create', payload, 'confirmation-exhausted', {
-            kind: 'intent',
-            id: i.id,
-          })
-        )
-      );
-      expect(await status()).toMatchObject({
-        kind: 'attachment',
-        attachment: { state: 'cancelled', deletion: 'complete', attentionRequired: false },
+        ),
+      ]);
+      expect(outcome).toBe('applied');
+      expect(await status(i)).toMatchObject({
+        attachment: { state: 'attached', attentionRequired: operation === 'exhaustion' },
       });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        { picture_asset_id: 'asset-A', version: 2 },
+      ]);
+      expect(await sql`select count(*)::int as count from outbox_events`).toEqual([{ count: 1 }]);
     }
-  });
-  it.each([
-    'creation',
-    'deletion',
-  ])('clears exhausted %s publication attention after trusted recovery, matching completion and duplicate result', async (kind) => {
-    const i = await begin();
-    await created(i);
-    if (kind === 'creation') {
-      await register(i);
-      await confirm(i);
-    } else {
-      const creation = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim())))[0];
-      if (!creation) throw new Error('Missing creation publication');
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(creation)));
-      await runtime.runPromise(
-        PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
-      );
-      await runtime.runPromise(
-        PictureAttachments.use((s) =>
-          s.assetResult({
-            attachmentId: i.id,
-            commandId: i.deleteCommandId,
-            causationId: i.deletionEventId,
-            outcome: 'deleted',
-            assetId: 'asset-A',
-          })
-        )
-      );
-    }
-    const claim = () => runtime.runPromise(AttachmentDelivery.use((d) => d.claim()));
-    const first = (await claim())[0];
-    if (!first) throw new Error('Missing original publication');
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
-    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
-    const second = (await claim())[0];
-    if (!second) throw new Error('Missing ambiguous publication retry');
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
-    const status = () =>
-      runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { attentionRequired: true },
-    });
-    expect(
-      await runAttachmentOperator(['recover-outbox', first.id], {
-        databaseUrl,
-        maxAttempts: 2,
-        retryDelayMs: 1,
-      })
-    ).toEqual({ recovered: true });
-    const recovered = (await claim())[0];
-    if (!recovered) throw new Error('Missing recovered publication');
-    expect(recovered.event).toEqual(first.event);
-    expect(recovered.attempts).toBe(0);
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(first)));
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: { attentionRequired: true },
-    });
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(recovered)));
-    expect(
-      kind === 'creation'
-        ? await created(i)
-        : await runtime.runPromise(
+  );
+  it.each(['source', 'deletion'])(
+    'recovers exhausted duplicate %s confirmation without leaving completed work in attention',
+    async (kind) => {
+      const i = await begin();
+      await created(i);
+      if (kind === 'source') {
+        await register(i);
+        expect(await confirm(i)).toBe('applied');
+      } else {
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
+        );
+        expect(
+          await runtime.runPromise(
             PictureAttachments.use((s) =>
               s.assetResult({
                 attachmentId: i.id,
@@ -1131,84 +819,471 @@ describe('PostgreSQL picture attachment contract', () => {
               })
             )
           )
-    ).toBe('ignored');
-    expect(await status()).toMatchObject({
-      kind: 'attachment',
-      attachment: {
-        state: kind === 'creation' ? 'attached' : 'cancelled',
-        attentionRequired: false,
-      },
+        ).toBe('applied');
+      }
+      const completed =
+        kind === 'source' ? { state: 'attached' } : { state: 'cancelled', deletion: 'complete' };
+      const source = sourceConfirmation();
+      const result = {
+        ...source,
+        type: 'asset.command.result',
+        causationsource: 'https://wallpaperdb/user',
+        causationid: i.deletionEventId,
+        data: {
+          commandId: i.deleteCommandId,
+          applicationReference: i.id,
+          outcome: 'deleted',
+          assetId: 'asset-A',
+        },
+      };
+      const payload = JSON.stringify(kind === 'source' ? source : result);
+      const quarantine = () =>
+        runtime.runPromise(
+          AttachmentDelivery.use((d) =>
+            d.quarantine(
+              'duplicate-source-A',
+              payload,
+              'confirmation-exhausted',
+              kind === 'source' ? { kind: 'asset', id: 'asset-A' } : { kind: 'intent', id: i.id }
+            )
+          )
+        );
+      const status = () =>
+        runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
+      await quarantine();
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { ...completed, attentionRequired: true },
+      });
+      const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
+        (a) => a.scope === 'confirmation'
+      );
+      if (!alert) throw new Error('Missing exhausted confirmation alert');
+      expect(
+        await Promise.all([
+          runAttachmentOperator(['recover-confirmation', alert.id], {
+            databaseUrl,
+            maxAttempts: 2,
+            retryDelayMs: 1,
+          }),
+          quarantine(),
+        ]).then(([recovered]) => recovered)
+      ).toEqual({ recovered: true });
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { ...completed, attentionRequired: false },
+      });
+      await quarantine();
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { ...completed, attentionRequired: false },
+      });
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
+      expect(
+        await runAttachmentOperator(['recover-confirmation', alert.id], {
+          databaseUrl,
+          maxAttempts: 2,
+          retryDelayMs: 1,
+        })
+      ).toEqual({ recovered: false });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        {
+          picture_asset_id: kind === 'source' ? 'asset-A' : null,
+          version: kind === 'source' ? 2 : 1,
+        },
+      ]);
+      expect(await sql`select count(*)::int as count from outbox_events`).toEqual([
+        { count: kind === 'source' ? 1 : 0 },
+      ]);
+    }
+  );
+  it('backfills retained quarantine routing without changing recovery or notification evidence', async () => {
+    const i = await begin();
+    const payload = creationConfirmation(i);
+    await sql`insert into picture_attachment_quarantine(id,payload,reason,notified_at) values ('legacy',${payload},'confirmation-exhausted',now()), ('malformed','{','invalid',null)`;
+    await promisify(execFile)(process.execPath, ['--import', 'tsx', 'scripts/migrate.ts'], {
+      env: { ...process.env, DATABASE_URL: databaseUrl },
     });
-    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
     expect(
-      await runAttachmentOperator(['recover-outbox', first.id], {
-        databaseUrl,
-        maxAttempts: 2,
-        retryDelayMs: 1,
-      })
-    ).toEqual({ recovered: false });
-    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      await sql`select id,application_reference,asset_id,payload,recovered_at,notified_at is not null as notified from picture_attachment_quarantine order by id`
+    ).toEqual([
       {
-        picture_asset_id: kind === 'creation' ? 'asset-A' : null,
-        version: kind === 'creation' ? 2 : 1,
+        id: 'legacy',
+        application_reference: i.id,
+        asset_id: null,
+        payload,
+        recovered_at: null,
+        notified: true,
+      },
+      {
+        id: 'malformed',
+        application_reference: null,
+        asset_id: null,
+        payload: '{',
+        recovered_at: null,
+        notified: false,
       },
     ]);
+    await created(i);
+    expect(
+      await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
+    ).toMatchObject({ kind: 'attachment', attachment: { attentionRequired: true } });
   });
-  it.each([
-    'complete',
-    'failed',
-    'claim',
-  ])('serializes %s with repeated cancellation without changing the orphan command', async (operation) => {
+  it('does not load unrelated quarantine payloads during attachment reconciliation', async () => {
     const i = await begin();
     await created(i);
-    const cancel = () =>
-      runtime.runPromise(PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id)));
-    await cancel();
-    const claim = () => runtime.runPromise(AttachmentDelivery.use((d) => d.claim()));
-    const publications = await claim();
-    const creation = publications.find((p) => p.id === i.creationEventId);
-    let deletion = publications.find((p) => p.id === i.deletionEventId);
-    if (!creation || !deletion) throw new Error('Missing claimed create/delete publications');
-    const firstDeletion = deletion;
-    await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(creation)));
-    if (operation !== 'complete') {
-      if (operation === 'failed')
-        await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(firstDeletion)));
-      await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${deletion.id}`;
-      deletion = (await claim()).find((p) => p.id === i.deletionEventId);
-      if (!deletion) throw new Error('Missing second deletion claim');
-      if (operation === 'claim')
-        await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${deletion.id}`;
-    }
-    const current = deletion;
-    await Promise.all([
-      cancel(),
-      operation === 'claim'
-        ? claim()
-        : runtime.runPromise(
-            AttachmentDelivery.use((d) =>
-              operation === 'complete' ? d.complete(current) : d.failed(current)
-            )
-          ),
-    ]);
-    if (operation === 'claim') await claim();
+    const unrelated = JSON.stringify({
+      ...sourceConfirmation(),
+      data: {
+        ...sourceConfirmation().data,
+        assetId: 'unrelated-asset',
+      },
+    });
+    await sql`insert into picture_attachment_quarantine(id,payload,reason,asset_id)
+      select 'unrelated-' || n, ${unrelated}, 'confirmation-exhausted', 'unrelated-asset'
+      from generate_series(1,1000) n`;
+    await sql`analyze picture_attachment_quarantine`;
+    const plan = await sql`explain (format json) select payload from picture_attachment_quarantine
+      where recovered_at is null and (application_reference=${i.id} or asset_id='asset-A')`;
+    expect(JSON.stringify(plan)).toContain('picture_attachment_quarantine_reference');
+    expect(JSON.stringify(plan)).toContain('picture_attachment_quarantine_asset');
+    await sql`select pg_stat_statements_reset()`;
+    await register(i);
+    await confirm(i);
+    const reads =
+      await sql`select coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls from pg_stat_statements
+      where query like 'select %from "picture_attachment_quarantine"%'`;
+    expect(reads[0]?.rows).toBe(0);
+    expect(reads[0]?.calls).toBeGreaterThan(0);
     expect(
-      await sql`select event->>'id' as id,status from picture_attachment_outbox where destination='asset-delete'`
-    ).toEqual([
-      { id: i.deletionEventId, status: operation === 'complete' ? 'published' : 'quarantined' },
-    ]);
+      await sql`select count(*)::int as count from picture_attachment_quarantine where recovered_at is null`
+    ).toEqual([{ count: 1000 }]);
     expect(
       await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
     ).toMatchObject({
       kind: 'attachment',
-      attachment: {
-        state: 'cancelled',
-        assetId: 'asset-A',
-        deletion: 'pending',
-        ...(operation === 'complete' ? {} : { attentionRequired: true }),
-      },
+      attachment: { state: 'attached', attentionRequired: false },
     });
   });
+  it.each(['confirmation', 'outbox', 'deletion'])(
+    'preserves outstanding %s attention while recovering a completed creation result',
+    async (remaining) => {
+      const i = await begin();
+      await created(i);
+      if (remaining === 'deletion') {
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
+        );
+        expect(
+          await runtime.runPromise(
+            PictureAttachments.use((s) =>
+              s.assetResult({
+                attachmentId: i.id,
+                commandId: i.deleteCommandId,
+                causationId: i.deletionEventId,
+                outcome: 'rejected',
+                assetId: 'asset-A',
+              })
+            )
+          )
+        ).toBe('requires-attention');
+      } else {
+        await register(i);
+        await confirm(i);
+      }
+      const payload = JSON.stringify({
+        ...sourceConfirmation(),
+        type: 'asset.command.result',
+        causationsource: 'https://wallpaperdb/user',
+        causationid: i.creationEventId,
+        data: {
+          commandId: i.commandId,
+          applicationReference: i.id,
+          outcome: 'created',
+          assetId: 'asset-A',
+        },
+      });
+      await runtime.runPromise(
+        AttachmentDelivery.use((d) =>
+          d.quarantine('old-create', payload, 'confirmation-exhausted', {
+            kind: 'intent',
+            id: i.id,
+          })
+        )
+      );
+      const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
+        (a) => a.scope === 'confirmation'
+      );
+      if (!alert) throw new Error('Missing creation confirmation alert');
+      if (remaining === 'confirmation') {
+        await runtime.runPromise(
+          AttachmentDelivery.use((d) =>
+            d.quarantine(
+              'source-confirmation',
+              JSON.stringify(sourceConfirmation()),
+              'confirmation-exhausted',
+              { kind: 'asset', id: 'asset-A' }
+            )
+          )
+        );
+      } else if (remaining === 'outbox') {
+        for (let n = 0; n < 2; n++) {
+          const claim = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim())))[0];
+          if (!claim) throw new Error('Missing real outbox claim');
+          await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(claim)));
+          await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${claim.id}`;
+        }
+      }
+      expect(
+        await runAttachmentOperator(['recover-confirmation', alert.id], {
+          databaseUrl,
+          maxAttempts: 2,
+          retryDelayMs: 1,
+        })
+      ).toEqual({ recovered: true });
+      const status = () =>
+        runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { attentionRequired: true },
+      });
+      if (remaining === 'confirmation') {
+        const publication = (
+          await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))
+        ).find((p) => p.id === i.creationEventId);
+        if (!publication) throw new Error('Missing publication beside unresolved confirmation');
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
+        expect(await status()).toMatchObject({
+          kind: 'attachment',
+          attachment: { attentionRequired: true },
+        });
+        const other = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
+          (a) => a.scope === 'confirmation' && a.id !== alert.id
+        );
+        if (!other) throw new Error('Missing other unresolved confirmation');
+        expect(
+          await runAttachmentOperator(['recover-confirmation', other.id], {
+            databaseUrl,
+            maxAttempts: 2,
+            retryDelayMs: 1,
+          })
+        ).toEqual({ recovered: true });
+        expect(await status()).toMatchObject({
+          kind: 'attachment',
+          attachment: { state: 'attached', attentionRequired: false },
+        });
+      } else if (remaining === 'outbox') {
+        expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toContainEqual({
+          id: i.creationEventId,
+          scope: 'outbox',
+          reason: 'exhausted',
+          quarantineId: expect.any(String),
+        });
+        expect(
+          await runAttachmentOperator(['recover-outbox', i.creationEventId], {
+            databaseUrl,
+            maxAttempts: 2,
+            retryDelayMs: 1,
+          })
+        ).toEqual({ recovered: true });
+        const publication = (
+          await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))
+        ).find((p) => p.id === i.creationEventId);
+        if (!publication) throw new Error('Missing recovered publication');
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
+        expect(await status()).toMatchObject({
+          kind: 'attachment',
+          attachment: { state: 'attached', attentionRequired: false },
+        });
+      } else {
+        const publication = (
+          await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))
+        ).find((p) => p.id === i.creationEventId);
+        if (!publication) throw new Error('Missing publication beside rejected deletion');
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
+        expect(await status()).toMatchObject({
+          kind: 'attachment',
+          attachment: { deletion: 'pending', attentionRequired: true },
+        });
+        expect(
+          await runtime.runPromise(
+            PictureAttachments.use((s) =>
+              s.assetResult({
+                attachmentId: i.id,
+                commandId: i.deleteCommandId,
+                causationId: i.deletionEventId,
+                outcome: 'deleted',
+                assetId: 'asset-A',
+              })
+            )
+          )
+        ).toBe('applied');
+        await runtime.runPromise(
+          AttachmentDelivery.use((d) =>
+            d.quarantine('old-create', payload, 'confirmation-exhausted', {
+              kind: 'intent',
+              id: i.id,
+            })
+          )
+        );
+        expect(await status()).toMatchObject({
+          kind: 'attachment',
+          attachment: { state: 'cancelled', deletion: 'complete', attentionRequired: false },
+        });
+      }
+    }
+  );
+  it.each(['creation', 'deletion'])(
+    'clears exhausted %s publication attention after trusted recovery, matching completion and duplicate result',
+    async (kind) => {
+      const i = await begin();
+      await created(i);
+      if (kind === 'creation') {
+        await register(i);
+        await confirm(i);
+      } else {
+        const creation = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim())))[0];
+        if (!creation) throw new Error('Missing creation publication');
+        await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(creation)));
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
+        );
+        await runtime.runPromise(
+          PictureAttachments.use((s) =>
+            s.assetResult({
+              attachmentId: i.id,
+              commandId: i.deleteCommandId,
+              causationId: i.deletionEventId,
+              outcome: 'deleted',
+              assetId: 'asset-A',
+            })
+          )
+        );
+      }
+      const claim = () => runtime.runPromise(AttachmentDelivery.use((d) => d.claim()));
+      const first = (await claim())[0];
+      if (!first) throw new Error('Missing original publication');
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
+      await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
+      const second = (await claim())[0];
+      if (!second) throw new Error('Missing ambiguous publication retry');
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+      const status = () =>
+        runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { attentionRequired: true },
+      });
+      expect(
+        await runAttachmentOperator(['recover-outbox', first.id], {
+          databaseUrl,
+          maxAttempts: 2,
+          retryDelayMs: 1,
+        })
+      ).toEqual({ recovered: true });
+      const recovered = (await claim())[0];
+      if (!recovered) throw new Error('Missing recovered publication');
+      expect(recovered.event).toEqual(first.event);
+      expect(recovered.attempts).toBe(0);
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(first)));
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: { attentionRequired: true },
+      });
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(recovered)));
+      expect(
+        kind === 'creation'
+          ? await created(i)
+          : await runtime.runPromise(
+              PictureAttachments.use((s) =>
+                s.assetResult({
+                  attachmentId: i.id,
+                  commandId: i.deleteCommandId,
+                  causationId: i.deletionEventId,
+                  outcome: 'deleted',
+                  assetId: 'asset-A',
+                })
+              )
+            )
+      ).toBe('ignored');
+      expect(await status()).toMatchObject({
+        kind: 'attachment',
+        attachment: {
+          state: kind === 'creation' ? 'attached' : 'cancelled',
+          attentionRequired: false,
+        },
+      });
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
+      expect(
+        await runAttachmentOperator(['recover-outbox', first.id], {
+          databaseUrl,
+          maxAttempts: 2,
+          retryDelayMs: 1,
+        })
+      ).toEqual({ recovered: false });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        {
+          picture_asset_id: kind === 'creation' ? 'asset-A' : null,
+          version: kind === 'creation' ? 2 : 1,
+        },
+      ]);
+    }
+  );
+  it.each(['complete', 'failed', 'claim'])(
+    'serializes %s with repeated cancellation without changing the orphan command',
+    async (operation) => {
+      const i = await begin();
+      await created(i);
+      const cancel = () =>
+        runtime.runPromise(PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id)));
+      await cancel();
+      const claim = () => runtime.runPromise(AttachmentDelivery.use((d) => d.claim()));
+      const publications = await claim();
+      const creation = publications.find((p) => p.id === i.creationEventId);
+      let deletion = publications.find((p) => p.id === i.deletionEventId);
+      if (!creation || !deletion) throw new Error('Missing claimed create/delete publications');
+      const firstDeletion = deletion;
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(creation)));
+      if (operation !== 'complete') {
+        if (operation === 'failed')
+          await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(firstDeletion)));
+        await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${deletion.id}`;
+        deletion = (await claim()).find((p) => p.id === i.deletionEventId);
+        if (!deletion) throw new Error('Missing second deletion claim');
+        if (operation === 'claim')
+          await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${deletion.id}`;
+      }
+      const current = deletion;
+      await Promise.all([
+        cancel(),
+        operation === 'claim'
+          ? claim()
+          : runtime.runPromise(
+              AttachmentDelivery.use((d) =>
+                operation === 'complete' ? d.complete(current) : d.failed(current)
+              )
+            ),
+      ]);
+      if (operation === 'claim') await claim();
+      expect(
+        await sql`select event->>'id' as id,status from picture_attachment_outbox where destination='asset-delete'`
+      ).toEqual([
+        { id: i.deletionEventId, status: operation === 'complete' ? 'published' : 'quarantined' },
+      ]);
+      expect(
+        await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
+      ).toMatchObject({
+        kind: 'attachment',
+        attachment: {
+          state: 'cancelled',
+          assetId: 'asset-A',
+          deletion: 'pending',
+          ...(operation === 'complete' ? {} : { attentionRequired: true }),
+        },
+      });
+    }
+  );
   it('keeps independent quarantined publication attention when another completed command is acknowledged', async () => {
     const i = await begin();
     await created(i);

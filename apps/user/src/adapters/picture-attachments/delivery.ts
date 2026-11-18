@@ -236,12 +236,15 @@ export function makeDelivery(
     quarantine: (id, payload, reason, target) =>
       query('quarantine', (db) =>
         db.transaction(async (tx) => {
+          const retainedTarget = confirmationTarget(payload.slice(0, 16384));
           const record = target ? await lockIntent(tx, target) : undefined;
           await tx
             .insert(attachmentQuarantine)
             .values({
               id: createHash('sha256').update(id).digest('hex'),
               payload: payload.slice(0, 16384),
+              applicationReference: retainedTarget?.kind === 'intent' ? retainedTarget.id : null,
+              assetId: retainedTarget?.kind === 'asset' ? retainedTarget.id : null,
               reason,
             })
             .onConflictDoNothing();

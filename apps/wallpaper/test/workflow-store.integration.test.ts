@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Cause, Effect, Exit, Layer, ManagedRuntime } from 'effect';
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
@@ -21,11 +23,13 @@ const databaseUrl = () =>
 let pool: Pool;
 beforeAll(async () => {
   container = await new GenericContainer('postgres:16-alpine')
+    .withCommand(['postgres', '-c', 'shared_preload_libraries=pg_stat_statements'])
     .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
     .withExposedPorts(5432)
     .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
     .start();
   pool = new Pool({ connectionString: databaseUrl() });
+  await pool.query('CREATE EXTENSION pg_stat_statements');
   await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
 });
 afterAll(async () => {
@@ -911,6 +915,99 @@ it('pages past 100 creations without losing older published or pending work or l
     ).toBe(true);
     expect(all.filter((w) => w.state === 'published')).toHaveLength(1);
     expect(all.filter((w) => w.state === 'awaiting-source')).toHaveLength(101);
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('does not load unrelated quarantine payloads during Wallpaper reconciliation', async () => {
+  const runtime = recoveryRuntime();
+  try {
+    const w = await runtime.runPromise(
+      WorkflowStore.use((s) => s.begin({ namespace: 'authors', subject: 'isolated' }, 'request'))
+    );
+    const unrelated = sourceEvent({ ...w, id: 'unrelated' });
+    await pool.query(
+      `INSERT INTO wallpaper_workflow_quarantine(id,payload,reason,asset_id)
+      SELECT 'unrelated-' || n, $1, 'confirmation-exhausted', 'asset:unrelated' FROM generate_series(1,1000) n`,
+      [JSON.stringify(unrelated)]
+    );
+    await pool.query('ANALYZE wallpaper_workflow_quarantine');
+    const plan = await pool.query(
+      `EXPLAIN (FORMAT JSON) SELECT payload FROM wallpaper_workflow_quarantine
+      WHERE recovered_at IS NULL AND (application_reference=$1 OR asset_id=$2)`,
+      [w.id, `asset:${w.id}`]
+    );
+    expect(JSON.stringify(plan.rows)).toContain('wallpaper_workflow_quarantine_reference');
+    expect(JSON.stringify(plan.rows)).toContain('wallpaper_workflow_quarantine_asset');
+    await pool.query('SELECT pg_stat_statements_reset()');
+    const publication = await claim(runtime);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(publication)));
+    await publish(runtime, w);
+    const published = await claim(runtime);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(published)));
+    const reads =
+      await pool.query(`SELECT coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls FROM pg_stat_statements
+      WHERE query LIKE 'select %from %"wallpaper_workflow_quarantine"%'`);
+    expect(reads.rows[0]?.rows).toBe(0);
+    expect(reads.rows[0]?.calls).toBeGreaterThan(0);
+    expect(
+      (
+        await pool.query(
+          'SELECT count(*)::int as count FROM wallpaper_workflow_quarantine WHERE recovered_at IS NULL'
+        )
+      ).rows
+    ).toEqual([{ count: 1000 }]);
+    expect(await read(runtime, w)).toMatchObject({ state: 'published', attentionRequired: false });
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('backfills retained Wallpaper quarantine routing without changing evidence', async () => {
+  const runtime = recoveryRuntime();
+  try {
+    const w = await runtime.runPromise(
+      WorkflowStore.use((s) => s.begin({ namespace: 'authors', subject: 'legacy' }, 'request'))
+    );
+    const payload = JSON.stringify(resultEvent(w));
+    await pool.query(
+      `INSERT INTO wallpaper_workflow_quarantine(id,payload,reason,notified_at) VALUES ('legacy',$1,'confirmation-exhausted',now()), ('malformed','{','invalid',null)`,
+      [payload]
+    );
+    await promisify(execFile)(process.execPath, ['--import', 'tsx', 'scripts/migrate.ts'], {
+      env: { ...process.env, DATABASE_URL: databaseUrl() },
+    });
+    expect(
+      (
+        await pool.query(
+          'SELECT id,application_reference,asset_id,payload,recovered_at,notified_at IS NOT NULL AS notified FROM wallpaper_workflow_quarantine ORDER BY id'
+        )
+      ).rows
+    ).toEqual([
+      {
+        id: 'legacy',
+        application_reference: w.id,
+        asset_id: null,
+        payload,
+        recovered_at: null,
+        notified: true,
+      },
+      {
+        id: 'malformed',
+        application_reference: null,
+        asset_id: null,
+        payload: '{',
+        recovered_at: null,
+        notified: false,
+      },
+    ]);
+    await pool.query(
+      `UPDATE wallpaper_intents SET state = state || '{"attentionRequired":true}'::jsonb WHERE id=$1`,
+      [w.id]
+    );
+    await attach(runtime, w);
+    expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
   } finally {
     await runtime.dispose();
   }

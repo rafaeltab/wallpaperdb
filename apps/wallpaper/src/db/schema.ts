@@ -56,14 +56,26 @@ export const workflowOutbox = pgTable(
     ),
   ]
 );
-export const workflowQuarantine = pgTable('wallpaper_workflow_quarantine', {
-  notifiedAt: timestamp('notified_at', { withTimezone: true }),
-  recoveredAt: timestamp('recovered_at', { withTimezone: true }),
-  id: text('id').primaryKey(),
-  payload: text('payload').notNull(),
-  reason: text('reason').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const workflowQuarantine = pgTable(
+  'wallpaper_workflow_quarantine',
+  {
+    // Routing is derived from the validated retained envelope on insertion/backfill.
+    applicationReference: text('application_reference'),
+    assetId: text('asset_id'),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    recoveredAt: timestamp('recovered_at', { withTimezone: true }),
+    id: text('id').primaryKey(),
+    payload: text('payload').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('wallpaper_workflow_quarantine_reference')
+      .on(t.applicationReference)
+      .where(sql`${t.recoveredAt} IS NULL`),
+    index('wallpaper_workflow_quarantine_asset').on(t.assetId).where(sql`${t.recoveredAt} IS NULL`),
+  ]
+);
 
 export const sourceIntents = pgTable(
   'wallpaper_source_intents',

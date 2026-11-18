@@ -191,14 +191,26 @@ export const attachmentOutbox = pgTable(
     ),
   ]
 );
-export const attachmentQuarantine = pgTable('picture_attachment_quarantine', {
-  id: text('id').primaryKey(),
-  payload: text('payload').notNull(),
-  reason: text('reason').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  notifiedAt: timestamp('notified_at', { withTimezone: true }),
-  recoveredAt: timestamp('recovered_at', { withTimezone: true }),
-});
+export const attachmentQuarantine = pgTable(
+  'picture_attachment_quarantine',
+  {
+    // Routing is derived from the validated retained envelope on insertion/backfill.
+    applicationReference: text('application_reference'),
+    assetId: text('asset_id'),
+    id: text('id').primaryKey(),
+    payload: text('payload').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    recoveredAt: timestamp('recovered_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('picture_attachment_quarantine_reference')
+      .on(t.applicationReference)
+      .where(sql`${t.recoveredAt} IS NULL`),
+    index('picture_attachment_quarantine_asset').on(t.assetId).where(sql`${t.recoveredAt} IS NULL`),
+  ]
+);
 
 export const pictureAttachmentSlots = pgTable('picture_attachment_slots', {
   profileId: text('profile_id')

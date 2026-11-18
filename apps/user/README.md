@@ -17,3 +17,5 @@ User owns contributor Profiles and the rules for changing public identity, inclu
 Clerk supplies authenticated identities. PostgreSQL owns Profile state and exclusive Handle claims. Sharp decodes Profile pictures into metadata-free images in an isolated process so expensive native work can be stopped.
 
 See the [domain context](GLOSSARY.md) for terminology and invariants and [workflow decisions](docs/adr/0001-effect-profile-workflows.md).
+
+Apply migrations with `make migrate PACKAGE=user` before starting writers. The [migration entry](scripts/migrate.ts) also rebuilds indexed quarantine routing for retained payloads in keyset batches. Stop service writers during this operation. Payloads and notification/recovery identities remain unchanged; malformed evidence stays quarantined. Ordinary reconciliation reads only relevant unresolved routing entries from the [schema indexes](src/db/schema.ts).

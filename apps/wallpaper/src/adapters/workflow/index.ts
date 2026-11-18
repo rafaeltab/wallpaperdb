@@ -126,15 +126,19 @@ export function workflowPostgresLayer(options: Options) {
       };
       const reconcileAttention = async (tx: Transaction, w: Wallpaper) => {
         const confirmations = await tx
-          .select({ payload: workflowQuarantine.payload })
+          .select({ id: workflowQuarantine.id })
           .from(workflowQuarantine)
-          .where(isNull(workflowQuarantine.recoveredAt));
-        const retained = confirmations.some(({ payload }) => {
-          const target = targetOf(payload);
-          return target?.kind === 'wallpaper'
-            ? target.id === w.id
-            : target?.kind === 'asset' && target.id === w.assetId;
-        });
+          .where(
+            and(
+              isNull(workflowQuarantine.recoveredAt),
+              or(
+                eq(workflowQuarantine.applicationReference, w.id),
+                w.assetId ? eq(workflowQuarantine.assetId, w.assetId) : undefined
+              )
+            )
+          )
+          .limit(1);
+        const retained = confirmations.length > 0;
         const outstanding = await tx
           .select({ status: workflowOutbox.status })
           .from(workflowOutbox)
@@ -533,12 +537,16 @@ export function workflowPostgresLayer(options: Options) {
         quarantine: (id, payload, reason, target) =>
           query('quarantine', (db) =>
             db.transaction(async (tx) => {
+              const retainedTarget = targetOf(payload.slice(0, 16384));
               const record = target ? await lockWallpaper(tx, target) : undefined;
               await tx
                 .insert(workflowQuarantine)
                 .values({
                   id: createHash('sha256').update(id).digest('hex'),
                   payload: payload.slice(0, 16384),
+                  applicationReference:
+                    retainedTarget?.kind === 'wallpaper' ? retainedTarget.id : null,
+                  assetId: retainedTarget?.kind === 'asset' ? retainedTarget.id : null,
                   reason,
                 })
                 .onConflictDoNothing();

@@ -1,4 +1,4 @@
-import { eq, isNull } from 'drizzle-orm';
+import { and, or, eq, isNull } from 'drizzle-orm';
 import type {
   AttachmentDelivery,
   PictureAttachment,
@@ -22,15 +22,19 @@ type AttachmentTransaction = Parameters<Parameters<AttachmentDatabase['transacti
  * as the ordinary transition or delivery closure; the summary boolean is never its own cause. */
 export async function reconcileAttention(tx: AttachmentTransaction, intent: PictureAttachment) {
   const pending = await tx
-    .select({ payload: attachmentQuarantine.payload })
+    .select({ id: attachmentQuarantine.id })
     .from(attachmentQuarantine)
-    .where(isNull(attachmentQuarantine.recoveredAt));
-  const otherConfirmation = pending.some(({ payload }) => {
-    const other = confirmationTarget(payload);
-    return other?.kind === 'intent'
-      ? other.id === intent.id
-      : other?.kind === 'asset' && other.id === intent.assetId;
-  });
+    .where(
+      and(
+        isNull(attachmentQuarantine.recoveredAt),
+        or(
+          eq(attachmentQuarantine.applicationReference, intent.id),
+          intent.assetId ? eq(attachmentQuarantine.assetId, intent.assetId) : undefined
+        )
+      )
+    )
+    .limit(1);
+  const otherConfirmation = pending.length > 0;
   const outbox = await tx
     .select({ id: attachmentOutbox.id, status: attachmentOutbox.status })
     .from(attachmentOutbox)

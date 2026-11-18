@@ -1,21 +1,34 @@
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import { config as loadEnv } from 'dotenv';
-
-loadEnv();
+import 'dotenv/config';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { decodeConfirmation } from '../src/adapters/picture-attachments/translation.js';
 
 const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL environment variable is required');
+if (!connectionString) throw new Error('DATABASE_URL is required');
+const pool = new Pool({ connectionString });
+try {
+  await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+  // Run with service writers stopped. Keyset batches bound memory; no payload or
+  // notification/recovery identity is rewritten, including malformed evidence.
+  let after = '';
+  for (;;) {
+    const { rows } = await pool.query<{ id: string; payload: string }>(
+      'SELECT id,payload FROM picture_attachment_quarantine WHERE id > $1 ORDER BY id LIMIT 100',
+      [after]
+    );
+    if (!rows.length) break;
+    for (const row of rows) {
+      const decoded = decodeConfirmation(new TextEncoder().encode(row.payload));
+      const reference = decoded.kind === 'result' ? decoded.result.attachmentId : null;
+      const asset = decoded.kind === 'source' ? decoded.confirmation.assetId : null;
+      await pool.query(
+        'UPDATE picture_attachment_quarantine SET application_reference=$2,asset_id=$3 WHERE id=$1',
+        [row.id, reference, asset]
+      );
+      after = row.id;
+    }
+  }
+} finally {
+  await pool.end();
 }
-
-const client = postgres(connectionString, { max: 1 });
-const db = drizzle(client);
-
-await migrate(db, { migrationsFolder: './drizzle' });
-
-await client.end();
-
-console.log('Migrations completed successfully');

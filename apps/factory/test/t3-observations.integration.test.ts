@@ -54,6 +54,14 @@ it('observes only managed lineage, replaces historical activity by identity and 
           { kind: 'synchronized' },
         ],
       });
+    } else if (request.tag === 'orchestration.subscribeArchivedShell') {
+      send({
+        _tag: 'Chunk',
+        requestId: request.id,
+        values: [
+          { kind: 'snapshot', snapshot: { snapshotSequence: 10, threads: [], projects: [] } },
+        ],
+      });
     } else {
       const id = request.payload?.threadId;
       if (!id) throw new Error('Missing thread');
@@ -165,6 +173,114 @@ it('observes only managed lineage, replaces historical activity by identity and 
     } finally {
       await reopened.close();
     }
+  } finally {
+    await observer.close();
+    await host.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+it('bootstraps archived descendants and discovers descendants created below a finished parent', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-t3-archive-'));
+  initializeState(directory);
+  const requested = new Set<string>();
+  let metadataUpdate!: (value: unknown) => void;
+  const row = (id: string, parentThreadId: string | null, archivedAt: string | null = null) => ({
+    id,
+    projectId: 'project',
+    title: id,
+    lineage: { parentThreadId },
+    archivedAt,
+    status: 'completed',
+    latestRunId: 'run',
+    activeRunId: null,
+    blockedOnThreadWait: false,
+    pendingBackgroundTasks: [],
+    pullRequests: [],
+  });
+  const host = await websocketProtocol((raw, send) => {
+    const request = z
+      .object({
+        _tag: z.string(),
+        id: z.string().optional(),
+        tag: z.string().optional(),
+        payload: z.object({ threadId: z.string().optional() }).optional(),
+      })
+      .parse(raw);
+    if (request._tag !== 'Request') return;
+    const reply = (values: unknown[]) => send({ _tag: 'Chunk', requestId: request.id, values });
+    if (request.tag === 'orchestration.subscribeShell') {
+      metadataUpdate = (value) => reply([value]);
+      reply([
+        {
+          kind: 'snapshot',
+          snapshot: {
+            snapshotSequence: 10,
+            projects: [],
+            threads: [row('owner', null)],
+            archivedThreads: [],
+          },
+        },
+        { kind: 'synchronized' },
+      ]);
+    } else if (request.tag === 'orchestration.subscribeArchivedShell') {
+      reply([
+        {
+          kind: 'snapshot',
+          snapshot: {
+            snapshotSequence: 10,
+            projects: [],
+            threads: [row('archived-child', 'owner', '2026-11-01T00:00:00Z')],
+          },
+        },
+      ]);
+    } else {
+      const id = request.payload?.threadId;
+      if (!id) throw new Error('Missing managed thread');
+      requested.add(id);
+      reply([
+        {
+          kind: 'snapshot',
+          snapshotSequence: 10,
+          projection: {
+            thread: {
+              ...row(id, null),
+              modelSelection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+              branch: 'factory/owner',
+              worktreePath: '/managed/worktree',
+            },
+            runs: [{ id: 'run', ordinal: 1, status: 'completed' }],
+            attempts: [],
+            runtimeRequests: [],
+            providerThreads: [],
+            messages: [],
+            turnItems: [],
+            visibleTurnItems: [],
+          },
+        },
+        { kind: 'synchronized' },
+      ]);
+    }
+  });
+  const observer = await t3Observations({
+    origin: host.origin,
+    checkpoints: sqliteObservationCheckpoints(directory),
+    credential: async () => ({ token: 'controlled-observer', expiresAt: Date.now() + 86400000 }),
+    report: () => undefined,
+  });
+  try {
+    observer.retain('owner');
+    await vi.waitFor(() => expect([...requested].sort()).toEqual(['archived-child', 'owner']));
+    metadataUpdate({
+      kind: 'thread.updated',
+      sequence: 15,
+      thread: row('new-grandchild', 'archived-child'),
+    });
+    await vi.waitFor(() =>
+      expect([...requested].sort()).toEqual(['archived-child', 'new-grandchild', 'owner'])
+    );
+    observer.release('owner');
+    expect(observer.inactive('owner', 'run')).toBe('busy');
   } finally {
     await observer.close();
     await host.close();

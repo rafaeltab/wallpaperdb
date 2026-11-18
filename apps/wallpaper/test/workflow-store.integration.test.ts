@@ -933,13 +933,6 @@ it('does not load unrelated quarantine payloads during Wallpaper reconciliation'
       [JSON.stringify(unrelated)]
     );
     await pool.query('ANALYZE wallpaper_workflow_quarantine');
-    const plan = await pool.query(
-      `EXPLAIN (FORMAT JSON) SELECT payload FROM wallpaper_workflow_quarantine
-      WHERE recovered_at IS NULL AND (application_reference=$1 OR asset_id=$2)`,
-      [w.id, `asset:${w.id}`]
-    );
-    expect(JSON.stringify(plan.rows)).toContain('wallpaper_workflow_quarantine_reference');
-    expect(JSON.stringify(plan.rows)).toContain('wallpaper_workflow_quarantine_asset');
     await pool.query('SELECT pg_stat_statements_reset()');
     const publication = await claim(runtime);
     await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(publication)));
@@ -947,10 +940,16 @@ it('does not load unrelated quarantine payloads during Wallpaper reconciliation'
     const published = await claim(runtime);
     await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(published)));
     const reads =
-      await pool.query(`SELECT coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls FROM pg_stat_statements
+      await pool.query(`SELECT coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls,
+        coalesce(sum(shared_blks_hit + shared_blks_read),0)::int as blocks FROM pg_stat_statements
       WHERE query LIKE 'select %from %"wallpaper_workflow_quarantine"%'`);
     expect(reads.rows[0]?.rows).toBe(0);
     expect(reads.rows[0]?.calls).toBeGreaterThan(0);
+    // Count actual adapter buffer accesses, including cache hits. Sixteen 8-KiB
+    // pages per lookup allow index traversal but cannot cover this 1,000-row backlog.
+    const work = reads.rows[0];
+    if (!work) throw new Error('Missing quarantine query statistics');
+    expect(work.blocks).toBeLessThanOrEqual(work.calls * 16);
     expect(
       (
         await pool.query(

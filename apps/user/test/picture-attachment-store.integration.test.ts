@@ -943,18 +943,20 @@ describe('PostgreSQL picture attachment contract', () => {
       select 'unrelated-' || n, ${unrelated}, 'confirmation-exhausted', 'unrelated-asset'
       from generate_series(1,1000) n`;
     await sql`analyze picture_attachment_quarantine`;
-    const plan = await sql`explain (format json) select payload from picture_attachment_quarantine
-      where recovered_at is null and (application_reference=${i.id} or asset_id='asset-A')`;
-    expect(JSON.stringify(plan)).toContain('picture_attachment_quarantine_reference');
-    expect(JSON.stringify(plan)).toContain('picture_attachment_quarantine_asset');
     await sql`select pg_stat_statements_reset()`;
     await register(i);
     await confirm(i);
     const reads =
-      await sql`select coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls from pg_stat_statements
+      await sql`select coalesce(sum(rows),0)::int as rows, coalesce(sum(calls),0)::int as calls,
+        coalesce(sum(shared_blks_hit + shared_blks_read),0)::int as blocks from pg_stat_statements
       where query like 'select %from "picture_attachment_quarantine"%'`;
     expect(reads[0]?.rows).toBe(0);
     expect(reads[0]?.calls).toBeGreaterThan(0);
+    // Count actual adapter buffer accesses, including cache hits. Sixteen 8-KiB
+    // pages per lookup allow index traversal but cannot cover this 1,000-row backlog.
+    const work = reads[0];
+    if (!work) throw new Error('Missing quarantine query statistics');
+    expect(work.blocks).toBeLessThanOrEqual(work.calls * 16);
     expect(
       await sql`select count(*)::int as count from picture_attachment_quarantine where recovered_at is null`
     ).toEqual([{ count: 1000 }]);

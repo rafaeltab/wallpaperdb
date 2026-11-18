@@ -176,7 +176,7 @@ it('gives automatic work a turn when recurring metadata wins cycle readiness', a
     const settled = () =>
       waitForIO(async () => {
         const value = await snapshot();
-        expect(value.threads.observedAt).toBe(Date.now());
+        expect(value.threads.observedAt).toBe(startedAt + 500);
         if (value.observations.startedAt === Date.now())
           expect(value.observations.observedAt).toBe(Date.now());
       });
@@ -537,7 +537,7 @@ it('exposes acknowledged delivery through local HTTP while the provider observat
     const { readFile } = await import('node:fs/promises');
     await vi.waitFor(
       async () => {
-        expect(await readFile(`${host.directory}/observing.pid`, 'utf8')).toMatch(/^[0-9]+$/);
+        expect(await readFile(`${host.directory}/observing-websocket`, 'utf8')).toBe('held');
       },
       { timeout: 3000, interval: 20 }
     );

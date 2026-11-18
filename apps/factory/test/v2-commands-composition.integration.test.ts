@@ -1575,11 +1575,17 @@ it('cancels the composed owning job without refunding its admission and replays 
       },
       { timeout: 5000, interval: 40 }
     );
-    const interrupts = (await host.calls()).filter(
-      (c) =>
-        c.binary === 't3' && c.args[0] === 'acp-mcp-call' && c.args[1] === 't3_thread_interrupt'
+    const interrupts = await vi.waitFor(
+      async () => {
+        const calls = (await host.calls()).filter(
+          (c) =>
+            c.binary === 't3' && c.args[0] === 'acp-mcp-call' && c.args[1] === 't3_thread_interrupt'
+        );
+        expect(calls.length).toBeGreaterThan(0);
+        return calls;
+      },
+      { timeout: 5000, interval: 40 }
     );
-    expect(interrupts.length).toBeGreaterThan(0);
     expect(interrupts.every((c) => JSON.parse(c.args[2]).threadId === 'thread-live')).toBe(true);
     const replay = await running.app.inject({
       method: 'POST',

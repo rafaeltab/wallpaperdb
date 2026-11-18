@@ -23,6 +23,7 @@ it('closes SQLite recovery composition without dispatching parked writers', asyn
       })
     );
     running = await startFactory({
+      ...f.host.mcpEnvironment,
       FACTORY_PROJECT: f.host.repository,
       FACTORY_T3_PROJECT_ID: 'project-id',
       FACTORY_BASE: f.host.base,

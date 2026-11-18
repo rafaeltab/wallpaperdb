@@ -21,16 +21,18 @@ export async function websocketProtocol(
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing protocol address');
+  let closing: Promise<void> | undefined;
   return {
     origin: `http://127.0.0.1:${address.port}`,
-    close: async () => {
-      for (const client of websocket.clients) client.terminate();
-      await new Promise<void>((resolve, reject) =>
-        websocket.close((error) => (error ? reject(error) : resolve()))
-      );
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve()))
-      );
-    },
+    close: () =>
+      (closing ??= (async () => {
+        for (const client of websocket.clients) client.terminate();
+        await new Promise<void>((resolve, reject) =>
+          websocket.close((error) => (error ? reject(error) : resolve()))
+        );
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve()))
+        );
+      })()),
   };
 }

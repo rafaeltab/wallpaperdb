@@ -411,6 +411,14 @@ export function fakeFixture(cursor: string, at: string): FactoryV2Snapshot {
       ],
       factory: {
         id: 'factory:demo',
+        execution: { model: 'gpt-6.1-sol', effort: null, mode: null, permissionLevel: null },
+        executionCatalog: {
+          models: [
+            { id: 'gpt-6.1-sol', efforts: ['low', 'medium', 'high'], modes: ['standard', 'fast'] },
+            { id: 'gpt-6.2-sol', efforts: ['low', 'medium', 'high'], modes: ['standard', 'fast'] },
+          ],
+          permissionLevels: ['approval-required', 'auto-accept-edits', 'auto', 'full-access'],
+        },
         planning: {
           maximumAttempts: 3,
           consecutiveModelDeadlineFailures: 0,

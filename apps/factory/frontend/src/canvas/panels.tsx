@@ -486,7 +486,11 @@ export function Details({
             <section key={id}>
               <h3>{job.stage}</h3>
               <p>{job.progress}</p>
-              <ExecutionSummary settings={job.executionSettings} observed={job.observedExecution} />
+              <ExecutionSummary
+                settings={job.executionSettings}
+                observed={job.observedExecution}
+                observedModel={job.observedModel}
+              />
               <p>
                 {job.execution.state === 'known' ? job.execution.value.state : job.execution.reason}
               </p>

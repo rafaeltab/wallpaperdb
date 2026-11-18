@@ -187,11 +187,24 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     const settings = page.getByRole('dialog', { name: 'Factory controls' });
     await settings.getByLabel('Concurrency', { exact: true }).fill('5');
     await settings.getByLabel('Admission allowance', { exact: true }).fill('12');
+    await settings.getByLabel('Model', { exact: true }).selectOption('gpt-6.2-sol');
+    await settings.getByLabel('Reasoning effort', { exact: true }).selectOption('high');
+    await settings.getByLabel('Execution mode', { exact: true }).selectOption('fast');
+    await settings.getByLabel('Permission level', { exact: true }).selectOption('auto');
     await settings.getByRole('button', { name: 'Apply controls' }).click();
     await browserExpect(page.getByText('Command succeeded', { exact: true })).toBeVisible();
     await settings.getByRole('button', { name: 'Close Factory controls' }).click();
     await page.getByRole('button', { name: 'Factory settings', exact: true }).click();
     await browserExpect(settings.getByLabel('Concurrency', { exact: true })).toHaveValue('5');
+    await browserExpect(settings.getByLabel('Model', { exact: true })).toHaveValue('gpt-6.2-sol');
+    await browserExpect(settings.getByLabel('Reasoning effort', { exact: true })).toHaveValue(
+      'high'
+    );
+    await browserExpect(settings.getByLabel('Execution mode', { exact: true })).toHaveValue('fast');
+    await browserExpect(settings.getByLabel('Permission level', { exact: true })).toHaveValue(
+      'auto'
+    );
+    if (directory) await page.screenshot({ path: `${directory}/factory-execution-settings.png` });
     await settings.getByRole('button', { name: 'Close Factory controls' }).click();
     await page.getByRole('button', { name: '◇ Preview plan', exact: true }).click();
     const plan = page.getByRole('dialog', { name: 'Plan preview' });

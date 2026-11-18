@@ -5,6 +5,61 @@ import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
 import type { PlanningInput } from '../src/capabilities/plan/index.js';
 import type { Status } from '../src/capabilities/job/index.js';
+it('allows a fresh planner request after capabilities fail before a launch is sent', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  const execution = {
+    model: 'gpt-6.2-sol',
+    effort: 'high',
+    mode: 'fast' as const,
+    permissionLevel: 'auto' as const,
+  };
+  const config = {
+    binary: host.binary,
+    project: host.repository,
+    projectId: 'project-id',
+    ...host.mcp,
+    stateDirectory: `${host.directory}/planner-state`,
+    readExecution: async () => execution,
+  };
+  const input = {
+    issues: [],
+    job: { kind: 'empty' as const },
+    capacity: { concurrency: 1, admission: 1 },
+  };
+  try {
+    await host.save({
+      planner: { proposal: { selected: [], deferred: [] } },
+      executionCatalog: {
+        runtimeMode: 'full-access',
+        providers: [
+          { providerInstanceId: 'codex', constraints: ['Temporarily unavailable'], models: [] },
+        ],
+      },
+    });
+    await expect(
+      Effect.runPromise(t3Planner(config).propose(input, { requestId: 'preflight-failed' }))
+    ).rejects.toMatchObject({ _tag: 'Unavailable' });
+    expect((await host.calls()).filter((call) => call.args[1] === 't3_thread_launch')).toHaveLength(
+      0
+    );
+    expect(await Effect.runPromise(t3Planner(config).ownership(false))).toBeUndefined();
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    expect(
+      await Effect.runPromise(
+        t3Planner(config).propose(input, { requestId: 'preflight-recovered' })
+      )
+    ).toEqual({ selected: [], deferred: [] });
+    expect((await host.calls()).filter((call) => call.args[1] === 't3_thread_launch')).toHaveLength(
+      1
+    );
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it('captures planner execution settings and reconciles them after the factory configuration changes', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;

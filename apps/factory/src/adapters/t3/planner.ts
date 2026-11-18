@@ -1,4 +1,4 @@
-import { launchExecution, observeExecutionSettings } from './execution-settings.js';
+import { prepareExecution, observeExecutionSettings } from './execution-settings.js';
 import type { ExecutionSettings } from '../../capabilities/job/index.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -454,6 +454,15 @@ export function t3Planner(config: {
               throw new Error('Planner message exceeds T3 maximum 120000 characters');
             }
             const execution = await config.readExecution?.();
+            const launch = await prepareExecution(
+              config,
+              {
+                title: `Factory ${attempt?.automatic ? 'automatic plan' : 'plan preview'} ${requestId}`,
+                message: prompt,
+              },
+              execution,
+              signal
+            );
             const handedOffAt = Date.now();
             const intent = await journal.save({
               revision: (current?.revision ?? -1) + 1,
@@ -476,17 +485,7 @@ export function t3Planner(config: {
                   projectId: z.literal(config.projectId),
                   runId: z.string().min(1),
                 })
-                .parse(
-                  await launchExecution(
-                    config,
-                    {
-                      title: `Factory ${attempt?.automatic ? 'automatic plan' : 'plan preview'} ${requestId}`,
-                      message: prompt,
-                    },
-                    execution,
-                    signal
-                  )
-                );
+                .parse(await launch());
             } catch (cause) {
               // Only a structured explicit invalid-params response proves non-launch.
               const rejected = confirmedRejection(cause);

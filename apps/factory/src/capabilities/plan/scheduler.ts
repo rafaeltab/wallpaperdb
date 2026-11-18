@@ -593,7 +593,7 @@ export const SchedulerLive = Layer.effect(
             command.execution &&
             (!executionConfiguration ||
               !supportsExecutionSettings(
-                yield* executionConfiguration.catalog(),
+                yield* executionConfiguration.catalog(command.execution.model),
                 command.execution
               ))
           )

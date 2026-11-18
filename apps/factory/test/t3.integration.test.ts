@@ -3,6 +3,43 @@ import { expect, it } from 'vitest';
 import { t3Execution, t3ExecutionConfiguration } from '../src/adapters/t3/index.js';
 import type { Intent } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
+it('resolves a supported requested model omitted from the default capability list', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    await host.save({
+      executionCatalog: {
+        runtimeMode: 'full-access',
+        providers: [{ providerInstanceId: 'codex', constraints: [], omittedModels: 1, models: [] }],
+      },
+      executionSearchCatalog: {
+        runtimeMode: 'full-access',
+        providers: [
+          {
+            providerInstanceId: 'codex',
+            constraints: [],
+            models: [{ id: 'gpt-6.2-sol', options: [{ id: 'reasoningEffort', values: ['high'] }] }],
+          },
+        ],
+      },
+    });
+    const adapter = t3ExecutionConfiguration({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    expect(await Effect.runPromise(adapter.catalog('gpt-6.2-sol'))).toMatchObject({
+      models: [{ id: 'gpt-6.2-sol', efforts: ['high'] }],
+    });
+    expect(await Effect.runPromise(adapter.catalog('not-a-model'))).toMatchObject({ models: [] });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
 it.each(['standard', 'fast'] as const)(
   'launches configured %s execution controls through structured T3 requests',
   async (mode) => {

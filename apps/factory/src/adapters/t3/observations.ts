@@ -26,6 +26,11 @@ interface Credential {
   expiresAt: number;
   replaced?: AbortSignal;
 }
+interface ManagedIssue {
+  jobs: Set<string>;
+  recoveries: Set<string>;
+  owners: Set<string>;
+}
 export type T3Observations = Awaited<ReturnType<typeof t3Observations>>;
 
 /** Shared local observations. Neither reads nor ownership registration performs external I/O. */
@@ -41,20 +46,32 @@ export async function t3Observations(config: {
   const metadataVersions = new Map<string, number>();
   const retained = new Set<string>();
   const identities = new Set<string>();
+  const managed = new Map<number, ManagedIssue>();
+  const retiredJobs = new Set<string>();
+  const retiredRecoveries = new Set<string>();
+  const retiredRoots = new Set<string>();
   const details = new Map<string, ThreadState>();
   const workers = new Map<string, { stop: AbortController; work: Promise<void> }>();
   let metadataReady = false;
   let archiveReady = false;
   let metadataSequence = 0;
   let metadataRevision = 0;
+  let metadataResume = false;
   let stopped = false;
   const saved = await Effect.runPromise(config.checkpoints.read(`${namespace}inventory`));
   if (saved) {
     metadataRevision = saved.revision;
     metadataSequence = saved.sequence;
-    for (const item of z.array(shell).parse(decodeObservation(saved))) {
-      metadata.set(item.id, item);
-      metadataVersions.set(item.id, saved.sequence);
+    try {
+      for (const item of z.array(shell).parse(decodeObservation(saved))) {
+        metadata.set(item.id, item);
+        metadataVersions.set(item.id, saved.sequence);
+      }
+      metadataResume = true;
+    } catch {
+      config.report(
+        new ObservationUnknown('Unusable T3 inventory checkpoint; requesting a snapshot')
+      );
     }
   }
   const encodings = new Map<string, ReturnType<typeof observationEncoding>>();
@@ -127,14 +144,22 @@ export async function t3Observations(config: {
     const signal = AbortSignal.any([stop.signal, cancellation.signal]);
     const work = (async () => {
       const previous = await Effect.runPromise(config.checkpoints.read(`${namespace}thread:${id}`));
-      if (previous)
-        details.set(id, {
-          sequence: previous.sequence,
-          revision: previous.revision,
-          value: projection.parse(decodeObservation(previous)),
-          ready: false,
-        });
+      let revision = previous?.revision ?? 0;
       let forceSnapshot = false;
+      if (previous)
+        try {
+          details.set(id, {
+            sequence: previous.sequence,
+            revision: previous.revision,
+            value: projection.parse(decodeObservation(previous)),
+            ready: false,
+          });
+        } catch {
+          forceSnapshot = true;
+          config.report(
+            new ObservationUnknown('Unusable managed T3 checkpoint; requesting a snapshot')
+          );
+        }
       await loop(signal, async (credential) => {
         const initial = details.get(id);
         if (initial) initial.ready = false;
@@ -192,10 +217,10 @@ export async function t3Observations(config: {
                   forceSnapshot = true;
                   throw new ObservationUnknown('Unsupported T3 observation');
                 }
-                const revision = current?.revision ?? 0;
                 await checkpoint(`thread:${id}`, revision, sequence, next);
+                revision++;
                 details.set(id, {
-                  revision: revision + 1,
+                  revision,
                   sequence,
                   value: next,
                   ready: current?.ready ?? false,
@@ -212,8 +237,27 @@ export async function t3Observations(config: {
     workers.set(id, { stop: cancellation, work });
   };
   let lineage = new Map<string, Set<string>>();
+  const issueRoots = (group: ManagedIssue) => {
+    const roots = new Set(group.owners);
+    for (const item of metadata.values()) {
+      const tag = /\[factory:(.+)\]$/.exec(item.title)?.[1];
+      if (
+        group.recoveries.has(item.title) ||
+        [...group.jobs].some(
+          (id) =>
+            tag === id ||
+            tag?.startsWith(`${id}:retry-`) ||
+            item.title === `Factory ${id}` ||
+            item.title.startsWith(`Factory ${id}:retry-`)
+        )
+      )
+        roots.add(item.id);
+    }
+    return roots;
+  };
   const select = () => {
     const roots = new Set(retained);
+    for (const group of managed.values()) for (const id of issueRoots(group)) roots.add(id);
     for (const item of metadata.values())
       if (
         [...identities].some(
@@ -259,7 +303,7 @@ export async function t3Observations(config: {
             method: 'orchestration.subscribeShell',
             payload: {
               requestCompletionMarker: true,
-              ...(metadataRevision ? { afterSequence: metadataSequence } : {}),
+              ...(metadataResume ? { afterSequence: metadataSequence } : {}),
             },
           },
         ],
@@ -342,6 +386,7 @@ export async function t3Observations(config: {
             await checkpoint('inventory', metadataRevision, sequence, [...next.values()]);
             metadataRevision++;
             metadataSequence = sequence;
+            metadataResume = true;
             metadata.clear();
             for (const [id, item] of next) metadata.set(id, item);
             staged = undefined;
@@ -369,10 +414,15 @@ export async function t3Observations(config: {
         }
       select();
     };
-    if (previous) {
-      for (const row of z.array(shell).parse(decodeObservation(previous))) rows.set(row.id, row);
-      merge();
-    }
+    if (previous)
+      try {
+        for (const row of z.array(shell).parse(decodeObservation(previous))) rows.set(row.id, row);
+        merge();
+      } catch {
+        config.report(
+          new ObservationUnknown('Unusable archived T3 checkpoint; requesting a snapshot')
+        );
+      }
     await loop(stop.signal, async (credential) => {
       const nextAt = Date.now() + 900000;
       const snapshot = z
@@ -404,12 +454,104 @@ export async function t3Observations(config: {
     return value;
   };
   const activity = (id: string) => observedActivity(state(id).value, metadata.get(id));
+  const inactive = (id: string, run: string | null): 'busy' | 'waiting' | 'idle' => {
+    if (!metadataReady || !archiveReady || !lineage.has(id)) return 'busy';
+    let waiting = false;
+    for (const owner of lineage.get(id) ?? []) {
+      const value = details.get(owner);
+      if (!value?.ready || metadataSequence < value.sequence) return 'busy';
+      const snapshot = activity(owner);
+      const meta = metadata.get(owner);
+      if (
+        !meta ||
+        meta.blockedOnThreadWait === undefined ||
+        meta.pendingBackgroundTasks === undefined ||
+        meta.latestRunId !== snapshot.thread.latestRunId ||
+        meta.activeRunId !== null ||
+        (owner === id && snapshot.thread.latestRunId !== run) ||
+        snapshot.thread.activeRunId ||
+        !['idle', 'completed', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+          snapshot.thread.status
+        ) ||
+        snapshot.thread.pendingRequestCount ||
+        meta.pendingBackgroundTasks.length ||
+        snapshot.items.some((item) => ['pending', 'running', 'waiting'].includes(item.status))
+      )
+        return 'busy';
+      waiting ||=
+        meta.blockedOnThreadWait ||
+        (meta.pullRequests?.some((pr) => pr.watching === true || pr.watch != null) ?? false);
+    }
+    return waiting ? 'waiting' : 'idle';
+  };
+  const groupFor = (issue: number) => {
+    let group = managed.get(issue);
+    if (!group) {
+      group = { jobs: new Set(), recoveries: new Set(), owners: new Set() };
+      managed.set(issue, group);
+    }
+    return group;
+  };
   return {
+    retainJob: (issue: number, id: string, owner?: string) => {
+      if (retiredJobs.has(id)) return false;
+      const group = groupFor(issue);
+      const changed = !group.jobs.has(id) || Boolean(owner && !group.owners.has(owner));
+      group.jobs.add(id);
+      if (owner) {
+        group.owners.add(owner);
+        retiredRoots.delete(owner);
+      }
+      if (changed) select();
+      return changed;
+    },
+    retainRecovery: (issue: number, title: string) => {
+      if (retiredRecoveries.has(title)) return;
+      const group = groupFor(issue);
+      if (group.recoveries.has(title)) return;
+      group.recoveries.add(title);
+      select();
+    },
+    retainForIssue: (issue: number, owner: string) => {
+      const group = managed.get(issue);
+      if (!group || group.owners.has(owner)) return;
+      group.owners.add(owner);
+      retiredRoots.delete(owner);
+      select();
+    },
+    retireIssue: (issue: number) => {
+      const group = managed.get(issue);
+      if (!group) return false;
+      if (
+        [...group.recoveries].some(
+          (title) => [...metadata.values()].filter((row) => row.title === title).length !== 1
+        )
+      )
+        return false;
+      const roots = issueRoots(group);
+      if (
+        !roots.size ||
+        [...roots].some(
+          (id) =>
+            !details.has(id) || inactive(id, observedThread(state(id).value).latestRunId) !== 'idle'
+        )
+      )
+        return false;
+      for (const id of group.jobs) retiredJobs.add(id);
+      for (const title of group.recoveries) retiredRecoveries.add(title);
+      for (const id of roots) retiredRoots.add(id);
+      managed.delete(issue);
+      select();
+      return true;
+    },
     retain: (id: string) => {
+      if (retained.has(id)) return;
+      retiredRoots.delete(id);
       retained.add(id);
       select();
     },
     retainIdentity: (identity: string) => {
+      if (identities.has(identity)) return;
       identities.add(identity);
       select();
     },
@@ -428,49 +570,35 @@ export async function t3Observations(config: {
     inventoryReady: () => metadataReady && archiveReady,
     activity,
     configuration: (id: string) => ({ ...state(id).value.thread, threadId: id }),
-    show: (id: string, limit: number) => ({
-      thread: observedThread(state(id).value, metadata.get(id)),
-      messages: activity(id)
-        .items.filter((item) => item.type === 'user_message' || item.type === 'assistant_message')
-        .slice(-limit)
-        .map((item) => ({
-          role: item.type === 'user_message' ? 'user' : 'assistant',
-          ...(item.runId ? { runId: item.runId } : {}),
-          text: item.text ?? '',
-        })),
-    }),
+    show: (id: string, limit: number) => {
+      const meta = metadata.get(id);
+      const thread = observedThread(state(id).value, meta);
+      if (
+        !retiredRoots.has(id) &&
+        meta &&
+        (meta.latestRunId !== thread.latestRunId ||
+          meta.activeRunId !== thread.activeRunId ||
+          meta.projectId !== thread.projectId ||
+          meta.title !== thread.title)
+      )
+        throw new ObservationUnknown('T3 thread detail is catching up with metadata');
+      return {
+        thread,
+        messages: activity(id)
+          .items.filter((item) => item.type === 'user_message' || item.type === 'assistant_message')
+          .slice(-limit)
+          .map((item) => ({
+            role: item.type === 'user_message' ? 'user' : 'assistant',
+            ...(item.runId ? { runId: item.runId } : {}),
+            text: item.text ?? '',
+          })),
+      };
+    },
     links: (id: string) => ({
       pullRequests: state(id).value.thread.pullRequests ?? [],
       nextCursor: null,
     }),
-    inactive: (id: string, run: string | null): 'busy' | 'waiting' | 'idle' => {
-      if (!metadataReady || !archiveReady || !lineage.has(id)) return 'busy';
-      let waiting = false;
-      for (const owner of lineage.get(id) ?? []) {
-        const value = details.get(owner);
-        if (!value?.ready || metadataSequence < value.sequence) return 'busy';
-        const snapshot = activity(owner);
-        const meta = metadata.get(owner);
-        if (
-          !meta ||
-          meta.blockedOnThreadWait === undefined ||
-          meta.pendingBackgroundTasks === undefined ||
-          (owner === id && snapshot.thread.latestRunId !== run) ||
-          snapshot.thread.activeRunId ||
-          !['idle', 'completed', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
-            snapshot.thread.status
-          ) ||
-          snapshot.thread.pendingRequestCount ||
-          meta.pendingBackgroundTasks.length ||
-          snapshot.items.some((item) => ['pending', 'running', 'waiting'].includes(item.status))
-        )
-          return 'busy';
-        waiting ||=
-          meta.blockedOnThreadWait ||
-          (meta.pullRequests?.some((pr) => pr.watching === true || pr.watch != null) ?? false);
-      }
-      return waiting ? 'waiting' : 'idle';
-    },
+    inactive,
     close: async () => {
       stopped = true;
       stop.abort();

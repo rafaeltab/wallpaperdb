@@ -420,9 +420,7 @@
       "indexes": {
         "one_active_planning_attempt": {
           "name": "one_active_planning_attempt",
-          "columns": [
-            "slot"
-          ],
+          "columns": ["slot"],
           "isUnique": true,
           "where": "\"planning_attempts\".\"phase\" in ('discovery', 'handoff', 'freshness')"
         }
@@ -480,10 +478,7 @@
       "indexes": {
         "planning_deadline_failure_position": {
           "name": "planning_deadline_failure_position",
-          "columns": [
-            "notice_id",
-            "position"
-          ],
+          "columns": ["notice_id", "position"],
           "isUnique": true
         }
       },
@@ -492,12 +487,8 @@
           "name": "planning_deadline_failures_notice_id_planning_notices_id_fk",
           "tableFrom": "planning_deadline_failures",
           "tableTo": "planning_notices",
-          "columnsFrom": [
-            "notice_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["notice_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -553,17 +544,12 @@
       "indexes": {
         "planning_notices_id_unique": {
           "name": "planning_notices_id_unique",
-          "columns": [
-            "id"
-          ],
+          "columns": ["id"],
           "isUnique": true
         },
         "planning_notices_pending": {
           "name": "planning_notices_pending",
-          "columns": [
-            "acknowledged_at",
-            "sequence"
-          ],
+          "columns": ["acknowledged_at", "sequence"],
           "isUnique": false
         }
       },
@@ -652,10 +638,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "records_namespace_name_pk": {
-          "columns": [
-            "namespace",
-            "name"
-          ],
+          "columns": ["namespace", "name"],
           "name": "records_namespace_name_pk"
         }
       },
@@ -788,18 +771,12 @@
       "indexes": {
         "v2_commands_plan": {
           "name": "v2_commands_plan",
-          "columns": [
-            "scope",
-            "plan_id"
-          ],
+          "columns": ["scope", "plan_id"],
           "isUnique": false
         },
         "v2_retry_opportunity": {
           "name": "v2_retry_opportunity",
-          "columns": [
-            "scope",
-            "retry_key"
-          ],
+          "columns": ["scope", "retry_key"],
           "isUnique": true
         }
       },

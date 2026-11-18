@@ -207,6 +207,8 @@ export const JobLive = Layer.effect(
               : delivery,
             elapsedMs: Math.max(0, now - intent.createdAt),
           };
+          if (status.delivery?.landed && status.delivery.active === false)
+            yield* execution.release?.(activeIntent) ?? Effect.void;
           if (reporting) yield* reporting.observed(generation, status);
           return status;
         }).pipe(

@@ -409,7 +409,8 @@ body {
 .fc-dialog textarea {
   width: 100%;
 }
-.fc-dialog select {
+.fc-dialog select,
+.fc-dialog input[list] {
   width: 192px;
 }
 .fc-dialog p {

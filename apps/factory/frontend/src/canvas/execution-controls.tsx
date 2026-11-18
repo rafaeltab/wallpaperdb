@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { Board } from './model';
 type Settings = NonNullable<Board['meta']['factory']['execution']>;
 export const inheritedExecution: Settings = {
@@ -21,6 +22,7 @@ export function ExecutionControls({
   catalog: Board['meta']['factory']['executionCatalog'];
   change: (settings: Settings) => void;
 }) {
+  const modelChoicesId = useId();
   const model = catalog?.models.find((m) => m.id === settings.model);
   return (
     <fieldset>
@@ -33,20 +35,25 @@ export function ExecutionControls({
       )}
       <label>
         Model
-        <select
+        <input
           aria-label="Model"
+          list={modelChoicesId}
+          required
+          maxLength={200}
           disabled={!catalog}
           value={settings.model}
           onChange={(e) => change({ ...settings, model: e.target.value })}
-        >
-          {!model && <option value={settings.model}>{settings.model} (unavailable)</option>}
+        />
+        <datalist id={modelChoicesId}>
           {catalog?.models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id}
-            </option>
+            <option key={m.id} value={m.id} />
           ))}
-        </select>
+        </datalist>
       </label>
+      <p>
+        Type a supported model ID if it is missing from suggestions. Save the model to load its
+        available effort and mode choices.
+      </p>
       <label>
         Reasoning effort
         <select
@@ -57,7 +64,9 @@ export function ExecutionControls({
         >
           <option value="">Inherited/default</option>
           {settings.effort && !model?.efforts.includes(settings.effort) && (
-            <option value={settings.effort}>{settings.effort} (unavailable)</option>
+            <option value={settings.effort}>
+              {settings.effort} ({model ? 'unavailable' : 'verify on save'})
+            </option>
           )}
           {model?.efforts.map((effort) => (
             <option key={effort} value={effort}>
@@ -86,7 +95,9 @@ export function ExecutionControls({
         >
           <option value="">Inherited/default</option>
           {settings.mode && !model?.modes.includes(settings.mode) && (
-            <option value={settings.mode}>{settings.mode} (unavailable)</option>
+            <option value={settings.mode}>
+              {settings.mode} ({model ? 'unavailable' : 'verify on save'})
+            </option>
           )}
           {model?.modes.map((mode) => (
             <option key={mode} value={mode}>

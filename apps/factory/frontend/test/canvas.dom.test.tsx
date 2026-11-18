@@ -292,10 +292,7 @@ it('edits supported factory execution controls and submits them with the capture
         ...seed.meta.factory,
         execution: { model: 'gpt-6.1-sol', effort: null, mode: null, permissionLevel: null },
         executionCatalog: {
-          models: [
-            { id: 'gpt-6.1-sol', efforts: ['low'], modes: ['standard'] },
-            { id: 'gpt-6.2-sol', efforts: ['high'], modes: ['standard', 'fast'] },
-          ],
+          models: [{ id: 'gpt-6.1-sol', efforts: ['low', 'high'], modes: ['standard', 'fast'] }],
           permissionLevels: ['auto', 'full-access'],
         },
       },
@@ -311,10 +308,11 @@ it('edits supported factory execution controls and submits them with the capture
   render(<FactoryApp client={client} />);
   await screen.findByText('Implement the command centre');
   await user.click(screen.getByRole('button', { name: 'Factory settings' }));
-  await user.selectOptions(screen.getByLabelText('Model', { exact: true }), 'gpt-6.2-sol');
   await user.selectOptions(screen.getByLabelText('Reasoning effort', { exact: true }), 'high');
   await user.selectOptions(screen.getByLabelText('Execution mode', { exact: true }), 'fast');
   await user.selectOptions(screen.getByLabelText('Permission level', { exact: true }), 'auto');
+  await user.clear(screen.getByLabelText('Model', { exact: true }));
+  await user.type(screen.getByLabelText('Model', { exact: true }), 'gpt-6.2-sol');
   await user.click(screen.getByRole('button', { name: 'Apply controls' }));
   await screen.findByText('Command succeeded');
   expect(JSON.parse(bodies[0])).toMatchObject({

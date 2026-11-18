@@ -232,7 +232,28 @@ it('saves execution controls through HTTP, reloads them after restart and launch
         { timeout: 10000, interval: 40 }
       );
     },
-    {},
+    {
+      executionCatalog: {
+        runtimeMode: 'full-access',
+        providers: [{ providerInstanceId: 'codex', constraints: [], omittedModels: 2, models: [] }],
+      },
+      executionSearchCatalog: {
+        runtimeMode: 'full-access',
+        providers: [
+          {
+            providerInstanceId: 'codex',
+            constraints: [],
+            models: ['gpt-6.1-sol', 'gpt-6.2-sol'].map((id) => ({
+              id,
+              options: [
+                { id: 'reasoningEffort', values: ['high'] },
+                { id: 'serviceTier', values: ['default', 'priority'] },
+              ],
+            })),
+          },
+        ],
+      },
+    },
     { paused: true }
   ));
 

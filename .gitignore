@@ -49,3 +49,6 @@ coverage
 # Generated Wallpaper application credentials
 apps/wallpaper/.workflow.json
 apps/user/.workflow.json
+
+# Isolated coverage reliability experiment build artifacts
+.coverage-experiment/

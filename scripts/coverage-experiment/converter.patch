@@ -1,0 +1,42 @@
+--- a/converter.mjs
++++ b/converter.mjs
+@@ -1,3 +1,4 @@
++import { prepareAwaitEntries } from "../scripts/coverage-experiment/await-entries.mjs";
+ import { walk as e } from "estree-walker";
+ import { dirname as t, resolve as n } from "node:path";
+ import { fileURLToPath as r } from "node:url";
+@@ -516,7 +517,7 @@
+ 		addStatement({
+ 			coverageMapData: this.coverageMapData,
+ 			loc: n,
+-			covered: r,
++			covered: this.entryCounts.get(e) ?? r,
+ 			filename: this.#e(n)
+ 		});
+ 	}
+@@ -541,13 +542,13 @@
+ 					startOffset: t.start + this.wrapperLength,
+ 					endOffset: t.end + this.wrapperLength
+ 				}, this.ranges), n = a.at(-1) || 0;
+-				a.push(e - n);
++				a.push((this.entryCounts.get(t) ?? e) - n);
+ 				continue;
+ 			}
+ 			let n = this.locator.getLoc(e);
+ 			n !== null && i.push(n);
+ 			let r = +(e.type === "BlockStatement");
+-			a.push(getCount({
++			a.push(this.entryCounts.get(e) ?? getCount({
+ 				startOffset: e.start + r + this.wrapperLength,
+ 				endOffset: e.end - r + this.wrapperLength
+ 			}, this.ranges));
+@@ -596,7 +597,8 @@
+ 	let t = getIgnoreHints(e.code);
+ 	if (t.length === 1 && t[0].type === "file") return {};
+ 	let n = getWalker(), r = await b.create(e, n.onIgnore), i = await e.ast;
+-	return n.walk(i, t, e.ignoreClassMethods, {
++	prepareAwaitEntries(r, i, e);
++ return n.walk(i, t, e.ignoreClassMethods, {
+ 		onFunctionDeclaration(e) {
+ 			r.onFunction(e, {
+ 				loc: e.body,

@@ -117,9 +117,11 @@ ${receiptInstructions(intent, 'implementation')}`,
     observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({
         try: async (signal): Promise<Observation & { failure?: Unavailable }> => {
-          config.observations?.retainIdentity(`[factory:${intent.id}]`);
-          config.observations?.retainIdentity(`Factory ${intent.id}`);
-          if (repair) config.observations?.retain(repair.threadId);
+          config.observations?.retainJob(
+            intent.issue,
+            intent.id.replace(/:retry-\d+$/, ''),
+            repair?.threadId
+          );
           const matches = repair
             ? [{ threadId: repair.threadId, title: title(intent) }]
             : listing
@@ -217,6 +219,10 @@ ${receiptInstructions(intent, 'implementation')}`,
   };
   return {
     ...execution,
+    release: (intent) =>
+      Effect.sync(() => {
+        config.observations?.retireIssue(intent.issue);
+      }),
     interrupt: (intent, threadId) =>
       Effect.tryPromise({
         try: async (signal) => {

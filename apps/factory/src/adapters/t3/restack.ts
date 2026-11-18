@@ -71,13 +71,13 @@ export function t3Restacker(
       : undefined;
   };
   const title = `Factory restack ${operation.id}`;
-  config.observations?.retainIdentity(title);
+  config.observations?.retainRecovery(operation.issue, title);
   const branch = `factory-restack/${operation.id}`;
   const call = async (args: string[], signal?: AbortSignal) => {
     if (config.observations && args[0] === 'list')
       return config.observations.list(config.projectId);
     if (config.observations && args[0] === 'show' && args[1]) {
-      config.observations.retain(args[1]);
+      config.observations.retainForIssue(operation.issue, args[1]);
       return config.observations.show(args[1], Number(args[3] ?? 1000));
     }
     return JSON.parse(

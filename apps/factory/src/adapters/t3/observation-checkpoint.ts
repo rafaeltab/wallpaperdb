@@ -13,9 +13,15 @@ const collections = [
 export function decodeObservation(checkpoint: ObservationCheckpoint): unknown {
   const value: unknown = JSON.parse(checkpoint.value);
   const header = z
-    .object({ format: z.enum(['list-1', 'projection-1']), thread: entity.optional() })
+    .object({
+      format: z.enum(['list-1', 'projection-1']),
+      thread: entity.optional(),
+      count: z.number().int().nonnegative(),
+    })
     .safeParse(value);
   if (!header.success) return value;
+  if ((checkpoint.entities?.length ?? 0) !== header.data.count)
+    throw new Error('Incomplete retained T3 entity set');
   if (header.data.format === 'list-1')
     return (checkpoint.entities ?? []).map((item) => JSON.parse(item.value));
   const result: Record<string, unknown> = { thread: header.data.thread };
@@ -36,7 +42,7 @@ export function observationEncoding() {
   let previous: Map<string, unknown> | undefined;
   return (value: Projection | Shell[]) => {
     const next = new Map<string, unknown>();
-    let header: unknown;
+    let header: { format: 'list-1' | 'projection-1'; thread?: Projection['thread'] };
     if (Array.isArray(value)) {
       header = { format: 'list-1' };
       for (const row of value) next.set(row.id, row);
@@ -50,7 +56,7 @@ export function observationEncoding() {
       if (previous?.get(id) !== row) entities.push({ id, value: JSON.stringify(row) });
     for (const id of previous?.keys() ?? []) if (!next.has(id)) entities.push({ id, value: null });
     return {
-      value: JSON.stringify(header),
+      value: JSON.stringify({ ...header, count: next.size }),
       entities,
       replaceEntities: previous === undefined,
       committed: () => {

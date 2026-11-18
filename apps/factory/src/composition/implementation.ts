@@ -296,6 +296,22 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       if (failures.length) throw new AggregateError(failures, 'Factory worker cleanup failed');
     });
     const legacy = await adoptLegacy(configuration.FACTORY_STATE, scheduleStore);
+    const retained = await Effect.runPromise(
+      sqliteLocalSnapshot(configuration.FACTORY_STATE).read()
+    );
+    for (const entry of retained.entries)
+      if (entry.intent) {
+        executionObservations.retainJob(
+          entry.intent.issue,
+          entry.intent.id,
+          entry.control.ownership?.threadId
+        );
+        if (entry.control.manualRepair?.threadId)
+          executionObservations.retainForIssue(
+            entry.intent.issue,
+            entry.control.manualRepair.threadId
+          );
+      }
     let rootIssue = legacy?.issue;
     const pool: JobPool = {
       job: (issue) =>

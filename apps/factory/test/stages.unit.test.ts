@@ -30,6 +30,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   let landed = false;
   let publicationAvailable = true;
   const sent: number[] = [];
+  const released: number[] = [];
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(100) }),
@@ -55,6 +56,10 @@ it('requires fresh accepted stages and matching current CI before reporting read
         }),
     }),
     Layer.succeed(Execution, {
+      release: (intent) =>
+        Effect.sync(() => {
+          released.push(intent.issue);
+        }),
       interrupt: () => Effect.void,
       launch: () => Effect.succeed({ kind: 'submitted' as const }),
       observe: (intent) =>
@@ -122,10 +127,12 @@ it('requires fresh accepted stages and matching current CI before reporting read
     delivery: { ready: false },
   });
   landed = true;
+  expect(released).toEqual([]);
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { ready: false, landed: true, active: false },
   });
   expect(sent).toEqual([1, 2]);
+  expect(released).toEqual([577]);
 });
 
 async function stagesFixture(admission?: ContinuationAdmission) {

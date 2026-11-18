@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { t3Observations } from '../src/adapters/t3/index.js';
+import { t3Observations, ObservationUnknown } from '../src/adapters/t3/index.js';
 import { sqliteObservationCheckpoints } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 import type { ObservationCheckpointUpdate } from '../src/capabilities/observe/index.js';
@@ -162,6 +162,17 @@ it('observes only managed lineage, replaces historical activity by identity and 
     inventoryUpdate({ kind: 'thread.updated', sequence: 15, thread: thread('owner', null) });
     await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
     expect(observer.activity('owner').items).toHaveLength(1);
+    inventoryUpdate({
+      kind: 'thread.updated',
+      sequence: 20,
+      thread: {
+        ...thread('owner', null),
+        latestRunId: 'resumed',
+        activeRunId: 'resumed',
+        status: 'running',
+      },
+    });
+    await vi.waitFor(() => expect(() => observer.show('owner', 1)).toThrow(ObservationUnknown));
     await host.close();
     await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('busy'));
     expect(observer.activity('owner').items).toMatchObject([
@@ -299,7 +310,8 @@ it('bootstraps archived descendants and discovers descendants created below a fi
     report: () => undefined,
   });
   try {
-    observer.retain('owner');
+    expect(observer.retainJob(819, 'existing-job', 'owner')).toBe(true);
+    expect(observer.retireIssue(819)).toBe(false);
     await vi.waitFor(() => expect([...requested].sort()).toEqual(['archived-child', 'owner']));
     metadataUpdate({
       kind: 'thread.removed',
@@ -309,7 +321,18 @@ it('bootstraps archived descendants and discovers descendants created below a fi
     await vi.waitFor(() =>
       expect([...requested].sort()).toEqual(['archived-child', 'new-grandchild', 'owner'])
     );
-    observer.release('owner');
+    await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
+    observer.retainRecovery(819, 'Factory restack unseen');
+    expect(observer.retireIssue(819)).toBe(false);
+    metadataUpdate({
+      kind: 'thread.updated',
+      sequence: 20,
+      thread: { ...row('new-recovery', null), title: 'Factory restack unseen' },
+    });
+    await vi.waitFor(() => expect(observer.inactive('new-recovery', 'run')).toBe('idle'));
+    expect(observer.retireIssue(819)).toBe(true);
+    await vi.waitFor(() => expect(host.connections()).toBe(1));
+    expect(observer.retainJob(819, 'existing-job', 'owner')).toBe(false);
     expect(observer.inactive('owner', 'run')).toBe('busy');
   } finally {
     await observer.close();

@@ -420,9 +420,7 @@
       "indexes": {
         "one_active_planning_attempt": {
           "name": "one_active_planning_attempt",
-          "columns": [
-            "slot"
-          ],
+          "columns": ["slot"],
           "isUnique": true,
           "where": "\"planning_attempts\".\"phase\" in ('discovery', 'handoff', 'freshness')"
         }
@@ -474,10 +472,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "records_namespace_name_pk": {
-          "columns": [
-            "namespace",
-            "name"
-          ],
+          "columns": ["namespace", "name"],
           "name": "records_namespace_name_pk"
         }
       },
@@ -585,10 +580,7 @@
       "indexes": {
         "v2_commands_plan": {
           "name": "v2_commands_plan",
-          "columns": [
-            "scope",
-            "plan_id"
-          ],
+          "columns": ["scope", "plan_id"],
           "isUnique": false
         }
       },

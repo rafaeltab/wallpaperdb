@@ -998,6 +998,7 @@ it('keeps large planning workloads compact without losing owning scope or verifi
     expect(prompt).not.toContain('"delivery":');
     expect(prompt).toContain(retainedScope);
     expect(prompt).toContain('## Owning issue 1\n');
+    expect(prompt).toContain(`## Owning issue 1\n\nbase: ${'b'.repeat(40)}\nstage: ci\n`);
     expect(prompt.match(/^## Owning issue /gm)).toHaveLength(40);
     expect(prompt).toContain(
       'Approved scope for #40: preserve the accepted decision.\nDo not broaden it.'

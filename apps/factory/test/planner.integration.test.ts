@@ -3,6 +3,8 @@ import { Effect } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { t3Planner } from '../src/adapters/t3/index.js';
 import { protocol } from './fixtures/setup.js';
+import type { PlanningInput } from '../src/capabilities/plan/index.js';
+import type { Status } from '../src/capabilities/job/index.js';
 it('translates a bound assistant proposal and rejects malformed or user messages', async () => {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
@@ -745,6 +747,24 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
       parents: [3],
       blockersReady: true,
       prerequisiteEvidence: 'PRIVATE_EVIDENCE_SENTINEL',
+      joinRequired: number === 1,
+      prerequisite:
+        number === 1
+          ? {
+              base: 'c'.repeat(40),
+              prBase: 'factory/pr-10',
+              evidence: 'PRIVATE_PREREQUISITE_EVIDENCE_SENTINEL',
+            }
+          : undefined,
+      recovery:
+        number === 2
+          ? {
+              progress: 'Waiting for an approved conflict decision',
+              active: false,
+              classification: 'COMPLEX' as const,
+              question: 'Preserve the approved interface?',
+            }
+          : undefined,
       metadata: {
         number,
         url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
@@ -782,6 +802,11 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
       },
       execution: { kind: 'absent' as const },
       elapsedMs: 0,
+      prerequisite: {
+        url: 'https://github.com/rafaeltab/wallpaperdb/pull/9',
+        commit: 'd'.repeat(40),
+        base: 'factory/pr-10',
+      },
     };
     const parked = {
       ...active,
@@ -829,11 +854,21 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
     expect(prompt.match(/^- #9: active$/gm)).toHaveLength(1);
     expect(prompt).not.toContain('- #7:');
     expect(prompt).toContain('PRIVATE_JOB_SENTINEL');
+    expect(prompt).toContain(
+      `accepted prerequisite: https://github.com/rafaeltab/wallpaperdb/pull/9\naccepted commit: ${'d'.repeat(40)}\naccepted target: factory/pr-10`
+    );
+    expect(prompt).toContain('stage: unknown\nactivity: unknown\nready: unknown\nlanded: unknown');
+    expect(prompt).toContain('blockers ready: yes\njoin required: yes');
+    expect(prompt).toContain(`verified base: ${'c'.repeat(40)}\npr target: factory/pr-10`);
+    expect(prompt).toContain('recovery: COMPLEX\nrecovery active: no');
+    expect(prompt).toContain('recovery status: Waiting for an approved conflict decision');
+    expect(prompt).toContain('recovery question: Preserve the approved interface?');
     expect(prompt).toContain('fetch its full issue body and all trusted maintainer comments');
     for (const omitted of [
       'PRIVATE_BODY_SENTINEL',
       'PRIVATE_COMMENT_SENTINEL',
       'PRIVATE_EVIDENCE_SENTINEL',
+      'PRIVATE_PREREQUISITE_EVIDENCE_SENTINEL',
       '"job":',
       '"jobs":',
       'deadline',
@@ -847,6 +882,140 @@ it('sends metadata and retained owning scope over stdin without duplicate jobs',
       .plannerState(config.stateDirectory)
       .read();
     expect((record?.deadline ?? 0) - Date.now()).toBeGreaterThan(590000);
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});
+
+it('keeps large planning workloads compact without losing owning scope or verified code', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const retainedScope = `Approved scope for #1:\n${'Retain the approved interface and behavior.\n'.repeat(100)}Final approved constraint: no unrelated repairs.`;
+    const progress = JSON.stringify(
+      Array.from({ length: 200 }, (_, step) => ({
+        run_id: 1000,
+        step,
+        status: 'completed',
+        conclusion: 'success',
+        name: `UNNECESSARY_CI_HISTORY_${step}`,
+      }))
+    );
+    const jobs: Status[] = Array.from({ length: 40 }, (_, index) => {
+      const issue = index + 1;
+      return {
+        kind: 'job',
+        intent: {
+          id: `owner-${issue}`,
+          issue,
+          issueUrl: `https://github.com/rafaeltab/wallpaperdb/issues/${issue}`,
+          base: 'b'.repeat(40),
+          context:
+            issue === 1
+              ? retainedScope
+              : `Approved scope for #${issue}: preserve the accepted decision.\nDo not broaden it.`,
+          branch: `factory/${issue}`,
+          createdAt: 0,
+          expectedStage: 'implementation',
+        },
+        execution: { kind: 'absent' },
+        elapsedMs: 0,
+        delivery: {
+          stage: 'ci',
+          active: index % 4 === 2,
+          activity: index % 4 === 3 ? 'awaiting-answer' : undefined,
+          question:
+            index % 4 === 3 ? { id: `q-${issue}`, text: `Retain decision #${issue}?` } : undefined,
+          ready: index % 4 === 0,
+          landed: index % 4 === 1,
+          commit: 'a'.repeat(40),
+          pr: {
+            kind: 'found',
+            url: `https://github.com/rafaeltab/wallpaperdb/pull/${issue + 100}`,
+            commit: 'a'.repeat(40),
+            base: 'main',
+            ready: index % 4 === 0,
+            landed: index % 4 === 1,
+            ci: { failed: false, progress },
+          },
+        },
+      };
+    });
+    const input: PlanningInput = {
+      issues: Array.from({ length: 100 }, (_, index) => {
+        const number = index + 1000;
+        const metadata = {
+          number,
+          url: `https://github.com/rafaeltab/wallpaperdb/issues/${number}`,
+          title: `Candidate issue ${number}`,
+          open: true,
+          candidate: true,
+          labels: ['ready-for-agent'],
+          assignees: [],
+          projectStatus: 'Planned',
+          projectPriority: null,
+          projectSize: null,
+          commentCount: 0,
+          blockers: [],
+          parents: [],
+          pullRequests: [],
+        };
+        return {
+          ...metadata,
+          metadata,
+          body: '',
+          author: 'rafaeltab',
+          comments: [],
+          blockersReady: true,
+          prerequisiteEvidence: '',
+        };
+      }),
+      job: jobs[0],
+      jobs,
+      availableCode: [{ issue: 1, pr: 101, commit: 'a'.repeat(40) }],
+      admissions: Array.from({ length: 40 }, (_, index) => index + 1),
+      maximumSelections: 3,
+      capacity: { concurrency: 3, admission: 10 },
+    };
+    await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
+    await expect(
+      Effect.runPromise(
+        t3Planner({
+          binary: host.binary,
+          project: host.repository,
+          projectId: 'project-id',
+          ...host.mcp,
+          stateDirectory: `${host.directory}/planner-state`,
+        }).propose(input)
+      )
+    ).resolves.toEqual({ selected: [], deferred: [] });
+    const { prompt } = JSON.parse(await readFile(`${host.directory}/planner.json`, 'utf8'));
+    expect(prompt.length).toBeLessThan(60_000);
+    expect(prompt).not.toContain('UNNECESSARY_CI_HISTORY_');
+    expect(prompt).not.toContain('"delivery":');
+    expect(prompt).toContain(retainedScope);
+    expect(prompt).toContain('## Owning issue 1\n');
+    expect(prompt.match(/^## Owning issue /gm)).toHaveLength(40);
+    expect(prompt).toContain(
+      'Approved scope for #40: preserve the accepted decision.\nDo not broaden it.'
+    );
+    expect(prompt).toContain('ready: yes\nlanded: no');
+    expect(prompt).toContain('ready: no\nlanded: yes');
+    expect(prompt).toContain('activity: awaiting-answer');
+    expect(prompt).toContain('question: Retain decision #40?');
+    expect(prompt).toContain('pr: https://github.com/rafaeltab/wallpaperdb/pull/101');
+    expect(prompt).toContain(`head: ${'a'.repeat(40)}\npr target: main`);
+    expect(prompt).toContain(`base: ${'b'.repeat(40)}`);
+    expect(prompt).toContain(`"availableCode":[{"issue":1,"pr":101,"commit":"${'a'.repeat(40)}"}]`);
+    expect(prompt).toContain('## open 1099 - Candidate issue 1099');
+    expect(
+      jobs[0].kind === 'job' &&
+        jobs[0].delivery?.pr?.kind === 'found' &&
+        jobs[0].delivery.pr.ci?.progress
+    ).toBe(progress);
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;

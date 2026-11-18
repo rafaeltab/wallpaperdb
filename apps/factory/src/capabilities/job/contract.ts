@@ -47,7 +47,8 @@ export interface ExecutionCatalog {
   readonly permissionLevels: readonly Exclude<ExecutionSettings['permissionLevel'], null>[];
 }
 export interface ExecutionConfiguration {
-  catalog(): Effect.Effect<ExecutionCatalog, Unavailable>;
+  /** Include the requested model when supported, even if omitted from the default listing. */
+  catalog(model?: string): Effect.Effect<ExecutionCatalog, Unavailable>;
 }
 export const ExecutionConfiguration = Context.Service<ExecutionConfiguration>(
   'wallpaperdb.factory.ExecutionConfiguration'

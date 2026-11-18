@@ -41,9 +41,9 @@ const capabilities = z.object({
 });
 export function t3ExecutionConfiguration(config: Configuration): ExecutionConfiguration {
   return {
-    catalog: () =>
+    catalog: (model) =>
       Effect.tryPromise({
-        try: (signal) => readCatalog(config, signal),
+        try: (signal) => readCatalog(config, signal, model),
         catch: (cause) => new Unavailable({ operation: 'execution-capabilities', cause }),
       }).pipe(
         Effect.tapError(Effect.logError),
@@ -51,7 +51,11 @@ export function t3ExecutionConfiguration(config: Configuration): ExecutionConfig
       ),
   };
 }
-async function readCatalog(config: Configuration, signal?: AbortSignal): Promise<ExecutionCatalog> {
+async function readCatalog(
+  config: Configuration,
+  signal?: AbortSignal,
+  requestedModel?: string
+): Promise<ExecutionCatalog> {
   const result = capabilities.parse(await mcpCall(config, 'orchestrator_capabilities', {}, signal));
   const provider = result.providers.find((p) => p.providerInstanceId === 'codex');
   if (!provider || provider.constraints.length)
@@ -59,8 +63,21 @@ async function readCatalog(config: Configuration, signal?: AbortSignal): Promise
       'The configured Codex provider is unavailable. Check the T3 provider configuration.'
     );
   const ceiling = permissionLevels.indexOf(result.runtimeMode);
+  const models = [...provider.models];
+  if (requestedModel && !models.some((model) => model.id === requestedModel)) {
+    const searched = capabilities.parse(
+      await mcpCall(config, 'orchestrator_capabilities', { search: requestedModel }, signal)
+    );
+    const candidate = searched.providers.find((p) => p.providerInstanceId === 'codex');
+    if (!candidate || candidate.constraints.length)
+      throw new Error(
+        'The configured Codex provider is unavailable. Check the T3 provider configuration.'
+      );
+    const selected = candidate.models.find((model) => model.id === requestedModel);
+    if (selected) models.push(selected);
+  }
   return {
-    models: provider.models.map((model) => {
+    models: models.map((model) => {
       const efforts =
         model.options
           ?.find((o) => o.id === 'reasoningEffort')
@@ -80,38 +97,39 @@ async function readCatalog(config: Configuration, signal?: AbortSignal): Promise
     ),
   };
 }
-export async function launchExecution(
+export async function prepareExecution(
   config: Configuration,
   request: { title: string; message: string; base?: string; branch?: string },
   settings: ExecutionSettings | undefined,
   signal?: AbortSignal
 ) {
   if (!settings) {
-    return JSON.parse(
-      await command(
-        config.binary,
-        [
-          'thread',
-          'start',
-          config.projectId,
-          request.base ? request.message : '-',
-          '--title',
-          request.title,
-          '--provider',
-          'codex',
-          '--model',
-          'gpt-6.1-sol',
-          ...(request.base ? ['--worktree', request.base, '--branch', request.branch ?? ''] : []),
-          '--json',
-        ],
-        config.project,
-        signal,
-        undefined,
-        request.base ? undefined : request.message
-      )
-    );
+    return async () =>
+      JSON.parse(
+        await command(
+          config.binary,
+          [
+            'thread',
+            'start',
+            config.projectId,
+            request.base ? request.message : '-',
+            '--title',
+            request.title,
+            '--provider',
+            'codex',
+            '--model',
+            'gpt-6.1-sol',
+            ...(request.base ? ['--worktree', request.base, '--branch', request.branch ?? ''] : []),
+            '--json',
+          ],
+          config.project,
+          signal,
+          undefined,
+          request.base ? undefined : request.message
+        )
+      );
   }
-  const catalog = await readCatalog(config, signal);
+  const catalog = await readCatalog(config, signal, settings.model);
   if (!supportsExecutionSettings(catalog, settings)) {
     throw new Error(
       'Saved execution settings are unavailable. Refresh Factory settings and select a supported model, effort, mode and permission level.'
@@ -123,28 +141,38 @@ export async function launchExecution(
       ? []
       : [{ id: 'serviceTier', value: settings.mode === 'fast' ? 'priority' : 'default' }]),
   ];
-  return mcpCall(
-    config,
-    't3_thread_launch',
-    {
-      projectId: config.projectId,
-      title: request.title,
-      message: request.message,
-      modelSelection: { instanceId: 'codex', model: settings.model, options },
-      ...(settings.permissionLevel === null ? {} : { runtimeMode: settings.permissionLevel }),
-      ...(request.base
-        ? {
-            workspaceStrategy: {
-              type: 'worktree',
-              baseRef: request.base,
-              branch: request.branch,
-              startFromOrigin: false,
-            },
-          }
-        : {}),
-    },
-    signal
-  );
+  return () =>
+    mcpCall(
+      config,
+      't3_thread_launch',
+      {
+        projectId: config.projectId,
+        title: request.title,
+        message: request.message,
+        modelSelection: { instanceId: 'codex', model: settings.model, options },
+        ...(settings.permissionLevel === null ? {} : { runtimeMode: settings.permissionLevel }),
+        ...(request.base
+          ? {
+              workspaceStrategy: {
+                type: 'worktree',
+                baseRef: request.base,
+                branch: request.branch,
+                startFromOrigin: false,
+              },
+            }
+          : {}),
+      },
+      signal
+    );
+}
+export async function launchExecution(
+  config: Configuration,
+  request: { title: string; message: string; base?: string; branch?: string },
+  settings: ExecutionSettings | undefined,
+  signal?: AbortSignal
+) {
+  const launch = await prepareExecution(config, request, settings, signal);
+  return launch();
 }
 export function retainedExecution(value: unknown): ExecutionSettings | undefined {
   return value == null ? undefined : executionSettingsSchema.parse(value);

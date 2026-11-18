@@ -308,7 +308,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
     });
     let executionCatalog: import('../capabilities/job/index.js').ExecutionCatalog | undefined;
-    const refreshExecutionCatalog = executionConfiguration.catalog().pipe(
+    const refreshExecutionCatalog = Effect.flatMap(scheduleStore.read(), (state) =>
+      executionConfiguration.catalog(state.execution?.model)
+    ).pipe(
       Effect.tap((value) =>
         Effect.sync(() => {
           executionCatalog = value;

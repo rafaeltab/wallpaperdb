@@ -127,31 +127,34 @@ export async function runProtocol(
     if (args[0] === 'acp-mcp-call' && args[1] === 'orchestrator_capabilities') {
       console.log(
         JSON.stringify({
-          structuredContent: config.executionCatalog ?? {
-            runtimeMode: 'full-access',
-            providers: [
-              {
-                providerInstanceId: 'codex',
-                constraints: [],
-                models: [
-                  {
-                    id: 'gpt-6.1-sol',
-                    options: [
-                      { id: 'reasoningEffort', values: ['low', 'high'] },
-                      { id: 'serviceTier', values: ['default', 'priority'] },
-                    ],
-                  },
-                  {
-                    id: 'gpt-6.2-sol',
-                    options: [
-                      { id: 'reasoningEffort', values: ['low', 'high'] },
-                      { id: 'serviceTier', values: ['default', 'priority'] },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
+          structuredContent: (JSON.parse(args[2]).search
+            ? config.executionSearchCatalog
+            : undefined) ??
+            config.executionCatalog ?? {
+              runtimeMode: 'full-access',
+              providers: [
+                {
+                  providerInstanceId: 'codex',
+                  constraints: [],
+                  models: [
+                    {
+                      id: 'gpt-6.1-sol',
+                      options: [
+                        { id: 'reasoningEffort', values: ['low', 'high'] },
+                        { id: 'serviceTier', values: ['default', 'priority'] },
+                      ],
+                    },
+                    {
+                      id: 'gpt-6.2-sol',
+                      options: [
+                        { id: 'reasoningEffort', values: ['low', 'high'] },
+                        { id: 'serviceTier', values: ['default', 'priority'] },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
         })
       );
       process.exit(0);

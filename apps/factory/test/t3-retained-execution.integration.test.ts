@@ -57,8 +57,12 @@ it('observes a retained owning execution during an outage without invoking a T3 
         },
         { kind: 'synchronized' },
       ]);
-    else if (request.tag === 'orchestration.subscribeArchivedShell')
-      reply([{ kind: 'snapshot', snapshot: { snapshotSequence: 10, threads: [], projects: [] } }]);
+    else if (request.tag === 'orchestration.getArchivedShellSnapshot')
+      send({
+        _tag: 'Exit',
+        requestId: request.id,
+        exit: { _tag: 'Success', value: { snapshotSequence: 10, threads: [], projects: [] } },
+      });
     else
       reply([
         {

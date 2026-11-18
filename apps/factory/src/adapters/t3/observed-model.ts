@@ -80,10 +80,10 @@ export function applyObservedEvent(current: Projection, raw: unknown): Projectio
   if (key) {
     const next = entity.parse(event.payload);
     const items = z.array(entity).parse(current[key] ?? []);
-    return projection.parse({
+    return {
       ...current,
       [key]: [...items.filter((item) => item.id !== next.id), next],
-    });
+    };
   }
   if (event.type.startsWith('thread.') && threadUpdates.has(event.type.slice(7))) {
     return {
@@ -193,7 +193,8 @@ function visible(value: Projection, item: z.infer<typeof entity>) {
     )
   );
 }
-export function observedActivity(value: Projection, metadata?: Shell) {
+function activityItems(value: Projection) {
+  const messages = new Map(value.messages.map((message) => [message.id, message]));
   const items = value.turnItems
     .filter((item) => visible(value, item))
     .map((item) => {
@@ -206,7 +207,7 @@ export function observedActivity(value: Projection, metadata?: Shell) {
           status: z.string(),
         })
         .parse(item);
-      const message = value.messages.find((message) => message.id === item.messageId);
+      const message = typeof item.messageId === 'string' ? messages.get(item.messageId) : undefined;
       return {
         itemId: parsed.id,
         sourceThreadId: parsed.threadId,
@@ -226,6 +227,15 @@ export function observedActivity(value: Projection, metadata?: Shell) {
       };
     })
     .sort((a, b) => a.position - b.position);
+  return Object.freeze(items.map((item) => Object.freeze(item)));
+}
+const timelines = new WeakMap<Projection, ReturnType<typeof activityItems>>();
+export function observedActivity(value: Projection, metadata?: Shell) {
+  let items = timelines.get(value);
+  if (!items) {
+    items = activityItems(value);
+    timelines.set(value, items);
+  }
   return {
     thread: observedThread(value, metadata),
     items,

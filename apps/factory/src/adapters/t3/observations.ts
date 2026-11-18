@@ -32,11 +32,13 @@ export async function t3Observations(config: {
   const stop = new AbortController();
   const namespace = `t3:${config.origin}:`;
   const metadata = new Map<string, Shell>();
+  const metadataVersions = new Map<string, number>();
   const retained = new Set<string>();
   const identities = new Set<string>();
   const details = new Map<string, ThreadState>();
   const workers = new Map<string, { stop: AbortController; work: Promise<void> }>();
   let metadataReady = false;
+  let archiveReady = false;
   let metadataSequence = 0;
   let metadataRevision = 0;
   let stopped = false;
@@ -44,7 +46,10 @@ export async function t3Observations(config: {
   if (saved) {
     metadataRevision = saved.revision;
     metadataSequence = saved.sequence;
-    for (const item of z.array(shell).parse(JSON.parse(saved.value))) metadata.set(item.id, item);
+    for (const item of z.array(shell).parse(JSON.parse(saved.value))) {
+      metadata.set(item.id, item);
+      metadataVersions.set(item.id, saved.sequence);
+    }
   }
   const checkpoint = async (key: string, revision: number, sequence: number, value: unknown) => {
     if (
@@ -245,9 +250,13 @@ export async function t3Observations(config: {
                 .parse(item.snapshot);
               if (snapshot.snapshotSequence < metadataSequence)
                 throw new ObservationUnknown('Obsolete T3 inventory');
-              staged = new Map(
-                [...snapshot.threads, ...snapshot.archivedThreads].map((row) => [row.id, row])
-              );
+              staged = new Map(metadata);
+              for (const row of [...snapshot.threads, ...snapshot.archivedThreads]) {
+                if (snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
+                  staged.set(row.id, row);
+                  metadataVersions.set(row.id, snapshot.snapshotSequence);
+                }
+              }
               sequence = snapshot.snapshotSequence;
               changed = true;
             } else if (item.kind === 'synchronized') {
@@ -257,7 +266,10 @@ export async function t3Observations(config: {
               const incoming = z.number().int().nonnegative().parse(item.sequence);
               if (incoming <= sequence) continue;
               staged ??= new Map(metadata);
-              staged.set(update.id, update);
+              if (incoming >= (metadataVersions.get(update.id) ?? -1)) {
+                staged.set(update.id, update);
+                metadataVersions.set(update.id, incoming);
+              }
               sequence = incoming;
               changed = true;
             } else if (item.kind === 'thread.removed') {
@@ -292,6 +304,71 @@ export async function t3Observations(config: {
       metadataReady = false;
     }
   }).catch(config.report);
+  // The active shell excludes archived rows on bootstrap. One shared archived
+  // metadata stream supplies them without fetching any conversation.
+  const archived = (async () => {
+    const previous = await Effect.runPromise(config.checkpoints.read(`${namespace}archive`));
+    let revision = previous?.revision ?? 0;
+    let sequence = previous?.sequence ?? 0;
+    const rows = new Map<string, Shell>();
+    const merge = () => {
+      for (const row of rows.values())
+        if (sequence >= (metadataVersions.get(row.id) ?? -1)) {
+          metadata.set(row.id, row);
+          metadataVersions.set(row.id, sequence);
+        }
+      select();
+    };
+    if (previous) {
+      for (const row of z.array(shell).parse(JSON.parse(previous.value))) rows.set(row.id, row);
+      merge();
+    }
+    await loop(stop.signal, async (credential) => {
+      archiveReady = false;
+      try {
+        await t3Subscription({
+          origin: config.origin,
+          token: credential.token,
+          signal: lifetime(credential, stop.signal),
+          requests: [
+            { id: 'archive', method: 'orchestration.subscribeArchivedShell', payload: {} },
+          ],
+          apply: async (_id, values) => {
+            for (const raw of values) {
+              const item = z.object({ kind: z.string() }).passthrough().parse(raw);
+              if (item.kind === 'snapshot') {
+                const snapshot = z
+                  .object({
+                    snapshotSequence: z.number().int().nonnegative(),
+                    threads: z.array(shell),
+                  })
+                  .parse(item.snapshot);
+                if (snapshot.snapshotSequence < sequence)
+                  throw new ObservationUnknown('Obsolete T3 archive snapshot');
+                rows.clear();
+                for (const row of snapshot.threads) rows.set(row.id, row);
+                sequence = snapshot.snapshotSequence;
+              } else if (item.kind === 'thread.updated') {
+                const incoming = z.number().int().nonnegative().parse(item.sequence);
+                if (incoming <= sequence) continue;
+                const row = shell.parse(item.thread);
+                rows.set(row.id, row);
+                sequence = incoming;
+              } else if (item.kind === 'thread.removed') {
+                continue;
+              } else throw new ObservationUnknown('Unsupported T3 archived metadata');
+              await checkpoint('archive', revision, sequence, [...rows.values()]);
+              revision++;
+              merge();
+              archiveReady = true;
+            }
+          },
+        });
+      } finally {
+        archiveReady = false;
+      }
+    });
+  })().catch(config.report);
   const state = (id: string) => {
     const value = details.get(id);
     if (!value) throw new ObservationUnknown('T3 thread observation is not available');
@@ -319,7 +396,7 @@ export async function t3Observations(config: {
       [...metadata.values()]
         .filter((row) => row.projectId === projectId)
         .map((row) => ({ threadId: row.id, title: row.title })),
-    inventoryReady: () => metadataReady,
+    inventoryReady: () => metadataReady && archiveReady,
     activity,
     configuration: (id: string) => ({ ...state(id).value.thread, threadId: id }),
     show: (id: string, limit: number) => ({
@@ -338,7 +415,7 @@ export async function t3Observations(config: {
       nextCursor: null,
     }),
     inactive: (id: string, run: string | null): 'busy' | 'waiting' | 'idle' => {
-      if (!metadataReady || !lineage.has(id)) return 'busy';
+      if (!metadataReady || !archiveReady || !lineage.has(id)) return 'busy';
       let waiting = false;
       for (const owner of lineage.get(id) ?? []) {
         const value = details.get(owner);
@@ -368,7 +445,11 @@ export async function t3Observations(config: {
     close: async () => {
       stopped = true;
       stop.abort();
-      await Promise.allSettled([inventory, ...[...workers.values()].map((worker) => worker.work)]);
+      await Promise.allSettled([
+        inventory,
+        archived,
+        ...[...workers.values()].map((worker) => worker.work),
+      ]);
     },
   };
 }

@@ -92,13 +92,15 @@ export async function t3Observations(config: {
       signal,
       ...(credential.replaced ? [credential.replaced] : []),
       AbortSignal.timeout(
-        Math.max(
-          1000,
-          Math.min(
-            2_147_483_647,
-            credential.expiresAt -
-              Date.now() -
-              Math.min(86400000, Math.max(60000, (credential.expiresAt - Date.now()) / 10))
+        Math.floor(
+          Math.max(
+            1000,
+            Math.min(
+              2_147_483_647,
+              credential.expiresAt -
+                Date.now() -
+                Math.min(86400000, Math.max(60000, (credential.expiresAt - Date.now()) / 10))
+            )
           )
         )
       ),

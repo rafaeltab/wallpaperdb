@@ -34,7 +34,10 @@ export const JobLive = Layer.effect(
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
     const prepareLaunch = (intent: Intent) =>
-      (execution.prepareLaunch?.(intent) ?? Effect.succeed(execution.launch(intent))).pipe(
+      (
+        execution.prepareLaunch?.(intent) ??
+        Effect.succeed(Effect.suspend(() => execution.launch(intent)))
+      ).pipe(
         Effect.mapError(
           (cause) => new Unavailable({ operation: 'prepare-launch', cause, launchNotSent: true })
         )

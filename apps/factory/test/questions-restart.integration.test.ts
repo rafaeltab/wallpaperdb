@@ -93,6 +93,11 @@ it('retains a parked job across process loss and never repeats an uncertain resu
       delivery: { activity: 'awaiting-answer', active: false },
     });
     await host.save({ lostSend: true, overrides: { status: 'completed', pendingRequestCount: 0 } });
+    await vi.waitFor(
+      async () =>
+        expect(await status()).toMatchObject({ execution: { kind: 'found', status: 'completed' } }),
+      { timeout: 10000, interval: 30 }
+    );
     const response = await fetch(`${origin}/api/job/resume`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

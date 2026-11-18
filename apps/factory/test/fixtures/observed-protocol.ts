@@ -56,9 +56,12 @@ export async function observedProtocol(directory: string, configFile: string) {
       const id = name === 'planner.json' ? 'planner-thread' : value.threadId;
       if (!id) continue;
       const held =
-        (value.stage === 'implementation' && config.holdImplementation) ||
-        (value.stage === 'review' && config.holdReview) ||
-        (value.stage === 'publication' && config.holdPublication);
+        !['failed', 'interrupted', 'cancelled'].includes(
+          config.overrides?.status ?? value.status
+        ) &&
+        ((value.stage === 'implementation' && config.holdImplementation) ||
+          (value.stage === 'review' && config.holdReview) ||
+          (value.stage === 'publication' && config.holdPublication));
       const status = held ? 'running' : (config.overrides?.status ?? value.status ?? 'completed');
       rows.push({
         ...value,
@@ -94,7 +97,11 @@ export async function observedProtocol(directory: string, configFile: string) {
         pullRequests: [],
         ...config.descendantSnapshots?.[child.threadId],
       });
-    return config.omitThreadList ? [] : rows;
+    return config.omitThreadList
+      ? []
+      : config.duplicate
+        ? rows.flatMap((row) => [row, { ...row, id: `${row.id}-conflicting` }])
+        : rows;
   };
   const threadProjection = async (id: string, signal: AbortSignal) => {
     const detail = await invoke(['thread', 'show', id, '--messages', '1000', '--json'], signal);

@@ -109,6 +109,7 @@ it.each(['absent', 'ambiguous'] as const)(
       };
       await f.host.save(config);
       const running = await startFactory({
+        ...f.host.mcpEnvironment,
         FACTORY_PROJECT: f.host.repository,
         FACTORY_T3_PROJECT_ID: 'project-id',
         FACTORY_BASE: f.host.base,
@@ -228,6 +229,7 @@ it('keeps idle and unlaunched writer-parked recovery available without dispatchi
   const f = await joinFixture({ conflict: true, restack: { outcome: 'SIMPLE' } });
   const collector = await collectAvailability();
   const configuration = {
+    ...f.host.mcpEnvironment,
     FACTORY_PROJECT: f.host.repository,
     FACTORY_T3_PROJECT_ID: 'project-id',
     FACTORY_BASE: f.host.base,

@@ -103,9 +103,11 @@ it('recovers incomplete implementation checks and then follows implement, review
     expect(first).toContain('$implement');
     expect(first).toContain('tests, coverage');
     expect(first).not.toContain('Inspect and reuse the intended linked PR');
-    expect((await running.app.inject('/api/job')).json()).toMatchObject({
-      delivery: { stage: 'implementation', ready: false },
-    });
+    await vi.waitFor(async () =>
+      expect((await running.app.inject('/api/job')).json()).toMatchObject({
+        delivery: { stage: 'implementation', ready: false },
+      })
+    );
     await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
     await vi.waitFor(
       async () =>

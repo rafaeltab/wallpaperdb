@@ -67,10 +67,14 @@ it('a fresh process reconciles publication after a lost response without repeati
       body: JSON.stringify({ issue: 577, context: 'Read only' }),
     });
     expect(response.status).toBe(202);
-    expect(await response.json()).toMatchObject({
-      kind: 'job',
-      execution: { kind: 'found', threadId: 'thread-live' },
-    });
+    expect(await response.json()).toMatchObject({ kind: 'job' });
+    await vi.waitFor(
+      async () =>
+        expect(await (await fetch(`${origin}/api/job`)).json()).toMatchObject({
+          execution: { kind: 'found', threadId: 'thread-live' },
+        }),
+      { timeout: 10000, interval: 30 }
+    );
     await stop(child);
     child = launch();
     await ready();

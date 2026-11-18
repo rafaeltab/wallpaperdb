@@ -2,6 +2,8 @@ import { Context, type Effect, Schema } from 'effect';
 export class Unavailable extends Schema.TaggedError<Unavailable>()('Unavailable', {
   operation: Schema.String,
   cause: Schema.Defect(),
+  /** Positive proof that a launch preparation failed before any external send. */
+  launchNotSent: Schema.optional(Schema.Literal(true)),
 }) {}
 export interface Time {
   now(): Effect.Effect<number, Unavailable>;
@@ -300,6 +302,8 @@ export const Issues = Context.Service<Issues>('wallpaperdb.factory.Issues');
 /** Launch may have succeeded on every failure. Observe must identify the exact title,
  * branch, model and isolated worktree; absence never authorizes a second launch. */
 export interface Execution {
+  /** Read-only preflight. Failure proves no launch was sent; run the returned effect only after claiming ownership. */
+  prepareLaunch?(intent: Intent): Effect.Effect<ReturnType<Execution['launch']>, Unavailable>;
   /** Idempotent cancellation of this owning job, without cancelling unrelated threads. */
   interrupt(intent: Intent, threadId: string): Effect.Effect<void, Unavailable>;
   inspectStage(

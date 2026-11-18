@@ -1,4 +1,4 @@
-import { launchExecution, observeExecutionSettings } from './execution-settings.js';
+import { prepareExecution, observeExecutionSettings } from './execution-settings.js';
 import { inactiveLineage } from './inactivity.js';
 import { mcpCall, pendingQuestion } from './questions.js';
 import { Effect } from 'effect';
@@ -60,40 +60,52 @@ export function t3Execution(config: {
     command(config.binary, ['thread', ...args, '--json'], config.project, signal).then((text) =>
       JSON.parse(text)
     );
-  const execution = {
-    launch: (intent: Intent) =>
-      Effect.tryPromise({
-        try: async (signal) => {
-          const launched = z
-            .object({
-              threadId: z.string().min(1),
-              projectId: z.literal(config.projectId),
-              runId: z.string().nullable(),
-            })
-            .parse(
-              await launchExecution(
-                config,
-                {
-                  title: title(intent),
-                  message: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
+  const submit = (launch: (signal?: AbortSignal) => Promise<unknown>) =>
+    Effect.tryPromise({
+      try: async (signal) => {
+        const launched = z
+          .object({
+            threadId: z.string().min(1),
+            projectId: z.literal(config.projectId),
+            runId: z.string().nullable(),
+          })
+          .parse(await launch(signal));
+        return { kind: 'submitted' as const, threadId: launched.threadId };
+      },
+      catch: (cause) => new Unavailable({ operation: 'launch', cause }),
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.logError(error).pipe(Effect.as({ kind: 'uncertain' as const }))
+      ),
+      Effect.withSpan('factory.t3.launch')
+    );
+  const prepareLaunch = (intent: Intent) =>
+    Effect.tryPromise({
+      try: (signal) =>
+        prepareExecution(
+          config,
+          {
+            title: title(intent),
+            message: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
 ${intent.context}
 Verified prerequisite evidence: ${intent.prerequisiteEvidence ?? 'None'}
 ${receiptInstructions(intent, 'implementation')}`,
-                  base: intent.base,
-                  branch: intent.branch,
-                },
-                intent.execution,
-                signal
-              )
-            );
-          return { kind: 'submitted' as const, threadId: launched.threadId };
-        },
-        catch: (cause) => new Unavailable({ operation: 'launch', cause }),
-      }).pipe(
+            base: intent.base,
+            branch: intent.branch,
+          },
+          intent.execution,
+          signal
+        ),
+      catch: (cause) => new Unavailable({ operation: 'prepare-launch', cause }),
+    }).pipe(Effect.map(submit), Effect.withSpan('factory.t3.prepare-launch'));
+  const execution = {
+    prepareLaunch,
+    launch: (intent: Intent) =>
+      prepareLaunch(intent).pipe(
+        Effect.flatMap((launch) => launch),
         Effect.catch((error) =>
           Effect.logError(error).pipe(Effect.as({ kind: 'uncertain' as const }))
-        ),
-        Effect.withSpan('factory.t3.launch')
+        )
       ),
     observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({

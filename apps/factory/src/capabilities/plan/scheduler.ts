@@ -572,7 +572,14 @@ export const SchedulerLive = Layer.effect(
             run: observedRun(target),
           };
           if (!(yield* claimResume(claim, target, snapshot))) return { kind: 'occupied' as const };
-          const result = yield* (yield* pool.job(target.intent.issue)).retry(command);
+          const result = yield* (yield* pool.job(target.intent.issue)).retry(command).pipe(
+            Effect.catch((error) =>
+              Effect.gen(function* () {
+                if (error.launchNotSent) yield* releaseResume(claim);
+                return yield* Effect.fail(error);
+              })
+            )
+          );
           if (result.kind === 'rejected' || resolvedStart(claim, result))
             yield* releaseResume(claim);
           return result;

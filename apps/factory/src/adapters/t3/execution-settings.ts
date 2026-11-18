@@ -104,7 +104,7 @@ export async function prepareExecution(
   signal?: AbortSignal
 ) {
   if (!settings) {
-    return async () =>
+    return async (launchSignal: AbortSignal | undefined = signal) =>
       JSON.parse(
         await command(
           config.binary,
@@ -123,7 +123,7 @@ export async function prepareExecution(
             '--json',
           ],
           config.project,
-          signal,
+          launchSignal,
           undefined,
           request.base ? undefined : request.message
         )
@@ -141,7 +141,7 @@ export async function prepareExecution(
       ? []
       : [{ id: 'serviceTier', value: settings.mode === 'fast' ? 'priority' : 'default' }]),
   ];
-  return () =>
+  return (launchSignal: AbortSignal | undefined = signal) =>
     mcpCall(
       config,
       't3_thread_launch',
@@ -162,17 +162,8 @@ export async function prepareExecution(
             }
           : {}),
       },
-      signal
+      launchSignal
     );
-}
-export async function launchExecution(
-  config: Configuration,
-  request: { title: string; message: string; base?: string; branch?: string },
-  settings: ExecutionSettings | undefined,
-  signal?: AbortSignal
-) {
-  const launch = await prepareExecution(config, request, settings, signal);
-  return launch();
 }
 export function retainedExecution(value: unknown): ExecutionSettings | undefined {
   return value == null ? undefined : executionSettingsSchema.parse(value);
@@ -205,7 +196,7 @@ export async function observeExecutionSettings(
           .optional(),
       }),
     })
-    .parse(await mcpCall(config, 't3_thread_configuration', { threadId }, signal));
+    .parse(await mcpCall(config, 't3_thread_configure', { threadId }, signal));
   const selected = (id: string) => {
     const value = result.modelSelection.options?.find((o) => o.id === id)?.value;
     return typeof value === 'string' ? value : null;

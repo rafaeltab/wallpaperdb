@@ -44,6 +44,7 @@ import {
   sqliteLocalSnapshot,
   sqliteScheduleObservations,
   sqlitePlanningSafety,
+  sqliteObservationCheckpoints,
 } from '../adapters/store/index.js';
 import {
   Attempts,
@@ -74,13 +75,15 @@ import {
   t3Execution,
   t3Planner,
   t3ExecutionConfiguration,
+  t3Observations,
+  t3ObserverCredential,
 } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command, stateDirectory } from '../platform/index.js';
 import { telemetry } from './telemetry.js';
 import { v2Producer } from './v2.js';
 import { planningWorker } from './planning.js';
-import { observationWorker } from './refresh.js';
+import { observationWorker, inventoryWorker } from './refresh.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
@@ -100,6 +103,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         .refine((value) => /^https?:/.test(value))
         .optional(),
       FACTORY_T3_MCP_ENDPOINT: z.string().url().optional(),
+      FACTORY_T3_OBSERVER_ORIGIN: z.string().url().optional(),
+      FACTORY_T3_AUTH_BASE_DIR: z.string().startsWith('/').optional(),
       FACTORY_T3_MCP_AUTHORIZATION_FILE: z.string().startsWith('/').optional(),
       FACTORY_T3_CONNECT_ORIGIN: z
         .string()
@@ -178,6 +183,30 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     );
     if (!help.includes('--worktree') || !help.includes('--model'))
       throw new Error('T3 installation lacks required headless thread interface');
+    const observerEndpoint =
+      configuration.FACTORY_T3_OBSERVER_ORIGIN ?? configuration.FACTORY_T3_MCP_ENDPOINT;
+    if (!observerEndpoint)
+      throw new Error('Configure FACTORY_T3_OBSERVER_ORIGIN or FACTORY_T3_MCP_ENDPOINT');
+    const observerOrigin = new URL(observerEndpoint).origin;
+    const observerReport = (cause: unknown) => {
+      void Effect.runPromise(
+        Effect.logError(new Unavailable({ operation: 'background-t3-observation', cause }))
+      );
+    };
+    const executionObservations = await t3Observations({
+      origin: observerOrigin,
+      checkpoints: sqliteObservationCheckpoints(configuration.FACTORY_STATE),
+      credential: t3ObserverCredential({
+        binary: configuration.FACTORY_T3_BINARY,
+        project,
+        directory: resolve(configuration.FACTORY_STATE, 'observer'),
+        origin: observerOrigin,
+        authBaseDir: configuration.FACTORY_T3_AUTH_BASE_DIR,
+        report: observerReport,
+      }),
+      report: observerReport,
+    });
+    startupCleanup.push(() => executionObservations.close());
     const readyPrerequisites = () =>
       Effect.gen(function* () {
         const result: VerifiedPrerequisite[] = [];
@@ -202,6 +231,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       readyPrerequisites: prerequisites,
       admitRecovery: (issue) => recoveryAdmission(issue),
       joins: {
+        observations: executionObservations,
         readExecution: async () => (await runtime.runPromise(scheduleStore.read())).execution,
         reconciliationLimit: configuration.FACTORY_AGENT_RECONCILIATION_LIMIT,
         directory: resolve(configuration.FACTORY_STATE, 'joins'),
@@ -235,6 +265,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         Layer.succeed(
           Execution,
           t3Execution({
+            observations: executionObservations,
             project,
             prBase: configuration.FACTORY_PR_BASE,
             projectId: configuration.FACTORY_T3_PROJECT_ID,
@@ -510,6 +541,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN,
         })),
     };
+    const inventory = inventoryWorker(() =>
+      runtime.runPromise(threads.refresh().pipe(Effect.catch(Effect.logError)), {
+        signal: requests.signal,
+      })
+    );
+    startupCleanup.push(() => inventory.close());
     let observing: Promise<unknown> | undefined;
     let recoveringPlanner: Promise<unknown> | undefined;
     let automaticCycles = 0;
@@ -526,7 +563,6 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               metadataAfterCycle = automaticCycles;
               return observations.refresh();
             }),
-            threads.refresh(),
             refreshExecutionCatalog,
           ],
           { concurrency: 2 }
@@ -660,6 +696,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               observing,
               recoveringPlanner,
               refreshes.close(),
+              inventory.close(),
+              executionObservations.close(),
             ]);
           } finally {
             clearTimeout(deadline);

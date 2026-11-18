@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { runProtocol } from './protocol.js';
 import { stripTypeScriptTypes } from 'node:module';
+import { observedProtocol } from './observed-protocol.js';
 export async function protocol(options: { origin?: boolean } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'factory-protocol-'));
   const repository = join(directory, 'repo');
@@ -62,6 +63,7 @@ export async function protocol(options: { origin?: boolean } = {}) {
   for (const name of ['gh', 't3']) {
     await nodeCommand(name, source, { module: true });
   }
+  const observations = await observedProtocol(directory, configFile);
   return {
     directory,
     repository,
@@ -90,6 +92,7 @@ export async function protocol(options: { origin?: boolean } = {}) {
     mcpEnvironment: {
       FACTORY_T3_MCP_ENDPOINT: 'http://controlled.invalid/mcp',
       FACTORY_T3_MCP_AUTHORIZATION_FILE: authorizationFile,
+      FACTORY_T3_OBSERVER_ORIGIN: observations.origin,
     },
     save: async (patch: object) => {
       const next = `${configFile}.next`;
@@ -107,6 +110,10 @@ export async function protocol(options: { origin?: boolean } = {}) {
         .filter(Boolean)
         .map((line) => JSON.parse(line)),
     // Covered fixture processes can finish writing while recursive removal is in progress.
-    cleanup: () => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
+    observationConnections: observations.connections,
+    cleanup: async () => {
+      await observations.close();
+      await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    },
   };
 }

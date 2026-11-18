@@ -3,7 +3,7 @@ import { WebSocketServer } from 'ws';
 
 /** A controlled endpoint for the installed T3 JSON RPC contract. */
 export async function websocketProtocol(
-  onRequest: (request: unknown, send: (value: unknown) => void) => void
+  onRequest: (request: unknown, send: (value: unknown) => void, signal: AbortSignal) => void
 ) {
   const server = createServer();
   const websocket = new WebSocketServer({ noServer: true, perMessageDeflate: true });
@@ -13,8 +13,14 @@ export async function websocketProtocol(
       return;
     }
     websocket.handleUpgrade(request, socket, head, (client) => {
+      const lifetime = new AbortController();
+      client.once('close', () => lifetime.abort());
       client.on('message', (data) =>
-        onRequest(JSON.parse(data.toString()), (value) => client.send(JSON.stringify(value)))
+        onRequest(
+          JSON.parse(data.toString()),
+          (value) => client.send(JSON.stringify(value)),
+          lifetime.signal
+        )
       );
     });
   });
@@ -24,6 +30,7 @@ export async function websocketProtocol(
   let closing: Promise<void> | undefined;
   return {
     origin: `http://127.0.0.1:${address.port}`,
+    connections: () => websocket.clients.size,
     close: () =>
       (closing ??= (async () => {
         for (const client of websocket.clients) client.terminate();

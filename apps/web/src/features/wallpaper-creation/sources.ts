@@ -94,7 +94,9 @@ export function createWallpaperSourceBatch<TFile>(
   let rows: readonly SourceUploadRow<TFile>[] = [];
   let busy = false;
   const pendingCount = () =>
-    rows.filter((row) => row.status === 'pending' || row.status === 'uploading').length;
+    rows.filter(
+      (row) => row.status === 'pending' || row.status === 'uploading' || row.id === blockedInitial
+    ).length;
   let current: {
     readonly rows: typeof rows;
     readonly busy: boolean;
@@ -179,8 +181,11 @@ export function createWallpaperSourceBatch<TFile>(
       publish();
       return true;
     },
+    canRetry(id: string): boolean {
+      return !busy && (id === blockedInitial || pendingCount() < 16);
+    },
     retry(id: string) {
-      if (busy || pendingCount() >= 16) return;
+      if (!batch.canRetry(id)) return;
       const row = rows.find((row) => row.id === id);
       if (row && (row.status === 'failed' || row.status === 'confirming'))
         update(id, { status: 'pending', message: undefined });

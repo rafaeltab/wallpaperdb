@@ -172,7 +172,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
             {(row.status === 'failed' || row.status === 'confirming') && (
               <button
                 type="button"
-                disabled={!snapshot.canIntake || managing}
+                disabled={!batch.canRetry(row.id) || managing}
                 className="underline"
                 onClick={() => {
                   batch.retry(row.id);

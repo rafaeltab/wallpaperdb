@@ -174,6 +174,14 @@ it('pauses an ambiguous first acceptance and resolves it by status before admitt
   expect(batch.run(new AbortController().signal)).toBe(pending);
   await pending;
   expect(uploads).toEqual(['first']);
+  expect(
+    batch.addFiles(
+      Array.from({ length: 15 }, (_, index) => ({
+        value: `extra-${index}`,
+        name: `extra-${index}.png`,
+      }))
+    )
+  ).toBe(false);
   await batch.run(new AbortController().signal); // Adding another action cannot silently supersede the unknown initial intent.
   expect(uploads).toEqual(['first']);
   const first = batch.getSnapshot().rows[0];
@@ -733,3 +741,53 @@ it.each(['accepted', 'rejected'])(
     );
   }
 );
+
+it('reserves recovery for an ambiguous initial Source when the pending queue is full', async () => {
+  const wallpaper = {
+    wallpaperId: 'saved',
+    assetId: 'asset',
+    sourceId: null,
+    state: 'awaiting-source' as const,
+    createdAt: 'now',
+  };
+  const api: SourceBatchApi<string> = {
+    identifier: () => crypto.randomUUID(),
+    begin: async () => wallpaper,
+    wallpaper: async () => wallpaper,
+    list: async () => ({
+      sourceSetRevision: '0',
+      sources: [],
+      candidates: [],
+      hasPendingCandidates: false,
+    }),
+    create: async (_asset, id) => ({
+      candidateId: id,
+      expectedSourceSetRevision: '0',
+      status: 'ready',
+    }),
+    status: async () => {
+      throw new Error('No recovery started yet');
+    },
+    upload: async () => {
+      throw new Error('Already inspected');
+    },
+    accept: async () => {
+      throw new Error('Acceptance response lost');
+    },
+    expectSource: async () => {},
+    cancel: async () => {},
+    wait: async () => {},
+  };
+  const batch = createWallpaperSourceBatch(api, { creationKey: 'saved' });
+  batch.addFiles(
+    Array.from({ length: 16 }, (_, index) => ({ name: `${index}.png`, value: String(index) }))
+  );
+  await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().canIntake).toBe(false);
+  const first = batch.getSnapshot().rows[0];
+  if (!first) throw new Error('Missing ambiguous initial Source');
+  expect(first.status).toBe('failed');
+  expect(batch.canRetry(first.id)).toBe(true);
+  batch.retry(first.id);
+  expect(batch.getSnapshot().rows.filter((row) => row.status === 'pending')).toHaveLength(16);
+});

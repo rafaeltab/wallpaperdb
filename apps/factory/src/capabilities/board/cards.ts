@@ -2,6 +2,7 @@ import { type ProjectionContext, gh } from './context.js';
 import type { PullRequest, WorkItem } from './model.js';
 import { attention, factoryStatus, providerStatus } from './status.js';
 import { entity, issueId, pullId, unknown } from './values.js';
+import { currentQuestion } from './jobs.js';
 export function populateCards(context: ProjectionContext) {
   const { tables, details, input, at, itemFact, facts } = context;
   function card(
@@ -94,7 +95,11 @@ export function populateCards(context: ProjectionContext) {
       observedAt: at,
       questions: jobs.flatMap((j) => {
         const w = input.localWork.find((w) => w.intent && issueId(w.intent.issue) === j.issueId);
-        return w?.control.parked ? [{ jobId: j.id, ...w.control.parked.question }] : [];
+        const current = input.jobs.find(
+          (status) => status.kind === 'job' && issueId(status.intent.issue) === j.issueId
+        );
+        const question = currentQuestion(current?.kind === 'job' ? current : undefined, w?.control);
+        return question ? [{ jobId: j.id, ...question }] : [];
       }),
       checkRuns: p?.checkRuns
         ? itemFact(`pull:${p.number}`)(

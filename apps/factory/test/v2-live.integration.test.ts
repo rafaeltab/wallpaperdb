@@ -2551,6 +2551,76 @@ it.each([
   }
 );
 
+it('removes historical questions from ready Project items after the job advances', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const pull = pullObservation(42, { linkedIssues: [1] });
+  const input = { ...parkedSnapshot(pull, true) };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      stageIndex: 5,
+      resume: undefined,
+      execution: { ...source.execution, status: 'completed', answeredQuestions: ['q1'] },
+      delivery: {
+        stage: 'ci',
+        commit: pull.head,
+        ready: true,
+        landed: false,
+        active: false,
+        pr: { kind: 'found', url: pull.url, commit: pull.head, ready: true, landed: false },
+      },
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'test', initial: input });
+  const itemId = 'item:pr:rafaeltab/wallpaperdb/42';
+  const snapshot = board.snapshot();
+  expect(snapshot.entities.items[itemId]).toMatchObject({
+    status: { code: 'ready' },
+    attention: { state: 'none' },
+  });
+  expect(snapshot.entities.jobs['job:rafaeltab/wallpaperdb/1'].question).toBeNull();
+  expect(board.details(itemId)).toMatchObject({
+    questions: [],
+  });
+  expect(input.localWork[0].control.parked?.question.id).toBe('q1');
+});
+
+it.each(['delivery', 'retained-current-stage'] as const)(
+  'shows a current question using %s evidence rather than an older parked question',
+  async (evidence) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const input = { ...parkedSnapshot(pullObservation(42, { linkedIssues: [1] }), true) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || !source.delivery) throw new Error('Missing job');
+    const question = { id: 'q2', text: 'Choose the next behavior' };
+    input.jobs = [
+      {
+        ...source,
+        stageIndex: 1,
+        delivery: { ...source.delivery, question: evidence === 'delivery' ? question : undefined },
+      },
+    ];
+    if (evidence === 'retained-current-stage')
+      input.localWork = input.localWork.map((work) => ({
+        ...work,
+        control: { ...work.control, parked: { index: 1, question } },
+      }));
+    const board = await liveBoard({ scopeId: 'test', initial: input });
+    const itemId = 'item:pr:rafaeltab/wallpaperdb/42';
+    expect(board.snapshot().entities.items[itemId]).toMatchObject({
+      status: { code: 'awaiting-answer' },
+      attention: { state: 'required' },
+    });
+    expect(board.snapshot().entities.jobs['job:rafaeltab/wallpaperdb/1'].question).toEqual({
+      id: 'q2',
+      summary: question.text,
+    });
+    expect(board.details(itemId)).toMatchObject({ questions: [{ id: 'q2', text: question.text }] });
+  }
+);
+
 it('keeps a parked owning job visible when its bound PR is closed', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const input = parkedSnapshot(pullObservation(42, { state: 'CLOSED', linkedIssues: [1] }), true);

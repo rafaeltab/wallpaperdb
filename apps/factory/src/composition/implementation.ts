@@ -307,10 +307,18 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
       mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
     });
-    const catalog = await Effect.runPromise(
-      Effect.cachedWithTTL(
-        executionConfiguration.catalog().pipe(Effect.catch(() => Effect.succeed(undefined))),
-        '30 seconds'
+    let executionCatalog: import('../capabilities/job/index.js').ExecutionCatalog | undefined;
+    const refreshExecutionCatalog = executionConfiguration.catalog().pipe(
+      Effect.tap((value) =>
+        Effect.sync(() => {
+          executionCatalog = value;
+        })
+      ),
+      Effect.asVoid,
+      Effect.catch(() =>
+        Effect.sync(() => {
+          executionCatalog = undefined;
+        })
       )
     );
     const schedulerDeps = Layer.mergeAll(
@@ -515,6 +523,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               return observations.refresh();
             }),
             threads.refresh(),
+            refreshExecutionCatalog,
           ],
           { concurrency: 2 }
         ).pipe(Effect.asVoid, Effect.catch(Effect.logError)),
@@ -538,7 +547,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       planningSafety,
       read: () =>
         Effect.all({
-          executionCatalog: catalog,
+          executionCatalog: Effect.sync(() => executionCatalog),
           schedule: observations.schedule(),
           threads: threads.snapshot(),
           safety: planningSafety.status(),

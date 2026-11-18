@@ -107,6 +107,20 @@ export const t3Observations = sqliteTable('t3_observations', {
     .notNull(),
 });
 
+export const observationCheckpoints = sqliteTable(
+  'observation_checkpoints',
+  {
+    stream: text('stream').primaryKey(),
+    revision: integer('revision').notNull(),
+    sequence: integer('sequence').notNull(),
+    value: text('value').notNull(),
+  },
+  (table) => [
+    check('observation_revision_positive', sql`${table.revision} > 0`),
+    check('observation_sequence_nonnegative', sql`${table.sequence} >= 0`),
+  ]
+);
+
 export const v2Board = sqliteTable('v2_board', {
   scope: text('scope').primaryKey(),
   value: text('value', { mode: 'json' })

@@ -4,6 +4,7 @@ export { sqliteAttemptStore } from './attempts.js';
 export { sqliteObservations, sqliteScheduleObservations } from './observations.js';
 export { sqliteLocalSnapshot } from './snapshots.js';
 export { sqliteThreads } from './threads.js';
+export { sqliteObservationCheckpoints } from './checkpoints.js';
 export { sqliteBoard } from './board.js';
 
 export { jobStateDirectory } from './namespace.js';

@@ -1,6 +1,9 @@
 import type { PlanningInput, PlanningIssue } from '../../capabilities/plan/index.js';
+import type { Status } from '../../capabilities/job/index.js';
 
 const list = (values: readonly (string | number)[]) => (values.length ? values.join(', ') : 'none');
+const flag = (value: boolean | undefined) =>
+  value === undefined ? 'unknown' : value ? 'yes' : 'no';
 function issueSection(issue: PlanningIssue) {
   const metadata = issue.metadata;
   if (!metadata) throw new Error(`Missing planning metadata for #${issue.number}`);
@@ -14,12 +17,46 @@ assignees: ${list(metadata.assignees)}
 prs: ${list(metadata.pullRequests.map((pr) => `${pr.number} ${pr.state.toLowerCase()}`))}
 parent: ${list(issue.parents)}
 comment count: ${metadata.commentCount}
-blockers:${issue.blockers.length ? `\n${issue.blockers.map((number) => `- ${number}`).join('\n')}` : ' none'}`;
+blockers:${issue.blockers.length ? `\n${issue.blockers.map((number) => `- ${number}`).join('\n')}` : ' none'}
+blockers ready: ${issue.blockersReady ? 'yes' : 'no'}
+join required: ${issue.joinRequired ? 'yes' : 'no'}${
+    issue.prerequisite
+      ? `\nverified base: ${issue.prerequisite.base}\npr target: ${issue.prerequisite.prBase}`
+      : ''
+  }${
+    issue.recovery
+      ? `\nrecovery: ${issue.recovery.classification ?? 'unclassified'}\nrecovery active: ${flag(issue.recovery.active)}\nrecovery status: ${issue.recovery.progress}\nrecovery question: ${issue.recovery.question ?? 'none'}`
+      : ''
+  }`;
+}
+function owningSection(job: Extract<Status, { kind: 'job' }>) {
+  const delivery = job.delivery;
+  const pr = delivery?.pr;
+  return `## Owning issue ${job.intent.issue}
+
+base: ${job.intent.base}
+stage: ${delivery?.stage ?? 'unknown'}
+activity: ${delivery?.activity ?? (delivery?.active === undefined ? 'unknown' : delivery.active ? 'active' : 'inactive')}
+ready: ${flag(delivery?.ready)}
+landed: ${flag(delivery?.landed)}
+commit: ${delivery?.commit ?? 'unknown'}
+question: ${delivery?.question?.text ?? 'none'}
+pr: ${pr?.kind === 'found' ? pr.url : (pr?.kind ?? 'unobserved')}${
+    pr?.kind === 'found' ? `\nhead: ${pr.commit}\npr target: ${pr.base ?? 'unknown'}` : ''
+  }${
+    job.prerequisite
+      ? `\naccepted prerequisite: ${job.prerequisite.url}\naccepted commit: ${job.prerequisite.commit}\naccepted target: ${job.prerequisite.base ?? 'unknown'}`
+      : ''
+  }
+scope:
+${job.intent.context || 'none'}`;
 }
 export function plannerMessage(input: PlanningInput, requestId: string) {
   const issues = [...new Map(input.issues.map((issue) => [issue.number, issue])).values()];
+  const owning = new Map<number, Extract<Status, { kind: 'job' }>>();
   const running = new Map<number, string>();
   for (const job of [input.job, ...(input.jobs ?? [])]) {
+    if (job.kind === 'job') owning.set(job.intent.issue, job);
     if (
       job.kind === 'job' &&
       !job.delivery?.ready &&
@@ -36,7 +73,10 @@ Project status, priority, size and assignees are informational, not execution ow
 Each selection must name includeCodeFromIssues as numeric issue numbers of existing verified code needed in its execution base. Empty means freshly fetched origin/main and a PR targeting main. Do not include itself, another new selection, unfinished work, ambiguous PR identities or unverified changes. Include mandatory open prerequisites explicitly. The factory verifies these exact references, prepares containing bases and automatically joins verified divergent code under its verification policy within this cycle. An already constructed containing branch or human merge is not required before selecting work. Never schedule future prerequisite implementation. Explanations of unselected work remain advisory.
 Return one JSON object as the entire final assistant response: {requestId, selected:[{issue,reason,includeCodeFromIssues:[issue numbers]}],deferred:[{issue,reason}]}. No dependsOn or conflicts fields.
 Request: ${JSON.stringify({ requestId, capacity: input.capacity, maximumSelections: input.maximumSelections, admissions: input.admissions ?? [], availableCode: input.availableCode ?? [] })}
-Owning work and verified availability: ${JSON.stringify({ owning: [...new Map([input.job, ...(input.jobs ?? [])].flatMap((job) => (job.kind === 'job' ? [[job.intent.issue, { issue: job.intent.issue, scope: job.intent.context, base: job.intent.base, delivery: job.delivery, prerequisite: job.prerequisite }] as const] : []))).values()], issues: issues.map(({ number, prerequisite, recovery, blockersReady, joinRequired }) => ({ number, prerequisite, recovery, blockersReady, joinRequired })) })}
+
+# Owning work
+
+${[...owning.values()].map(owningSection).join('\n\n') || 'none'}
 
 Issue URL template: https://github.com/rafaeltab/wallpaperdb/issues/<number>
 

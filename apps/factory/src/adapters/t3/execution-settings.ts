@@ -9,6 +9,7 @@ import {
 } from '../../capabilities/job/index.js';
 import { command, executionSettingsSchema } from '../../platform/index.js';
 import { mcpCall } from './questions.js';
+import type { T3Observations } from './observations.js';
 
 interface Configuration {
   binary: string;
@@ -16,6 +17,7 @@ interface Configuration {
   projectId: string;
   mcpEndpoint?: string;
   mcpAuthorizationFile?: string;
+  observations?: T3Observations;
 }
 const permissionLevels = ['approval-required', 'auto-accept-edits', 'auto', 'full-access'] as const;
 const permission = z.enum(permissionLevels);

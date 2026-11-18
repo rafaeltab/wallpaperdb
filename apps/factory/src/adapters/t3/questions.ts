@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { command } from '../../platform/index.js';
+import type { T3Observations } from './observations.js';
 interface Configuration {
   binary: string;
   project: string;
   mcpEndpoint?: string;
   mcpAuthorizationFile?: string;
+  observations?: T3Observations;
 }
 export async function mcpCall(
   config: Configuration,
@@ -13,6 +15,15 @@ export async function mcpCall(
   args: object,
   signal?: AbortSignal
 ) {
+  if (
+    config.observations &&
+    ['t3_thread_read', 't3_thread_configure', 'list_thread_pull_requests'].includes(tool)
+  ) {
+    const { threadId } = z.object({ threadId: z.string() }).parse(args);
+    if (tool === 't3_thread_read') return config.observations.activity(threadId);
+    if (tool === 't3_thread_configure') return config.observations.configuration(threadId);
+    return config.observations.links(threadId);
+  }
   const { endpoint, authorization } = await mcpAuthorization(config);
   const raw = await command(
     config.binary,

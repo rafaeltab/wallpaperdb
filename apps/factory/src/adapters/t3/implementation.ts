@@ -12,6 +12,7 @@ import {
 } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
 import { receiptInstructions, stageExecution } from './stages.js';
+import { ObservationUnknown, type T3Observations } from './observations.js';
 const associations = z.object({
   pullRequests: z.array(z.object({ url: z.string().url(), source: z.string() })),
 });
@@ -55,11 +56,17 @@ export function t3Execution(config: {
   prBase?: string;
   mcpEndpoint?: string;
   mcpAuthorizationFile?: string;
+  observations?: T3Observations;
 }): Execution {
-  const call = (args: string[], signal?: AbortSignal) =>
-    command(config.binary, ['thread', ...args, '--json'], config.project, signal).then((text) =>
-      JSON.parse(text)
+  const call = (args: string[], signal?: AbortSignal): Promise<unknown> => {
+    if (config.observations && args[0] === 'list')
+      return Promise.resolve(config.observations.list(config.projectId));
+    if (config.observations && args[0] === 'show' && args[1])
+      return Promise.resolve(config.observations.show(args[1], Number(args[3] ?? 1000)));
+    return command(config.binary, ['thread', ...args, '--json'], config.project, signal).then(
+      (text) => JSON.parse(text)
     );
+  };
   const submit = (launch: (signal?: AbortSignal) => Promise<unknown>) =>
     Effect.tryPromise({
       try: async (signal) => {
@@ -110,18 +117,35 @@ ${receiptInstructions(intent, 'implementation')}`,
     observe: (intent: Intent, repair?: StageRequest) =>
       Effect.tryPromise({
         try: async (signal): Promise<Observation & { failure?: Unavailable }> => {
+          config.observations?.retainIdentity(`[factory:${intent.id}]`);
+          config.observations?.retainIdentity(`Factory ${intent.id}`);
+          if (repair) config.observations?.retain(repair.threadId);
           const matches = repair
             ? [{ threadId: repair.threadId, title: title(intent) }]
             : listing
                 .parse(await call(['list', '--project', config.projectId], signal))
                 .filter((item) => matchesTitle(item.title, intent));
-          if (matches.length === 0) return { kind: 'absent' };
+          if (matches.length === 0)
+            return {
+              kind:
+                config.observations && !config.observations.inventoryReady()
+                  ? 'ambiguous'
+                  : 'absent',
+            };
           if (matches.length !== 1) return { kind: 'ambiguous' };
           const match = matches[0];
           if (!match) return { kind: 'ambiguous' };
-          const { thread } = detail.parse(
-            await call(['show', match.threadId, '--messages', '1'], signal)
-          );
+          let observed: unknown;
+          try {
+            observed = await call(['show', match.threadId, '--messages', '1'], signal);
+          } catch (cause) {
+            if (cause instanceof ObservationUnknown)
+              return repair
+                ? { kind: 'unverified', threadId: repair.threadId, status: 'unknown' }
+                : { kind: 'ambiguous' };
+            throw cause;
+          }
+          const { thread } = detail.parse(observed);
           if (thread.threadId !== match.threadId || thread.projectId !== config.projectId)
             return { kind: 'ambiguous' };
           const unverified: Observation = repair
@@ -226,12 +250,14 @@ ${receiptInstructions(intent, 'implementation')}`,
       },
       (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
       (threadId, runId, signal) =>
-        inactiveLineage(
-          (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
-          threadId,
-          runId,
-          signal
-        ),
+        config.observations
+          ? Promise.resolve(config.observations.inactive(threadId, runId))
+          : inactiveLineage(
+              (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
+              threadId,
+              runId,
+              signal
+            ),
       config.mcpEndpoint && config.mcpAuthorizationFile
         ? (intent, request, prompt, signal) =>
             mcpCall(

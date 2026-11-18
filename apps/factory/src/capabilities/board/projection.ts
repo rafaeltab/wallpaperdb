@@ -1,3 +1,4 @@
+import { legacyExecutionSettings } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import { capacityOccupied, emptyPlanningSafety, type PlanningSafetyView } from '../plan/index.js';
 import { populateCards } from './cards.js';
@@ -24,6 +25,8 @@ export function project(input: ScheduleSnapshot, at: string, scopeId: string, cu
   const coverage = coverageFor(tables.issues, !!facts);
   const factory = entity({
     id: 'factory:local' as const,
+    execution: input.state.execution ?? legacyExecutionSettings,
+    executionCatalog: input.executionCatalog,
     paused: input.state.paused,
     planning: planning(
       input.planningSafety ?? emptyPlanningSafety,

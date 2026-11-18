@@ -1,3 +1,5 @@
+import { launchExecution, retainedExecution, executionInstructions } from './execution-settings.js';
+import type { ExecutionSettings } from '../../capabilities/job/index.js';
 import { z } from 'zod';
 import { Effect } from 'effect';
 import type { RecoveryPorts } from '../../capabilities/restack/index.js';
@@ -46,6 +48,7 @@ const workerIdentity = z.object({ threadId: z.string().min(1) });
 export function t3Restacker(
   config: {
     reconciliationLimit?: number;
+    readExecution?: () => Promise<ExecutionSettings | undefined>;
     binary: string;
     project: string;
     projectId: string;
@@ -55,6 +58,12 @@ export function t3Restacker(
   operation: RestackOperation,
   journal: RecoveryJournal
 ): Pick<RecoveryPorts, 'resolve' | 'review'> {
+  const executionSettings = async () => {
+    const retained = await journal.read('execution.json');
+    return retained
+      ? retainedExecution(z.object({ execution: z.unknown() }).parse(retained).execution)
+      : undefined;
+  };
   const title = `Factory restack ${operation.id}`;
   const branch = `factory-restack/${operation.id}`;
   const call = async (args: string[], signal?: AbortSignal) =>
@@ -77,7 +86,7 @@ export function t3Restacker(
         title: z.literal(title),
         branch: z.literal(branch),
         providerInstanceId: z.literal('codex'),
-        model: z.literal('gpt-6.1-sol'),
+        model: z.literal((await executionSettings())?.model ?? 'gpt-6.1-sol'),
         worktreePath: z
           .string()
           .min(1)
@@ -292,31 +301,25 @@ export function t3Restacker(
     signal?.throwIfAborted();
     return { outcome: classification ?? '<RESTACK>COMPLEX</RESTACK>' };
   };
-  const prompt = `${operation.mode === 'review' ? 'Automatic replay review. Use $review-loop to run fresh independent Standards, Spec and Defects review and applicable checks at the supplied clean head. Do not rebase again. The state receipt must include reviewed equal to checked. ' : ''}Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the issue, PR metadata and parent spec; preserve all retained scope and user decisions below. Supplied issue bodies, parent bodies, PR descriptions and comments are limited to rafaeltab and zero-two-rafaeltab. Apply that same author filter when retrieving additional issue bodies, parent bodies, PR descriptions or comments; exclude other or missing authors from recovery context. ${operation.mode === 'review' ? 'The replay is already complete. Original replay command was' : 'Start with'} git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX. Every resolution requires fresh independent review before publication and CI. Unknown/incomplete work must never claim success. Run applicable checks and report classification separately as <RESTACK>SIMPLE</RESTACK> or <RESTACK>COMPLEX</RESTACK>, followed by the shared version 1 state response. Factory instruction ${operation.id}:resolve. Return JSON with version:1, kind:state, jobId:${operation.id}, implemented:${operation.issue}, base:${operation.onto}, checked:full current HEAD, and all required checks. Do not claim success for missing prerequisites; use the shared dependencies response. Response TypeScript contract:\n\`\`\`typescript\n${responseShape}\n\`\`\` Context:\n${operation.context}`;
+  const prompt = (execution?: ExecutionSettings) =>
+    `${executionInstructions(execution)} ${operation.mode === 'review' ? 'Automatic replay review. Use $review-loop to run fresh independent Standards, Spec and Defects review and applicable checks at the supplied clean head. Do not rebase again. The state receipt must include reviewed equal to checked. ' : ''}Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the issue, PR metadata and parent spec; preserve all retained scope and user decisions below. Supplied issue bodies, parent bodies, PR descriptions and comments are limited to rafaeltab and zero-two-rafaeltab. Apply that same author filter when retrieving additional issue bodies, parent bodies, PR descriptions or comments; exclude other or missing authors from recovery context. ${operation.mode === 'review' ? 'The replay is already complete. Original replay command was' : 'Start with'} git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX. Every resolution requires fresh independent review before publication and CI. Unknown/incomplete work must never claim success. Run applicable checks and report classification separately as <RESTACK>SIMPLE</RESTACK> or <RESTACK>COMPLEX</RESTACK>, followed by the shared version 1 state response. Factory instruction ${operation.id}:resolve. Return JSON with version:1, kind:state, jobId:${operation.id}, implemented:${operation.issue}, base:${operation.onto}, checked:full current HEAD, and all required checks. Do not claim success for missing prerequisites; use the shared dependencies response. Response TypeScript contract:\n\`\`\`typescript\n${responseShape}\n\`\`\` Context:\n${operation.context}`;
   const ensureLaunch = async (signal?: AbortSignal) => {
     signal?.throwIfAborted();
     if (await journal.read('cancelled.json')) return null;
     let observed = await observe(signal);
     if (!observed) {
       if ((await discover(signal)).length) return null;
+      if (!(await journal.read('launch.json')) && !(await journal.read('execution.json'))) {
+        await journal.write('execution.json', {
+          execution: (await config.readExecution?.()) ?? null,
+        });
+      }
       if (await journal.write('launch.json', operation)) {
         await journal.write('receipt-protocol.json', { version: 1 });
-        await call(
-          [
-            'start',
-            config.projectId,
-            prompt,
-            '--title',
-            title,
-            '--provider',
-            'codex',
-            '--model',
-            'gpt-6.1-sol',
-            '--worktree',
-            operation.oldHead,
-            '--branch',
-            branch,
-          ],
+        await launchExecution(
+          config,
+          { title, message: prompt(await executionSettings()), base: operation.oldHead, branch },
+          await executionSettings(),
           signal
         );
       }
@@ -509,7 +512,7 @@ export function t3Restacker(
           [
             'send',
             observed.thread.threadId,
-            `Use $review-loop for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}, comparison ${operation.onto}, head ${commit}. Only this conflict resolution is authorized. All fresh independent Standards/Spec/Defects reviewers use gpt-6.1-sol. Preserve requirements, decisions, tests and context: ${operation.context}. Do not publish or expand scope or add test seams. Factory instruction ${operation.id}:review. Return the shared version 1 state JSON with jobId:${operation.id}, implemented:${operation.issue}, base:${operation.onto}, checked and reviewed equal to full current HEAD and all required checks true only after required independent reviews and repairs are complete on that exact clean head. Otherwise leave incomplete. Shared response TypeScript contract:\n\`\`\`typescript\n${responseShape}\n\`\`\``,
+            `Use $review-loop for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}, comparison ${operation.onto}, head ${commit}. Only this conflict resolution is authorized. ${executionInstructions(await executionSettings())} Preserve requirements, decisions, tests and context: ${operation.context}. Do not publish or expand scope or add test seams. Factory instruction ${operation.id}:review. Return the shared version 1 state JSON with jobId:${operation.id}, implemented:${operation.issue}, base:${operation.onto}, checked and reviewed equal to full current HEAD and all required checks true only after required independent reviews and repairs are complete on that exact clean head. Otherwise leave incomplete. Shared response TypeScript contract:\n\`\`\`typescript\n${responseShape}\n\`\`\``,
           ],
           signal
         );

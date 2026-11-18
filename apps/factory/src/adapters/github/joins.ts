@@ -51,6 +51,9 @@ type Layer = z.infer<typeof layer>;
 type Intent = z.infer<typeof intent>;
 type RepairAuthority = { request: StageRequest; evidence: StageEvidence };
 export interface JoinConfiguration {
+  readonly readExecution?: () => Promise<
+    import('../../capabilities/job/index.js').ExecutionSettings | undefined
+  >;
   readonly reconciliationLimit?: number;
   readonly directory: string;
   readonly binary: string;

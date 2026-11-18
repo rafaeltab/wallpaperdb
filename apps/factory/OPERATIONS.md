@@ -8,6 +8,14 @@ Retain the active release's pinned Node installation, private configuration and 
 
 Completion verification requires the structured T3 MCP connection configured in the [composition root](src/composition/implementation.ts). CLI transcript output alone cannot establish descendant inactivity or registered waits. Missing connection or activity evidence leaves completion unverified.
 
+## Execution settings
+
+Use the Project canvas Settings panel to save the factory-wide model, reasoning effort, Standard/Fast mode and permission level without restarting. Choices come from the configured T3/Codex installation; Fast requests Codex priority service independently of effort. Permission choices respect the MCP client's ceiling and provider restrictions. Supervised permission modes can leave unattended work waiting for a human. Inherited/default values preserve T3 defaults, whose effective values may be unknown. See the [Settings controls](frontend/src/canvas/execution-controls.tsx) and [T3 translation](src/adapters/t3/execution-settings.ts).
+
+The scheduler captures execution settings at admission. Planner attempts and recovery operations capture them before claiming a launch. Later stages, uncertain-launch reconciliation, continuations and implementation retries retain the captured settings, including permissions. A new admission or new planner/recovery operation uses the latest saved settings; changing settings never restarts an existing worker or consumes another admission. Changing an existing execution's permissions requires a separate execution context, not a factory configuration edit. Job and planner details distinguish captured settings from observed T3 selections, inherited defaults and unknown values. See the [scheduler](src/capabilities/plan/scheduler.ts), [planner](src/adapters/t3/planner.ts) and [recovery adapter](src/adapters/t3/restack.ts).
+
+Existing records without execution settings retain the legacy model and inherited options and permissions. Saving unrelated scheduling controls preserves the current execution settings. Configured launches require the authenticated MCP connection described above and use structured launch controls; unavailable combinations fail without substitution. Settings persist in the existing revisioned [JSON records](src/platform/record-schemas.ts) in SQLite, so rollback needs a reader compatible with those additional fields.
+
 ## Upgrade and recovery
 
 Stop all writers and back up the entire state directory, including database journals, before migration or restoration. Retain the previous release, unit and private configuration. Verify copied production state through the [migration-only entry point](src/main.ts). Starting a full factory against that copy can contact retained external workers even while admissions are paused. Development and demonstrations need isolated state and controlled external endpoints.

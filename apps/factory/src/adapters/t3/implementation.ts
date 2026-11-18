@@ -1,3 +1,4 @@
+import { launchExecution, observeExecutionSettings } from './execution-settings.js';
 import { inactiveLineage } from './inactivity.js';
 import { mcpCall, pendingQuestion } from './questions.js';
 import { Effect } from 'effect';
@@ -70,25 +71,18 @@ export function t3Execution(config: {
               runId: z.string().nullable(),
             })
             .parse(
-              await call(
-                [
-                  'start',
-                  config.projectId,
-                  `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
+              await launchExecution(
+                config,
+                {
+                  title: title(intent),
+                  message: `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
 ${intent.context}
 Verified prerequisite evidence: ${intent.prerequisiteEvidence ?? 'None'}
 ${receiptInstructions(intent, 'implementation')}`,
-                  '--title',
-                  title(intent),
-                  '--provider',
-                  'codex',
-                  '--model',
-                  'gpt-6.1-sol',
-                  '--worktree',
-                  intent.base,
-                  '--branch',
-                  intent.branch,
-                ],
+                  base: intent.base,
+                  branch: intent.branch,
+                },
+                intent.execution,
                 signal
               )
             );
@@ -135,7 +129,7 @@ ${receiptInstructions(intent, 'implementation')}`,
               title: z.string().refine((value) => matchesTitle(value, intent)),
               threadId: z.literal(match.threadId),
               providerInstanceId: z.literal('codex'),
-              model: z.literal('gpt-6.1-sol'),
+              model: z.literal(intent.execution?.model ?? 'gpt-6.1-sol'),
               branch: z.literal(intent.branch),
               worktreePath: z
                 .string()
@@ -160,6 +154,9 @@ ${receiptInstructions(intent, 'implementation')}`,
               worktree,
               branch,
               model: thread.model,
+              observedExecution: intent.execution
+                ? await observeExecutionSettings(config, thread.threadId, signal)
+                : undefined,
             };
           } catch (error) {
             // Checkout/receipt verification cannot erase a known worker lifecycle.

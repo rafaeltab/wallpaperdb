@@ -91,6 +91,9 @@ export function populateJobs(context: ProjectionContext) {
       issueId: iid,
       pullRequestId: pid,
       threadId: safeTid,
+      executionSettings: current?.intent.execution ?? admission.execution,
+      observedExecution:
+        current?.execution.kind === 'found' ? current.execution.observedExecution : undefined,
       lastAcceptedDelivery: current?.acknowledgement,
       startedAt: timestamp(current?.intent.createdAt),
       stage: delivery?.stage ?? 'unknown',

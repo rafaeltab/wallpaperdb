@@ -1,3 +1,4 @@
+import { executionSettingsSchema } from '../../platform/index.js';
 import { z } from 'zod';
 import type { ActionId, FactoryV2Problem } from './contract.js';
 
@@ -22,7 +23,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
       ...common,
       kind: z.literal('configure'),
       payload: z
-        .object({ paused: z.boolean(), concurrency: limit, admissionAllowance: limit })
+        .object({
+          paused: z.boolean(),
+          concurrency: limit,
+          admissionAllowance: limit,
+          execution: executionSettingsSchema.optional(),
+        })
         .strict(),
     })
     .strict(),

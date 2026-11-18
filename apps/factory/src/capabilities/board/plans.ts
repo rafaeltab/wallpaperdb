@@ -54,6 +54,8 @@ export function planDetails(
   }
   const plan: PlanAttempt = entity({
     id: `plan:${attempt.id}`,
+    executionSettings: attempt.launch?.execution,
+    observedExecution: attempt.launch?.observedExecution,
     startedAt: new Date(attempt.startedAt).toISOString(),
     deadline: timestamp(attempt.launch?.deadline),
     finishedAt: timestamp(attempt.finishedAt),

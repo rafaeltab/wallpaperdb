@@ -1,3 +1,5 @@
+import { launchExecution, observeExecutionSettings } from './execution-settings.js';
+import type { ExecutionSettings } from '../../capabilities/job/index.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { plannerMessage } from './planner-message.js';
@@ -41,6 +43,7 @@ export function t3Planner(config: {
   project: string;
   projectId: string;
   stateDirectory: string;
+  readExecution?: () => Promise<ExecutionSettings | undefined>;
   mcpEndpoint?: string;
   mcpAuthorizationFile?: string;
   automaticPolicy?: {
@@ -94,7 +97,11 @@ export function t3Planner(config: {
   const terminal = (status: string) =>
     ['idle', 'completed', 'interrupted', 'failed', 'cancelled'].includes(status);
   const observedRuns = new Map<string, string>();
-  const observe = async (run: { threadId: string; runId: string }, signal: AbortSignal) => {
+  const observe = async (
+    run: { threadId: string; runId: string },
+    signal: AbortSignal,
+    execution?: ExecutionSettings
+  ) => {
     const detail = z
       .object({
         thread: z.object({
@@ -103,7 +110,7 @@ export function t3Planner(config: {
           status: z.string(),
           settled: z.boolean().optional(),
           providerInstanceId: z.literal('codex'),
-          model: z.literal('gpt-6.1-sol'),
+          model: z.literal(execution?.model ?? 'gpt-6.1-sol'),
         }),
         messages: z.array(
           z.object({ role: z.string(), runId: z.string().optional(), text: z.string() })
@@ -111,7 +118,12 @@ export function t3Planner(config: {
       })
       .parse(await call(['show', run.threadId, '--messages', '20'], signal));
     observedRuns.set(detail.thread.threadId, detail.thread.latestRunId);
-    return detail;
+    return {
+      ...detail,
+      observedExecution: execution
+        ? await observeExecutionSettings(config, run.threadId, signal)
+        : undefined,
+    };
   };
   type Record = Awaited<ReturnType<typeof journal.save>>;
   const reportDeadline = async (record: Record) => {
@@ -185,12 +197,13 @@ export function t3Planner(config: {
       throw new Error('Missing durable model ownership');
     const run = record.run;
     // Confirmed completion and settlement have their own provider budgets.
-    if (record.phase === 'succeeded' || record.phase === 'failed') return observe(run, signal);
+    if (record.phase === 'succeeded' || record.phase === 'failed')
+      return observe(run, signal, record.execution);
     const remaining = record.deadline - Date.now();
     if (remaining > 0) {
       const deadline = AbortSignal.timeout(remaining);
       try {
-        const detail = await observe(run, AbortSignal.any([signal, deadline]));
+        const detail = await observe(run, AbortSignal.any([signal, deadline]), record.execution);
         if (terminal(detail.thread.status) || Date.now() < record.deadline) return detail;
       } catch (cause) {
         if (signal.aborted || !deadline.aborted) throw cause;
@@ -207,7 +220,7 @@ export function t3Planner(config: {
     } catch (cause) {
       interruptionFailure = cause;
     }
-    const detail = await observe(run, signal);
+    const detail = await observe(run, signal, record.execution);
     if (['completed', 'idle'].includes(detail.thread.status)) return detail;
     if (terminal(detail.thread.status)) {
       const at = await terminalAt(record, detail, signal);
@@ -253,6 +266,7 @@ export function t3Planner(config: {
             retired: false,
             phase,
             completedAt,
+            observedExecution: detail.observedExecution,
           });
     // Cleanup failure retains this exact completed run, rather than launching a replacement.
     if (!detail.thread.settled) {
@@ -264,7 +278,8 @@ export function t3Planner(config: {
       );
       const settled = await observe(
         { threadId: detail.thread.threadId, runId: detail.thread.latestRunId },
-        signal
+        signal,
+        record.execution
       );
       if (!settled.thread.settled) throw new Error('Planner thread settlement is not confirmed');
     }
@@ -438,6 +453,7 @@ export function t3Planner(config: {
               });
               throw new Error('Planner message exceeds T3 maximum 120000 characters');
             }
+            const execution = await config.readExecution?.();
             const handedOffAt = Date.now();
             const intent = await journal.save({
               revision: (current?.revision ?? -1) + 1,
@@ -449,6 +465,7 @@ export function t3Planner(config: {
               modelHandedOffAt: handedOffAt,
               deadline: Math.min(attempt?.deadline ?? Infinity, handedOffAt + 600000),
               phase: 'launch-intent',
+              execution,
             });
             needsRecovery = true;
             let launched: { threadId: string; projectId: string; runId: string };
@@ -460,20 +477,14 @@ export function t3Planner(config: {
                   runId: z.string().min(1),
                 })
                 .parse(
-                  await call(
-                    [
-                      'start',
-                      config.projectId,
-                      '-',
-                      '--title',
-                      `Factory ${attempt?.automatic ? 'automatic plan' : 'plan preview'} ${requestId}`,
-                      '--provider',
-                      'codex',
-                      '--model',
-                      'gpt-6.1-sol',
-                    ],
-                    signal,
-                    prompt
+                  await launchExecution(
+                    config,
+                    {
+                      title: `Factory ${attempt?.automatic ? 'automatic plan' : 'plan preview'} ${requestId}`,
+                      message: prompt,
+                    },
+                    execution,
+                    signal
                   )
                 );
             } catch (cause) {

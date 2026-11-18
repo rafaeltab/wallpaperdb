@@ -9,3 +9,12 @@ export const executionSettingsSchema = z
       .nullable(),
   })
   .strict();
+
+export const observedExecutionSchema = z
+  .object({
+    model: z.string(),
+    effort: z.string().nullable(),
+    serviceTier: z.string().nullable(),
+    permissionLevel: z.string(),
+  })
+  .strict();

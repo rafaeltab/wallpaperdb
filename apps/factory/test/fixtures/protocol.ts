@@ -93,6 +93,109 @@ export async function runProtocol(
       join(config.directory, 'calls.jsonl'),
       `${JSON.stringify({ binary: basename(process.argv[1]), args })}\n`
     );
+    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_configuration') {
+      const { threadId } = JSON.parse(args[2]);
+      const resource =
+        threadId === 'planner-thread'
+          ? JSON.parse(readFileSync(join(config.directory, 'planner.json'), 'utf8'))
+          : JSON.parse(
+              readFileSync(
+                join(
+                  config.directory,
+                  config.parallel
+                    ? `resource-${threadId.replaceAll('/', '-')}.json`
+                    : 'resource.json'
+                ),
+                'utf8'
+              )
+            );
+      console.log(
+        JSON.stringify({
+          structuredContent: {
+            threadId,
+            modelSelection: {
+              instanceId: 'codex',
+              model: resource.model,
+              options: resource.options ?? [],
+            },
+            runtimeMode: resource.runtimeMode ?? 'full-access',
+          },
+        })
+      );
+      process.exit(0);
+    }
+    if (args[0] === 'acp-mcp-call' && args[1] === 'orchestrator_capabilities') {
+      console.log(
+        JSON.stringify({
+          structuredContent: config.executionCatalog ?? {
+            runtimeMode: 'full-access',
+            providers: [
+              {
+                providerInstanceId: 'codex',
+                constraints: [],
+                models: [
+                  {
+                    id: 'gpt-6.1-sol',
+                    options: [
+                      { id: 'reasoningEffort', values: ['low', 'high'] },
+                      { id: 'serviceTier', values: ['default', 'priority'] },
+                    ],
+                  },
+                  {
+                    id: 'gpt-6.2-sol',
+                    options: [
+                      { id: 'reasoningEffort', values: ['low', 'high'] },
+                      { id: 'serviceTier', values: ['default', 'priority'] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        })
+      );
+      process.exit(0);
+    }
+    if (args[0] === 'acp-mcp-call' && args[1] === 't3_thread_launch') {
+      const input = JSON.parse(args[2]);
+      const options = input.modelSelection.options ?? [];
+      const code = await runProtocol(
+        environment,
+        [
+          argv[0],
+          argv[1],
+          'thread',
+          'start',
+          input.projectId,
+          input.message,
+          '--title',
+          input.title,
+          '--provider',
+          input.modelSelection.instanceId,
+          '--model',
+          input.modelSelection.model,
+          ...(input.workspaceStrategy
+            ? [
+                '--worktree',
+                input.workspaceStrategy.baseRef,
+                '--branch',
+                input.workspaceStrategy.branch,
+              ]
+            : []),
+          '--execution-options',
+          JSON.stringify(options),
+          '--permission-level',
+          input.runtimeMode ?? '',
+          '--json',
+        ],
+        {
+          log: (value) => console.log(JSON.stringify({ structuredContent: JSON.parse(value) })),
+          error: (value) => console.error(value),
+        },
+        signal
+      );
+      process.exit(code);
+    }
     if (basename(process.argv[1]) === 'gh' && process.env.GH_DEBUG === 'api') {
       appendFileSync(
         join(config.directory, 'github-requests.jsonl'),
@@ -420,7 +523,13 @@ export async function runProtocol(
             title: flag('--title'),
             branch: flag('--branch'),
             providerInstanceId: 'codex',
-            model: 'gpt-6.1-sol',
+            model: flag('--model') || 'gpt-6.1-sol',
+            options: args.includes('--execution-options')
+              ? JSON.parse(flag('--execution-options'))
+              : [],
+            runtimeMode: args.includes('--permission-level')
+              ? flag('--permission-level') || 'full-access'
+              : 'full-access',
             worktreePath: worktree,
             status: config.restack.question ? 'waiting' : (config.recoveryStatus ?? 'completed'),
             pendingRequestCount: config.restack.question ? 1 : 0,
@@ -1105,14 +1214,27 @@ export async function runProtocol(
         process.exit(1);
       }
       const request = JSON.parse(prompt.split('Request: ')[1].split('\n')[0]);
-      writeFileSync(join(config.directory, 'planner.json'), JSON.stringify({ ...request, prompt }));
+      writeFileSync(
+        join(config.directory, 'planner.json'),
+        JSON.stringify({
+          ...request,
+          options: args.includes('--execution-options')
+            ? JSON.parse(flag('--execution-options'))
+            : [],
+          runtimeMode: args.includes('--permission-level')
+            ? flag('--permission-level') || 'full-access'
+            : 'full-access',
+          prompt,
+          model: flag('--model'),
+        })
+      );
       writeFileSync(join(config.directory, 'planner-settled'), 'false');
       writeFileSync(join(config.directory, 'planner-interrupted'), 'false');
       if (config.planner.lostStart) process.exit(1);
       reply({ threadId: 'planner-thread', projectId: 'project-id', runId: 'planner-run' });
     } else if (config.planner && args[1] === 'show' && args[2] === 'planner-thread') {
       await hold('planner-observation');
-      const { requestId } = JSON.parse(
+      const { requestId, model } = JSON.parse(
         readFileSync(join(config.directory, 'planner.json'), 'utf8')
       );
       reply({
@@ -1128,7 +1250,7 @@ export async function runProtocol(
             existsSync(join(config.directory, 'planner-settled')) &&
             readFileSync(join(config.directory, 'planner-settled'), 'utf8') === 'true',
           providerInstanceId: 'codex',
-          model: 'gpt-6.1-sol',
+          model: model ?? 'gpt-6.1-sol',
         },
         messages: [
           {
@@ -1289,7 +1411,7 @@ export async function runProtocol(
     else if (args[1] === 'start') {
       if (config.unavailableStart) throw new Error('Controlled unavailable launch response');
       if (
-        flag('--model') !== 'gpt-6.1-sol' ||
+        !['gpt-6.1-sol', 'gpt-6.2-sol'].includes(flag('--model')) ||
         flag('--provider') !== 'codex' ||
         args[2] !== 'project-id'
       )
@@ -1320,7 +1442,13 @@ export async function runProtocol(
           projectId: 'project-id',
           title: flag('--title'),
           providerInstanceId: 'codex',
-          model: 'gpt-6.1-sol',
+          model: flag('--model') || 'gpt-6.1-sol',
+          options: args.includes('--execution-options')
+            ? JSON.parse(flag('--execution-options'))
+            : [],
+          runtimeMode: args.includes('--permission-level')
+            ? flag('--permission-level') || 'full-access'
+            : 'full-access',
           branch: flag('--branch'),
           worktreePath: worktree,
           status: config.complete ? 'completed' : 'running',

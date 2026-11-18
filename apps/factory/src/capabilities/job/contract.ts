@@ -32,6 +32,12 @@ export interface ExecutionSettings {
     | 'full-access'
     | null;
 }
+export interface ObservedExecution {
+  readonly model: string;
+  readonly effort: string | null;
+  readonly serviceTier: string | null;
+  readonly permissionLevel: string;
+}
 export interface ExecutionCatalog {
   readonly models: readonly {
     readonly id: string;
@@ -85,6 +91,7 @@ export type Observation =
     }
   | {
       readonly kind: 'found';
+      readonly observedExecution?: ObservedExecution;
       readonly threadId: string;
       readonly status: string;
       /** A fresh state must follow this maintainer-initiated run. Never rewinds a stage. */

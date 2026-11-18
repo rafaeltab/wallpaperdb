@@ -239,6 +239,13 @@ export interface Thread extends Entity<ThreadId> {
     | { readonly state: 'absent' | 'ambiguous' | 'unknown'; readonly reasons: readonly Reason[] };
 }
 export interface Job extends Entity<JobId> {
+  readonly executionSettings?: ExecutionSettings;
+  readonly observedExecution?: {
+    readonly model: string;
+    readonly effort: string | null;
+    readonly serviceTier: string | null;
+    readonly permissionLevel: string;
+  };
   readonly lastAcceptedDelivery?: {
     readonly stage: 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
     readonly index: number;
@@ -380,7 +387,28 @@ export interface AutomaticModelDeadlineFailure {
   readonly threadId: ThreadId | null;
   readonly runId: string | null;
 }
+export interface ExecutionSettings {
+  readonly model: string;
+  readonly effort: string | null;
+  readonly mode: 'standard' | 'fast' | null;
+  readonly permissionLevel:
+    | 'approval-required'
+    | 'auto-accept-edits'
+    | 'auto'
+    | 'full-access'
+    | null;
+}
+export interface ExecutionCatalog {
+  readonly models: readonly {
+    readonly id: string;
+    readonly efforts: readonly string[];
+    readonly modes: readonly ('standard' | 'fast')[];
+  }[];
+  readonly permissionLevels: readonly Exclude<ExecutionSettings['permissionLevel'], null>[];
+}
 export interface FactoryControl extends Entity<EntityId<'factory'>> {
+  readonly execution?: ExecutionSettings;
+  readonly executionCatalog?: ExecutionCatalog;
   readonly planning: FactoryPlanningState;
   readonly paused: boolean;
   readonly concurrency: { readonly limit: Limit; readonly occupied: number };
@@ -408,6 +436,13 @@ export interface Action extends Entity<ActionId> {
 }
 
 export interface PlanAttempt extends Entity<EntityId<'plan'>> {
+  readonly executionSettings?: ExecutionSettings;
+  readonly observedExecution?: {
+    readonly model: string;
+    readonly effort: string | null;
+    readonly serviceTier: string | null;
+    readonly permissionLevel: string;
+  };
   readonly startedAt: Timestamp;
   /** Model deadline, null until durable model handoff; not a discovery/freshness deadline. */
   readonly deadline: Timestamp | null;
@@ -528,6 +563,7 @@ export type FactoryV2Command = {
   | {
       readonly kind: 'configure';
       readonly payload: {
+        readonly execution?: ExecutionSettings;
         readonly paused: boolean;
         readonly concurrency: Limit;
         readonly admissionAllowance: Limit;

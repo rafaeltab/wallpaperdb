@@ -1,5 +1,5 @@
 import { controlledPlanningSafetyLayer } from './fixtures/planning-safety.js';
-import { Time } from '../src/capabilities/job/index.js';
+import { Time, ExecutionConfiguration } from '../src/capabilities/job/index.js';
 import { Effect, Layer, ManagedRuntime, Deferred } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -175,6 +175,16 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
           }),
   };
   const deps = Layer.mergeAll(
+    Layer.succeed(ExecutionConfiguration, {
+      catalog: () =>
+        Effect.succeed({
+          models: [
+            { id: 'gpt-6.1-sol', efforts: ['high'], modes: ['standard', 'fast'] },
+            { id: 'gpt-6.2-sol', efforts: ['high'], modes: ['standard', 'fast'] },
+          ],
+          permissionLevels: ['auto', 'full-access'],
+        }),
+    }),
     Layer.succeed(ScheduleObservations, {
       publish: (value) =>
         publicationFailed
@@ -420,6 +430,23 @@ it('releases a parked slot without satisfying its dependent and admits unrelated
     await f.run((s) => s.tick(base));
     expect(f.launches).toEqual([1, 3]);
     expect(f.preparations).toEqual([]);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+it.each([
+  { model: 'unavailable', effort: null, mode: null, permissionLevel: null },
+  { model: 'gpt-6.1-sol', effort: 'unsupported', mode: null, permissionLevel: null },
+  { model: 'gpt-6.1-sol', effort: null, mode: null, permissionLevel: 'approval-required' as const },
+])('rejects unsupported execution settings without saving controls: %j', async (execution) => {
+  const f = fixture();
+  try {
+    expect(
+      await f.run((s) =>
+        s.configure({ revision: -1, concurrency: 2, allowance: 2, paused: false, execution })
+      )
+    ).toBe('unsupported-execution');
+    expect(f.snapshot().revision).toBe(-1);
   } finally {
     await f.runtime.dispose();
   }

@@ -10,6 +10,7 @@ import type { FactoryClient } from './client';
 import type { Factory } from './use-factory';
 import { CommandFeedback } from './feedback';
 import { planningResumeBlocked } from './planning-notice';
+import { ExecutionControls, ExecutionSummary, inheritedExecution } from './execution-controls';
 import { type Board, type Issue, subject, title, metadataIssue, issueIds } from './model';
 import {
   Checks,
@@ -107,6 +108,7 @@ export function Controls({
 }) {
   const [base] = useState(board.meta.factory);
   const [baseScope] = useState(board.scopeId);
+  const [execution, setExecution] = useState(base.execution ?? inheritedExecution);
   const [paused, setPaused] = useState(base.paused);
   const [concurrency, setConcurrency] = useState(
     base.concurrency.limit.kind === 'limited' ? String(base.concurrency.limit.maximum) : ''
@@ -142,6 +144,10 @@ export function Controls({
                   paused,
                   concurrency: limit(concurrency),
                   admissionAllowance: limit(allowance),
+                  ...(JSON.stringify(execution) ===
+                  JSON.stringify(base.execution ?? inheritedExecution)
+                    ? {}
+                    : { execution }),
                 },
               });
           } catch (e) {
@@ -181,6 +187,11 @@ export function Controls({
           {board.meta.factory.admission.consumed} distinct admissions consumed. Cancelling does not
           restore allowance.
         </p>
+        <ExecutionControls
+          settings={execution}
+          catalog={base.executionCatalog}
+          change={setExecution}
+        />
         {stale && (
           <p role="alert">
             Factory controls changed while editing. Close and reopen to edit the latest values.
@@ -475,6 +486,7 @@ export function Details({
             <section key={id}>
               <h3>{job.stage}</h3>
               <p>{job.progress}</p>
+              <ExecutionSummary settings={job.executionSettings} observed={job.observedExecution} />
               <p>
                 {job.execution.state === 'known' ? job.execution.value.state : job.execution.reason}
               </p>
@@ -627,6 +639,10 @@ export function Plan({
         <>
           <h3>{attempt.phase}</h3>
           <p>{attempt.progress}</p>
+          <ExecutionSummary
+            settings={attempt.executionSettings}
+            observed={attempt.observedExecution}
+          />
           <p>Applicability: {attempt.applicability}</p>
           <p>
             Started {attempt.startedAt}

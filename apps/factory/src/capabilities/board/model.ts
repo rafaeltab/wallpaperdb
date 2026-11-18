@@ -234,6 +234,8 @@ export interface Thread extends Entity<ThreadId> {
     | { readonly state: 'absent' | 'ambiguous' | 'unknown'; readonly reasons: readonly Reason[] };
 }
 export interface Job extends Entity<JobId> {
+  readonly executionSettings?: import('../job/index.js').ExecutionSettings;
+  readonly observedExecution?: import('../job/index.js').ObservedExecution;
   readonly lastAcceptedDelivery?: {
     readonly stage: 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
     readonly index: number;
@@ -376,6 +378,8 @@ export interface AutomaticModelDeadlineFailure {
   readonly runId: string | null;
 }
 export interface FactoryControl extends Entity<EntityId<'factory'>> {
+  readonly execution?: import('../job/index.js').ExecutionSettings;
+  readonly executionCatalog?: import('../job/index.js').ExecutionCatalog;
   readonly planning: FactoryPlanningState;
   readonly paused: boolean;
   readonly concurrency: { readonly limit: Limit; readonly occupied: number };
@@ -403,6 +407,8 @@ export interface Action extends Entity<ActionId> {
 }
 
 export interface PlanAttempt extends Entity<EntityId<'plan'>> {
+  readonly executionSettings?: import('../job/index.js').ExecutionSettings;
+  readonly observedExecution?: import('../job/index.js').ObservedExecution;
   readonly startedAt: Timestamp;
   /** Model deadline, null until durable model handoff; not a discovery/freshness deadline. */
   readonly deadline: Timestamp | null;
@@ -504,6 +510,7 @@ export type BoardCommand = {
   | {
       readonly kind: 'configure';
       readonly payload: {
+        readonly execution?: import('../job/index.js').ExecutionSettings;
         readonly paused: boolean;
         readonly concurrency: Limit;
         readonly admissionAllowance: Limit;

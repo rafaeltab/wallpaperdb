@@ -324,6 +324,18 @@ export async function t3Observations(config: {
               if (snapshot.snapshotSequence < metadataSequence)
                 throw new ObservationUnknown('Obsolete T3 inventory');
               staged = new Map(metadata);
+              const present = new Set(
+                [...snapshot.threads, ...snapshot.archivedThreads].map((row) => row.id)
+              );
+              for (const row of metadata.values())
+                if (
+                  !present.has(row.id) &&
+                  row.archivedAt == null &&
+                  snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)
+                ) {
+                  staged.set(row.id, { ...row, observationMissing: true });
+                  metadataVersions.set(row.id, snapshot.snapshotSequence);
+                }
               for (const row of [...snapshot.threads, ...snapshot.archivedThreads]) {
                 if (snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
                   staged.set(row.id, row);
@@ -365,6 +377,15 @@ export async function t3Observations(config: {
                     })
                   );
                 staged ??= new Map(metadata);
+                const removed = metadata.get(z.string().parse(item.threadId));
+                if (
+                  removed &&
+                  !family.threads.some((row) => row.id === removed.id) &&
+                  incoming >= (metadataVersions.get(removed.id) ?? -1)
+                ) {
+                  staged.set(removed.id, { ...removed, observationMissing: true });
+                  metadataVersions.set(removed.id, incoming);
+                }
                 for (const row of family.threads)
                   if (family.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
                     staged.set(row.id, row);
@@ -464,6 +485,7 @@ export async function t3Observations(config: {
       const meta = metadata.get(owner);
       if (
         !meta ||
+        meta.observationMissing === true ||
         meta.blockedOnThreadWait === undefined ||
         meta.pendingBackgroundTasks === undefined ||
         meta.latestRunId !== snapshot.thread.latestRunId ||
@@ -565,7 +587,7 @@ export async function t3Observations(config: {
     },
     list: (projectId: string) =>
       [...metadata.values()]
-        .filter((row) => row.projectId === projectId)
+        .filter((row) => row.projectId === projectId && row.observationMissing !== true)
         .map((row) => ({ threadId: row.id, title: row.title })),
     inventoryReady: () => metadataReady && archiveReady,
     activity,
@@ -576,7 +598,8 @@ export async function t3Observations(config: {
       if (
         !retiredRoots.has(id) &&
         meta &&
-        (meta.latestRunId !== thread.latestRunId ||
+        (meta.observationMissing === true ||
+          meta.latestRunId !== thread.latestRunId ||
           meta.activeRunId !== thread.activeRunId ||
           meta.projectId !== thread.projectId ||
           meta.title !== thread.title)

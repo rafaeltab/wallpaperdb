@@ -173,6 +173,12 @@ it('observes only managed lineage, replaces historical activity by identity and 
       },
     });
     await vi.waitFor(() => expect(() => observer.show('owner', 1)).toThrow(ObservationUnknown));
+    inventoryUpdate({
+      kind: 'snapshot',
+      snapshot: { snapshotSequence: 25, threads: [], archivedThreads: [], projects: [] },
+    });
+    await vi.waitFor(() => expect(observer.list('project')).toEqual([]));
+    expect(observer.inactive('owner', 'run')).toBe('busy');
     await host.close();
     await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('busy'));
     expect(observer.activity('owner').items).toMatchObject([

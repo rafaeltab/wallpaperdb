@@ -181,6 +181,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
           models: [
             { id: 'gpt-6.1-sol', efforts: ['high'], modes: ['standard', 'fast'] },
             { id: 'gpt-6.2-sol', efforts: ['high'], modes: ['standard', 'fast'] },
+            { id: 'standard-only', efforts: ['high'], modes: ['standard'] },
           ],
           permissionLevels: ['auto', 'full-access'],
         }),
@@ -437,6 +438,7 @@ it('releases a parked slot without satisfying its dependent and admits unrelated
 it.each([
   { model: 'unavailable', effort: null, mode: null, permissionLevel: null },
   { model: 'gpt-6.1-sol', effort: 'unsupported', mode: null, permissionLevel: null },
+  { model: 'standard-only', effort: null, mode: 'fast' as const, permissionLevel: null },
   { model: 'gpt-6.1-sol', effort: null, mode: null, permissionLevel: 'approval-required' as const },
 ])('rejects unsupported execution settings without saving controls: %j', async (execution) => {
   const f = fixture();
@@ -447,6 +449,25 @@ it.each([
       )
     ).toBe('unsupported-execution');
     expect(f.snapshot().revision).toBe(-1);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+it('saves Standard mode for a model that does not support Fast', async () => {
+  const f = fixture();
+  const execution = {
+    model: 'standard-only',
+    effort: null,
+    mode: 'standard' as const,
+    permissionLevel: null,
+  };
+  try {
+    expect(
+      await f.run((s) =>
+        s.configure({ revision: -1, concurrency: 1, allowance: 1, paused: false, execution })
+      )
+    ).toBe('saved');
+    expect(f.snapshot().execution).toEqual(execution);
   } finally {
     await f.runtime.dispose();
   }

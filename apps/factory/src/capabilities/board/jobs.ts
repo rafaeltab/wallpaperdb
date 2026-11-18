@@ -1,4 +1,5 @@
 import { holdsSlot } from '../plan/index.js';
+import type { Control, Status } from '../job/index.js';
 import { type ProjectionContext, gh, local, t3 } from './context.js';
 import { entity, jobId, known, pullId, threadId, timestamp, unknown } from './values.js';
 export function populateJobs(context: ProjectionContext) {
@@ -10,6 +11,7 @@ export function populateJobs(context: ProjectionContext) {
       control = work?.control;
     const current = status?.kind === 'job' ? status : undefined;
     const delivery = current?.delivery;
+    const question = currentQuestion(current, control);
     const observation = current
       ? input.observations.items?.[`job:${current.intent.id}`]
       : undefined;
@@ -128,11 +130,19 @@ export function populateJobs(context: ProjectionContext) {
           : unknown(local, 'Owning execution not observed. Do not relaunch.'),
       occupiesCapacity: holdsSlot(status ?? { kind: 'empty' }, resuming),
       cancelled: control?.cancelled ?? false,
-      question: control?.parked
-        ? { id: control.parked.question.id, summary: control.parked.question.text.slice(0, 200) }
-        : delivery?.question
-          ? { id: delivery.question.id, summary: delivery.question.text.slice(0, 200) }
-          : null,
+      question: question ? { id: question.id, summary: question.text.slice(0, 200) } : null,
     });
   }
+}
+
+export function currentQuestion(
+  current: Extract<Status, { kind: 'job' }> | undefined,
+  control: Control | undefined
+) {
+  const index = current?.stageIndex ?? current?.resume?.index;
+  const parked = control?.parked;
+  return (
+    current?.delivery?.question ??
+    (parked && (index === undefined || parked.index === index) ? parked.question : undefined)
+  );
 }

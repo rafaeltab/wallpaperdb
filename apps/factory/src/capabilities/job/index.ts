@@ -43,3 +43,5 @@ export { JobReporting } from './contract.js';
 export type { AgentResponse } from './contract.js';
 
 export { AgentReconciliationPolicy, defaultAgentReconciliationLimit } from './contract.js';
+export { ExecutionConfiguration, legacyExecutionSettings } from './contract.js';
+export type { ExecutionSettings, ExecutionCatalog } from './contract.js';

@@ -146,6 +146,7 @@ export const SchedulerLive = Layer.effect(
             ...state.admissions,
             {
               ...command,
+              execution: state.execution,
               ...((state.released ?? []).some((item) => item.admission.issue === command.issue)
                 ? {
                     generation: (state.released ?? []).filter(

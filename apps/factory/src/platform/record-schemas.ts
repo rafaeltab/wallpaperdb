@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { executionSettingsSchema } from './execution-schema.js';
 export const intentSchema = z
   .object({
+    execution: executionSettingsSchema.optional(),
     receiptProtocol: z.literal('delivery-v1').optional(),
     generation: z.number().int().nonnegative().optional(),
     id: z.string().min(1),
@@ -152,6 +154,7 @@ const controlSchema = z
   .strict();
 const scheduleSchema = z
   .object({
+    execution: executionSettingsSchema.optional(),
     revision: z.number().int().nonnegative(),
     concurrency: z
       .number()
@@ -220,6 +223,7 @@ const scheduleSchema = z
             jobId: z.string().min(1),
             admission: z
               .object({
+                execution: executionSettingsSchema.optional(),
                 issue: z.number().int().positive(),
                 generation: z.number().int().nonnegative().optional(),
                 base: z.string().regex(/^[a-f0-9]{40}$/),
@@ -237,6 +241,7 @@ const scheduleSchema = z
     admissions: z.array(
       z
         .object({
+          execution: executionSettingsSchema.optional(),
           issue: z.number().int().positive(),
           includeCodeFromIssues: z.array(z.number().int().positive()).optional(),
           selectionBase: z
@@ -257,6 +262,7 @@ const scheduleSchema = z
 export { stageSchema, waitSchema, controlSchema, scheduleSchema };
 export const plannerSchema = z
   .object({
+    execution: executionSettingsSchema.optional(),
     revision: z.number().int().nonnegative(),
     requestId: z.string().min(1),
     input: z.string(),

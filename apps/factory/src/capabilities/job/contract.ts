@@ -20,7 +20,40 @@ export interface ContinuationAdmission {
 export const ContinuationAdmission = Context.Service<ContinuationAdmission>(
   'wallpaperdb.factory.ContinuationAdmission'
 );
+export interface ExecutionSettings {
+  readonly model: string;
+  /** Null preserves the installation's inherited/default selection. */
+  readonly effort: string | null;
+  readonly mode: 'standard' | 'fast' | null;
+  readonly permissionLevel:
+    | 'approval-required'
+    | 'auto-accept-edits'
+    | 'auto'
+    | 'full-access'
+    | null;
+}
+export interface ExecutionCatalog {
+  readonly models: readonly {
+    readonly id: string;
+    readonly efforts: readonly string[];
+    readonly modes: readonly ('standard' | 'fast')[];
+  }[];
+  readonly permissionLevels: readonly Exclude<ExecutionSettings['permissionLevel'], null>[];
+}
+export interface ExecutionConfiguration {
+  catalog(): Effect.Effect<ExecutionCatalog, Unavailable>;
+}
+export const ExecutionConfiguration = Context.Service<ExecutionConfiguration>(
+  'wallpaperdb.factory.ExecutionConfiguration'
+);
+export const legacyExecutionSettings: ExecutionSettings = {
+  model: 'gpt-6.1-sol',
+  effort: null,
+  mode: null,
+  permissionLevel: null,
+};
 export interface Intent {
+  readonly execution?: ExecutionSettings;
   readonly generation?: number;
   readonly receiptProtocol?: 'delivery-v1';
   readonly includeCodeFromIssues?: readonly number[];
@@ -275,6 +308,7 @@ export interface Execution {
 }
 export const Execution = Context.Service<Execution>('wallpaperdb.factory.Execution');
 export interface Start {
+  readonly execution?: ExecutionSettings;
   readonly generation?: number;
   readonly includeCodeFromIssues?: readonly number[];
   readonly selectionBase?: string;

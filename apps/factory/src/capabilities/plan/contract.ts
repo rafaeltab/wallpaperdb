@@ -141,6 +141,7 @@ export interface ExecutionCycle {
   readonly allowance: number;
 }
 export interface ScheduleState {
+  readonly execution?: import('../job/index.js').ExecutionSettings;
   /** Abandoned dependency attempts remain audit records, outside current allowance. */
   readonly released?: readonly {
     readonly admission: import('../job/index.js').Start;
@@ -222,6 +223,7 @@ export interface Scheduler {
   ): Effect.Effect<boolean, Unavailable>;
   status(): Effect.Effect<ScheduleStatus, Unavailable>;
   configure(command: {
+    execution?: import('../job/index.js').ExecutionSettings;
     revision: number;
     concurrency: number;
     allowance: number;
@@ -239,6 +241,7 @@ export interface Scheduler {
 export const Scheduler = Context.Service<Scheduler>('wallpaperdb.factory.Scheduler');
 
 export interface PlannerOwnership {
+  readonly execution?: import('../job/index.js').ExecutionSettings;
   requestId: string;
   revision: number;
   deadline?: number;

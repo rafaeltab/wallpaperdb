@@ -5,7 +5,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { RecentCreations } from '@/components/upload/recent-creations';
 import { recentCreations } from '@/features/wallpaper-creation/adapters/http';
 import { resumeWallpaperWithDetails } from '@/lib/api/wallpaper';
-vi.mock('@clerk/react', () => ({ useAuth: () => ({ userId: 'creator', isSignedIn: true }) }));
+const session = vi.hoisted(() => ({ userId: 'creator' }));
+vi.mock('@clerk/react', () => ({ useAuth: () => ({ userId: session.userId, isSignedIn: true }) }));
 vi.mock('@/features/wallpaper-creation/adapters/http', () => ({
   recentCreations: vi.fn(),
   downloadOriginal: vi.fn(),
@@ -82,4 +83,37 @@ it('opens older saved creations through a continuation and returns to the newest
   await userEvent.setup().click(screen.getByRole('button', { name: 'Newest creations' }));
   await screen.findByText('new');
   client.clear();
+});
+
+it('aborts pending list requests on session replacement and navigation', async () => {
+  const signals: AbortSignal[] = [];
+  vi.mocked(recentCreations).mockImplementation((signal) => {
+    if (signal) signals.push(signal);
+    return new Promise(() => {});
+  });
+  const client = new QueryClient();
+  const view = render(
+    <QueryClientProvider client={client}>
+      <RecentCreations />
+    </QueryClientProvider>
+  );
+  try {
+    await waitFor(() => expect(signals).toHaveLength(1));
+    expect(signals[0]?.aborted).toBe(false);
+    session.userId = 'replacement';
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <RecentCreations />
+      </QueryClientProvider>
+    );
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+    view.unmount();
+    expect(signals[1]?.aborted).toBe(true);
+  } finally {
+    view.unmount();
+    client.clear();
+    session.userId = 'creator';
+  }
 });

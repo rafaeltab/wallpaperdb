@@ -4,10 +4,12 @@ vi.mock('@/lib/auth/token-provider', () => ({ getAuthToken: async () => 'owner-t
 afterEach(() => vi.unstubAllGlobals());
 it('reads the saved candidate rejection after loading durable Wallpaper progress again', async () => {
   const requests: string[] = [];
+  const signal = new AbortController().signal;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, options: RequestInit) => {
       requests.push(url);
+      expect(options.signal).toBe(signal);
       expect(new Headers(options.headers).get('Authorization')).toBe('Bearer owner-token');
       const data =
         requests.length === 1
@@ -29,7 +31,7 @@ it('reads the saved candidate rejection after loading durable Wallpaper progress
       });
     })
   );
-  expect(await recentCreations()).toEqual({
+  expect(await recentCreations(signal)).toEqual({
     wallpapers: [
       {
         wallpaperId: 'wallpaper',

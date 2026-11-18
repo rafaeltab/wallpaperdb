@@ -171,3 +171,89 @@ it('requires explicit selection of the winner when a competing replacement retir
   expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old' }, { operation: 'replace-one', targetSourceId: 'winner' }]);
   expect(batch.getSnapshot().rows[1]).toMatchObject({ status: 'accepted' });
 });
+
+it.each(['accepted', 'rejected'])(
+  'admits more work after 16 %s outcomes while retaining independent retry and saved recovery',
+  async (outcome) => {
+    const wallpaper = {
+      wallpaperId: 'published',
+      assetId: 'asset',
+      sourceId: 'first',
+      state: 'published' as const,
+      createdAt: 'now',
+    };
+    let rejected = outcome === 'rejected';
+    const uploads: string[] = [];
+    const api: SourceBatchApi<string> = {
+      identifier: () => crypto.randomUUID(),
+      begin: async () => wallpaper,
+      wallpaper: async () => wallpaper,
+      list: async () => ({
+        sourceSetRevision: '1',
+        sources: [{ sourceId: 'first' }],
+        candidates: [],
+        hasPendingCandidates: false,
+      }),
+      create: async (_asset, id) => ({
+        candidateId: id,
+        expectedSourceSetRevision: '1',
+        status: 'awaiting-bytes',
+      }),
+      status: async (_asset, id) => ({
+        candidateId: id,
+        expectedSourceSetRevision: '1',
+        status: 'awaiting-bytes',
+      }),
+      upload: async (_asset, id, file) => {
+        uploads.push(file);
+        return {
+          candidateId: id,
+          expectedSourceSetRevision: '1',
+          status: rejected ? 'rejected' : 'ready',
+        };
+      },
+      accept: async (_asset, id) => ({
+        candidateId: id,
+        expectedSourceSetRevision: '1',
+        status: 'accepted',
+        sourceId: id,
+      }),
+      expectSource: async () => {
+        throw new Error('Preserve publication');
+      },
+      cancel: async () => {},
+      wait: async () => {},
+    };
+    const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+    const files = Array.from({ length: 16 }, (_, index) => ({
+      name: `file-${index}`,
+      value: `file-${index}`,
+    }));
+    expect(batch.addFiles(files)).toBe(true);
+    expect(batch.addFiles([{ name: 'overflow', value: 'overflow' }])).toBe(false);
+    await batch.run(new AbortController().signal);
+    expect(batch.getSnapshot().rows).toHaveLength(16);
+    expect(batch.addFiles([{ name: 'additional', value: 'additional' }])).toBe(true);
+    expect(batch.replace({ name: 'replacement', value: 'replacement' }, 'first')).toBe(true);
+    expect(
+      batch.resume(
+        { name: 'saved', value: 'saved' },
+        { candidateId: 'retained', expectedSourceSetRevision: '1', status: 'awaiting-bytes' }
+      )
+    ).toBe(true);
+    rejected = false;
+    const first = batch.getSnapshot().rows[0];
+    if (!first) throw new Error('Missing first outcome');
+    batch.retry(first.id);
+    await batch.run(new AbortController().signal);
+    expect(
+      batch
+        .getSnapshot()
+        .rows.slice(16)
+        .map((row) => row.status)
+    ).toEqual(['accepted', 'accepted', 'accepted']);
+    expect(uploads.filter((file) => file === 'file-0')).toHaveLength(
+      outcome === 'rejected' ? 2 : 1
+    );
+  }
+);

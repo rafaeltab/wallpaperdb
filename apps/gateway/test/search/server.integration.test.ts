@@ -131,89 +131,89 @@ describe('Gateway bootstrap and deployed artifact', () => {
       expect(output).not.toContain(secret);
   });
 
-  it.each([
-    'inspect-index',
-    'update-index-mapping',
-    'create-index',
-    'recheck-index',
-  ])('reports %s failures without logging upstream response or authentication metadata', async (operation) => {
-    const secret = 'startup-private-upstream-response';
-    const password = 'startup-private-http-password';
-    let inspections = 0;
-    if (operation === 'update-index-mapping') {
-      await Effect.runPromise(
-        Layer.build(
-          openSearchLayer({
-            ...tester.search.options,
-            wallpaperIndex: environment().OPENSEARCH_INDEX,
-          })
-        ).pipe(Effect.scoped)
-      );
-    }
-    const dependency = createHttpServer((request, response) => {
-      if (
-        operation === 'update-index-mapping' &&
-        request.url?.includes(environment().OPENSEARCH_INDEX)
-      ) {
-        const forwarded = forwardHttpRequest(
-          new URL(request.url, tester.search.options.url),
-          { method: request.method, headers: request.headers },
-          (upstream) => {
-            response.writeHead(upstream.statusCode ?? 500, upstream.headers);
-            upstream.pipe(response);
-          }
+  it.each(['inspect-index', 'update-index-mapping', 'create-index', 'recheck-index'])(
+    'reports %s failures without logging upstream response or authentication metadata',
+    async (operation) => {
+      const secret = 'startup-private-upstream-response';
+      const password = 'startup-private-http-password';
+      let inspections = 0;
+      if (operation === 'update-index-mapping') {
+        await Effect.runPromise(
+          Layer.build(
+            openSearchLayer({
+              ...tester.search.options,
+              wallpaperIndex: environment().OPENSEARCH_INDEX,
+            })
+          ).pipe(Effect.scoped)
         );
-        forwarded.on('error', () => response.destroy());
-        request.pipe(forwarded);
-        return;
       }
-      if (request.method === 'HEAD') {
-        inspections++;
-        const status =
-          operation === 'inspect-index' || (operation === 'recheck-index' && inspections > 1)
-            ? 403
-            : operation === 'update-index-mapping'
-              ? 200
-              : 404;
-        response.writeHead(status);
-        response.end();
-        return;
-      }
-      response.writeHead(403, { 'Content-Type': 'application/json', 'X-Private': secret });
-      response.end(JSON.stringify({ error: { type: secret, reason: secret }, status: 403 }));
-    });
-    dependency.listen(0, '127.0.0.1');
-    await once(dependency, 'listening');
-    const address = dependency.address();
-    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
-    try {
-      const { output, failures } = await failedExecutable({
-        OPENSEARCH_URL: `http://127.0.0.1:${address.port}`,
-        OPENSEARCH_USERNAME: 'private-http-user',
-        OPENSEARCH_PASSWORD: password,
+      const dependency = createHttpServer((request, response) => {
+        if (
+          operation === 'update-index-mapping' &&
+          request.url?.includes(environment().OPENSEARCH_INDEX)
+        ) {
+          const forwarded = forwardHttpRequest(
+            new URL(request.url, tester.search.options.url),
+            { method: request.method, headers: request.headers },
+            (upstream) => {
+              response.writeHead(upstream.statusCode ?? 500, upstream.headers);
+              upstream.pipe(response);
+            }
+          );
+          forwarded.on('error', () => response.destroy());
+          request.pipe(forwarded);
+          return;
+        }
+        if (request.method === 'HEAD') {
+          inspections++;
+          const status =
+            operation === 'inspect-index' || (operation === 'recheck-index' && inspections > 1)
+              ? 403
+              : operation === 'update-index-mapping'
+                ? 200
+                : 404;
+          response.writeHead(status);
+          response.end();
+          return;
+        }
+        response.writeHead(403, { 'Content-Type': 'application/json', 'X-Private': secret });
+        response.end(JSON.stringify({ error: { type: secret, reason: secret }, status: 403 }));
       });
-      expect(failures).toContainEqual(
-        expect.objectContaining({
-          diagnostics: [
-            expect.objectContaining({
-              dependency: 'opensearch',
-              operation,
-              code: 'ResponseError',
-              statusCode: 403,
-            }),
-          ],
-        })
-      );
-      expect(output).not.toContain(secret);
-      expect(output).not.toContain(password);
-      expect(output).not.toContain(Buffer.from(`private-http-user:${password}`).toString('base64'));
-    } finally {
-      dependency.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        dependency.close((error) => (error ? reject(error) : resolve()))
-      );
+      dependency.listen(0, '127.0.0.1');
+      await once(dependency, 'listening');
+      const address = dependency.address();
+      if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+      try {
+        const { output, failures } = await failedExecutable({
+          OPENSEARCH_URL: `http://127.0.0.1:${address.port}`,
+          OPENSEARCH_USERNAME: 'private-http-user',
+          OPENSEARCH_PASSWORD: password,
+        });
+        expect(failures).toContainEqual(
+          expect.objectContaining({
+            diagnostics: [
+              expect.objectContaining({
+                dependency: 'opensearch',
+                operation,
+                code: 'ResponseError',
+                statusCode: 403,
+              }),
+            ],
+          })
+        );
+        expect(output).not.toContain(secret);
+        expect(output).not.toContain(password);
+        expect(output).not.toContain(
+          Buffer.from(`private-http-user:${password}`).toString('base64')
+        );
+      } finally {
+        dependency.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          dependency.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
     }
-  });
+  );
 
   it('reports retained-message remediation from the executable without exposing the original', async () => {
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
@@ -504,66 +504,68 @@ describe('Gateway bootstrap and deployed artifact', () => {
     })
   );
 
-  it.each([
-    'environment',
-    'dotenv',
-  ])('starts the built service with %s configuration, serves GraphQL, and exits cleanly on SIGINT', async (source) => {
-    const port = await availablePort();
-    const directory = await mkdtemp(join(tmpdir(), 'gateway-bootstrap-'));
-    const config = { ...environment(), PORT: String(port) };
-    if (source === 'dotenv') {
-      await writeFile(
-        join(directory, '.env'),
-        Object.entries(config)
-          .map(([name, value]) => `${name}=${JSON.stringify(value)}`)
-          .join('\n')
-      );
-    }
-    const child = spawn(
-      process.execPath,
-      [fileURLToPath(new URL('../../dist/index.mjs', import.meta.url))],
-      {
-        cwd: directory,
-        env: source === 'dotenv' ? {} : config,
-        stdio: ['ignore', 'pipe', 'pipe'],
+  it.each(['environment', 'dotenv'])(
+    'starts the built service with %s configuration, serves GraphQL, and exits cleanly on SIGINT',
+    async (source) => {
+      const port = await availablePort();
+      const directory = await mkdtemp(join(tmpdir(), 'gateway-bootstrap-'));
+      const config = { ...environment(), PORT: String(port) };
+      if (source === 'dotenv') {
+        await writeFile(
+          join(directory, '.env'),
+          Object.entries(config)
+            .map(([name, value]) => `${name}=${JSON.stringify(value)}`)
+            .join('\n')
+        );
       }
-    );
-    let output = '';
-    child.stdout.on('data', (chunk) => {
-      output += String(chunk);
-    });
-    child.stderr.on('data', (chunk) => {
-      output += String(chunk);
-    });
-    const exited = once(child, 'exit');
-    try {
-      await expect
-        .poll(
-          async () => {
-            if (child.exitCode !== null)
-              throw new Error(`Built gateway exited prematurely: ${output}`);
-            try {
-              return (await fetch(`http://127.0.0.1:${port}/ready`)).status;
-            } catch {
-              return 0;
-            }
-          },
-          { timeout: 15000, interval: 50 }
-        )
-        .toBe(200);
-      const response = await fetch(`http://127.0.0.1:${port}/graphql`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: '{ searchWallpapers { edges { node { wallpaperId } } } }' }),
+      const child = spawn(
+        process.execPath,
+        [fileURLToPath(new URL('../../dist/index.mjs', import.meta.url))],
+        {
+          cwd: directory,
+          env: source === 'dotenv' ? {} : config,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
+      let output = '';
+      child.stdout.on('data', (chunk) => {
+        output += String(chunk);
       });
-      expect(await response.json()).toEqual({ data: { searchWallpapers: { edges: [] } } });
-      child.kill('SIGINT');
-      await expect.poll(() => child.exitCode, { timeout: 10000, interval: 25 }).toBe(0);
-      expect(await exited).toEqual([0, null]);
-    } finally {
-      if (child.exitCode === null) child.kill('SIGKILL');
-      await exited;
-      await rm(directory, { recursive: true, force: true });
+      child.stderr.on('data', (chunk) => {
+        output += String(chunk);
+      });
+      const exited = once(child, 'exit');
+      try {
+        await expect
+          .poll(
+            async () => {
+              if (child.exitCode !== null)
+                throw new Error(`Built gateway exited prematurely: ${output}`);
+              try {
+                return (await fetch(`http://127.0.0.1:${port}/ready`)).status;
+              } catch {
+                return 0;
+              }
+            },
+            { timeout: 15000, interval: 50 }
+          )
+          .toBe(200);
+        const response = await fetch(`http://127.0.0.1:${port}/graphql`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: '{ searchWallpapers { edges { node { wallpaperId } } } }',
+          }),
+        });
+        expect(await response.json()).toEqual({ data: { searchWallpapers: { edges: [] } } });
+        child.kill('SIGINT');
+        await expect.poll(() => child.exitCode, { timeout: 10000, interval: 25 }).toBe(0);
+        expect(await exited).toEqual([0, null]);
+      } finally {
+        if (child.exitCode === null) child.kill('SIGKILL');
+        await exited;
+        await rm(directory, { recursive: true, force: true });
+      }
     }
-  });
+  );
 });

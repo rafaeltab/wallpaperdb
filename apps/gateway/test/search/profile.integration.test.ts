@@ -74,87 +74,91 @@ describe('OpenSearch profile projection port contract', () => {
     expect(await byHandle('profile-read')).toBeNull();
   });
 
-  it.each([
-    'without-aliases',
-    'without-lifetimes',
-  ])('upgrades an existing Profile index %s without losing stored Profiles', async (legacy) => {
-    const existing = createSearchFixture();
-    const snapshot = profile(`legacy-${legacy}`);
-    let upgraded: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
-    try {
-      await client.indices.create({
-        index: existing.index('profiles'),
-        body: {
-          mappings: {
-            properties: {
-              id: { type: 'keyword' },
-              displayName: { type: 'text' },
-              handle: { type: 'keyword' },
-              claimGeneration: { type: 'long' },
-              biographyMarkdown: { type: 'text', index: false },
-              pictureAssetId: { type: 'keyword' },
-              version: { type: 'long' },
-              createdAt: { type: 'date' },
-              updatedAt: { type: 'date' },
-              ...(legacy === 'without-lifetimes'
-                ? {
-                    aliases: {
-                      type: 'nested',
-                      properties: {
-                        handle: { type: 'keyword' },
-                        claimGeneration: { type: 'long' },
+  it.each(['without-aliases', 'without-lifetimes'])(
+    'upgrades an existing Profile index %s without losing stored Profiles',
+    async (legacy) => {
+      const existing = createSearchFixture();
+      const snapshot = profile(`legacy-${legacy}`);
+      let upgraded: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
+      try {
+        await client.indices.create({
+          index: existing.index('profiles'),
+          body: {
+            mappings: {
+              properties: {
+                id: { type: 'keyword' },
+                displayName: { type: 'text' },
+                handle: { type: 'keyword' },
+                claimGeneration: { type: 'long' },
+                biographyMarkdown: { type: 'text', index: false },
+                pictureAssetId: { type: 'keyword' },
+                version: { type: 'long' },
+                createdAt: { type: 'date' },
+                updatedAt: { type: 'date' },
+                ...(legacy === 'without-lifetimes'
+                  ? {
+                      aliases: {
+                        type: 'nested',
+                        properties: {
+                          handle: { type: 'keyword' },
+                          claimGeneration: { type: 'long' },
+                        },
                       },
-                    },
-                  }
-                : {}),
+                    }
+                  : {}),
+              },
             },
           },
-        },
-      });
-      await client.index({
-        index: existing.index('profiles'),
-        id: snapshot.id,
-        body: snapshot,
-        refresh: true,
-      });
-      upgraded = await acquireSearchFixture(existing.options);
-      expect(await Effect.runPromise(upgraded.adapter.read.profile(snapshot.id))).toEqual(snapshot);
-      const withAlias = {
-        ...snapshot,
-        version: 2,
-        aliases: [
-          {
-            handle: `${snapshot.id}-alias`,
-            claimGeneration: 1,
-            createdAt: timestamp,
-            expiresAt: null,
-          },
-        ],
-      };
-      await Effect.runPromise(
-        upgraded.project.record({
-          _tag: 'ProfilePublished',
-          profile: withAlias,
-          occurrence: {
-            source: 'wallpaperdb/profile',
-            id: `${snapshot.id}-2`,
-            occurredAt: timestamp,
-          },
-        })
-      );
-      expect(
-        await Effect.runPromise(upgraded.adapter.read.profileByHandle(withAlias.aliases[0].handle))
-      ).toEqual(withAlias);
-      const mapping = await client.indices.get({ index: existing.index('profiles') });
-      expect(mapping.body[existing.index('profiles')].mappings.properties.aliases).toMatchObject({
-        type: 'nested',
-        properties: { createdAt: { type: 'date' }, expiresAt: { type: 'date' } },
-      });
-    } finally {
-      await upgraded?.dispose();
-      await existing.destroy();
+        });
+        await client.index({
+          index: existing.index('profiles'),
+          id: snapshot.id,
+          body: snapshot,
+          refresh: true,
+        });
+        upgraded = await acquireSearchFixture(existing.options);
+        expect(await Effect.runPromise(upgraded.adapter.read.profile(snapshot.id))).toEqual(
+          snapshot
+        );
+        const withAlias = {
+          ...snapshot,
+          version: 2,
+          aliases: [
+            {
+              handle: `${snapshot.id}-alias`,
+              claimGeneration: 1,
+              createdAt: timestamp,
+              expiresAt: null,
+            },
+          ],
+        };
+        await Effect.runPromise(
+          upgraded.project.record({
+            _tag: 'ProfilePublished',
+            profile: withAlias,
+            occurrence: {
+              source: 'wallpaperdb/profile',
+              id: `${snapshot.id}-2`,
+              occurredAt: timestamp,
+            },
+          })
+        );
+        expect(
+          await Effect.runPromise(
+            upgraded.adapter.read.profileByHandle(withAlias.aliases[0].handle)
+          )
+        ).toEqual(withAlias);
+        const mapping = await client.indices.get({ index: existing.index('profiles') });
+        expect(mapping.body[existing.index('profiles')].mappings.properties.aliases).toMatchObject({
+          type: 'nested',
+          properties: { createdAt: { type: 'date' }, expiresAt: { type: 'date' } },
+        });
+      } finally {
+        await upgraded?.dispose();
+        await existing.destroy();
+      }
     }
-  });
+  );
 
   it('updates the complete profile snapshot when its version advances', async () => {
     const original = profile('profile-updated');

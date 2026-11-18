@@ -7,42 +7,44 @@ import {
 } from './unit/http-fixture.js';
 
 describe('health HTTP contract', () => {
-  it.each([
-    'degraded',
-    'unhealthy',
-  ] as const)('represents %s health as Problem Details', async (status) => {
-    const checks = { opensearch: status === 'degraded', nats: false, otel: false };
-    const app = await createHttpApp(httpConfig, {
-      catalogue: new EmptyCatalogue(),
-      admission: { admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 100, reset: 1000 }) },
-      availability: {
-        health: () =>
-          Effect.succeed({
-            status,
-            checks,
-            timestamp: '2026-09-15T12:00:00.000Z',
-            totalDurationMs: 25,
-          }),
-        ready: () => Effect.succeed({ ready: true, timestamp: '2026-09-15T12:00:00.000Z' }),
-      },
-    });
-    try {
-      const response = await app.inject({ url: '/health' });
-      expect(response.statusCode).toBe(503);
-      expect(response.headers['content-type']).toContain('application/problem+json');
-      expect(response.json()).toMatchObject({
-        type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
-        title: 'Service unavailable',
-        status: 503,
-        healthStatus: status,
-        timestamp: '2026-09-15T12:00:00.000Z',
-        totalDurationMs: 25,
-        checks,
+  it.each(['degraded', 'unhealthy'] as const)(
+    'represents %s health as Problem Details',
+    async (status) => {
+      const checks = { opensearch: status === 'degraded', nats: false, otel: false };
+      const app = await createHttpApp(httpConfig, {
+        catalogue: new EmptyCatalogue(),
+        admission: {
+          admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 100, reset: 1000 }),
+        },
+        availability: {
+          health: () =>
+            Effect.succeed({
+              status,
+              checks,
+              timestamp: '2026-09-15T12:00:00.000Z',
+              totalDurationMs: 25,
+            }),
+          ready: () => Effect.succeed({ ready: true, timestamp: '2026-09-15T12:00:00.000Z' }),
+        },
       });
-    } finally {
-      await app.close();
+      try {
+        const response = await app.inject({ url: '/health' });
+        expect(response.statusCode).toBe(503);
+        expect(response.headers['content-type']).toContain('application/problem+json');
+        expect(response.json()).toMatchObject({
+          type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+          title: 'Service unavailable',
+          status: 503,
+          healthStatus: status,
+          timestamp: '2026-09-15T12:00:00.000Z',
+          totalDurationMs: 25,
+          checks,
+        });
+      } finally {
+        await app.close();
+      }
     }
-  });
+  );
 
   it('documents health and readiness success schemas and Problem Details failures', async () => {
     const app = await createHttpApp(httpConfig, {

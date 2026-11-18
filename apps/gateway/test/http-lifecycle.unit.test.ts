@@ -127,50 +127,50 @@ describe('HTTP request lifecycle', () => {
     );
   });
 
-  it.each([
-    'disconnect',
-    'timeout',
-  ])('holds a %s request slot until its cancellation finalizer settles', async (cause) => {
-    const cleanup = Deferred.makeUnsafe<void>();
-    let entered = false;
-    let cancelling = false;
-    let calls = 0;
-    const read = Effect.suspend(() => {
-      calls++;
-      if (calls > 1) return Effect.succeed(profile);
-      entered = true;
-      return Effect.never.pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            cancelling = true;
-          }).pipe(Effect.andThen(Deferred.await(cleanup)))
-        )
-      );
-    });
-    const { address } = await serve(controlledCatalogue(read), 1000, {
-      graphqlMaxActive: 1,
-      graphqlDeadlineMs: cause === 'timeout' ? 50 : 5000,
-    });
-    const abort = new AbortController();
-    const pending = query(address, abort.signal).catch((error: unknown) => error);
-    try {
-      await expect.poll(() => entered).toBe(true);
-      if (cause === 'disconnect') {
-        abort.abort();
-        expect(await pending).toBeInstanceOf(Error);
-      } else {
-        const response = await pending;
-        expect(response).toBeInstanceOf(Response);
-        if (response instanceof Response) expect(response.status).toBe(503);
+  it.each(['disconnect', 'timeout'])(
+    'holds a %s request slot until its cancellation finalizer settles',
+    async (cause) => {
+      const cleanup = Deferred.makeUnsafe<void>();
+      let entered = false;
+      let cancelling = false;
+      let calls = 0;
+      const read = Effect.suspend(() => {
+        calls++;
+        if (calls > 1) return Effect.succeed(profile);
+        entered = true;
+        return Effect.never.pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              cancelling = true;
+            }).pipe(Effect.andThen(Deferred.await(cleanup)))
+          )
+        );
+      });
+      const { address } = await serve(controlledCatalogue(read), 1000, {
+        graphqlMaxActive: 1,
+        graphqlDeadlineMs: cause === 'timeout' ? 50 : 5000,
+      });
+      const abort = new AbortController();
+      const pending = query(address, abort.signal).catch((error: unknown) => error);
+      try {
+        await expect.poll(() => entered).toBe(true);
+        if (cause === 'disconnect') {
+          abort.abort();
+          expect(await pending).toBeInstanceOf(Error);
+        } else {
+          const response = await pending;
+          expect(response).toBeInstanceOf(Response);
+          if (response instanceof Response) expect(response.status).toBe(503);
+        }
+        await expect.poll(() => cancelling).toBe(true);
+        expect((await query(address)).status).toBe(503);
+        expect(calls).toBe(1);
+      } finally {
+        await Effect.runPromise(Deferred.succeed(cleanup, undefined));
       }
-      await expect.poll(() => cancelling).toBe(true);
-      expect((await query(address)).status).toBe(503);
-      expect(calls).toBe(1);
-    } finally {
-      await Effect.runPromise(Deferred.succeed(cleanup, undefined));
+      await expect.poll(async () => (await query(address)).status).toBe(200);
     }
-    await expect.poll(async () => (await query(address)).status).toBe(200);
-  });
+  );
 
   it('limits each replica independently and keeps other HTTP routes available', async () => {
     const release = Deferred.makeUnsafe<void>();

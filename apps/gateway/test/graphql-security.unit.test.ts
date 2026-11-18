@@ -216,62 +216,60 @@ describe('GraphQL security driving contract', () => {
     { args: 'first:$size', definition: '($size:Int)', variables: { size: 20 }, size: 20 },
     { args: 'first:null', definition: '', variables: undefined, size: 10 },
     { args: '', definition: '', variables: undefined, size: 10 },
-  ])('prices resolved Profile discovery page sizes before catalogue access: $args', async ({
-    args,
-    definition,
-    variables,
-    size,
-  }) => {
-    const catalogue = new ObservedCatalogue();
-    const complexity = size * 12 + 1;
-    const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
-    const text = `query${definition}{searchProfiles(query:"sky"${args ? `,${args}` : ''}){edges{node{id}}}}`;
-    expect((await execute(app, text, variables)).json().errors?.[0].extensions).toMatchObject({
-      code: 'COMPLEXITY_LIMIT_EXCEEDED',
-      complexity,
-    });
-    expect(catalogue.calls).toEqual([]);
-  });
-  it.each([
-    0, -1, 51,
-  ])('rejects unsupported Profile discovery page size %i before catalogue access', async (first) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({}, { catalogue });
-    expect(
-      (
-        await execute(
-          app,
-          `query($first:Int){searchProfiles(query:"sky",first:$first){edges{node{id}}}}`,
-          { first }
-        )
-      ).json().errors?.[0].extensions.code
-    ).toBe('BAD_USER_INPUT');
-    expect(catalogue.calls).toEqual([]);
-  });
-  it.each([
-    '',
-    ',first:null',
-    ',first:10',
-  ])('rejects nested Profile discovery amplification: %s', async (args) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({ graphqlMaxDepth: 10, graphqlMaxComplexity: 1000 }, { catalogue });
-    const response = await execute(
-      app,
-      `{
+  ])(
+    'prices resolved Profile discovery page sizes before catalogue access: $args',
+    async ({ args, definition, variables, size }) => {
+      const catalogue = new ObservedCatalogue();
+      const complexity = size * 12 + 1;
+      const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
+      const text = `query${definition}{searchProfiles(query:"sky"${args ? `,${args}` : ''}){edges{node{id}}}}`;
+      expect((await execute(app, text, variables)).json().errors?.[0].extensions).toMatchObject({
+        code: 'COMPLEXITY_LIMIT_EXCEEDED',
+        complexity,
+      });
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
+  it.each([0, -1, 51])(
+    'rejects unsupported Profile discovery page size %i before catalogue access',
+    async (first) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({}, { catalogue });
+      expect(
+        (
+          await execute(
+            app,
+            `query($first:Int){searchProfiles(query:"sky",first:$first){edges{node{id}}}}`,
+            { first }
+          )
+        ).json().errors?.[0].extensions.code
+      ).toBe('BAD_USER_INPUT');
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
+  it.each(['', ',first:null', ',first:10'])(
+    'rejects nested Profile discovery amplification: %s',
+    async (args) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({ graphqlMaxDepth: 10, graphqlMaxComplexity: 1000 }, { catalogue });
+      const response = await execute(
+        app,
+        `{
       searchProfiles(query:"sky"${args}) {edges{node{...Contributions}}}
     } fragment Contributions on Profile {wallpapers{edges{node{wallpaperId}}}}`
-    );
-    expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
-    expect(catalogue.calls).toEqual([]);
-  });
-  it.each([
-    10, 50,
-  ])('admits the shipped Profile discovery selection with %i results', async (first) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({}, { catalogue });
-    const response = await execute(
-      app,
-      `
+      );
+      expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
+  it.each([10, 50])(
+    'admits the shipped Profile discovery selection with %i results',
+    async (first) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({}, { catalogue });
+      const response = await execute(
+        app,
+        `
       query SearchProfiles($query:String!,$first:Int,$after:String) {
         searchProfiles(query:$query,first:$first,after:$after) {
           edges {node{id version handle displayName picture{id url} canonicalPath}}
@@ -279,11 +277,12 @@ describe('GraphQL security driving contract', () => {
         }
       }
     `,
-      { query: 'sky', first }
-    );
-    expect(response.json().errors).toBeUndefined();
-    expect(catalogue.calls).toEqual(['searchProfiles']);
-  });
+        { query: 'sky', first }
+      );
+      expect(response.json().errors).toBeUndefined();
+      expect(catalogue.calls).toEqual(['searchProfiles']);
+    }
+  );
   it('admits the shipped Handle resolution selection under the default depth budget', async () => {
     const catalogue = new ObservedCatalogue();
     const app = await build({}, { catalogue });
@@ -409,14 +408,15 @@ describe('GraphQL security driving contract', () => {
     });
     expect(catalogue.calls).toEqual([]);
   });
-  it.each(
-    nestedQueries
-  )('rejects nested page expansion before catalogue work: %s', async (text) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({}, { catalogue });
-    expect((await execute(app, text)).json().errors).toBeDefined();
-    expect(catalogue.calls).toEqual([]);
-  });
+  it.each(nestedQueries)(
+    'rejects nested page expansion before catalogue work: %s',
+    async (text) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({}, { catalogue });
+      expect((await execute(app, text)).json().errors).toBeDefined();
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
   it.each(nestedQueries)('applies depth limits through fragment boundaries: %s', async (text) => {
     const catalogue = new ObservedCatalogue();
     const app = await build({ graphqlMaxComplexity: 100_000 }, { catalogue });
@@ -462,27 +462,28 @@ describe('GraphQL security driving contract', () => {
     });
     expect(catalogue.calls).toEqual([]);
   });
-  it.each([
-    14, 15,
-  ])('merges repeated response fields and unions their children at cost %i', async (limit) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({ graphqlMaxComplexity: limit, graphqlMaxAliases: 1 }, { catalogue });
-    const response = await execute(
-      app,
-      `
+  it.each([14, 15])(
+    'merges repeated response fields and unions their children at cost %i',
+    async (limit) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({ graphqlMaxComplexity: limit, graphqlMaxAliases: 1 }, { catalogue });
+      const response = await execute(
+        app,
+        `
       { profile(id:"profile_a"){...Page ...Page ...More} }
       fragment Page on Profile {page:wallpapers(first:1){edges{node{wallpaperId}}}}
       fragment More on Profile {page:wallpapers(first:1){edges{node{profileId}}}}
     `
-    );
-    if (limit === 15) {
-      expect(response.json().errors).toBeUndefined();
-      expect(catalogue.calls).toEqual(['profile']);
-    } else {
-      expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
-      expect(catalogue.calls).toEqual([]);
+      );
+      if (limit === 15) {
+        expect(response.json().errors).toBeUndefined();
+        expect(catalogue.calls).toEqual(['profile']);
+      } else {
+        expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+        expect(catalogue.calls).toEqual([]);
+      }
     }
-  });
+  );
   it.each([
     {
       placement: 'field',
@@ -620,70 +621,68 @@ describe('GraphQL security driving contract', () => {
       (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).json().errors
     ).toBeUndefined();
   });
-  describe.each([
-    'searchWallpapers',
-    'Profile.wallpapers',
-  ])('effective pagination for %s', (field) => {
-    it.each([
-      { label: 'literal first', args: '(first:80)', size: 80 },
-      { label: 'literal last', args: '(last:80)', size: 80 },
-      {
-        label: 'supplied first variable',
-        definition: '($size:Int)',
-        args: '(first:$size)',
-        variables: { size: 80 },
-        size: 80,
-      },
-      {
-        label: 'default first variable',
-        definition: '($size:Int=80)',
-        args: '(first:$size)',
-        size: 80,
-      },
-      {
-        label: 'supplied last variable',
-        definition: '($size:Int)',
-        args: '(last:$size)',
-        variables: { size: 80 },
-        size: 80,
-      },
-      {
-        label: 'default last variable',
-        definition: '($size:Int=80)',
-        args: '(last:$size)',
-        size: 80,
-      },
-      { label: 'null first with last', args: '(first:null,last:80)', size: 80 },
-      {
-        label: 'omitted first variable with last',
-        definition: '($first:Int)',
-        args: '(first:$first,last:80)',
-        size: 80,
-      },
-      { label: 'omitted pagination', args: '', size: 10 },
-      { label: 'null pagination', args: '(first:null,last:null)', size: 10 },
-      { label: 'first precedence', args: '(first:2,last:80)', size: 2 },
-    ])('prices $label before allowing catalogue work', async ({
-      definition = '',
-      args,
-      variables,
-      size,
-    }) => {
-      const catalogue = new ObservedCatalogue();
-      const complexity = size * 12 + (field === 'searchWallpapers' ? 1 : 2);
-      const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
-      const selection =
-        field === 'searchWallpapers'
-          ? `searchWallpapers${args}{edges{node{wallpaperId}}}`
-          : `profile(id:"profile_a"){wallpapers${args}{edges{node{wallpaperId}}}}`;
-      const response = await execute(app, `query${definition}{${selection}}`, variables);
-      expect(response.json().errors?.[0].extensions).toMatchObject({
-        code: 'COMPLEXITY_LIMIT_EXCEEDED',
-        complexity,
-      });
-      expect(catalogue.calls).toEqual([]);
-    });
-  });
+  describe.each(['searchWallpapers', 'Profile.wallpapers'])(
+    'effective pagination for %s',
+    (field) => {
+      it.each([
+        { label: 'literal first', args: '(first:80)', size: 80 },
+        { label: 'literal last', args: '(last:80)', size: 80 },
+        {
+          label: 'supplied first variable',
+          definition: '($size:Int)',
+          args: '(first:$size)',
+          variables: { size: 80 },
+          size: 80,
+        },
+        {
+          label: 'default first variable',
+          definition: '($size:Int=80)',
+          args: '(first:$size)',
+          size: 80,
+        },
+        {
+          label: 'supplied last variable',
+          definition: '($size:Int)',
+          args: '(last:$size)',
+          variables: { size: 80 },
+          size: 80,
+        },
+        {
+          label: 'default last variable',
+          definition: '($size:Int=80)',
+          args: '(last:$size)',
+          size: 80,
+        },
+        { label: 'null first with last', args: '(first:null,last:80)', size: 80 },
+        {
+          label: 'omitted first variable with last',
+          definition: '($first:Int)',
+          args: '(first:$first,last:80)',
+          size: 80,
+        },
+        { label: 'omitted pagination', args: '', size: 10 },
+        { label: 'null pagination', args: '(first:null,last:null)', size: 10 },
+        { label: 'first precedence', args: '(first:2,last:80)', size: 2 },
+      ])(
+        'prices $label before allowing catalogue work',
+        async ({ definition = '', args, variables, size }) => {
+          const catalogue = new ObservedCatalogue();
+          const complexity = size * 12 + (field === 'searchWallpapers' ? 1 : 2);
+          const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
+          const selection =
+            field === 'searchWallpapers'
+              ? `searchWallpapers${args}{edges{node{wallpaperId}}}`
+              : `profile(id:"profile_a"){wallpapers${args}{edges{node{wallpaperId}}}}`;
+          const response = await execute(app, `query${definition}{${selection}}`, variables);
+          expect(response.json().errors?.[0].extensions).toMatchObject({
+            code: 'COMPLEXITY_LIMIT_EXCEEDED',
+            complexity,
+          });
+          expect(catalogue.calls).toEqual([]);
+        }
+      );
+    }
+  );
   it('prices only the selected named operation and its referenced fragments', async () => {
     const catalogue = new ObservedCatalogue();
     const app = await build({ graphqlMaxComplexity: 500 }, { catalogue });
@@ -718,23 +717,21 @@ describe('GraphQL security driving contract', () => {
     expect(rejected.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
     expect(catalogue.calls).toEqual([]);
   });
-  it.each([
-    undefined,
-    { size: '80' },
-    { size: 1.5 },
-    { size: null },
-  ])('preserves invalid variable errors without execution: %j', async (variables) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({}, { catalogue });
-    const response = await execute(
-      app,
-      'query($size:Int!){searchWallpapers(first:$size){edges{node{wallpaperId}}}}',
-      variables
-    );
-    expect(response.json().errors?.[0].message).toContain('Variable "$size"');
-    expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
-    expect(catalogue.calls).toEqual([]);
-  });
+  it.each([undefined, { size: '80' }, { size: 1.5 }, { size: null }])(
+    'preserves invalid variable errors without execution: %j',
+    async (variables) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({}, { catalogue });
+      const response = await execute(
+        app,
+        'query($size:Int!){searchWallpapers(first:$size){edges{node{wallpaperId}}}}',
+        variables
+      );
+      expect(response.json().errors?.[0].message).toContain('Variable "$size"');
+      expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
   it.each([101, 50_000])('rejects an unsupported page size %i before execution', async (size) => {
     const catalogue = new ObservedCatalogue();
     const app = await build({}, { catalogue });
@@ -749,59 +746,59 @@ describe('GraphQL security driving contract', () => {
     });
     expect(catalogue.calls).toEqual([]);
   });
-  it.each([
-    undefined,
-    'Missing',
-  ])('rejects ambiguous or unknown operation names without execution: %s', async (operationName) => {
-    const catalogue = new ObservedCatalogue();
-    const app = await build({}, { catalogue });
-    const response = await execute(
-      app,
-      'query First{searchWallpapers{edges{node{wallpaperId}}}} query Second{profile(id:"profile_a"){id}}',
-      undefined,
-      operationName
-    );
-    expect(response.json().errors).toHaveLength(1);
-    expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
-    expect(catalogue.calls).toEqual([]);
-  });
-  it.each([
-    '/graphql?operationName=test',
-    '/%67raphql',
-  ])('limits GraphQL URL %s despite user agent rotation', async (url) => {
-    const app = await build({ quotaCapacity: 421 });
-    expect((await execute(app)).statusCode).toBe(200);
-    const limited = await app.inject({
-      method: 'POST',
-      url,
-      payload: { query },
-    });
-    expect(limited.statusCode).toBe(429);
-    expect(limited.headers['retry-after']).toBe('60');
-    expect(limited.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
-    expect(
-      (
-        await app.inject({
-          method: 'POST',
-          url: '/graphql',
-          headers: {
-            'user-agent': 'other',
-            authorization: 'Bearer caller-token',
-            'x-forwarded-for': '198.51.100.9',
-            forwarded: 'for=198.51.100.10',
-          },
-          payload: { query },
-        })
-      ).statusCode
-    ).toBe(429);
-  });
-  it.each([
-    { nodeEnv: 'production' as const },
-    { graphqlIntrospectionEnabled: false },
-  ])('blocks introspection when configured %j', async (overrides) => {
-    const app = await build(overrides);
-    expect((await execute(app, '{__schema{queryType{name}}}')).json().errors).toBeDefined();
-  });
+  it.each([undefined, 'Missing'])(
+    'rejects ambiguous or unknown operation names without execution: %s',
+    async (operationName) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({}, { catalogue });
+      const response = await execute(
+        app,
+        'query First{searchWallpapers{edges{node{wallpaperId}}}} query Second{profile(id:"profile_a"){id}}',
+        undefined,
+        operationName
+      );
+      expect(response.json().errors).toHaveLength(1);
+      expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
+      expect(catalogue.calls).toEqual([]);
+    }
+  );
+  it.each(['/graphql?operationName=test', '/%67raphql'])(
+    'limits GraphQL URL %s despite user agent rotation',
+    async (url) => {
+      const app = await build({ quotaCapacity: 421 });
+      expect((await execute(app)).statusCode).toBe(200);
+      const limited = await app.inject({
+        method: 'POST',
+        url,
+        payload: { query },
+      });
+      expect(limited.statusCode).toBe(429);
+      expect(limited.headers['retry-after']).toBe('60');
+      expect(limited.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/graphql',
+            headers: {
+              'user-agent': 'other',
+              authorization: 'Bearer caller-token',
+              'x-forwarded-for': '198.51.100.9',
+              forwarded: 'for=198.51.100.10',
+            },
+            payload: { query },
+          })
+        ).statusCode
+      ).toBe(429);
+    }
+  );
+  it.each([{ nodeEnv: 'production' as const }, { graphqlIntrospectionEnabled: false }])(
+    'blocks introspection when configured %j',
+    async (overrides) => {
+      const app = await build(overrides);
+      expect((await execute(app, '{__schema{queryType{name}}}')).json().errors).toBeDefined();
+    }
+  );
   it('permits test introspection and developer GraphiQL', async () => {
     const app = await build({ nodeEnv: 'development' });
     expect(
@@ -930,32 +927,32 @@ describe('GraphQL security driving contract', () => {
       fault: Object.assign(new Error('private admission status'), { statusCode: '400' }),
       status: 500,
     },
-  ])('maps pre-execution GraphQL transport defects to a safe GraphQL response ($status)', async ({
-    fault,
-    status,
-  }) => {
-    const app = await build(
-      {},
-      {
-        admission: {
-          admit() {
-            throw fault;
-          },
-        },
-      }
-    );
-    const response = await execute(app);
-    expect(response.statusCode).toBe(status);
-    expect(response.json()).toEqual({
-      data: null,
-      errors: [
+  ])(
+    'maps pre-execution GraphQL transport defects to a safe GraphQL response ($status)',
+    async ({ fault, status }) => {
+      const app = await build(
+        {},
         {
-          message: status === 500 ? 'Internal server error' : 'Invalid request',
-          extensions: { code: status === 500 ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST' },
-        },
-      ],
-    });
-  });
+          admission: {
+            admit() {
+              throw fault;
+            },
+          },
+        }
+      );
+      const response = await execute(app);
+      expect(response.statusCode).toBe(status);
+      expect(response.json()).toEqual({
+        data: null,
+        errors: [
+          {
+            message: status === 500 ? 'Internal server error' : 'Invalid request',
+            extensions: { code: status === 500 ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST' },
+          },
+        ],
+      });
+    }
+  );
 });
 
 it('translates saturated quota commands into safe overload without executing catalogue work', async () => {

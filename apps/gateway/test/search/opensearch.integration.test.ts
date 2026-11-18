@@ -189,60 +189,61 @@ describe('OpenSearch catalogue port contract', () => {
     }
   });
 
-  it.each([
-    'uploadedAt',
-    'updatedAt',
-    'variants.createdAt',
-  ] as const)('rejects an existing %s date mapping that cannot parse ISO timestamps', async (field) => {
-    const index = searchFixture.index(`epoch-millis-${field.replace('.', '-').toLowerCase()}`);
-    const required = await client.indices.getMapping({
-      index: searchFixture.options.wallpaperIndex,
-    });
-    const mapping = structuredClone(required.body[searchFixture.options.wallpaperIndex].mappings);
-    const dateField =
-      field === 'variants.createdAt'
-        ? mapping.properties.variants.properties.createdAt
-        : mapping.properties[field];
-    dateField.format = 'epoch_millis';
-    try {
-      await client.indices.create({
-        index,
-        body: {
-          settings: { 'index.mapping.total_fields.limit': 10100 },
-          mappings: mapping,
-        },
+  it.each(['uploadedAt', 'updatedAt', 'variants.createdAt'] as const)(
+    'rejects an existing %s date mapping that cannot parse ISO timestamps',
+    async (field) => {
+      const index = searchFixture.index(`epoch-millis-${field.replace('.', '-').toLowerCase()}`);
+      const required = await client.indices.getMapping({
+        index: searchFixture.options.wallpaperIndex,
       });
-      await expect(
-        client.index({
+      const mapping = structuredClone(required.body[searchFixture.options.wallpaperIndex].mappings);
+      const dateField =
+        field === 'variants.createdAt'
+          ? mapping.properties.variants.properties.createdAt
+          : mapping.properties[field];
+      dateField.format = 'epoch_millis';
+      try {
+        await client.indices.create({
           index,
-          id: 'iso-date-probe',
           body: {
-            wallpaperId: 'iso-date-probe',
-            userId: 'owner',
-            variants: [variant],
-            uploadedAt: timestamp,
-            updatedAt: timestamp,
+            settings: { 'index.mapping.total_fields.limit': 10100 },
+            mappings: mapping,
           },
-        })
-      ).rejects.toMatchObject({ meta: { body: { error: { type: 'mapper_parsing_exception' } } } });
-
-      const result = await Effect.runPromise(
-        Layer.build(openSearchLayer({ ...searchFixture.options, wallpaperIndex: index })).pipe(
-          Effect.scoped,
-          Effect.result
-        )
-      );
-      expect(result._tag).toBe('Failure');
-      if (result._tag === 'Failure')
-        expect(result.failure.diagnostic).toMatchObject({
-          dependency: 'opensearch',
-          operation: 'inspect-index',
-          index,
         });
-    } finally {
-      await client.indices.delete({ index, ignore_unavailable: true });
+        await expect(
+          client.index({
+            index,
+            id: 'iso-date-probe',
+            body: {
+              wallpaperId: 'iso-date-probe',
+              userId: 'owner',
+              variants: [variant],
+              uploadedAt: timestamp,
+              updatedAt: timestamp,
+            },
+          })
+        ).rejects.toMatchObject({
+          meta: { body: { error: { type: 'mapper_parsing_exception' } } },
+        });
+
+        const result = await Effect.runPromise(
+          Layer.build(openSearchLayer({ ...searchFixture.options, wallpaperIndex: index })).pipe(
+            Effect.scoped,
+            Effect.result
+          )
+        );
+        expect(result._tag).toBe('Failure');
+        if (result._tag === 'Failure')
+          expect(result.failure.diagnostic).toMatchObject({
+            dependency: 'opensearch',
+            operation: 'inspect-index',
+            index,
+          });
+      } finally {
+        await client.indices.delete({ index, ignore_unavailable: true });
+      }
     }
-  });
+  );
 
   it('publishes a wallpaper and makes the completed write immediately readable', async () => {
     expect(await upload('published')).toEqual({ _tag: 'Completed' });
@@ -374,42 +375,42 @@ describe('OpenSearch catalogue port contract', () => {
     expect(persisted.body._source.colorSnapshot.descriptor).toEqual(current);
   });
 
-  it.each([
-    false,
-    true,
-  ])('orders same-millisecond colors and variants precisely (newer first: %s)', async (newerFirst) => {
-    const id = `precise-${newerFirst}`;
-    await upload(id);
-    const oldOccurrence = occurrence('z-older', '2026-01-01T00:00:00.1231Z');
-    const newOccurrence = occurrence('a-newer', '2026-01-01T00:00:00.1239Z');
-    const newerColors = measuredColors('precise', timestamp, 'dark-red').descriptor;
-    const newerVariant = { ...variant, fileSizeBytes: 2000 };
-    const events: ProjectionChange[] = [
-      {
-        ...measuredColors(id),
-        occurrence: oldOccurrence,
-        descriptor: colors,
-      },
-      { _tag: 'VariantAvailable', wallpaperId: id, occurrence: oldOccurrence, variant },
-      {
-        ...measuredColors(id),
-        occurrence: newOccurrence,
-        descriptor: newerColors,
-      },
-      {
-        _tag: 'VariantAvailable',
-        wallpaperId: id,
-        occurrence: newOccurrence,
-        variant: newerVariant,
-      },
-    ];
-    for (const event of newerFirst ? [...events].reverse() : events) await record(event);
-    for (const event of events) expect(await record(event)).toEqual({ _tag: 'Ignored' });
-    expect((await get(id))?.variants).toEqual([newerVariant]);
-    expect((await get(id))?.updatedAt).toBe('2026-01-01T00:00:00.123Z');
-    const persisted = await client.get({ index: searchFixture.index('wallpapers'), id });
-    expect(persisted.body._source.colorSnapshot.descriptor).toEqual(newerColors);
-  });
+  it.each([false, true])(
+    'orders same-millisecond colors and variants precisely (newer first: %s)',
+    async (newerFirst) => {
+      const id = `precise-${newerFirst}`;
+      await upload(id);
+      const oldOccurrence = occurrence('z-older', '2026-01-01T00:00:00.1231Z');
+      const newOccurrence = occurrence('a-newer', '2026-01-01T00:00:00.1239Z');
+      const newerColors = measuredColors('precise', timestamp, 'dark-red').descriptor;
+      const newerVariant = { ...variant, fileSizeBytes: 2000 };
+      const events: ProjectionChange[] = [
+        {
+          ...measuredColors(id),
+          occurrence: oldOccurrence,
+          descriptor: colors,
+        },
+        { _tag: 'VariantAvailable', wallpaperId: id, occurrence: oldOccurrence, variant },
+        {
+          ...measuredColors(id),
+          occurrence: newOccurrence,
+          descriptor: newerColors,
+        },
+        {
+          _tag: 'VariantAvailable',
+          wallpaperId: id,
+          occurrence: newOccurrence,
+          variant: newerVariant,
+        },
+      ];
+      for (const event of newerFirst ? [...events].reverse() : events) await record(event);
+      for (const event of events) expect(await record(event)).toEqual({ _tag: 'Ignored' });
+      expect((await get(id))?.variants).toEqual([newerVariant]);
+      expect((await get(id))?.updatedAt).toBe('2026-01-01T00:00:00.123Z');
+      const persisted = await client.get({ index: searchFixture.index('wallpapers'), id });
+      expect(persisted.body._source.colorSnapshot.descriptor).toEqual(newerColors);
+    }
+  );
 
   it('preserves newer enrichment timestamp when the initial upload arrives late', async () => {
     await addVariant('late-upload', variant, '2026-02-01T00:00:00.000Z');

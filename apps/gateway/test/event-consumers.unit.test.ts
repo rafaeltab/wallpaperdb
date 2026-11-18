@@ -161,15 +161,18 @@ describe('Projection event driving adapter contract', () => {
     ['ce-type', 'wallpaper.uploaded'],
     ['ce-time', '2026-01-02T00:00:00.000Z'],
     ['ce-time', 'invalid'],
-  ])('rejects an invalid or conflicting binary %s header before applying an event', async (name, value) => {
-    const project = new ControlledProjection();
-    const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
-    metadata.set(name, value);
-    expect(await deliver(variant.eventType, variant, project, 1, metadata)).toEqual({
-      _tag: 'Invalid',
-    });
-    expect(project.changes).toEqual([]);
-  });
+  ])(
+    'rejects an invalid or conflicting binary %s header before applying an event',
+    async (name, value) => {
+      const project = new ControlledProjection();
+      const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
+      metadata.set(name, value);
+      expect(await deliver(variant.eventType, variant, project, 1, metadata)).toEqual({
+        _tag: 'Invalid',
+      });
+      expect(project.changes).toEqual([]);
+    }
+  );
 
   it.each([
     ['ce-source', 'https://wallpaperdb/other'],
@@ -249,20 +252,20 @@ describe('Projection event driving adapter contract', () => {
     ]);
   });
 
-  it.each([
-    created,
-    updated,
-  ])('translates profile facts into complete local snapshots', async (event) => {
-    const project = new ControlledProjection();
-    await deliver(event.eventType, event, project);
-    expect(project.changes).toEqual([
-      {
-        _tag: 'ProfilePublished',
-        profile: event.profile,
-        occurrence: { source: 'wallpaperdb/profile', id: 'event-1', occurredAt: timestamp },
-      },
-    ]);
-  });
+  it.each([created, updated])(
+    'translates profile facts into complete local snapshots',
+    async (event) => {
+      const project = new ControlledProjection();
+      await deliver(event.eventType, event, project);
+      expect(project.changes).toEqual([
+        {
+          _tag: 'ProfilePublished',
+          profile: event.profile,
+          occurrence: { source: 'wallpaperdb/profile', id: 'event-1', occurredAt: timestamp },
+        },
+      ]);
+    }
+  );
 
   it.each([
     {

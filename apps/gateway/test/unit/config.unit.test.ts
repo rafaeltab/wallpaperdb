@@ -161,23 +161,23 @@ describe('startup configuration', () => {
   });
 });
 
-it.each([
-  'RATE_LIMIT_ENABLED',
-  'REDIS_ENABLED',
-])('rejects disabled production protection %s but permits explicit development disabling', async (field) => {
-  const overrides = {
-    ...environment,
-    NODE_ENV: 'production',
-    TRUSTED_PROXIES: '10.0.0.1',
-    REDIS_ENABLED: 'true',
-    [field]: 'false',
-  };
-  const error = await Effect.runPromise(
-    gatewayConfig.pipe(
-      Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown(overrides)),
-      Effect.flip
-    )
-  );
-  expect(error.fields).toContain(field);
-  expect(() => loadConfig({ ...overrides, NODE_ENV: 'development' })).not.toThrow();
-});
+it.each(['RATE_LIMIT_ENABLED', 'REDIS_ENABLED'])(
+  'rejects disabled production protection %s but permits explicit development disabling',
+  async (field) => {
+    const overrides = {
+      ...environment,
+      NODE_ENV: 'production',
+      TRUSTED_PROXIES: '10.0.0.1',
+      REDIS_ENABLED: 'true',
+      [field]: 'false',
+    };
+    const error = await Effect.runPromise(
+      gatewayConfig.pipe(
+        Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown(overrides)),
+        Effect.flip
+      )
+    );
+    expect(error.fields).toContain(field);
+    expect(() => loadConfig({ ...overrides, NODE_ENV: 'development' })).not.toThrow();
+  }
+);

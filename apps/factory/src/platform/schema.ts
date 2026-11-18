@@ -121,6 +121,18 @@ export const observationCheckpoints = sqliteTable(
   ]
 );
 
+export const observationEntities = sqliteTable(
+  'observation_entities',
+  {
+    stream: text('stream')
+      .notNull()
+      .references(() => observationCheckpoints.stream, { onDelete: 'cascade' }),
+    id: text('id').notNull(),
+    value: text('value').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.stream, table.id] })]
+);
+
 export const v2Board = sqliteTable('v2_board', {
   scope: text('scope').primaryKey(),
   value: text('value', { mode: 'json' })

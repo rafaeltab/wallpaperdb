@@ -34,6 +34,7 @@ export function ExecutionControls({
       <label>
         Model
         <select
+          aria-label="Model"
           disabled={!catalog}
           value={settings.model}
           onChange={(e) => change({ ...settings, model: e.target.value })}
@@ -49,6 +50,7 @@ export function ExecutionControls({
       <label>
         Reasoning effort
         <select
+          aria-label="Reasoning effort"
           disabled={!catalog}
           value={settings.effort ?? ''}
           onChange={(e) => change({ ...settings, effort: e.target.value || null })}
@@ -67,6 +69,7 @@ export function ExecutionControls({
       <label>
         Execution mode
         <select
+          aria-label="Execution mode"
           disabled={!catalog}
           value={settings.mode ?? ''}
           onChange={(e) =>
@@ -95,6 +98,7 @@ export function ExecutionControls({
       <label>
         Permission level
         <select
+          aria-label="Permission level"
           disabled={!catalog}
           value={settings.permissionLevel ?? ''}
           onChange={(e) =>
@@ -136,8 +140,10 @@ export function ExecutionControls({
 export function ExecutionSummary({
   settings,
   observed,
+  observedModel,
 }: {
   settings: Settings | undefined;
+  observedModel?: string;
   observed?: {
     model: string;
     effort: string | null;
@@ -159,7 +165,7 @@ export function ExecutionSummary({
         .
       </p>
       <p>
-        Observed model: {observed?.model ?? 'Unknown'}. Effort:{' '}
+        Observed model: {observed?.model ?? observedModel ?? 'Unknown'}. Effort:{' '}
         {observed ? (observed.effort ?? 'Inherited/default (effective value unknown)') : 'Unknown'}.
         Mode:{' '}
         {observed

@@ -155,7 +155,7 @@ export function executionInstructions(settings?: ExecutionSettings) {
       ? []
       : [`serviceTier: '${settings.mode === 'fast' ? 'priority' : 'default'}'`]),
   ];
-  return `All agents and fresh independent reviewers use Codex model ${settings.model}. Preserve its execution settings for independent reviews: target.options = {${options.join(', ')}}. ${settings.permissionLevel === null ? 'Inherit the owning thread permission level.' : `Use permission level ${settings.permissionLevel}; do not broaden it.`}`;
+  return `All agents and fresh independent reviewers use Codex model ${settings.model}. These factory execution settings override skill model defaults. Preserve them for independent reviews: target.options = {${options.join(', ')}}. ${settings.permissionLevel === null ? 'Inherit the owning thread permission level.' : `Use permission level ${settings.permissionLevel}; do not broaden it.`}`;
 }
 
 export async function observeExecutionSettings(

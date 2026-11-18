@@ -189,7 +189,11 @@ export function t3Restacker(
         (await idle(current))
       );
     },
-    (threadId, prompt, signal) => call(['send', threadId, prompt], signal)
+    async (threadId, prompt, signal) =>
+      call(
+        ['send', threadId, `${executionInstructions(await executionSettings())} ${prompt}`],
+        signal
+      )
   );
   const acknowledged = (
     observed: z.infer<typeof detail>,

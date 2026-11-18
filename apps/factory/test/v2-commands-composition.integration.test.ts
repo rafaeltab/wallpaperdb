@@ -200,6 +200,32 @@ it('saves execution controls through HTTP, reloads them after restart and launch
         modelSelection: { model: execution.model },
         runtimeMode: 'auto',
       });
+      const changed = {
+        ...command,
+        ...(await action(restarted, 'configure')),
+        commandId: '00000000-0000-4000-8000-000000000075',
+        payload: {
+          ...command.payload,
+          execution: { ...execution, model: 'gpt-6.1-sol', mode: 'standard' },
+        },
+      };
+      expect(
+        (await restarted.app.inject({ method: 'POST', url: '/api/v2/commands', payload: changed }))
+          .statusCode
+      ).toBe(202);
+      await receipt(restarted, changed.commandId);
+      const reopened = await reopen();
+      await vi.waitFor(
+        async () => {
+          const current = (await reopened.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+          expect(current.meta.factory.execution?.model).toBe('gpt-6.1-sol');
+          expect(current.entities.jobs['job:rafaeltab/wallpaperdb/577']).toMatchObject({
+            executionSettings: execution,
+            execution: { state: 'known', value: { state: 'running' } },
+          });
+        },
+        { timeout: 10000, interval: 40 }
+      );
     },
     {},
     { paused: true }

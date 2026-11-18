@@ -61,6 +61,25 @@ it.each(['standard', 'fast'] as const)(
           permissionLevel: 'auto',
         },
       });
+      await host.save({
+        lost: false,
+        complete: true,
+        base: host.base,
+        overrides: { status: 'completed' },
+      });
+      await Effect.runPromise(
+        adapter.sendStage(intent, {
+          stage: 'babysitting',
+          index: 1,
+          ordinal: 2,
+          threadId: 'thread-live',
+          commit: host.base,
+          previousRunId: 'run-1',
+        })
+      );
+      const delivery = (await host.calls()).find((call) => call.args[1] === 't3_thread_send');
+      if (!delivery) throw new Error('Missing babysitting delivery');
+      expect(JSON.parse(delivery.args[2]).message).toContain('Codex model gpt-6.2-sol');
     } finally {
       if (previous === undefined) delete process.env.FACTORY_FIXTURE;
       else process.env.FACTORY_FIXTURE = previous;

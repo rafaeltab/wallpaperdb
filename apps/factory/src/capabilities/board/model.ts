@@ -234,6 +234,7 @@ export interface Thread extends Entity<ThreadId> {
     | { readonly state: 'absent' | 'ambiguous' | 'unknown'; readonly reasons: readonly Reason[] };
 }
 export interface Job extends Entity<JobId> {
+  readonly observedModel?: string;
   readonly executionSettings?: import('../job/index.js').ExecutionSettings;
   readonly observedExecution?: import('../job/index.js').ObservedExecution;
   readonly lastAcceptedDelivery?: {

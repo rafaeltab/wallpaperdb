@@ -86,6 +86,7 @@ body {
 }
 .fc-dialog button,
 .fc-dialog input,
+.fc-dialog select,
 .fc-dialog textarea {
   font: inherit;
   color: inherit;
@@ -282,6 +283,7 @@ body {
   align-items: center;
 }
 .fc-dialog input:not([type="checkbox"]),
+.fc-dialog select,
 .fc-dialog textarea {
   border: 1px solid #444452;
   background: #0e0e14;

@@ -148,6 +148,7 @@ export function fakeState(epoch: string, now: () => number, historyLimit: number
           ...meta.factory,
           version,
           paused: command.payload.paused,
+          execution: command.payload.execution ?? meta.factory.execution,
           concurrency: { ...meta.factory.concurrency, limit: command.payload.concurrency },
           admission: { ...meta.factory.admission, limit: command.payload.admissionAllowance },
         },

@@ -8,6 +8,14 @@ Retain the active release's pinned Node installation, private configuration and 
 
 Completion verification requires the structured T3 MCP connection configured in the [composition root](src/composition/implementation.ts). CLI transcript output alone cannot establish descendant inactivity or registered waits. Missing connection or activity evidence leaves completion unverified.
 
+## Background T3 observation
+
+The [composition configuration](src/composition/implementation.ts) derives the WebSocket origin from `FACTORY_T3_MCP_ENDPOINT`. Set `FACTORY_T3_OBSERVER_ORIGIN` when it differs. `FACTORY_T3_AUTH_BASE_DIR` selects the configured CLI's authentication directory when its default is unsuitable. Keep the MCP-only credential separate from the normal read-only bearer session used by WebSocket observation.
+
+The [credential adapter](src/adapters/t3/observer-credential.ts) issues a dedicated `orchestration:read` session through the supported T3 CLI. It stores the session privately at `observer/session` below `FACTORY_STATE`, reuses it after restart, replaces it before expiration or after authentication rejection, and reconnects subscriptions on replacement. The directory is mode 0700 and the session is mode 0600. Preserve these permissions and include the private session in stopped-state backups. Do not publish it in logs or issue evidence. Provisioning failures retain observations and claims and retry in the background.
+
+The [observer](src/adapters/t3/observations.ts) maintains shared thread metadata and detailed managed-thread activity. The installed runtime must support authenticated protocol-v2 shell/thread subscriptions, cursor replay, synchronization markers, archived shell snapshots and thread-family metadata. Initial synchronization and recovery may read full managed snapshots. Routine decisions use retained local facts; disconnects do not release occupied capacity, and unavailable completion evidence remains unverified. The separate [inventory worker](src/composition/refresh.ts) refreshes lightweight link metadata immediately and every 15 minutes, independently of planning.
+
 ## Execution settings
 
 Use the Project canvas Settings panel to save the factory-wide model, reasoning effort, Standard/Fast mode and permission level without restarting. Choices come from the configured T3/Codex installation; Fast requests Codex priority service independently of effort. Permission choices respect the MCP client's ceiling and provider restrictions. Supervised permission modes can leave unattended work waiting for a human. Inherited/default values preserve T3 defaults, whose effective values may be unknown. See the [Settings controls](frontend/src/canvas/execution-controls.tsx) and [T3 translation](src/adapters/t3/execution-settings.ts).
@@ -27,6 +35,8 @@ Configure the per-job Agent reconciliation attempt limit with `FACTORY_AGENT_REC
 After the factory performs external work newer than a backup, restoring that backup can discard claims for work that still exists. Preserve the current state and use a compatible release. Restore an older backup only after the supervising operator reconciles every subsequent external effect. After JSON-to-SQLite migration, legacy JSON files are historical originals, not a current backup. Do not delete records or fields to make an older release accept newer state.
 
 The installed service's lock does not protect against direct development launches. Keep those launches away from the service's state directory.
+
+An authorized live branch trial against retained execution state must stop the main writer completely and acquire its exact service lock. Preserve the pinned installation, unit and private configuration, back up the entire stopped state, and first verify the exact returning release against isolated copies using migration-only and read validation. Do not run a full factory on a copied production journal. At handback, stop the branch writer and resume the unchanged pinned service against the newest authoritative state. Verify retained claims and launches; never restore a pre-trial backup over external work created during the trial.
 
 ## Stage reconciliation
 

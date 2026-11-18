@@ -57,6 +57,10 @@ _Avoid_: Agent turn, PR
 **Stage**:
 A bounded responsibility within a job's delivery, such as implementation, independent review, publication, babysitting or CI observation. Finishing an agent turn is not necessarily completing its stage.
 
+**Managed thread**:
+A thread owned by a retained job or recovery operation, or a descendant of that owning thread. Management continues until verified landing and completion of outstanding factory responsibilities, including when the thread is archived or has no PR.
+_Avoid_: Linked thread
+
 **Factory activity**:
 Current coordination work performed by the Software Factory, such as gathering planning information or requesting a plan proposal. It is distinct from a job's delivery stage.
 _Avoid_: Job stage

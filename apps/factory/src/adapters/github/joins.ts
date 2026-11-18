@@ -60,6 +60,7 @@ export interface JoinConfiguration {
   readonly projectId: string;
   readonly mcpEndpoint?: string;
   readonly mcpAuthorizationFile?: string;
+  readonly observations?: import('../t3/index.js').T3Observations;
 }
 type Gh = (args: string[], signal?: AbortSignal) => Promise<unknown>;
 

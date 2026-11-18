@@ -15,6 +15,7 @@ import {
 import { defaultAgentReconciliationLimit, Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion, mcpCall } from './questions.js';
 import { inactiveLineage } from './inactivity.js';
+import { ObservationUnknown, type T3Observations } from './observations.js';
 import { receiptSchema, responseShape, latestRecoveryResponse, responseValue } from './response.js';
 import { command } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -58,6 +59,7 @@ export function t3Restacker(
     projectId: string;
     mcpEndpoint?: string;
     mcpAuthorizationFile?: string;
+    observations?: T3Observations;
   },
   operation: RestackOperation,
   journal: RecoveryJournal
@@ -69,9 +71,19 @@ export function t3Restacker(
       : undefined;
   };
   const title = `Factory restack ${operation.id}`;
+  config.observations?.retainIdentity(title);
   const branch = `factory-restack/${operation.id}`;
-  const call = async (args: string[], signal?: AbortSignal) =>
-    JSON.parse(await command(config.binary, ['thread', ...args, '--json'], config.project, signal));
+  const call = async (args: string[], signal?: AbortSignal) => {
+    if (config.observations && args[0] === 'list')
+      return config.observations.list(config.projectId);
+    if (config.observations && args[0] === 'show' && args[1]) {
+      config.observations.retain(args[1]);
+      return config.observations.show(args[1], Number(args[3] ?? 1000));
+    }
+    return JSON.parse(
+      await command(config.binary, ['thread', ...args, '--json'], config.project, signal)
+    );
+  };
   const discover = async (signal?: AbortSignal) =>
     z
       .array(z.object({ threadId: z.string(), title: z.string() }))
@@ -80,9 +92,14 @@ export function t3Restacker(
   const observe = async (signal?: AbortSignal) => {
     const matches = await discover(signal);
     if (matches.length !== 1 || !matches[0]) return null;
-    const observed = detail.parse(
-      await call(['show', matches[0].threadId, '--messages', '1000'], signal)
-    );
+    let value: unknown;
+    try {
+      value = await call(['show', matches[0].threadId, '--messages', '1000'], signal);
+    } catch (cause) {
+      if (cause instanceof ObservationUnknown) return null;
+      throw cause;
+    }
+    const observed = detail.parse(value);
     const binding = z
       .object({
         threadId: z.literal(matches[0].threadId),
@@ -157,21 +174,29 @@ export function t3Restacker(
     return true;
   };
   const idle = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
-    if (!config.mcpEndpoint || !config.mcpAuthorizationFile) return false;
-    const state = await inactiveLineage(
-      async (tool, args, childSignal) => {
-        const value = await mcpCall(config, tool, args, childSignal);
-        if (tool === 't3_thread_read') {
-          const current = cancellationState.safeParse(value);
-          if (current.success && current.data.thread.threadId === observed.thread.threadId)
-            await cancelled(current.data, childSignal);
-        }
-        return value;
-      },
-      observed.thread.threadId,
-      observed.thread.latestRunId,
-      signal
-    );
+    if (!config.observations && (!config.mcpEndpoint || !config.mcpAuthorizationFile)) return false;
+    if (config.observations) {
+      const current = cancellationState.safeParse(
+        config.observations.activity(observed.thread.threadId)
+      );
+      if (current.success) await cancelled(current.data, signal);
+    }
+    const state = config.observations
+      ? config.observations.inactive(observed.thread.threadId, observed.thread.latestRunId)
+      : await inactiveLineage(
+          async (tool, args, childSignal) => {
+            const value = await mcpCall(config, tool, args, childSignal);
+            if (tool === 't3_thread_read') {
+              const current = cancellationState.safeParse(value);
+              if (current.success && current.data.thread.threadId === observed.thread.threadId)
+                await cancelled(current.data, childSignal);
+            }
+            return value;
+          },
+          observed.thread.threadId,
+          observed.thread.latestRunId,
+          signal
+        );
     return (
       state === 'idle' &&
       !(await journal.read('cancelled.json')) &&
@@ -314,6 +339,7 @@ export function t3Restacker(
   const ensureLaunch = async (signal?: AbortSignal) => {
     signal?.throwIfAborted();
     if (await journal.read('cancelled.json')) return null;
+    if (config.observations && !config.observations.inventoryReady()) return null;
     let observed = await observe(signal);
     if (!observed) {
       if ((await discover(signal)).length) return null;
@@ -342,7 +368,7 @@ export function t3Restacker(
   const question = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
     if (!observed.thread.pendingRequestCount) return undefined;
     const fallback = 'Open recovery thread to answer the pending question';
-    if (!config.mcpEndpoint) return fallback;
+    if (!config.observations && !config.mcpEndpoint) return fallback;
     return (
       (await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal))
         .question?.text ?? fallback

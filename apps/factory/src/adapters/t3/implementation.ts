@@ -282,7 +282,7 @@ async function questionObservation(
   signal?: AbortSignal,
   jobId?: string
 ) {
-  if (config.mcpEndpoint && config.mcpAuthorizationFile)
+  if (config.observations || (config.mcpEndpoint && config.mcpAuthorizationFile))
     return {
       ...(await pendingQuestion(config, thread.threadId, thread.latestRunId, signal, jobId)),
       run: currentRun(thread),

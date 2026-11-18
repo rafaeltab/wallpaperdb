@@ -61,12 +61,8 @@
           "name": "upload_outbox_wallpaper_id_wallpapers_id_fk",
           "tableFrom": "upload_outbox",
           "tableTo": "wallpapers",
-          "columnsFrom": [
-            "wallpaper_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["wallpaper_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -317,22 +313,12 @@
     "public.file_type": {
       "name": "file_type",
       "schema": "public",
-      "values": [
-        "image",
-        "video"
-      ]
+      "values": ["image", "video"]
     },
     "public.upload_state": {
       "name": "upload_state",
       "schema": "public",
-      "values": [
-        "initiated",
-        "uploading",
-        "stored",
-        "processing",
-        "completed",
-        "failed"
-      ]
+      "values": ["initiated", "uploading", "stored", "processing", "completed", "failed"]
     }
   },
   "schemas": {},

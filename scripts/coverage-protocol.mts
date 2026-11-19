@@ -1,12 +1,18 @@
+import { resolve } from "node:path";
+import { repositoryRoot } from "@wallpaperdb/coverage-runtime";
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import convert from "ast-v8-to-istanbul";
 
 const require = createRequire(import.meta.url);
 const { parse } = createRequire(require.resolve("vitest"))("acorn");
-export async function verifyProtocolCoverage(directory, generated, original) {
+export async function verifyProtocolCoverage(
+	directory: string,
+	generated: string,
+	original: string,
+) {
 	const code = await readFile(generated, "utf8");
 	const mapName = [...code.matchAll(/sourceMappingURL=([^\s]+)/g)].at(-1)?.[1];
 	assert.ok(mapName, "compiled production source must provide its map");
@@ -20,7 +26,7 @@ export async function verifyProtocolCoverage(directory, generated, original) {
 	const recordings = [];
 	for (const name of await readdir(directory))
 		if (name.endsWith(".json")) {
-			const raw = JSON.parse(await readFile(directory + "/" + name, "utf8"));
+			const raw = JSON.parse(await readFile(`${directory}/${name}`, "utf8"));
 			for (const script of raw.result)
 				if (script.url === pathToFileURL(generated).href)
 					recordings.push(script);
@@ -38,7 +44,7 @@ export async function verifyProtocolCoverage(directory, generated, original) {
 	});
 	assert.deepEqual(Object.keys(result), [original]);
 	const coverage = result[original];
-	const count = (name) =>
+	const count = (name: string) =>
 		Object.entries(coverage.fnMap)
 			.filter(([, f]) => f.name === name)
 			.map(([id]) => coverage.f[id]);
@@ -58,18 +64,17 @@ export async function verifyProtocolCoverage(directory, generated, original) {
 		...Object.values(coverage.b).flat(),
 	])
 		assert.ok(Number.isSafeInteger(value) && value >= 0);
-	const root =
-		(process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT ||
-			fileURLToPath(
-				new URL("../../.coverage-runtime/evidence", import.meta.url),
-			)) + "/protocol-child";
+	const root = `${
+		process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT ||
+		resolve(repositoryRoot(), ".coverage-runtime/evidence")
+	}/protocol-child`;
 	await mkdir(root, { recursive: true });
-	const evidence = await mkdtemp(root + "/attempt-");
+	const evidence = await mkdtemp(`${root}/attempt-`);
 	await Promise.all([
-		writeFile(evidence + "/generated.js", code),
-		writeFile(evidence + "/generated.js.map", mapBytes),
-		writeFile(evidence + "/raw.json", JSON.stringify(recordings)),
-		writeFile(evidence + "/converted.json", JSON.stringify(result)),
+		writeFile(`${evidence}/generated.js`, code),
+		writeFile(`${evidence}/generated.js.map`, mapBytes),
+		writeFile(`${evidence}/raw.json`, JSON.stringify(recordings)),
+		writeFile(`${evidence}/converted.json`, JSON.stringify(result)),
 	]);
 	console.log(
 		"Actual production child: raw JS identity, exact original TS map, readRecord200/publisher0",

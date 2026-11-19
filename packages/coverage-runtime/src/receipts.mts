@@ -1,5 +1,5 @@
+import { receiptSchema, reportSchema } from "./json.mjs";
 import type {
-	Report,
 	SourceIdentities,
 	TierIdentity,
 	AuditEntry,
@@ -21,11 +21,11 @@ export const hash = (bytes: string | Uint8Array) =>
 	createHash("sha256").update(bytes).digest("hex");
 const portable = <T,>(value: T, root: string): T =>
 	JSON.parse(
-		JSON.stringify(value).replaceAll(root.replace(/\/$/, "") + "/", "$ROOT/"),
+		JSON.stringify(value).replaceAll(`${root.replace(/\/$/, "")}/`, "$ROOT/"),
 	);
 const restored = <T,>(value: T, root: string): T =>
 	JSON.parse(
-		JSON.stringify(value).replaceAll("$ROOT/", root.replace(/\/$/, "") + "/"),
+		JSON.stringify(value).replaceAll("$ROOT/", `${root.replace(/\/$/, "")}/`),
 	);
 export const revision = (root: string) =>
 	execFileSync("git", ["-C", root, "rev-parse", "HEAD"], {
@@ -35,8 +35,8 @@ export async function writeReceipt(
 	directory: string,
 	root: string,
 	row: TierIdentity,
-	raw: Report | null,
-	data: Report | null,
+	raw: unknown,
+	data: unknown,
 	sourceHashes: SourceIdentities,
 	audit: AuditEntry[],
 	generated: GeneratedSources = {},
@@ -57,8 +57,8 @@ export async function writeReceipt(
 				sha,
 			]),
 		),
-		raw: portable(raw, root),
-		data: portable(data, root),
+		raw: raw === null ? null : portable(reportSchema.parse(raw), root),
+		data: data === null ? null : portable(reportSchema.parse(data), root),
 		audit: portable(audit, root),
 		generated: Object.fromEntries(
 			Object.entries(generated).map(([path, { source, ...entry }]) => [
@@ -73,7 +73,7 @@ export async function writeReceipt(
 	receipt.reportHash = hash(JSON.stringify(receipt.data));
 	receipt.rawHash = hash(JSON.stringify(receipt.raw));
 	await writeFile(
-		resolve(directory, row.id + ".json"),
+		resolve(directory, `${row.id}.json`),
 		JSON.stringify(receipt),
 	);
 }
@@ -94,15 +94,15 @@ export async function mergeReceipts(
 		workspaces = new Set();
 	assert.deepEqual(
 		names.filter((n) => n.endsWith(".json")).sort(),
-		expected.map((r) => r.id + ".json").sort(),
+		expected.map((r) => `${r.id}.json`).sort(),
 		"Incomplete or unexpected coverage receipts",
 	);
 	const identity = checkoutIdentity(root);
 	const inputs: ReportInput[] = [],
 		receipts: Receipt[] = [];
 	for (const row of expected) {
-		const receipt: Receipt = JSON.parse(
-			await readFile(resolve(directory, row.id + ".json"), "utf8"),
+		const receipt = receiptSchema.parse(
+			JSON.parse(await readFile(resolve(directory, `${row.id}.json`), "utf8")),
 		);
 		assert.equal(
 			receipt.identity,

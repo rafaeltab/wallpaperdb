@@ -1,16 +1,18 @@
+import { inventorySchema } from "./json.mjs";
+import { repositoryRoot } from "./repository-root.mjs";
 import { mkdtempSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { beginAttempt } from "./artifacts.mjs";
 
-const root = fileURLToPath(new URL("../../", import.meta.url));
+const root = repositoryRoot();
 const evidenceRoot =
 	process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT ||
-	new URL("../../.coverage-runtime/evidence", import.meta.url).pathname;
-const { tiers } = JSON.parse(
-	await readFile(evidenceRoot + "/matrix.json", "utf8"),
+	resolve(repositoryRoot(), ".coverage-runtime/evidence");
+const { tiers } = inventorySchema.parse(
+	JSON.parse(await readFile(`${evidenceRoot}/matrix.json`, "utf8")),
 );
 const id = process.argv[2],
 	mode = "candidate",
@@ -60,8 +62,8 @@ if (mode === "candidate") {
 	process.env.WALLPAPERDB_COVERAGE_NATIVE_SOURCES = mkdtempSync(
 		resolve(root, ".coverage-runtime/native-sources-"),
 	);
-	process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --import=${JSON.stringify(resolve(root, "scripts/coverage-runtime", hook))}`;
-	await import(new URL(hook, import.meta.url));
+	process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --import=${JSON.stringify(fileURLToPath(new URL(hook, import.meta.url)))}`;
+	await import(new URL(hook, import.meta.url).href);
 }
 const require = createRequire(resolve(source, "package.json"));
 const cli = resolve(
@@ -80,7 +82,7 @@ process.argv = [
 	cli,
 	"run",
 	"--config",
-	resolve(root, "scripts/coverage-runtime/vitest.config.mjs"),
+	fileURLToPath(new URL("./vitest.config.mjs", import.meta.url)),
 	...(focus ? [focus] : []),
 	...row.args.map((arg) =>
 		arg.startsWith("--coverage.reportsDirectory=")

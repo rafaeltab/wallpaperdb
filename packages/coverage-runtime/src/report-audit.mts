@@ -1,9 +1,5 @@
-import type {
-	AuditEntry,
-	ReportInput,
-	AuditPolicy,
-	Estimate,
-} from "./contract.mjs";
+import { reportSchema } from "./json.mjs";
+import type { AuditEntry, AuditPolicy, Estimate } from "./contract.mjs";
 import type {
 	FileCoverageData,
 	Range,
@@ -88,11 +84,14 @@ function estimateArm(
 	};
 }
 export function auditReports(
-	inputs: ReportInput[],
+	inputs: { id: string; data: unknown }[],
 	root: string,
 	estimates: AuditPolicy = {},
 ) {
-	const reports = inputs.map((input) => structuredClone(input)),
+	const reports = inputs.map((input) => ({
+			id: input.id,
+			data: reportSchema.parse(structuredClone(input.data)),
+		})),
 		audit: AuditEntry[] = [],
 		seen = new Set();
 	for (const { id, data } of reports)

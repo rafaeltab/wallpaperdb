@@ -107,7 +107,7 @@ async function produceCoverage(workspaces: Workspace[]) {
     }
   } catch {}
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(root, 'scripts/coverage-runtime/command.mjs'), '--packages', participants.map(w => w.directory.split('/').at(-1)).join(',')], {
+    const child = spawn(process.execPath, [path.join(root, 'packages/coverage-runtime/dist/command.mjs'), '--packages', participants.map(w => w.directory.split('/').at(-1)).join(',')], {
       cwd: root, stdio,
     });
     child.on('error', reject);

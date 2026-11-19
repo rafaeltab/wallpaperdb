@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector";
-export const sourceKey = (url) =>
+export const sourceKey = (url: string) =>
 	createHash("sha256").update(url).digest("hex");
 if (process.env.WALLPAPERDB_COVERAGE_NATIVE_SOURCES) {
 	const directory = process.env.WALLPAPERDB_COVERAGE_NATIVE_SOURCES;
@@ -14,7 +14,7 @@ if (process.env.WALLPAPERDB_COVERAGE_NATIVE_SOURCES) {
 		if (
 			!params.url.startsWith("file:") ||
 			!["manual", "automock", "autospy"].includes(
-				new URL(params.url).searchParams.get("mock"),
+				new URL(params.url).searchParams.get("mock") || "",
 			)
 		)
 			return;
@@ -29,7 +29,7 @@ if (process.env.WALLPAPERDB_COVERAGE_NATIVE_SOURCES) {
 					code: result.scriptSource,
 				});
 				if (existsSync(path) && readFileSync(path, "utf8") !== record)
-					throw new Error("Conflicting generated sources: " + params.url);
+					throw new Error(`Conflicting generated sources: ${params.url}`);
 				writeFileSync(path, record);
 				writeFileSync(
 					`${directory}/${sourceKey(params.url)}.js`,

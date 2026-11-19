@@ -1,13 +1,18 @@
-import { createRequire } from "node:module";
+import remapping from "@jridgewell/remapping";
+import {
+	TraceMap,
+	decodedMappings,
+	type SourceMapSegment,
+	type EncodedSourceMap,
+} from "@jridgewell/trace-mapping";
 
-const require = createRequire(import.meta.url),
-	vitest = createRequire(require.resolve("vitest"));
-const mapTools = createRequire(vitest.resolve("vite/package.json"));
-const remapping = mapTools("@jridgewell/remapping");
-const { TraceMap, decodedMappings } = createRequire(
-	mapTools.resolve("@jridgewell/remapping"),
-)("@jridgewell/trace-mapping");
-export function mockSourceMap(outer, inner, original, generated, synthetic) {
+export function mockSourceMap(
+	outer: EncodedSourceMap,
+	inner: EncodedSourceMap,
+	original: string,
+	generated: string,
+	synthetic: string,
+) {
 	if (outer.sources.length !== 1)
 		throw new Error(
 			"NATIVE_MOCK_SOURCE_MISMATCH: unexpected generated source graph",
@@ -15,7 +20,7 @@ export function mockSourceMap(outer, inner, original, generated, synthetic) {
 	const lines = generated.split("\n"),
 		before = original.split("\n");
 	const mappings = decodedMappings(new TraceMap(outer)).map((row) =>
-		row.map((segment) => [...segment]),
+		row.map((segment): SourceMapSegment => [...segment]),
 	);
 	for (let line = 0; line < lines.length; line++) {
 		mappings[line] ??= [];
@@ -24,7 +29,8 @@ export function mockSourceMap(outer, inner, original, generated, synthetic) {
 		// MagicString omits exclusive line-end mappings. Extend only an exactly
 		// equal, verified suffix; never infer across a changed or unmapped region.
 		if (
-			last?.length >= 4 &&
+			last &&
+			last.length !== 1 &&
 			last[1] === 0 &&
 			lines[line].slice(last[0]) === before[last[2]]?.slice(last[3])
 		)
@@ -35,7 +41,7 @@ export function mockSourceMap(outer, inner, original, generated, synthetic) {
 				row.push([column, 1, line, column]);
 	}
 	const source = outer.sources[0];
-	return remapping(
+	const result = remapping(
 		{
 			...outer,
 			mappings,
@@ -44,4 +50,7 @@ export function mockSourceMap(outer, inner, original, generated, synthetic) {
 		},
 		(id) => (id === source ? inner : null),
 	);
+	if (typeof result.mappings !== "string")
+		throw new Error("Expected encoded mock source map");
+	return { ...result, version: 3 as const, mappings: result.mappings };
 }

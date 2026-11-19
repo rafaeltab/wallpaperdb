@@ -1,4 +1,4 @@
-import type { AuditPolicy } from "../packages/coverage-runtime/src/contract.mjs";
+import type { AuditPolicy } from "@wallpaperdb/coverage-runtime";
 export const estimates: AuditPolicy = {
 	"apps/factory/src/adapters/github/joins.ts:1134:4": {
 		sourceSHA256:
@@ -16,3 +16,13 @@ export const estimates: AuditPolicy = {
 		finalReturn: [299, 4, 299, 18],
 	},
 };
+
+export const sourceViteWorkspaces = [
+	".",
+	"scripts",
+	"infra",
+	"apps/web",
+	"packages/react-muuri",
+	"packages/crap-typescript-core",
+	"packages/biome-test-rules",
+];

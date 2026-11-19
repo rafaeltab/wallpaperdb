@@ -31,9 +31,11 @@ test "$stage" != "$CI_TEST_FAILURE"
 `,
 			{ mode: 0o700 },
 		);
-		mkdirSync(join(directory, "scripts/coverage-runtime"), { recursive: true });
+		mkdirSync(join(directory, "packages/coverage-runtime/dist"), {
+			recursive: true,
+		});
 		writeFileSync(
-			join(directory, "scripts/coverage-runtime/command.mjs"),
+			join(directory, "packages/coverage-runtime/dist/command.mjs"),
 			`
 import {appendFileSync} from 'node:fs';
 appendFileSync(process.env.CI_TEST_LOG, 'coverage\\n');

@@ -9,7 +9,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { hash, writeReceipt } from "./coverage-runtime/receipts.mjs";
+import {
+	hash,
+	writeReceipt,
+} from "../packages/coverage-runtime/dist/receipts.mjs";
 
 test("local verified coverage includes unit and integration and flat producers but excludes stale E2E reports", async () => {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-coverage-"));

@@ -53,6 +53,13 @@ function isolatedRepository() {
 		"scripts/toolchain.ts",
 		"scripts/crap.mts",
 		"scripts/lib/coverage-validation.ts",
+		"scripts/coverage-build.mts",
+		"scripts/coverage-policy.mts",
+		"scripts/coverage-protocol.mts",
+		"scripts/coverage-sync-built.mts",
+		"scripts/tsconfig.coverage.json",
+		"packages/coverage-runtime/tsconfig.json",
+		"packages/coverage-runtime/tsconfig.test.json",
 		"scripts/operator-inbox.ts",
 		"infra/docker-compose.yml",
 		"mutation.inventory.json",
@@ -66,8 +73,8 @@ function isolatedRepository() {
 	// The real CRAP CLI obtains fresh reports through the maintained producer.
 	// Keep its modules local so the fixture cannot read another checkout's inputs.
 	cpSync(
-		join(repository, "scripts/coverage-runtime"),
-		join(directory, "scripts/coverage-runtime"),
+		join(repository, "packages/coverage-runtime/src"),
+		join(directory, "packages/coverage-runtime/src"),
 		{ recursive: true },
 	);
 	symlinkSync(
@@ -247,8 +254,12 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		};
 		const runCollector = (mode: string) =>
 			spawnSync(
-				join(repository, "scripts/node_modules/.bin/tsx"),
-				[join(directory, "scripts/crap.mts"), mode],
+				"make",
+				[
+					mode === "report" ? "crap" : "check-crap",
+					"PACKAGE=biome-test-rules",
+					"CRAP_THRESHOLD=0",
+				],
 				{
 					cwd: directory,
 					encoding: "utf8",
@@ -486,8 +497,15 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 		"crap.config.mts",
 		"scripts/crap.mts",
 		"scripts/lib/coverage-validation.ts",
-		"scripts/coverage-runtime/command.mjs",
-		"scripts/coverage-runtime/report-audit.mjs",
+		"scripts/coverage-build.mts",
+		"scripts/coverage-policy.mts",
+		"scripts/coverage-protocol.mts",
+		"scripts/coverage-sync-built.mts",
+		"scripts/tsconfig.coverage.json",
+		"packages/coverage-runtime/tsconfig.json",
+		"packages/coverage-runtime/tsconfig.test.json",
+		"packages/coverage-runtime/src/command.mts",
+		"packages/coverage-runtime/src/report-audit.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
 		"scripts/lib/mutation-catalog.ts",

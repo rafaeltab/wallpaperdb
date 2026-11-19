@@ -14,6 +14,9 @@ patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0':
     hash: 39ecdbebeb734113082eb3b58b0b82bc047fe79cb47f3b0405ea899876fd345d
     path: patches/stryker-vitest-10.0.0.patch
+  '@vitest/coverage-v8@5.0.2':
+    hash: 4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b
+    path: patches/vitest-coverage-v8-5.0.2.patch
   nats@2.29.3:
     hash: 6cd944b2572f0b3f276cace32d697ab22d9f274f32bd1dd20b6794ed3b9d3cc3
     path: patches/nats-2.29.3.patch
@@ -30,7 +33,7 @@ importers:
         version: 26.0.1
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
@@ -535,7 +538,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
@@ -704,7 +707,7 @@ importers:
         version: 8.16.0
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
@@ -1523,7 +1526,7 @@ importers:
         version: 26.0.1
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@wallpaperdb/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -1633,7 +1636,7 @@ importers:
         version: 26.0.1
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@wallpaperdb/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -16627,7 +16630,7 @@ snapshots:
       - vite
     optional: true
 
-  '@vitest/coverage-v8@5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)':
+  '@vitest/coverage-v8@5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)':
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/istanbul-lib-coverage': 1.0.1
@@ -20884,7 +20887,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/node': 22.19.3
       '@vitest/browser-playwright': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(playwright@1.59.1)(utf-8-validate@6.0.6)(vite@6.4.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)
-      '@vitest/coverage-v8': 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@vitest/coverage-v8': 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui': 5.0.2(vitest@5.0.2)
       jsdom: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
@@ -20910,7 +20913,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/node': 22.19.3
       '@vitest/browser-playwright': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(playwright@1.59.1)(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))(vitest@5.0.2)
-      '@vitest/coverage-v8': 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@vitest/coverage-v8': 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui': 5.0.2(vitest@5.0.2)
       jsdom: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
@@ -20936,7 +20939,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/node': 22.19.3
       '@vitest/browser-playwright': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(playwright@1.59.1)(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)
-      '@vitest/coverage-v8': 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@vitest/coverage-v8': 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui': 5.0.2(vitest@5.0.2)
       jsdom: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
@@ -20962,7 +20965,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/node': 24.10.4
       '@vitest/browser-playwright': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@24.10.4)(typescript@5.9.3))(playwright@1.59.1)(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)
-      '@vitest/coverage-v8': 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@vitest/coverage-v8': 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui': 5.0.2(vitest@5.0.2)
       jsdom: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
@@ -20988,7 +20991,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/node': 26.0.1
       '@vitest/browser-playwright': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(playwright@1.59.1)(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)
-      '@vitest/coverage-v8': 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@vitest/coverage-v8': 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@vitest/ui': 5.0.2(vitest@5.0.2)
       jsdom: 25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:

@@ -1,0 +1,24 @@
+diff --git a/dist/provider.js b/dist/provider.js
+index f852cadb9b4aa4c058ae53485d6606858b5c1457..168438ab5e35a0c834d2cd7129532e9063b0ba7b 100644
+--- a/dist/provider.js
++++ b/dist/provider.js
+@@ -51,7 +51,9 @@ class V8CoverageProvider extends BaseCoverageProvider {
+ 		await this.readCoverageFiles({
+ 			onFileRead(coverage) {
+ 				for (const script of coverage.result) {
+-					const previous = mergedScripts.get(script.url);
++					// Subprocess and Vitest transforms have different offsets until remapping.
++					const key = `${Boolean(script.isExtendedContext)}:${script.url}`;
++					const previous = mergedScripts.get(key);
+ 					const merged = mergeScriptCovs(previous ? [previous, script] : [script]);
+ 					const startOffset = previous?.startOffset || script.startOffset || 0;
+ 					const isExtendedContext = previous?.isExtendedContext || script.isExtendedContext;
+@@ -59,7 +61,7 @@ class V8CoverageProvider extends BaseCoverageProvider {
+ 					if (autoAttachSubprocess && isExtendedContext) {
+ 						merged.isExtendedContext = true;
+ 					}
+-					mergedScripts.set(merged.url, merged);
++					mergedScripts.set(key, merged);
+ 				}
+ 			},
+ 			onFinished: async (project, environment) => {

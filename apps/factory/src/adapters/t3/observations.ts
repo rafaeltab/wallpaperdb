@@ -150,6 +150,21 @@ export async function t3Observations(config: {
         )
       ),
     ]);
+  const restoreCheckpoint = async (stream: string, signal: AbortSignal) => {
+    while (!signal.aborted) {
+      try {
+        return await run(config.checkpoints.read(`${namespace}${stream}`));
+      } catch (error) {
+        if (!signal.aborted) config.report(error);
+      }
+      try {
+        await delay(1000, undefined, { signal });
+      } catch {
+        break;
+      }
+    }
+    return null;
+  };
   const freshness = t3FamilyFreshness({
     signal: stop.signal,
     report: config.report,
@@ -181,7 +196,7 @@ export async function t3Observations(config: {
     const cancellation = new AbortController();
     const signal = AbortSignal.any([stop.signal, cancellation.signal]);
     const work = (async () => {
-      const previous = await run(config.checkpoints.read(`${namespace}thread:${id}`));
+      const previous = await restoreCheckpoint(`thread:${id}`, signal);
       let revision = previous?.revision ?? 0;
       let forceSnapshot = false;
       if (previous)
@@ -504,7 +519,7 @@ export async function t3Observations(config: {
   // The installed runtime exposes archived bootstrap metadata as a single-response
   // RPC. Incremental archived changes arrive on the shared shell as removals.
   const archived = (async () => {
-    const previous = await run(config.checkpoints.read(`${namespace}archive`));
+    const previous = await restoreCheckpoint('archive', stop.signal);
     let revision = previous?.revision ?? 0;
     let sequence = previous?.sequence ?? 0;
     const rows = new Map<string, Shell>();

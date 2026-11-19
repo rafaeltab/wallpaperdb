@@ -8,6 +8,139 @@ import { t3Observations } from '../src/adapters/t3/index.js';
 import { sqliteObservationCheckpoints, fileStore } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 import { websocketProtocol } from './fixtures/websocket.js';
+import { Unavailable } from '../src/capabilities/job/index.js';
+
+it.each(['thread:owner', 'archive'])(
+  'retries failed %s checkpoint initialization without restarting the observer',
+  async (stream) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-checkpoint-retry-'));
+    initializeState(directory);
+    const row = {
+      id: 'owner',
+      projectId: 'project',
+      title: 'Owner',
+      lineage: { parentThreadId: null },
+      status: 'completed',
+      latestRunId: 'run',
+      activeRunId: null,
+      blockedOnThreadWait: false,
+      pendingBackgroundTasks: [],
+      pullRequests: [],
+    };
+    const positions: (number | undefined)[] = [];
+    const host = await websocketProtocol((raw, send) => {
+      const request = z
+        .object({
+          _tag: z.string(),
+          id: z.string().optional(),
+          tag: z.string().optional(),
+          payload: z.object({ afterSequence: z.number().optional() }).optional(),
+        })
+        .parse(raw);
+      if (request._tag !== 'Request') return;
+      const reply = (values: unknown[]) => send({ _tag: 'Chunk', requestId: request.id, values });
+      if (request.tag === 'orchestration.subscribeShell') {
+        reply([
+          {
+            kind: 'snapshot',
+            snapshot: { snapshotSequence: 10, threads: [row], archivedThreads: [], projects: [] },
+          },
+          { kind: 'synchronized' },
+        ]);
+      } else if (request.tag === 'orchestration.getArchivedShellSnapshot') {
+        send({
+          _tag: 'Exit',
+          requestId: request.id,
+          exit: { _tag: 'Success', value: { snapshotSequence: 10, threads: [] } },
+        });
+      } else {
+        positions.push(request.payload?.afterSequence);
+        reply([
+          {
+            kind: 'snapshot',
+            snapshotSequence: 10,
+            projection: {
+              thread: {
+                ...row,
+                modelSelection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+                branch: null,
+                worktreePath: null,
+              },
+              runs: [{ id: 'run', ordinal: 1, status: 'completed' }],
+              attempts: [],
+              runtimeRequests: [],
+              providerThreads: [],
+              messages: [],
+              turnItems: [],
+            },
+          },
+          { kind: 'synchronized' },
+        ]);
+      }
+    });
+    const store = sqliteObservationCheckpoints(directory);
+    const config = {
+      origin: host.origin,
+      checkpoints: store,
+      credential: async () => ({ token: 'controlled-observer', expiresAt: Date.now() + 86400000 }),
+      report: () => undefined,
+    };
+    const first = await t3Observations(config);
+    let recovering: Awaited<ReturnType<typeof t3Observations>> | undefined;
+    let cancelled: Awaited<ReturnType<typeof t3Observations>> | undefined;
+    let released = false;
+    let attempts = 0;
+    const checkpoints = {
+      ...store,
+      read: (key: string) =>
+        Effect.suspend(() => {
+          if (key.endsWith(`:${stream}`) && !released) {
+            attempts++;
+            return Effect.fail(
+              new Unavailable({
+                operation: 'controlled-checkpoint-read',
+                cause: new Error('Controlled transient storage failure'),
+              })
+            );
+          }
+          return store.read(key);
+        }),
+    };
+    try {
+      first.retain('owner');
+      await vi.waitFor(() => expect(first.inactive('owner', 'run')).toBe('idle'));
+      await first.close();
+      recovering = await t3Observations({ ...config, checkpoints });
+      const observer = recovering;
+      observer.retain('owner');
+      await vi.waitFor(() => expect(attempts).toBeGreaterThanOrEqual(2), { timeout: 3500 });
+      expect(observer.inactive('owner', 'run')).toBe('busy');
+      if (stream === 'archive') expect(observer.inventoryReady()).toBe(false);
+      released = true;
+      await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'), {
+        timeout: 3500,
+      });
+      expect(positions.at(-1)).toBe(10);
+      await observer.close();
+
+      released = false;
+      attempts = 0;
+      cancelled = await t3Observations({ ...config, checkpoints });
+      cancelled.retain('owner');
+      await vi.waitFor(() => expect(attempts).toBeGreaterThanOrEqual(1));
+      await cancelled.close();
+      const stoppedAttempts = attempts;
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      expect(attempts).toBe(stoppedAttempts);
+    } finally {
+      await first.close();
+      await recovering?.close();
+      await cancelled?.close();
+      await host.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
 
 it.each(['invalid bytes', 'missing entities'])(
   'recovers metadata with %s without erasing an execution claim or resuming from unusable state',

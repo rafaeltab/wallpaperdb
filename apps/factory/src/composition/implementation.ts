@@ -11,6 +11,7 @@ import {
   Observations,
   ObservationsLive,
   ObservationStore,
+  ObservationCheckpoints,
   ObservationSource,
   LocalSnapshot,
 } from '../capabilities/observe/index.js';
@@ -170,7 +171,15 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const startupCleanup: Array<() => Promise<unknown>> = [];
   try {
     const observability = telemetry(configuration.FACTORY_OTEL_ENDPOINT);
-    const observerRuntime = ManagedRuntime.make(observability);
+    const observerRuntime = ManagedRuntime.make(
+      Layer.mergeAll(
+        observability,
+        Layer.succeed(
+          ObservationCheckpoints,
+          sqliteObservationCheckpoints(configuration.FACTORY_STATE)
+        )
+      )
+    );
     startupCleanup.push(() => observerRuntime.dispose());
     const github = githubRequests({
       project,
@@ -199,7 +208,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     const executionObservations = await t3Observations({
       run: (operation) => observerRuntime.runPromise(operation),
       origin: observerOrigin,
-      checkpoints: sqliteObservationCheckpoints(configuration.FACTORY_STATE),
+      checkpoints: await observerRuntime.runPromise(ObservationCheckpoints),
       credential: t3ObserverCredential({
         binary: configuration.FACTORY_T3_BINARY,
         project,

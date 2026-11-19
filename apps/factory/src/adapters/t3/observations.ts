@@ -14,6 +14,9 @@ import {
   type Shell,
 } from './observed-model.js';
 
+import { t3CompleteSnapshot } from './complete-snapshot.js';
+import { t3FamilyFreshness } from './observation-freshness.js';
+
 interface ThreadState {
   sequence: number;
   revision: number;
@@ -147,6 +150,32 @@ export async function t3Observations(config: {
         )
       ),
     ]);
+  const freshness = t3FamilyFreshness({
+    signal: stop.signal,
+    report: config.report,
+    read: (root) =>
+      run(
+        Effect.tryPromise({
+          try: async () => {
+            const credential = await config.credential(false, stop.signal);
+            try {
+              return await t3ReadRpc({
+                origin: config.origin,
+                token: credential.token,
+                signal: lifetime(credential, stop.signal),
+                method: 'orchestration.getThreadFamily',
+                payload: { threadId: root },
+              });
+            } catch (error) {
+              if (error instanceof Error && /HTTP (401|403)/.test(error.message))
+                await config.credential(true, stop.signal);
+              throw error;
+            }
+          },
+          catch: (cause) => cause,
+        }).pipe(Effect.withSpan('factory.t3.observation.family'))
+      ),
+  });
   const startThread = (id: string) => {
     if (workers.has(id) || stopped) return;
     const cancellation = new AbortController();
@@ -172,11 +201,13 @@ export async function t3Observations(config: {
       await loop(signal, async (credential) => {
         const initial = details.get(id);
         if (initial) initial.ready = false;
+        const streamStop = new AbortController();
+        const streamSignal = AbortSignal.any([signal, streamStop.signal]);
         try {
           await t3Subscription({
             origin: config.origin,
             token: credential.token,
-            signal: lifetime(credential, signal),
+            signal: lifetime(credential, streamSignal),
             requests: [
               {
                 id,
@@ -205,8 +236,48 @@ export async function t3Observations(config: {
                     item.hasMoreHistory === true ||
                     item.turnItemsOmitLocalVisible === true ||
                     item.payloadBudgetExceeded === true
-                  )
-                    throw new ObservationUnknown('Incomplete T3 thread history');
+                  ) {
+                    const recovered = await run(
+                      Effect.tryPromise({
+                        try: () =>
+                          t3CompleteSnapshot({
+                            origin: config.origin,
+                            token: credential.token,
+                            signal: lifetime(credential, streamSignal),
+                            threadId: id,
+                          }),
+                        catch: (cause) => cause,
+                      }).pipe(Effect.withSpan('factory.t3.observation.history'))
+                    );
+                    const boundedSequence = z
+                      .number()
+                      .int()
+                      .nonnegative()
+                      .parse(item.snapshotSequence);
+                    if (
+                      recovered.snapshotSequence < Math.max(boundedSequence, current?.sequence ?? 0)
+                    )
+                      throw new ObservationUnknown('Obsolete complete T3 thread snapshot');
+                    signal.throwIfAborted();
+                    await checkpoint(
+                      `thread:${id}`,
+                      revision,
+                      recovered.snapshotSequence,
+                      recovered.projection
+                    );
+                    revision++;
+                    details.set(id, {
+                      revision,
+                      sequence: recovered.snapshotSequence,
+                      value: recovered.projection,
+                      ready: false,
+                    });
+                    forceSnapshot = false;
+                    // Reconnect at the recovered cursor. The bounded stream's marker
+                    // cannot prove that the replacement snapshot has synchronized.
+                    streamStop.abort();
+                    return;
+                  }
                   next = projection.parse(item.projection);
                   if (next.thread.id !== id)
                     throw new ObservationUnknown('Mismatched T3 thread snapshot');
@@ -484,12 +555,14 @@ export async function t3Observations(config: {
     return value;
   };
   const activity = (id: string) => observedActivity(state(id).value, metadata.get(id));
-  const inactive = (id: string, run: string | null): 'busy' | 'waiting' | 'idle' => {
-    if (!metadataReady || !archiveReady || !lineage.has(id)) return 'busy';
+  const candidate = (id: string, run: string | null) => {
+    if (!metadataReady || !archiveReady || !lineage.has(id)) return undefined;
     let waiting = false;
+    let sequence = 0;
+    const rows: Shell[] = [];
     for (const owner of lineage.get(id) ?? []) {
       const value = details.get(owner);
-      if (!value?.ready || metadataSequence < value.sequence) return 'busy';
+      if (!value?.ready) return undefined;
       const snapshot = activity(owner);
       const meta = metadata.get(owner);
       if (
@@ -508,13 +581,44 @@ export async function t3Observations(config: {
         meta.pendingBackgroundTasks.length ||
         snapshot.items.some((item) => ['pending', 'running', 'waiting'].includes(item.status))
       )
-        return 'busy';
+        return undefined;
+      sequence = Math.max(sequence, value.sequence);
+      rows.push(meta);
       waiting ||=
         meta.blockedOnThreadWait ||
         (meta.pullRequests?.some((pr) => pr.watching === true || pr.watch != null) ?? false);
     }
-    return waiting ? 'waiting' : 'idle';
+    return { sequence, rows, waiting };
   };
+  const inactive = (id: string, run: string | null): 'busy' | 'waiting' | 'idle' => {
+    const value = candidate(id, run);
+    if (
+      !value ||
+      (metadataSequence < value.sequence && !freshness.synchronized(id, value.sequence, value.rows))
+    )
+      return 'busy';
+    return value.waiting ? 'waiting' : 'idle';
+  };
+  const confirmations = (async () => {
+    while (!stop.signal.aborted) {
+      for (const id of lineage.keys()) {
+        const current = details.get(id);
+        if (!current) continue;
+        const value = candidate(id, observedThread(current.value).latestRunId);
+        if (
+          value &&
+          metadataSequence < value.sequence &&
+          !freshness.synchronized(id, value.sequence, value.rows)
+        )
+          freshness.refresh(id);
+      }
+      try {
+        await delay(1000, undefined, { signal: stop.signal });
+      } catch {
+        break;
+      }
+    }
+  })().catch(config.report);
   const groupFor = (issue: number) => {
     let group = managed.get(issue);
     if (!group) {
@@ -637,6 +741,8 @@ export async function t3Observations(config: {
       await Promise.allSettled([
         inventory,
         archived,
+        freshness.close(),
+        confirmations,
         ...[...workers.values()].map((worker) => worker.work),
       ]);
     },

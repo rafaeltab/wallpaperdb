@@ -26,6 +26,9 @@ export interface ObservationCheckpoints {
     checkpoint: ObservationCheckpointUpdate
   ) => Effect.Effect<boolean, Unavailable>;
 }
+export const ObservationCheckpoints = Context.Service<ObservationCheckpoints>(
+  'wallpaperdb.factory.ObservationCheckpoints'
+);
 export interface ObservedUser {
   id: string;
   login: string;

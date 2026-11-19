@@ -29,5 +29,5 @@ export type { CollectedObservation } from './contract.js';
 export type {
   ObservationCheckpoint,
   ObservationCheckpointUpdate,
-  ObservationCheckpoints,
 } from './contract.js';
+export { ObservationCheckpoints } from './contract.js';

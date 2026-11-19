@@ -1,11 +1,17 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { WebSocketServer } from 'ws';
 
 /** A controlled endpoint for the installed T3 JSON RPC contract. */
 export async function websocketProtocol(
-  onRequest: (request: unknown, send: (value: unknown) => void, signal: AbortSignal) => void
+  onRequest: (request: unknown, send: (value: unknown) => void, signal: AbortSignal) => void,
+  onHttp?: (request: IncomingMessage, response: ServerResponse) => void
 ) {
-  const server = createServer();
+  const server = createServer(
+    onHttp ??
+      ((_request, response) => {
+        response.writeHead(404).end();
+      })
+  );
   const websocket = new WebSocketServer({ noServer: true, perMessageDeflate: true });
   server.on('upgrade', (request, socket, head) => {
     if (request.headers.authorization !== 'Bearer controlled-observer') {

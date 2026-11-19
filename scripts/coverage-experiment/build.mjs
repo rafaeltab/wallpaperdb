@@ -14,18 +14,13 @@ import {
 import { resolve, relative, dirname, join } from "node:path";
 const root = process.cwd(),
 	out = resolve(".coverage-experiment/build");
+const processEntries = new Set([
+	'apps/color-extractor/src/adapters/image/decoder.ts',
+	'apps/variant-generator/src/adapters/image/encoder.ts',
+]);
+const outputExtension = source => processEntries.has(source) ? '.mjs' : '.js';
 await rm(out, { recursive: true, force: true });
-const workspaces = [
-	".",
-	"apps/user",
-	"apps/asset",
-	"apps/wallpaper",
-	...(await Promise.all(
-		["packages"].map(async (dir) =>
-			(await readdir(dir)).map((n) => `${dir}/${n}`),
-		),
-	).then((x) => x.flat())),
-];
+const workspaces = ['.', 'infra','scripts',...(await Promise.all(['apps','packages','experiments'].map(async parent=>existsSync(parent)?(await readdir(parent)).filter(name=>existsSync(join(parent,name,'package.json'))).map(name=>`${parent}/${name}`):[]))).flat()];
 const owned = new Map();
 for (const w of workspaces) {
 	try {
@@ -86,7 +81,9 @@ async function compile(dir, only) {
 		}
 		if (src.endsWith(".d.ts")) continue;
 		await mkdir(dirname(dest), { recursive: true });
-		if (src.endsWith(".ts")) {
+		if (/\.tsx?$/.test(src)) {
+			const containerFixture = src === 'apps/ingestor/test/instrumentation/telemetry-availability.integration.test.ts';
+			const protocolFixture = src === 'apps/factory/test/protocol-fixture.integration.test.ts';
 			const cleanCli = [
 				"apps/asset/test/source-confirmation.integration.test.ts",
 				"apps/asset/test/result-notification.integration.test.ts",
@@ -94,8 +91,9 @@ async function compile(dir, only) {
 			const result = ts.transpileModule(await readFile(src, "utf8"), {
 				fileName: resolve(src),
 				compilerOptions: {
-					target: ts.ScriptTarget.ESNext,
+					target: ts.ScriptTarget.ES2024,
 					module: ts.ModuleKind.ESNext,
+ jsx: ts.JsxEmit.ReactJSX,
 					sourceMap: !src.includes("/test/"),
 					inlineSources: !src.includes("/test/"),
 					experimentalDecorators: true,
@@ -106,6 +104,13 @@ async function compile(dir, only) {
 					before: [
 						(context) => (source) =>
 							ts.visitNode(source, function visit(node) {
+								if(protocolFixture && ts.isStringLiteral(node) && node.text === 'src/platform/durable.ts')return ts.factory.createStringLiteral('src/platform/durable.js');
+								if(protocolFixture && ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && ts.isPropertyAccessExpression(node.expression.expression) && node.expression.expression.name.text === 'toContain' && node.expression.arguments[0]?.getText(source) === "resolve('src/platform/durable.ts')")
+									return ts.factory.createBlock([ts.visitEachChild(node,visit,context),ts.factory.createExpressionStatement(ts.factory.createAwaitExpression(ts.factory.createCallExpression(ts.factory.createIdentifier('__verifyProtocolCoverage'),undefined,[ts.factory.createIdentifier('collector'),ts.factory.createCallExpression(ts.factory.createIdentifier('resolve'),undefined,[ts.factory.createStringLiteral('src/platform/durable.js')]),ts.factory.createStringLiteral(resolve('apps/factory/src/platform/durable.ts'))])))],true);
+								if(containerFixture && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'withBindMounts')
+									return ts.factory.createCallExpression(ts.factory.createIdentifier('__coverageContainer'),undefined,[ts.visitNode(node.expression.expression,visit)]);
+								if(containerFixture && ts.isStringLiteral(node) && node.text.includes('node --import tsx test/fixtures/telemetry-outage.ts'))
+									return ts.factory.createBinaryExpression(ts.factory.createStringLiteral(node.text.replace('node --import tsx test/fixtures/telemetry-outage.ts','node test/fixtures/telemetry-outage.js').split('result=$?;')[0]),ts.SyntaxKind.PlusToken,ts.factory.createIdentifier('__coverageExit'));
 								// This contract exercises the development image's TS watch command
 								// against a disposable edited source copy, not compiled application execution.
 								if (
@@ -192,7 +197,7 @@ async function compile(dir, only) {
 									node.text.endsWith(".ts")
 								)
 									return ts.factory.createStringLiteral(
-										node.text.slice(0, -3) + ".js",
+										node.text.slice(0, -3) + outputExtension(join(dirname(src), node.text)),
 									);
 								if (
 									ts.isStringLiteral(node) &&
@@ -226,7 +231,7 @@ async function compile(dir, only) {
 														].includes(parent.expression.name.text)))));
 									if (moduleRef) {
 										const base = resolve(dirname(src), node.text);
-										const suffix = existsSync(base + ".ts")
+										const suffix = (existsSync(base + ".ts") || existsSync(base + ".tsx"))
 											? ".js"
 											: existsSync(join(base, "index.ts"))
 												? "/index.js"
@@ -359,14 +364,16 @@ async function compile(dir, only) {
 				: null;
 			if (map) map.sources = [resolve(src)];
 			if (map) map.sourceRoot = "";
+			// These entries are launched as .mjs by the real process adapter and
+			// observed by the ownership tests. Keep that public launch contract.
 			await writeFile(
-				dest.slice(0, -3) + ".js",
+				dest.replace(/\.tsx?$/, outputExtension(src)),
 				(cleanCli
 					? `import {coverageEnvironment as __coverageEnv} from ${JSON.stringify(pathToFileURL(resolve("scripts/coverage-experiment/coverage-env.mjs")).href)};\n`
-					: "") + result.outputText,
+					: "") + (containerFixture ? `import {containerExecution as __coverageContainer, coverageExit as __coverageExit} from ${JSON.stringify(pathToFileURL(resolve('scripts/coverage-experiment/container-execution.mjs')).href)};\n` : '') + (protocolFixture ? `import {verifyProtocolCoverage as __verifyProtocolCoverage} from ${JSON.stringify(pathToFileURL(resolve('scripts/coverage-experiment/protocol-coverage.mjs')).href)};\n` : '') + result.outputText,
 			);
 			if (map)
-				await writeFile(dest.slice(0, -3) + ".js.map", JSON.stringify(map));
+				await writeFile(dest.replace(/\.tsx?$/, ".js.map"), JSON.stringify(map));
 		} else if (entry.name === "package.json") {
 			const p = JSON.parse(await readFile(src, "utf8"));
 			for (const key of ["exports", "main", "module", "imports"])
@@ -377,7 +384,7 @@ async function compile(dir, only) {
 	}
 }
 for (const w of owned.values()) {
-	if (w !== ".") {
+	if (w !== "." && w !== "scripts") {
 		await compile(w);
 		await cp(join(w, "dist"), join(out, w, "dist"), { recursive: true }).catch(
 			(e) => {
@@ -414,8 +421,12 @@ for (const w of owned.values()) {
 	});
 }
 console.log("Compiled mirror:", out);
+// Deployment contracts invoke the real build task from their repository root.
+// Keep that task, then synchronize its output into the mirror they launch.
+await writeFile(join(out,'Makefile'),`.PHONY: build\nbuild:\n\t$(MAKE) -C ${JSON.stringify(root)} build PACKAGE="$(PACKAGE)"\n\t${JSON.stringify(process.execPath)} ${JSON.stringify(join(root,'scripts/coverage-experiment/sync-built.mjs'))} "$(PACKAGE)"\n`);
 
 await compile("scripts", new Set(["operator-inbox.ts"]));
+if(process.env.COVERAGE_DELIVERY!=="1") {
 await compile("scripts/coverage-experiment/fixtures");
 
 await cp(
@@ -481,6 +492,7 @@ await cp(
 	"scripts/coverage-experiment/fixtures/native-app-mock.mjs",
 	join(out, "apps/user/test/coverage-experiment/app-mock.qualification.js"),
 );
+}
 // Immutable inputs read by the actual Compose deployment contract test. The TS
 // inbox is copied as container input data; host application execution uses JS.
 for (const fixture of [
@@ -493,6 +505,7 @@ for (const fixture of [
 	await cp(fixture, join(out, fixture));
 }
 
+if(process.env.COVERAGE_DELIVERY!=="1") {
 await cp(
 	join(out, "scripts/coverage-experiment/fixtures/auto-target.js"),
 	join(out, "apps/user/src/coverage-experiment-auto-target.js"),
@@ -506,3 +519,5 @@ for (const kind of ["automock", "autospy"])
 		`scripts/coverage-experiment/fixtures/native-${kind}.mjs`,
 		join(out, `apps/user/test/coverage-experiment/${kind}.qualification.js`),
 	);
+
+}

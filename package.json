@@ -39,7 +39,20 @@
         "experiment:coverage:clean-env": "node scripts/coverage-experiment/coverage-env.test.mjs",
         "experiment:coverage:auto-provenance": "node scripts/coverage-experiment/auto-provenance.test.mjs",
         "experiment:coverage:recorded-layouts": "node scripts/coverage-experiment/recorded-layouts.test.mjs",
-        "experiment:coverage:recorded-ambiguity": "node scripts/coverage-experiment/recorded-ambiguity.test.mjs"
+        "experiment:coverage:recorded-ambiguity": "node scripts/coverage-experiment/recorded-ambiguity.test.mjs",
+        "experiment:coverage:repo-inventory": "node scripts/coverage-experiment/repo-inventory.mjs",
+        "experiment:coverage:repo": "node scripts/coverage-experiment/repo-runner.mjs",
+        "experiment:coverage:repo-batch": "node scripts/coverage-experiment/repo-batch.mjs",
+        "experiment:coverage:repo-artifacts": "node scripts/coverage-experiment/repo-artifacts.test.mjs",
+        "experiment:coverage:repo-report": "node scripts/coverage-experiment/repo-report.mjs",
+        "experiment:coverage:repo-playwright": "node scripts/coverage-experiment/repo-playwright.mjs",
+        "experiment:coverage:compiled-entry": "node scripts/coverage-experiment/compiled-entry.test.mjs",
+        "experiment:coverage:resource": "node scripts/coverage-experiment/resource.test.mjs",
+        "experiment:coverage:container-exit": "node scripts/coverage-experiment/container-exit.test.mjs",
+        "coverage:compiled": "node scripts/coverage-experiment/delivery.mjs",
+        "experiment:coverage:report-audit": "node scripts/coverage-experiment/report-audit.test.mjs",
+        "experiment:coverage:publication": "node scripts/coverage-experiment/publish-reports.test.mjs",
+        "experiment:coverage:publication-cleanup": "node scripts/coverage-experiment/publication-cleanup.test.mjs"
     },
     "peerDependencies": {
         "graphql": "16.12.0"

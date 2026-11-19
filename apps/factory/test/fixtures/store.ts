@@ -54,6 +54,7 @@ export function controlledStore(): JobStore {
         if (
           control.cancelled ||
           control.released ||
+          control.retirement ||
           control.dependencyRecovery ||
           claims.has(index)
         )

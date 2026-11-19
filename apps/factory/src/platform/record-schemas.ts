@@ -94,6 +94,36 @@ const waitSchema = z
   .strict();
 const controlSchema = z
   .object({
+    retirement: z
+      .object({
+        publication: z
+          .object({
+            url: z.string().url(),
+            commit: z.string().regex(/^[a-f0-9]{40}$/),
+            base: z.string().optional(),
+          })
+          .strict(),
+        execution: z
+          .object({
+            threadId: z.string().min(1),
+            status: z.enum([
+              'completed',
+              'idle',
+              'failed',
+              'interrupted',
+              'cancelled',
+              'rolled_back',
+            ]),
+            run: z
+              .object({ id: z.string().min(1), ordinal: z.number().int().positive() })
+              .strict()
+              .optional(),
+          })
+          .strict(),
+        stageIndex: z.number().int().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
     ownership: z
       .object({ threadId: z.string().min(1), prUrl: z.string().url().optional() })
       .strict()

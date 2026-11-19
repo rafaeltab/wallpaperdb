@@ -6,6 +6,23 @@ import { expect, it } from 'vitest';
 import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { completionFixture } from './fixtures/completion.js';
 
+it('retains verified landing through SQLite reopen without requiring retired observations', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-landed-retirement-'));
+  let f = await completionFixture(3, fileStore(directory));
+  try {
+    f.state({ observationStatus: 'completed', landed: true });
+    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    await f.close();
+    f = await completionFixture(3, fileStore(directory));
+    f.state({ managedIdle: false, publicationUnavailable: true, inspectFailed: true });
+    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    expect(f.sends).toEqual([]);
+  } finally {
+    await f.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 it.each([false, true])(
   'retains a confirmed launch before discovery, available=%s, through SQLite reopen',
   async (discoveryAvailable) => {

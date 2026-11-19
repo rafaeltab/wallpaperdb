@@ -19,6 +19,7 @@ import {
   type Start,
   type Intent,
   type Delivery,
+  type Status,
   Time,
   ContinuationAdmission,
   Unavailable,
@@ -52,7 +53,9 @@ export const JobLive = Layer.effect(
         }
         return result;
       });
-    const observe = (intent: Intent) =>
+    const observe = (
+      intent: Intent
+    ): Effect.Effect<Extract<Status, { kind: 'job' }>, Unavailable> =>
       Effect.gen(function* () {
         const generation = reporting ? yield* reporting.begin() : 0;
         let observedOwnership: { threadId: string; prUrl?: string } | undefined;
@@ -81,6 +84,17 @@ export const JobLive = Layer.effect(
             return status;
           }
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
+          if (before.retirement) {
+            const status = retiredStatus(
+              activeIntent,
+              before,
+              before.retirement,
+              yield* time.now()
+            );
+            yield* execution.release?.(activeIntent) ?? Effect.void;
+            if (reporting) yield* reporting.observed(generation, status);
+            return status;
+          }
           const latestStage = yield* currentStage(store);
           const owningStage =
             latestStage && latestStage.index >= (before.restart?.index ?? 0) ? latestStage : null;
@@ -143,12 +157,24 @@ export const JobLive = Layer.effect(
               delivery?.pr?.kind === 'found' ? delivery.pr.url : observedPublication
             );
           const control = yield* store.readControl();
+          if ((control.restart?.index ?? 0) !== (before.restart?.index ?? 0))
+            return yield* observe(intent);
           if (control.released) {
             const status = releasedStatus(intent, control, yield* time.now());
             if (reporting) yield* reporting.observed(generation, status);
             return status;
           }
           const stage = yield* currentStage(store);
+          if (control.retirement) {
+            const status = retiredStatus(
+              activeIntent,
+              control,
+              control.retirement,
+              yield* time.now()
+            );
+            if (reporting) yield* reporting.observed(generation, status);
+            return status;
+          }
           if (
             delivery?.activity === 'dependency-handback' &&
             (control.cancelled ||
@@ -204,8 +230,32 @@ export const JobLive = Layer.effect(
               : delivery,
             elapsedMs: Math.max(0, now - intent.createdAt),
           };
-          if (status.delivery?.landed && status.delivery.active === false)
+          if (
+            status.delivery?.landed &&
+            status.delivery.active === false &&
+            status.delivery.pr?.kind === 'found' &&
+            (observation.kind === 'found' || observation.kind === 'unverified')
+          ) {
+            const pr = status.delivery.pr;
+            if (
+              !(yield* store.saveControl({
+                ...control,
+                revision: control.revision + 1,
+                retirement: {
+                  publication: { url: pr.url, commit: pr.commit, base: pr.base },
+                  execution: {
+                    threadId: observation.threadId,
+                    status: observation.status,
+                    run: observation.run,
+                  },
+                  stageIndex: stage?.index,
+                },
+              }))
+            )
+              return yield* observe(intent);
+            status.controlRevision = control.revision + 1;
             yield* execution.release?.(activeIntent) ?? Effect.void;
+          }
           if (reporting) yield* reporting.observed(generation, status);
           return status;
         }).pipe(
@@ -297,7 +347,12 @@ export const JobLive = Layer.effect(
             return { kind: 'rejected' as const };
           if (yield* store.claimStage(index)) {
             const current = yield* store.readControl();
-            if (!current.cancelled && !current.released && !current.dependencyRecovery) {
+            if (
+              !current.cancelled &&
+              !current.released &&
+              !current.retirement &&
+              !current.dependencyRecovery
+            ) {
               const launch = yield* launchOwned(active, index, prepared);
               if (launch.kind === 'submitted' && reporting)
                 yield* reporting.accepted({ ...active, id: intent.id }, 'implementation', index);
@@ -321,6 +376,7 @@ export const JobLive = Layer.effect(
               intent.id !== command.jobId ||
               control.cancelled ||
               control.released ||
+              control.retirement ||
               control.revision !== command.revision ||
               stage?.index !== command.index
             )
@@ -432,6 +488,7 @@ function matchesResume(
     intent.id === command.jobId &&
     !control.cancelled &&
     !control.released &&
+    !control.retirement &&
     !control.dependencyRecovery &&
     waiting.index === command.index &&
     control.parked?.index === waiting.index &&
@@ -550,6 +607,31 @@ function retainOwnership(
 
 export function trustedAuthor(author: string) {
   return ['rafaeltab', 'zero-two-rafaeltab'].includes(author);
+}
+
+function retiredStatus(
+  intent: Intent,
+  control: import('./contract.js').Control,
+  retirement: NonNullable<import('./contract.js').Control['retirement']>,
+  now: number
+): Extract<import('./contract.js').Status, { kind: 'job' }> {
+  return {
+    kind: 'job',
+    intent,
+    controlRevision: control.revision,
+    stageIndex: retirement.stageIndex,
+    prerequisite: control.prerequisite,
+    execution: { kind: 'unverified', ...retirement.execution },
+    elapsedMs: Math.max(0, now - intent.createdAt),
+    delivery: {
+      stage: 'ci',
+      commit: retirement.publication.commit,
+      ready: false,
+      landed: true,
+      active: false,
+      pr: { kind: 'found', ...retirement.publication, ready: false, landed: true },
+    },
+  };
 }
 
 function releasedStatus(

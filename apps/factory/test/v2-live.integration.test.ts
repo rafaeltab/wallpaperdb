@@ -3974,6 +3974,31 @@ it('does not mistake retained completed jobs or unmanaged CI for current respons
   };
   const board = await liveBoard({ scopeId: 'activity-retained', initial: input });
   expect(board.snapshot().meta.activity).toMatchObject({ items: [], uncertainty: [] });
+  const retiredExecution = { threadId: current.execution.threadId, status: 'completed' };
+  await board.publish({
+    ...input,
+    jobs: [
+      {
+        ...current,
+        execution: { kind: 'unverified', ...retiredExecution },
+        delivery: { ...current.delivery, ready: false, landed: true, active: false },
+      },
+    ],
+    localWork: input.localWork.map((work) => ({
+      ...work,
+      control: {
+        ...work.control,
+        retirement: {
+          publication: {
+            url: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+            commit: 'a'.repeat(40),
+          },
+          execution: retiredExecution,
+        },
+      },
+    })),
+  });
+  expect(board.snapshot().meta.activity).toMatchObject({ items: [], uncertainty: [] });
   await board.publish({ ...input, jobs: [] });
   expect(board.snapshot().meta.activity?.uncertainty).toContain(
     'Managed execution or wait coverage is incomplete.'

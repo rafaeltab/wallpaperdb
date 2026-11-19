@@ -112,6 +112,7 @@ export function fileStore(directory: string): JobStore {
           if (
             state.cancelled ||
             state.released ||
+            state.retirement ||
             state.dependencyRecovery ||
             state.claimed.includes(index)
           )

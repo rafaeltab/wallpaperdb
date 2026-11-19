@@ -24,7 +24,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     uncertainty.push('Coordination activity coverage is incomplete.');
   const unfinished = input.state.admissions.some((admission) => {
     const work = input.localWork.find((w) => w.intent?.issue === admission.issue);
-    if (work?.control.cancelled) return false;
+    if (work?.control.cancelled || work?.control.retirement) return false;
     const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
     return (
       job?.kind !== 'job' ||

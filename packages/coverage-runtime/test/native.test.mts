@@ -305,3 +305,24 @@ test("isolated container descendants load the compiled hook with an explicit rep
 		await rm(directory, { recursive: true, force: true });
 	}
 });
+
+test("workspace builds preserve compiled tooling while its native preload is active", async () => {
+	const hook = resolve(root, "packages/coverage-runtime/dist/native-hook.mjs");
+	const before = await readFile(hook);
+	const build = spawnSync(
+		"make",
+		["build", "PACKAGE=coverage-runtime", "FORCE=1"],
+		{
+			cwd: root,
+			encoding: "utf8",
+			env: {
+				...process.env,
+				NODE_OPTIONS: `--import=${JSON.stringify(hook)}`,
+				MAKEFLAGS: "",
+				MAKEOVERRIDES: "",
+			},
+		},
+	);
+	expect(build.status, build.stdout + build.stderr).toBe(0);
+	expect(await readFile(hook)).toStrictEqual(before);
+});

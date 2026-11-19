@@ -26,6 +26,7 @@ export async function completionFixture(
   let accepted = false;
   let idle = false;
   let observationStatus: string | undefined;
+  let observationAfterInspection: string | undefined;
   let migrationRequired: boolean | undefined = false;
   let rejection: StageEvidence['rejection'];
   let dependencies: readonly string[] | undefined;
@@ -116,25 +117,28 @@ export async function completionFixture(
                     model: 'gpt-6.1-sol',
                   }),
             inspectStage: (_intent, stage) =>
-              inspectFailed
-                ? Effect.fail(
-                    new Unavailable({ operation: 'inspect-stage', cause: 'controlled outage' })
-                  )
-                : Effect.succeed({
-                    base,
-                    unexpectedBase,
-                    runId: `run-${run}`,
-                    ordinal: run,
-                    stageIndex: stage.index,
-                    commit,
-                    accepted,
-                    idle,
-                    migrationRequired,
-                    rejection,
-                    dependencies,
-                    worktreeClean: clean,
-                    linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
-                  } satisfies StageEvidence),
+              Effect.suspend(() => {
+                observationStatus = observationAfterInspection ?? observationStatus;
+                return inspectFailed
+                  ? Effect.fail(
+                      new Unavailable({ operation: 'inspect-stage', cause: 'controlled outage' })
+                    )
+                  : Effect.succeed({
+                      base,
+                      unexpectedBase,
+                      runId: `run-${run}`,
+                      ordinal: run,
+                      stageIndex: stage.index,
+                      commit,
+                      accepted,
+                      idle,
+                      migrationRequired,
+                      rejection,
+                      dependencies,
+                      worktreeClean: clean,
+                      linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
+                    } satisfies StageEvidence);
+              }),
             sendStage: (_intent, stage) =>
               Effect.sync(() => {
                 sends.push(stage);
@@ -197,6 +201,7 @@ export async function completionFixture(
       publicationAbsent?: boolean;
       run?: number;
       observationStatus?: string;
+      observationAfterInspection?: string;
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
       handbackVerified?: boolean;
     }) => {
@@ -224,6 +229,7 @@ export async function completionFixture(
       publicationAbsent = change.publicationAbsent ?? publicationAbsent;
       run = change.run ?? run;
       observationStatus = change.observationStatus ?? observationStatus;
+      observationAfterInspection = change.observationAfterInspection ?? observationAfterInspection;
     },
   };
 }

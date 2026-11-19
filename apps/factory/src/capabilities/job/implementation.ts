@@ -236,6 +236,26 @@ export const JobLive = Layer.effect(
             status.delivery.pr?.kind === 'found' &&
             (observation.kind === 'found' || observation.kind === 'unverified')
           ) {
+            const latestExecution = yield* execution.observe(activeIntent, stage ?? undefined);
+            status.execution = latestExecution;
+            const stopped =
+              (latestExecution.kind === 'found' || latestExecution.kind === 'unverified') &&
+              latestExecution.threadId === observation.threadId &&
+              ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+                latestExecution.status
+              );
+            const idle =
+              stopped &&
+              (execution.isIdle
+                ? yield* execution
+                    .isIdle(latestExecution.threadId, latestExecution.run?.id ?? null)
+                    .pipe(Effect.catch(() => Effect.succeed(false)))
+                : true);
+            if (!stopped || !idle) {
+              status.delivery = { ...status.delivery, landed: false, active: true };
+              if (reporting) yield* reporting.observed(generation, status);
+              return status;
+            }
             const pr = status.delivery.pr;
             if (
               !(yield* store.saveControl({
@@ -249,9 +269,9 @@ export const JobLive = Layer.effect(
                     lifecycle: pr.lifecycle,
                   },
                   execution: {
-                    threadId: observation.threadId,
-                    status: observation.status,
-                    run: observation.run,
+                    threadId: latestExecution.threadId,
+                    status: latestExecution.status,
+                    run: latestExecution.run,
                   },
                   stageIndex: stage?.index,
                 },

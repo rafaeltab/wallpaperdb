@@ -148,7 +148,9 @@ export interface Control {
   /** Durable terminal delivery authority, recorded before releasing observation.
    * The execution snapshot is historical; no subscription is needed to retain landing. */
   readonly retirement?: {
-    readonly publication: Pick<AcceptedPublication, 'url' | 'commit' | 'base'>;
+    readonly publication: Pick<AcceptedPublication, 'url' | 'commit' | 'base'> & {
+      readonly lifecycle?: string;
+    };
     readonly execution: {
       readonly threadId: string;
       readonly status: string;

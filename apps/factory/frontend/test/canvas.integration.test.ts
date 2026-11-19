@@ -147,18 +147,15 @@ it('uses the canvas and every command flow against the real fake v2 HTTP server'
     await page.goto(origin);
     await browserExpect(page.getByRole('group', { name: 'Factory activity' })).toBeVisible();
     // These measurements distinguish the selected prototype from the rejected redesign.
-    expect(
-      await page.locator('.cc-toolbar').evaluate((el) => el.getBoundingClientRect().height)
-    ).toBe(44);
-    expect(await page.locator('.cc-world').evaluate((el) => getComputedStyle(el).transform)).toBe(
+    // Activity can render before the canvas layout has settled.
+    await browserExpect
+      .poll(() => page.locator('.cc-toolbar').evaluate((el) => el.getBoundingClientRect().height))
+      .toBe(44);
+    await browserExpect(page.locator('.cc-world')).toHaveCSS(
+      'transform',
       'matrix(0.9, 0, 0, 0.9, 12, 12)'
     );
-    expect(
-      await page
-        .locator('.cc-issue-card')
-        .first()
-        .evaluate((el) => getComputedStyle(el).width)
-    ).toBe('384px');
+    await browserExpect(page.locator('.cc-issue-card').first()).toHaveCSS('width', '384px');
     await page.getByRole('button', { name: 'Fit all nodes', exact: true }).click();
     await browserExpect(
       page.getByRole('button', { name: 'Highlight 2 items needing human attention', exact: true })

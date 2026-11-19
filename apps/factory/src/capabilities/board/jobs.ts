@@ -143,6 +143,7 @@ export function currentQuestion(
   current: Extract<Status, { kind: 'job' }> | undefined,
   control: Control | undefined
 ) {
+  if (current?.delivery?.landed) return undefined;
   const index = current?.stageIndex ?? current?.resume?.index;
   const parked = control?.parked;
   return (

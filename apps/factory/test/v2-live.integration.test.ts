@@ -4194,47 +4194,66 @@ it.each([
   board.close();
 });
 
-it.each(['cancelled', 'released', 'parked', 'capacity', 'uncertain', 'unverified'] as const)(
-  'does not count %s ownership as current implementation',
-  async (condition) => {
-    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
-    const input = { ...stoppedImplementationSnapshot() };
-    const source = input.jobs[0];
-    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
-    input.jobs = [
-      {
-        ...source,
-        execution:
-          condition === 'uncertain'
-            ? { kind: 'ambiguous' }
-            : condition === 'unverified'
-              ? { kind: 'unverified', threadId: 'owner', status: 'running' }
-              : { ...source.execution, status: 'running' },
-        delivery: {
-          stage: 'implementation',
-          active: condition === 'parked' || condition === 'capacity' ? false : true,
-          activity:
-            condition === 'parked'
-              ? 'awaiting-answer'
-              : condition === 'capacity'
-                ? 'continuation-pending'
-                : undefined,
-          commit: source.intent.base,
-          ready: false,
-          landed: false,
+it.each([
+  'cancelled',
+  'released',
+  'parked',
+  'capacity',
+  'uncertain',
+  'unverified',
+  'failed-observation',
+] as const)('does not count %s ownership as current implementation', async (condition) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = { ...stoppedImplementationSnapshot() };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      execution:
+        condition === 'uncertain'
+          ? { kind: 'ambiguous' }
+          : condition === 'unverified'
+            ? { kind: 'unverified', threadId: 'owner', status: 'running' }
+            : { ...source.execution, status: 'running' },
+      delivery: {
+        stage: 'implementation',
+        active: condition === 'parked' || condition === 'capacity' ? false : true,
+        activity:
+          condition === 'parked'
+            ? 'awaiting-answer'
+            : condition === 'capacity'
+              ? 'continuation-pending'
+              : undefined,
+        commit: source.intent.base,
+        ready: false,
+        landed: false,
+      },
+    },
+  ];
+  input.localWork = input.localWork.map((work) => ({
+    ...work,
+    control: {
+      ...work.control,
+      cancelled: condition === 'cancelled',
+      released: condition === 'released',
+    },
+  }));
+  if (condition === 'failed-observation')
+    input.observations = {
+      ...input.observations,
+      items: {
+        [`job:${source.intent.id}`]: {
+          generation: 1,
+          sequence: 1,
+          attemptedAt: 3000,
+          observedAt: 2000,
+          failedAt: 3000,
+          error: 'offline',
         },
       },
-    ];
-    input.localWork = input.localWork.map((work) => ({
-      ...work,
-      control: {
-        ...work.control,
-        cancelled: condition === 'cancelled',
-        released: condition === 'released',
-      },
-    }));
-    const board = await liveBoard({ scopeId: 'excluded-implementation', initial: input });
-    expect(board.snapshot().meta.activity?.items).toEqual([]);
-    board.close();
-  }
-);
+    };
+  const board = await liveBoard({ scopeId: 'excluded-implementation', initial: input });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});

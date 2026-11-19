@@ -60,6 +60,11 @@ function mcpResult(raw: string) {
   );
 }
 const activity = z.object({
+  recentRuns: z
+    .array(
+      z.object({ runId: z.string(), startedAt: z.string().datetime({ offset: true }).nullable() })
+    )
+    .optional(),
   thread: z.object({ latestRunId: z.string().nullable() }),
   items: z.array(
     z.object({
@@ -110,7 +115,12 @@ export async function pendingQuestion(
     question = questionOnPage(page, threadId) ?? question;
     answeredQuestions.push(...answeredOnPage(page, threadId));
     if (!page.hasMore)
-      return { question, answeredQuestions, manual: manualBoundary(messages, threadId, jobId) };
+      return {
+        question,
+        answeredQuestions,
+        manual: manualBoundary(messages, threadId, jobId),
+        runStartedAt: page.recentRuns?.find((run) => run.runId === expectedRunId)?.startedAt,
+      };
     afterPosition = followingPosition(page, afterPosition);
   }
 }

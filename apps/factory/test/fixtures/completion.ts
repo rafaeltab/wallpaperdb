@@ -35,6 +35,7 @@ export async function completionFixture(
   let prCommit = commit;
   let ready = false;
   let landed = false;
+  let lifecycle: string | undefined;
   let manual = false;
   let managedIdle = true;
   let failed = false;
@@ -82,6 +83,7 @@ export async function completionFixture(
                     commit: prCommit,
                     ready,
                     landed,
+                    lifecycle,
                     ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
                   }),
           }),
@@ -178,6 +180,7 @@ export async function completionFixture(
       prCommit?: string;
       ready?: boolean;
       landed?: boolean;
+      lifecycle?: string;
       manual?: boolean;
       managedIdle?: boolean;
       failed?: boolean;
@@ -204,6 +207,7 @@ export async function completionFixture(
       prCommit = change.prCommit ?? prCommit;
       ready = change.ready ?? ready;
       landed = change.landed ?? landed;
+      lifecycle = change.lifecycle ?? lifecycle;
       manual = change.manual ?? manual;
       managedIdle = change.managedIdle ?? managedIdle;
       failed = change.failed ?? failed;

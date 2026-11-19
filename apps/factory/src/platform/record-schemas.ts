@@ -101,6 +101,7 @@ const controlSchema = z
             url: z.string().url(),
             commit: z.string().regex(/^[a-f0-9]{40}$/),
             base: z.string().optional(),
+            lifecycle: z.string().optional(),
           })
           .strict(),
         execution: z

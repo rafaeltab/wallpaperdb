@@ -242,7 +242,12 @@ export const JobLive = Layer.effect(
                 ...control,
                 revision: control.revision + 1,
                 retirement: {
-                  publication: { url: pr.url, commit: pr.commit, base: pr.base },
+                  publication: {
+                    url: pr.url,
+                    commit: pr.commit,
+                    base: pr.base,
+                    lifecycle: pr.lifecycle,
+                  },
                   execution: {
                     threadId: observation.threadId,
                     status: observation.status,

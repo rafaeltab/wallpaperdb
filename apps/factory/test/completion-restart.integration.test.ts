@@ -10,12 +10,28 @@ it('retains verified landing through SQLite reopen without requiring retired obs
   const directory = await mkdtemp(join(tmpdir(), 'factory-landed-retirement-'));
   let f = await completionFixture(3, fileStore(directory));
   try {
-    f.state({ observationStatus: 'completed', landed: true });
-    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    f.state({
+      observationStatus: 'completed',
+      landed: true,
+      lifecycle: 'Linked issue closed; project Done',
+    });
+    expect(await f.status()).toMatchObject({
+      delivery: {
+        landed: true,
+        active: false,
+        pr: { lifecycle: 'Linked issue closed; project Done' },
+      },
+    });
     await f.close();
     f = await completionFixture(3, fileStore(directory));
     f.state({ managedIdle: false, publicationUnavailable: true, inspectFailed: true });
-    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    expect(await f.status()).toMatchObject({
+      delivery: {
+        landed: true,
+        active: false,
+        pr: { lifecycle: 'Linked issue closed; project Done' },
+      },
+    });
     expect(f.sends).toEqual([]);
   } finally {
     await f.close();

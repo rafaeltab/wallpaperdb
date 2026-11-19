@@ -338,9 +338,27 @@ it.each([
   { active: true, landed: true, mismatch: false, question: false, recovery: false, visible: true },
   { active: false, landed: true, mismatch: false, question: true, recovery: false, visible: false },
   { active: false, landed: true, mismatch: false, question: false, recovery: true, visible: false },
+  {
+    active: false,
+    landed: true,
+    mismatch: false,
+    question: false,
+    recovery: false,
+    maintenanceActive: true,
+    visible: true,
+  },
+  {
+    active: false,
+    landed: true,
+    mismatch: false,
+    question: false,
+    recovery: false,
+    maintenanceActive: false,
+    visible: false,
+  },
 ])(
   'retires only inactive verified landed items despite retained OPEN metadata: %j',
-  async ({ active, landed, mismatch, question, recovery, visible }) => {
+  async ({ active, landed, mismatch, question, recovery, maintenanceActive, visible }) => {
     const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
     const pull = pullObservation(2);
     const input = { ...parkedSnapshot(pull, true) };
@@ -371,6 +389,17 @@ it.each([
       },
     ];
     input.localWork = [];
+    if (maintenanceActive !== undefined) {
+      input.recoveries = [
+        {
+          issue: source.intent.issue,
+          pr: pull.url,
+          progress: 'Independent maintenance',
+          active: maintenanceActive,
+          phase: maintenanceActive ? 'resolving' : 'manual-recovery',
+        },
+      ];
+    }
     if (active) {
       input.state = {
         ...input.state,
@@ -427,7 +456,10 @@ it.each([
     await board.publish(input);
     expect(!!board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2']).toBe(visible);
     expect(Object.keys(board.snapshot().entities.jobs)).toHaveLength(active ? 2 : 1);
-    if (landed) expect(board.snapshot().meta.factory.concurrency.occupied).toBe(active ? 1 : 0);
+    if (landed)
+      expect(board.snapshot().meta.factory.concurrency.occupied).toBe(
+        active || maintenanceActive ? 1 : 0
+      );
     expect(
       board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].metadata
     ).toMatchObject({ value: { state: 'open' } });

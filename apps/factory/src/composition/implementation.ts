@@ -88,6 +88,17 @@ import { observationWorker, inventoryWorker } from './refresh.js';
 import { compatibleState } from './state.js';
 import { availabilityObservation, retainedWorkAvailable } from './availability.js';
 
+const httpUrl = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      return ['http:', 'https:'].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, 'Expected an HTTP or HTTPS URL');
+
 export async function startFactory(environment: NodeJS.ProcessEnv) {
   const configuration = z
     .object({
@@ -103,8 +114,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         .url()
         .refine((value) => /^https?:/.test(value))
         .optional(),
-      FACTORY_T3_MCP_ENDPOINT: z.string().url().optional(),
-      FACTORY_T3_OBSERVER_ORIGIN: z.string().url().optional(),
+      FACTORY_T3_MCP_ENDPOINT: httpUrl.optional(),
+      FACTORY_T3_OBSERVER_ORIGIN: httpUrl.optional(),
       FACTORY_T3_AUTH_BASE_DIR: z.string().startsWith('/').optional(),
       FACTORY_T3_MCP_AUTHORIZATION_FILE: z.string().startsWith('/').optional(),
       FACTORY_T3_CONNECT_ORIGIN: z

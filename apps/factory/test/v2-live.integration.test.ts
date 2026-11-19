@@ -4106,6 +4106,7 @@ it.each([
   ['implementation', 'continuation-pending'],
   ['ci', 'repairing'],
   ['babysitting', 'repairing'],
+  ['babysitting', 'continuation-pending'],
 ] as const)(
   'reports current implementation responsibility for %s/%s through HTTP',
   async (stage, activity) => {
@@ -4149,7 +4150,8 @@ it.each([
         issue: 1,
         pullRequest: null,
         startedAt: '1970-01-01T00:00:02.500Z',
-        reason: activity === 'repairing' ? 'Repairing managed code' : 'Implementing admitted issue',
+        reason:
+          stage === 'implementation' ? 'Implementing admitted issue' : 'Repairing managed code',
       });
       await board.publish({
         ...input,
@@ -4257,3 +4259,35 @@ it.each([
   expect(board.snapshot().meta.activity?.items).toEqual([]);
   board.close();
 });
+
+it.each([
+  ['running', true, 1],
+  ['running', false, 0],
+  ['completed', true, 0],
+  ['waiting-for-input', true, 0],
+] as const)(
+  'reports a babysitting continuation only with current executing responsibility: %s/%s',
+  async (status, active, count) => {
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const input = { ...stoppedImplementationSnapshot() };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        execution: { ...source.execution, status },
+        delivery: {
+          stage: 'babysitting',
+          activity: 'continuation-pending',
+          active,
+          commit: source.intent.base,
+          ready: false,
+          landed: false,
+        },
+      },
+    ];
+    const board = await liveBoard({ scopeId: 'repair-continuation', initial: input });
+    expect(board.snapshot().meta.activity?.items).toHaveLength(count);
+    board.close();
+  }
+);

@@ -70,7 +70,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
           : null,
       startedAt: timestamp(execution.run?.startedAt),
       reason:
-        job.delivery?.activity === 'repairing'
+        job.delivery?.activity === 'repairing' || job.delivery?.stage === 'babysitting'
           ? 'Repairing managed code'
           : 'Implementing admitted issue',
     });
@@ -130,6 +130,7 @@ function implementing(job: Status): job is Extract<Status, { kind: 'job' }> {
   )
     return false;
   if (!['running', 'preparing', 'queued', 'starting'].includes(job.execution.status)) return false;
+  if (delivery.stage === 'babysitting' && delivery.activity === 'continuation-pending') return true;
   if (delivery.activity === 'repairing')
     return (
       delivery.stage === 'ci' ||

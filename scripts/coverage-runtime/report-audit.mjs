@@ -7,16 +7,16 @@ import { relative } from "node:path";
 // encountering another anomaly requires review, rather than silently expanding
 // a generic sanitizer. Estimated hits are boolean indicators, not exact counts.
 const sites = new Set([
-	"apps/factory/src/adapters/github/joins.ts:1133:4",
+	"apps/factory/src/adapters/github/joins.ts:1134:4",
 	"apps/factory/src/adapters/t3/planner.ts:272:4",
 ]);
 const estimates = {
-	"apps/factory/src/adapters/github/joins.ts:1133:4": {
+	"apps/factory/src/adapters/github/joins.ts:1134:4": {
 		sourceSHA256:
-			"59315ac2d0cc2025b1d697670e77dbf12595c381f60bacaa8ae407dd3af94d3c",
-		branch: [1133, 4, 1133, 57],
-		body: [1133, 18, 1133, 57],
-		following: [1134, 18, 1134, 43],
+			"0d0418671200a0e521c15bee06e48323e3e13c6cc4cf7cd655edb149dcd1759f",
+		branch: [1134, 4, 1134, 57],
+		body: [1134, 18, 1134, 57],
+		following: [1135, 18, 1135, 43],
 	},
 	"apps/factory/src/adapters/t3/planner.ts:272:4": {
 		sourceSHA256:

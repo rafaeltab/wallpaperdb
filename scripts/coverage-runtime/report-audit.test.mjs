@@ -33,7 +33,7 @@ function input(name, line, counts) {
 	};
 }
 const inputs = [
-		input("github/joins", 1133, [549, -310]),
+		input("github/joins", 1134, [549, -310]),
 		input("t3/planner", 272, [89, -2]),
 	],
 	before = structuredClone(inputs);
@@ -58,7 +58,7 @@ for (const counts of [
 	[0, 3],
 	[0, 0],
 ]) {
-	const x = [input("github/joins", 1133, counts)];
+	const x = [input("github/joins", 1134, counts)];
 	assert.deepEqual(auditReports(x, root), { reports: x, audit: [] });
 }
 assert.throws(
@@ -71,11 +71,11 @@ assert.throws(
 );
 // Three completed calls: two true visits and one false visit. The incoming
 // continuation reports one visit, producing [2,-1]; following read runs three times.
-const mixed = input("github/joins", 1133, [2, -1]);
+const mixed = input("github/joins", 1134, [2, -1]);
 const mixedFile = Object.values(mixed.data)[0];
 const branch = {
-	start: { line: 1133, column: 4 },
-	end: { line: 1133, column: 57 },
+	start: { line: 1134, column: 4 },
+	end: { line: 1134, column: 57 },
 };
 mixedFile.branchMap[0] = {
 	type: "if",
@@ -83,10 +83,26 @@ mixedFile.branchMap[0] = {
 	locations: [branch, { start: {}, end: {} }],
 };
 mixedFile.statementMap = {
-	0: { start: { line: 1133, column: 18 }, end: { line: 1133, column: 57 } },
-	1: { start: { line: 1134, column: 18 }, end: { line: 1134, column: 43 } },
+	0: { start: { line: 1134, column: 18 }, end: { line: 1134, column: 57 } },
+	1: { start: { line: 1135, column: 18 }, end: { line: 1135, column: 43 } },
 };
 mixedFile.s = { 0: 2, 1: 3 };
+const joinLines = readFileSync(mixedFile.path, "utf8").split("\n");
+assert.equal(
+	joinLines[branch.start.line - 1].slice(
+		branch.start.column,
+		branch.end.column,
+	),
+	"if (proposed) await publish(dir, planName, proposed);",
+);
+const followingJoin = mixedFile.statementMap[1];
+assert.equal(
+	joinLines[followingJoin.start.line - 1].slice(
+		followingJoin.start.column,
+		followingJoin.end.column,
+	),
+	"await read(dir, planName)",
+);
 const mixedBefore = structuredClone(mixed),
 	estimated = auditReports([mixed], root);
 assert.deepEqual(Object.values(estimated.reports[0].data)[0].b[0], [2, 1]);
@@ -336,7 +352,7 @@ try {
 }
 for (const kind of ["s", "f", "b"])
 	for (const bad of [NaN, Infinity, "1", -0.5, ...(kind === "b" ? [] : [-1])]) {
-		const x = input("github/joins", 1133, [1, 0]);
+		const x = input("github/joins", 1134, [1, 0]);
 		Object.values(x.data)[0][kind][0] = kind === "b" ? [1, bad] : bad;
 		assert.throws(() => auditReports([x], root), /Invalid|invalid|Nonfinite/);
 	}

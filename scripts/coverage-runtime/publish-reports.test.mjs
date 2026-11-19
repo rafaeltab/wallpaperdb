@@ -87,20 +87,20 @@ try {
 	);
 	const factory = resolve("apps/factory/src/adapters/github/joins.ts"),
 		decision = {
-			start: { line: 1133, column: 4 },
-			end: { line: 1133, column: 57 },
+			start: { line: 1134, column: 4 },
+			end: { line: 1134, column: 57 },
 		};
 	const raw = {
 		[factory]: {
 			path: factory,
 			statementMap: {
 				0: {
-					start: { line: 1133, column: 18 },
-					end: { line: 1133, column: 57 },
+					start: { line: 1134, column: 18 },
+					end: { line: 1134, column: 57 },
 				},
 				1: {
-					start: { line: 1134, column: 18 },
-					end: { line: 1134, column: 43 },
+					start: { line: 1135, column: 18 },
+					end: { line: 1135, column: 43 },
 				},
 			},
 			s: { 0: 2, 1: 3 },
@@ -130,7 +130,7 @@ try {
 	assert.deepEqual(raw, before, "publication mutated raw evidence");
 	assert.match(
 		await readFile(directory + "/estimated/lcov.info", "utf8"),
-		/BRDA:1133,0,1,1/,
+		/BRDA:1134,0,1,1/,
 	);
 	const estimatedSummary = JSON.parse(
 		await readFile(directory + "/estimated/coverage-summary.json", "utf8"),

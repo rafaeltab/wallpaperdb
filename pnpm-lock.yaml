@@ -1963,7 +1963,7 @@ importers:
         version: 10.0.0(patch_hash=39ecdbebeb734113082eb3b58b0b82bc047fe79cb47f3b0405ea899876fd345d)(@stryker-mutator/core@10.0.0(@types/node@26.0.1))(vitest@5.0.2)
       '@vitest/coverage-v8':
         specifier: 5.0.2
-        version: 5.0.2(@vitest/browser@5.0.2)(vitest@5.0.2)
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
       '@wallpaperdb/crap-typescript-core':
         specifier: workspace:*
         version: link:../packages/crap-typescript-core

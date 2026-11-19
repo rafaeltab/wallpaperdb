@@ -1,5 +1,6 @@
 export {
   SourceFailure,
+  sourceCandidatePageSize,
   SourceStore,
   SourceBytes,
   MandatoryInspection,

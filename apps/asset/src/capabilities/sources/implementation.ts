@@ -6,6 +6,7 @@ import {
   SourceBytes,
   MandatoryInspection,
   SourceFailure,
+  sourceCandidatePageSize,
   type Candidate,
   type CandidateIntent,
   type SourceOutcome,
@@ -216,48 +217,33 @@ export function sourcesLayer(configuration: {
             null,
             (state) => {
               if (!owns(owner, state)) return { state, result: unavailable };
-              if (state.candidatePage)
-                return {
-                  state,
-                  result: state.candidatePage.valid
-                    ? {
-                        kind: 'found' as const,
-                        asset: {
-                          assetId,
-                          assetType: state.asset.assetType,
-                          sources: state.sources,
-                          candidates: state.candidates,
-                          hasPendingCandidates: state.nonterminalCandidateCount > 0,
-                          ...(state.candidatePage.nextCursor
-                            ? { nextCandidateCursor: state.candidatePage.nextCursor }
-                            : {}),
-                          defaultSourceId: state.defaultSourceId,
-                          sourceSetRevision: state.sourceSetRevision,
-                          deliveryRevision: state.deliveryRevision,
-                        },
-                      }
-                    : unavailable,
-                };
-              let end = state.candidates.length;
-              if (cursor !== undefined) {
-                if (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
-                  return { state, result: unavailable };
-                const split = cursor.indexOf(':');
-                const position = cursor.slice(0, split);
-                const index = Number(position);
-                if (
-                  split < 1 ||
-                  !/^(0|[1-9][0-9]*)$/.test(position) ||
-                  !Number.isSafeInteger(index) ||
-                  state.candidates[index]?.candidateId !== cursor.slice(split + 1)
-                )
-                  return { state, result: unavailable };
-                end = index;
+              let candidates = state.candidates;
+              let nextCandidateCursor = state.candidatePage?.nextCursor;
+              if (state.candidatePage) {
+                if (!state.candidatePage.valid) return { state, result: unavailable };
+              } else {
+                let end = state.candidates.length;
+                if (cursor !== undefined) {
+                  if (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
+                    return { state, result: unavailable };
+                  const split = cursor.indexOf(':');
+                  const position = cursor.slice(0, split);
+                  const index = Number(position);
+                  if (
+                    split < 1 ||
+                    !/^(0|[1-9][0-9]*)$/.test(position) ||
+                    !Number.isSafeInteger(index) ||
+                    state.candidates[index]?.candidateId !== cursor.slice(split + 1)
+                  )
+                    return { state, result: unavailable };
+                  end = index;
+                }
+                // Appending history preserves existing index/identity cursors.
+                const start = Math.max(0, end - sourceCandidatePageSize);
+                const next = start > 0 ? state.candidates[start] : undefined;
+                candidates = state.candidates.slice(start, end).reverse();
+                nextCandidateCursor = next ? `${start}:${next.candidateId}` : undefined;
               }
-              // Appending history preserves existing index/identity cursors. Verify the
-              // identity so a stale cursor cannot silently skip data after future retirement.
-              const start = Math.max(0, end - 32);
-              const next = start > 0 ? state.candidates[start] : undefined;
               return {
                 state,
                 result: {
@@ -266,9 +252,9 @@ export function sourcesLayer(configuration: {
                     assetId,
                     assetType: state.asset.assetType,
                     sources: state.sources,
-                    candidates: state.candidates.slice(start, end).reverse(),
+                    candidates,
                     hasPendingCandidates: state.nonterminalCandidateCount > 0,
-                    ...(next ? { nextCandidateCursor: `${start}:${next.candidateId}` } : {}),
+                    ...(nextCandidateCursor ? { nextCandidateCursor } : {}),
                     defaultSourceId: state.defaultSourceId,
                     sourceSetRevision: state.sourceSetRevision,
                     deliveryRevision: state.deliveryRevision,

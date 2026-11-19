@@ -127,6 +127,13 @@
       "when": 1792875889182,
       "tag": "0017_romantic_rictor",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795048005490,
+      "tag": "0018_whole_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

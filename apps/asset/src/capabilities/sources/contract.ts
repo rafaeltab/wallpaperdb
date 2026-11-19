@@ -60,7 +60,9 @@ export interface SourceState {
   defaultSourceId: string | null;
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
+  /** Selected candidate window only, never the complete retained history. */
   candidates: Candidate[];
+  candidatePage?: { readonly nextCursor?: string; readonly valid: boolean };
   /** Includes expired records until their durable status becomes terminal. */
   nonterminalCandidateCount: number;
 }
@@ -118,6 +120,13 @@ export interface SourceStorePort {
         readonly expiresAt: string;
       };
       readonly cleanupContext?: CommandContext;
+    },
+    selection?: {
+      readonly candidateId?: string;
+      readonly idempotencyKey?: string;
+      readonly pendingAfter?: string;
+      readonly pendingLimit?: number;
+      readonly cursor?: string;
     }
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;

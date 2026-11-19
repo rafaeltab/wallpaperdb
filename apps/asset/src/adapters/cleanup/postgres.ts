@@ -44,6 +44,7 @@ async function finishDeletedAsset(tx: Transaction, assetId: string) {
     .update(assetDeletions)
     .set({ cleanupPending: false })
     .where(eq(assetDeletions.assetId, assetId));
+  await tx.delete(sourceCandidates).where(eq(sourceCandidates.assetId, assetId));
   await tx.delete(assetSourceState).where(eq(assetSourceState.assetId, assetId));
   await tx.delete(sourceReads).where(eq(sourceReads.assetId, assetId));
 }

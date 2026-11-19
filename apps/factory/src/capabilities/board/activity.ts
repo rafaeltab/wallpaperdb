@@ -130,7 +130,11 @@ function implementing(job: Status): job is Extract<Status, { kind: 'job' }> {
   )
     return false;
   if (!['running', 'preparing', 'queued', 'starting'].includes(job.execution.status)) return false;
-  if (delivery.stage === 'babysitting' && delivery.activity === 'continuation-pending') return true;
+  if (
+    delivery.stage === 'babysitting' &&
+    (delivery.activity === 'continuation-pending' || delivery.activity === 'resume-pending')
+  )
+    return true;
   if (delivery.activity === 'repairing')
     return (
       delivery.stage === 'ci' ||

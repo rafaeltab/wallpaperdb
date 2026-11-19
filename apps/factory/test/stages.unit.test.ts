@@ -29,6 +29,8 @@ it('requires fresh accepted stages and matching current CI before reporting read
   let ci = false;
   let landed = false;
   let publicationAvailable = true;
+  let releasedOwner = false;
+  let publishedCommit = 'b'.repeat(40);
   const sent: number[] = [];
   const released: number[] = [];
   const deps = Layer.mergeAll(
@@ -41,7 +43,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
           : Effect.succeed({
               kind: 'found' as const,
               url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
-              commit: 'b'.repeat(40),
+              commit: publishedCommit,
               ready: ci,
               landed,
             }),
@@ -59,6 +61,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
       release: (intent) =>
         Effect.sync(() => {
           released.push(intent.issue);
+          releasedOwner = true;
         }),
       interrupt: () => Effect.void,
       launch: () => Effect.succeed({ kind: 'submitted' as const }),
@@ -77,7 +80,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
           ordinal: stage + 1,
           stageIndex: request.index,
           commit: 'b'.repeat(40),
-          accepted: accepted && request.index === stage,
+          accepted: accepted && request.index === stage && !releasedOwner,
           linked: ['https://github.com/rafaeltab/wallpaperdb/pull/999'],
         }),
       sendStage: (_intent, request) =>
@@ -133,6 +136,13 @@ it('requires fresh accepted stages and matching current CI before reporting read
   });
   expect(sent).toEqual([1, 2]);
   expect(released).toEqual([577]);
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    delivery: { ready: false, landed: true, active: false },
+  });
+  publishedCommit = 'c'.repeat(40);
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    delivery: { ready: false, landed: false },
+  });
 });
 
 async function stagesFixture(admission?: ContinuationAdmission) {

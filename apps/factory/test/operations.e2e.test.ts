@@ -142,19 +142,6 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       );
       await browserExpect(page.getByText(host.base, { exact: true })).toBeVisible();
       const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
-      await host.save({
-        complete: true,
-        base: host.base,
-        overrides: { status: 'completed' },
-        prs: [{ ...pr, state: 'MERGED' }],
-        landing: { pr: 999, merge: host.base, head: host.base },
-      });
-      await browserExpect(
-        page.getByText('Landed on the default branch', { exact: true })
-      ).toBeVisible();
-      await browserExpect(
-        page.getByText('Linked issue closed; project Done', { exact: false })
-      ).toBeVisible();
       pr.statusCheckRollup[0].conclusion = 'FAILURE';
       await host.save({
         complete: true,
@@ -169,14 +156,47 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       ).toBeVisible();
       await browserExpect(page.getByText(/GitHub wait deadline:/)).toBeVisible();
       await browserExpect(page.getByText('Ready for manual merge', { exact: true })).toHaveCount(0);
-      expect(
-        (await host.calls()).filter(
+      pr.statusCheckRollup[0].conclusion = 'SUCCESS';
+      await host.save({
+        complete: true,
+        base: host.base,
+        prs: [pr],
+        overrides: { status: 'completed' },
+      });
+      await browserExpect(page.getByText('Ready for manual merge', { exact: true })).toBeVisible();
+      await host.save({
+        complete: true,
+        base: host.base,
+        overrides: { status: 'completed' },
+        prs: [{ ...pr, state: 'MERGED' }],
+        landing: { pr: 999, merge: host.base, head: host.base },
+      });
+      await browserExpect(
+        page.getByText('Landed on the default branch', { exact: true })
+      ).toBeVisible();
+      await browserExpect(
+        page.getByText('Linked issue closed; project Done', { exact: false })
+      ).toBeVisible();
+
+      const deliveredSkills = (await host.calls())
+        .filter(
           (call) =>
             call.binary === 't3' &&
             ((['send', 't3_thread_send'].includes(call.args[1]) && !call.args.includes('--help')) ||
               (call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_send'))
         )
-      ).toHaveLength(3);
+        .map((call) => {
+          const message =
+            call.args[1] === 't3_thread_send' ? JSON.parse(call.args[2]).message : call.args[3];
+          return message.match(/\$(review-loop|publish-pr|babysit-pr)/)?.[1];
+        });
+      expect(deliveredSkills).toEqual([
+        'review-loop',
+        'publish-pr',
+        'babysit-pr',
+        'review-loop',
+        'publish-pr',
+      ]);
       expect(
         (await host.calls()).filter(
           (call) =>
@@ -594,6 +614,18 @@ it.each(['implementation', 'publication'] as const)(
         await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(
           0
         );
+        await browserExpect
+          .poll(async () => {
+            const current = await (
+              await page.request.get(`http://127.0.0.1:${address.port}/api/job`)
+            ).json();
+            return { status: current.execution?.status, run: current.execution?.run };
+          })
+          .toEqual({
+            status: 'running',
+            run:
+              stage === 'publication' ? { id: 'run-4', ordinal: 4 } : { id: 'run-2', ordinal: 2 },
+          });
         await browserExpect(page.getByText('Status: running')).toBeVisible();
         const resumed = await (
           await page.request.get(`http://127.0.0.1:${address.port}/api/job`)

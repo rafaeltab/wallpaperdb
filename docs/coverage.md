@@ -12,7 +12,7 @@ Published `coverage/receipts` retain each selected tier's original report, audit
 
 ## Converter maintenance
 
-The [pnpm patch](../patches/ast-v8-to-istanbul-1.0.6.patch) repairs qualified awaited-conditional conversion in the locked converter. Normal frozen installation applies it through [patchedDependencies](../pnpm-workspace.yaml). No runtime download or external checkout is required. Changes to the converter, Vitest native APIs, generated mock sources or compilation strategy require rerunning the normal Scripts runtime controls and full configured coverage. Native mock adaptation rejects unqualified generated source identities rather than attributing proxy plumbing to application code.
+The [pnpm patch](../patches/ast-v8-to-istanbul-1.0.6.patch) repairs qualified awaited-conditional conversion in the locked converter. Normal frozen installation applies it through [patchedDependencies](../pnpm-workspace.yaml). No runtime download or external checkout is required. Changes to the converter, Vitest native APIs, generated mock sources or compilation strategy require rerunning the coverage-runtime workspace controls and full configured coverage. Native mock adaptation rejects unqualified generated source identities rather than attributing proxy plumbing to application code.
 
 ## Estimated covered decisions
 

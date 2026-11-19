@@ -4107,63 +4107,51 @@ it.each([
   ['ci', 'repairing'],
   ['babysitting', 'repairing'],
   ['babysitting', 'continuation-pending'],
-] as const)(
-  'reports current implementation responsibility for %s/%s through HTTP',
-  async (stage, activity) => {
-    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
-    const input = { ...stoppedImplementationSnapshot(2) };
-    const source = input.jobs[0];
-    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
-    input.jobs = [
-      {
-        ...source,
-        retry: undefined,
-        execution: {
-          ...source.execution,
-          status: 'running',
-          run: { id: 'current', ordinal: 3, startedAt: 2500 },
-        },
-        delivery: {
-          stage,
-          activity,
-          active: true,
-          commit: source.intent.base,
-          ready: false,
-          landed: false,
-        },
+  ['babysitting', 'resume-pending'],
+] as const)('reports current implementation responsibility for %s/%s', async (stage, activity) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = { ...stoppedImplementationSnapshot(2) };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      retry: undefined,
+      execution: {
+        ...source.execution,
+        status: 'running',
+        run: { id: 'current', ordinal: 3, startedAt: 2500 },
       },
-    ];
-    const board = await liveBoard({ scopeId: 'implementation-activity', initial: input });
-    const app = operationsServer({
-      base: source.intent.base,
-      run: Effect.runPromise,
-      job,
-      v2: board,
+      delivery: {
+        stage,
+        activity,
+        active: true,
+        commit: source.intent.base,
+        ready: false,
+        landed: false,
+      },
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'implementation-activity', initial: input });
+  try {
+    expect(board.snapshot().meta.activity?.items).toContainEqual({
+      id: 'implementation:parked-owner:current',
+      category: 'implementing',
+      lifecycle: 'current',
+      issue: 1,
+      pullRequest: null,
+      startedAt: '1970-01-01T00:00:02.500Z',
+      reason: stage === 'implementation' ? 'Implementing admitted issue' : 'Repairing managed code',
     });
-    try {
-      const response = await app.inject('/api/v2/board');
-      expect(response.statusCode).toBe(200);
-      expect(response.json<FactoryV2Snapshot>().meta.activity?.items).toContainEqual({
-        id: 'implementation:parked-owner:current',
-        category: 'implementing',
-        lifecycle: 'current',
-        issue: 1,
-        pullRequest: null,
-        startedAt: '1970-01-01T00:00:02.500Z',
-        reason:
-          stage === 'implementation' ? 'Implementing admitted issue' : 'Repairing managed code',
-      });
-      await board.publish({
-        ...input,
-        jobs: [{ ...source, execution: { ...source.execution, status: 'completed' } }],
-      });
-      expect(board.snapshot().meta.activity?.items).toEqual([]);
-    } finally {
-      board.close();
-      await app.close();
-    }
+    await board.publish({
+      ...input,
+      jobs: [{ ...source, execution: { ...source.execution, status: 'completed' } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  } finally {
+    board.close();
   }
-);
+});
 
 it.each([
   'completed',
@@ -4291,3 +4279,52 @@ it.each([
     board.close();
   }
 );
+
+it('translates a current implementing item through the existing board endpoint', async () => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = { ...stoppedImplementationSnapshot() };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      execution: {
+        ...source.execution,
+        status: 'running',
+        run: { id: 'http-run', ordinal: 2, startedAt: 2500 },
+      },
+      delivery: {
+        stage: 'implementation',
+        active: true,
+        commit: source.intent.base,
+        ready: false,
+        landed: false,
+      },
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'implementation-http', initial: input });
+  const app = operationsServer({
+    base: source.intent.base,
+    run: Effect.runPromise,
+    job,
+    v2: board,
+  });
+  try {
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<FactoryV2Snapshot>().meta.activity?.items).toEqual([
+      {
+        id: 'implementation:parked-owner:http-run',
+        category: 'implementing',
+        lifecycle: 'current',
+        issue: 1,
+        pullRequest: null,
+        startedAt: '1970-01-01T00:00:02.500Z',
+        reason: 'Implementing admitted issue',
+      },
+    ]);
+  } finally {
+    board.close();
+    await app.close();
+  }
+});

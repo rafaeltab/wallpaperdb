@@ -8,7 +8,7 @@ import { relative } from "node:path";
 // a generic sanitizer. Estimated hits are boolean indicators, not exact counts.
 const sites = new Set([
 	"apps/factory/src/adapters/github/joins.ts:1133:4",
-	"apps/factory/src/adapters/t3/planner.ts:277:4",
+	"apps/factory/src/adapters/t3/planner.ts:272:4",
 ]);
 const estimates = {
 	"apps/factory/src/adapters/github/joins.ts:1133:4": {
@@ -18,13 +18,13 @@ const estimates = {
 		body: [1133, 18, 1133, 57],
 		following: [1134, 18, 1134, 43],
 	},
-	"apps/factory/src/adapters/t3/planner.ts:277:4": {
+	"apps/factory/src/adapters/t3/planner.ts:272:4": {
 		sourceSHA256:
 			"1ebb19481a4a668e301fee2a70d6dd8eb8c40a2b0d141897c3dfe4df00ff01fb",
-		branch: [277, 4, 289, 5],
-		body: [278, 6, 283, 8],
-		following: [292, 20, 292, 98],
-		finalReturn: [303, 4, 303, 18],
+		branch: [272, 4, 285, 5],
+		body: [273, 6, 278, 8],
+		following: [288, 20, 288, 98],
+		finalReturn: [299, 4, 299, 18],
 	},
 };
 function matches(span, expected) {

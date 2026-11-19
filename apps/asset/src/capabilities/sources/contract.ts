@@ -53,6 +53,8 @@ export interface AcceptedSource {
   readonly facts: SourceFacts;
   readonly layout: 'asset-layout-1';
 }
+/** Application-owned maximum candidate history page size. */
+export const sourceCandidatePageSize = 32;
 export interface SourceState {
   readonly asset: OwnedAsset;
   sourceSetRevision: string;

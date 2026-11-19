@@ -10,6 +10,7 @@ import {
   SourceStore,
   SourceAcceptanceOutbox,
   SourceFailure,
+  sourceCandidatePageSize,
   type SourceState,
   type SourceStorePort,
   type SourcePublication,
@@ -198,9 +199,11 @@ export function sourcePostgresLayer(options: Options) {
                         )
                       )
                       .orderBy(desc(sourceCandidates.position))
-                      .limit(keyed ? 1 : 33)
+                      .limit(keyed ? 1 : sourceCandidatePageSize + 1)
                   : [];
-                initial.candidates = selected.slice(0, keyed ? 1 : 32).map((row) => row.candidate);
+                initial.candidates = selected
+                  .slice(0, keyed ? 1 : sourceCandidatePageSize)
+                  .map((row) => row.candidate);
                 if (selection?.pendingAfter !== undefined) {
                   const pending = await tx
                     .select()
@@ -218,10 +221,10 @@ export function sourcePostgresLayer(options: Options) {
                       initial.candidates.push(row.candidate);
                 }
                 if (!keyed) {
-                  const last = selected[31];
+                  const last = selected[sourceCandidatePageSize - 1];
                   initial.candidatePage = {
                     valid,
-                    ...(selected.length > 32 && last
+                    ...(selected.length > sourceCandidatePageSize && last
                       ? { nextCursor: `${last.position}:${last.candidateId}` }
                       : {}),
                   };

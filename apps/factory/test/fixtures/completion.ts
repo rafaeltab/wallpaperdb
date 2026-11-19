@@ -34,6 +34,8 @@ export async function completionFixture(
   let commit = 'b'.repeat(40);
   let prCommit = commit;
   let ready = false;
+  let landed = false;
+  let manual = false;
   let failed = false;
   let dependencyResult: 'valid' | 'invalid' | 'cycle' = 'valid';
   let handbackVerified = false;
@@ -42,6 +44,7 @@ export async function completionFixture(
   let publicationUnavailable = false;
   const sends: StageRequest[] = [];
   const interrupts: string[] = [];
+  const releases: number[] = [];
   const runtime = ManagedRuntime.make(
     JobLive.pipe(
       Layer.provide(
@@ -77,11 +80,15 @@ export async function completionFixture(
                     url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                     commit: prCommit,
                     ready,
-                    landed: false,
+                    landed,
                     ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
                   }),
           }),
           Layer.succeed(Execution, {
+            release: (intent) =>
+              Effect.sync(() => {
+                releases.push(intent.issue);
+              }),
             launch: () =>
               Effect.succeed({ kind: 'submitted' as const, threadId: launch?.threadId }),
             interrupt: (_intent, threadId) =>
@@ -94,6 +101,7 @@ export async function completionFixture(
                 : Effect.succeed({
                     kind: 'found' as const,
                     threadId: 'owner',
+                    manual: manual ? { runId: `run-${run}` } : undefined,
                     status: observationStatus ?? (idle ? 'completed' : 'running'),
                     run: { id: `run-${run}`, ordinal: run },
                     worktree: '/owner',
@@ -151,6 +159,7 @@ export async function completionFixture(
     store,
     sends,
     interrupts,
+    releases,
     status: () => call((job) => job.status()),
     close: () => runtime.dispose(),
     resume: (command: import('../../src/capabilities/job/index.js').Resume) =>
@@ -166,6 +175,8 @@ export async function completionFixture(
       commit?: string;
       prCommit?: string;
       ready?: boolean;
+      landed?: boolean;
+      manual?: boolean;
       failed?: boolean;
       clean?: boolean;
       rejection?: StageEvidence['rejection'];
@@ -189,6 +200,8 @@ export async function completionFixture(
       commit = change.commit ?? commit;
       prCommit = change.prCommit ?? prCommit;
       ready = change.ready ?? ready;
+      landed = change.landed ?? landed;
+      manual = change.manual ?? manual;
       failed = change.failed ?? failed;
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;

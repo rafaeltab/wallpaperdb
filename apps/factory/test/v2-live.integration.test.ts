@@ -336,8 +336,8 @@ it.each([
   },
   { active: false, landed: true, mismatch: true, question: false, recovery: false, visible: true },
   { active: true, landed: true, mismatch: false, question: false, recovery: false, visible: true },
-  { active: false, landed: true, mismatch: false, question: true, recovery: false, visible: true },
-  { active: false, landed: true, mismatch: false, question: false, recovery: true, visible: true },
+  { active: false, landed: true, mismatch: false, question: true, recovery: false, visible: false },
+  { active: false, landed: true, mismatch: false, question: false, recovery: true, visible: false },
 ])(
   'retires only inactive verified landed items despite retained OPEN metadata: %j',
   async ({ active, landed, mismatch, question, recovery, visible }) => {
@@ -427,6 +427,7 @@ it.each([
     await board.publish(input);
     expect(!!board.snapshot().entities.items['item:pr:rafaeltab/wallpaperdb/2']).toBe(visible);
     expect(Object.keys(board.snapshot().entities.jobs)).toHaveLength(active ? 2 : 1);
+    if (landed) expect(board.snapshot().meta.factory.concurrency.occupied).toBe(active ? 1 : 0);
     expect(
       board.snapshot().entities.pullRequests['pr:rafaeltab/wallpaperdb/2'].metadata
     ).toMatchObject({ value: { state: 'open' } });

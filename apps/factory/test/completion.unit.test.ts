@@ -683,3 +683,23 @@ it('withholds progression and reconciliation for an unexpected comparison', asyn
     await f.close();
   }
 });
+
+it.each(['unverified', 'manual-recovery', 'manual-continuation'] as const)(
+  'releases landed work despite %s without requiring another receipt',
+  async (state) => {
+    const f = await fixture(state === 'manual-recovery' ? 0 : 3);
+    try {
+      f.state({ observationStatus: 'completed', idle: state === 'manual-recovery' });
+      if (state === 'manual-recovery')
+        expect(await f.status()).toMatchObject({ delivery: { activity: 'manual-recovery' } });
+      f.state({ landed: true, manual: state === 'manual-continuation', inspectFailed: true });
+      expect(await f.status()).toMatchObject({
+        delivery: { landed: true, active: false, pr: { kind: 'found', landed: true } },
+      });
+      expect(f.sends).toEqual([]);
+      expect(f.releases).toEqual([757]);
+    } finally {
+      await f.close();
+    }
+  }
+);

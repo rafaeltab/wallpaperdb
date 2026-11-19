@@ -51,8 +51,27 @@ export function reconcileStages(
 ) {
   return Effect.gen(function* () {
     const initialIndex = authority.restart?.index ?? 0;
-    if (observation.kind !== 'found') return undefined;
     if (((yield* store.readControl()).restart?.index ?? 0) !== initialIndex) return undefined;
+    // Landing is an external delivery fact, independent of the worker receipt.
+    // Check it before recovering or sending any further stage instructions.
+    if (
+      (observation.kind === 'found' || observation.kind === 'unverified') &&
+      ['completed', 'idle', 'failed', 'interrupted', 'cancelled', 'rolled_back'].includes(
+        observation.status
+      )
+    ) {
+      const pr = yield* issues.pullRequest(intent).pipe(Effect.catch(() => Effect.succeed(null)));
+      if (pr?.kind === 'found' && pr.landed)
+        return {
+          stage: 'ci' as const,
+          commit: pr.commit,
+          pr,
+          ready: false,
+          landed: true,
+          active: false,
+        };
+    }
+    if (observation.kind !== 'found') return undefined;
     yield* retainInitialStage(store, intent, initialIndex, observation.threadId);
     yield* recoverManualRepair(store);
     yield* recoverReconciliation(store);

@@ -121,7 +121,15 @@ export function populateCards(context: ProjectionContext) {
     const jobs = Object.values(tables.jobs).filter((j) => j.pullRequestId === pr.id);
     const raw = facts?.pullRequests.find((p) => p.number === pr.number);
     if (
-      (pr.readiness.state === 'landed' || raw?.state !== 'OPEN') &&
+      pr.readiness.state === 'landed' &&
+      jobs.every((j) => !j.occupiesCapacity) &&
+      !Object.values(tables.maintenance).some(
+        (m) => m.pullRequestId === pr.id && m.occupiesCapacity
+      )
+    )
+      continue;
+    if (
+      raw?.state !== 'OPEN' &&
       !jobs.some(
         (j) =>
           j.occupiesCapacity || (!j.cancelled && !!j.question) || j.activity === 'manual-recovery'

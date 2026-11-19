@@ -1506,6 +1506,7 @@ export async function runProtocol(
             ? 'implementation'
             : 'publication';
       resource.latestRunId = `run-${resource.runCount}`;
+      resource.status = config.complete ? 'completed' : 'running';
       if (resource.stage === 'publication') {
         const pr = existsSync(join(config.directory, 'pr.json'))
           ? JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))

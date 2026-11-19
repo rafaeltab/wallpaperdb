@@ -597,7 +597,10 @@ it.each(['implementation', 'publication'] as const)(
             .toEqual({ stage: 'publication', run: 'run-3' });
           publication = await readFile(join(host.directory, 'pr.json'), 'utf8');
         }
-        await host.save({ overrides: { status: 'interrupted' } });
+        const resourcePath = join(host.directory, 'resource.json');
+        const resource = JSON.parse(await readFile(resourcePath, 'utf8'));
+        await writeFile(resourcePath, JSON.stringify({ ...resource, status: 'interrupted' }));
+        await host.save({});
         await page.reload();
         await browserExpect(
           page.getByRole('button', { name: 'Retry existing stage' })
@@ -609,7 +612,6 @@ it.each(['implementation', 'publication'] as const)(
         await page.getByRole('button', { name: 'Retry existing stage' }).click();
         expect((await delivered).status()).toBe(202);
 
-        await host.save({});
         await page.reload();
         await browserExpect(page.getByRole('button', { name: 'Retry existing stage' })).toHaveCount(
           0

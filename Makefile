@@ -223,10 +223,10 @@ coverage-summary: ## Summarize existing test coverage
 	@node scripts/coverage-summary.ts
 
 crap: ## Rank functions using fresh test coverage (optional PACKAGE)
-	@PACKAGE="$(PACKAGE)" pnpm exec wallpaperdb-crap report
+	@PACKAGE="$(PACKAGE)" pnpm --filter @wallpaperdb/scripts exec tsx crap.mts report
 
 check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
-	@PACKAGE="$(PACKAGE)" pnpm exec wallpaperdb-crap check
+	@PACKAGE="$(PACKAGE)" pnpm --filter @wallpaperdb/scripts exec tsx crap.mts check
 
 worktree-remove: ## Tear down this worktree and release its slot
 	@node scripts/teardown-worktree.ts

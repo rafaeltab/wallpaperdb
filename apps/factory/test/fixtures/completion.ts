@@ -44,6 +44,7 @@ export async function completionFixture(
   let lost = false;
   let inspectFailed = false;
   let publicationUnavailable = false;
+  let publicationAbsent = false;
   const sends: StageRequest[] = [];
   const interrupts: string[] = [];
   const releases: number[] = [];
@@ -73,19 +74,21 @@ export async function completionFixture(
                 url: 'https://github.com/rafaeltab/wallpaperdb/issues/757',
               }),
             pullRequest: () =>
-              publicationUnavailable
-                ? Effect.fail(
-                    new Unavailable({ operation: 'observe-publication', cause: 'outage' })
-                  )
-                : Effect.succeed({
-                    kind: 'found' as const,
-                    url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
-                    commit: prCommit,
-                    ready,
-                    landed,
-                    lifecycle,
-                    ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
-                  }),
+              publicationAbsent
+                ? Effect.succeed({ kind: 'absent' as const })
+                : publicationUnavailable
+                  ? Effect.fail(
+                      new Unavailable({ operation: 'observe-publication', cause: 'outage' })
+                    )
+                  : Effect.succeed({
+                      kind: 'found' as const,
+                      url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+                      commit: prCommit,
+                      ready,
+                      landed,
+                      lifecycle,
+                      ...(failed ? { ci: { failed: true, progress: 'Completed failed CI' } } : {}),
+                    }),
           }),
           Layer.succeed(Execution, {
             isIdle: () => Effect.succeed(managedIdle),
@@ -168,6 +171,8 @@ export async function completionFixture(
     close: () => runtime.dispose(),
     resume: (command: import('../../src/capabilities/job/index.js').Resume) =>
       call((job) => job.resume(command)),
+    retry: (command: import('../../src/capabilities/job/index.js').Retry) =>
+      call((job) => job.retry(command)),
     cancel: (id: string) => call((job) => job.cancel(id)),
     state: (change: {
       base?: string;
@@ -189,6 +194,7 @@ export async function completionFixture(
       lost?: boolean;
       inspectFailed?: boolean;
       publicationUnavailable?: boolean;
+      publicationAbsent?: boolean;
       run?: number;
       observationStatus?: string;
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
@@ -215,6 +221,7 @@ export async function completionFixture(
       lost = change.lost ?? lost;
       inspectFailed = change.inspectFailed ?? inspectFailed;
       publicationUnavailable = change.publicationUnavailable ?? publicationUnavailable;
+      publicationAbsent = change.publicationAbsent ?? publicationAbsent;
       run = change.run ?? run;
       observationStatus = change.observationStatus ?? observationStatus;
     },

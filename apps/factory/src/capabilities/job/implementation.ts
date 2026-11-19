@@ -86,7 +86,7 @@ export const JobLive = Layer.effect(
           const activeIntent = attemptIntent(intent, before.restart?.index ?? 0);
           if (before.retirement) {
             const status = retiredStatus(
-              activeIntent,
+              { ...intent, branch: activeIntent.branch },
               before,
               before.retirement,
               yield* time.now()
@@ -167,7 +167,7 @@ export const JobLive = Layer.effect(
           const stage = yield* currentStage(store);
           if (control.retirement) {
             const status = retiredStatus(
-              activeIntent,
+              { ...intent, branch: activeIntent.branch },
               control,
               control.retirement,
               yield* time.now()

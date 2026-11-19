@@ -740,3 +740,26 @@ it('keeps verified retirement after releasing the managed observation subscripti
     await f.close();
   }
 });
+
+it('retains canonical job identity and the retry branch across retired status polls', async () => {
+  const f = await fixture(0);
+  try {
+    f.state({ idle: true, observationStatus: 'completed', publicationAbsent: true });
+    const stopped = await f.status();
+    if (stopped.kind !== 'job' || !stopped.retry) throw new Error('Missing fresh retry');
+    const original = stopped.intent;
+    const retried = await f.retry({ jobId: original.id, ...stopped.retry });
+    expect(retried).toMatchObject({
+      kind: 'job',
+      intent: { branch: `${original.branch}-retry-1` },
+    });
+    f.state({ landed: true, observationStatus: 'completed', publicationAbsent: false });
+    const first = await f.status();
+    const next = await f.status();
+    const expected = { id: original.id, branch: `${original.branch}-retry-1` };
+    expect(first).toMatchObject({ intent: expected, delivery: { landed: true, active: false } });
+    expect(next).toMatchObject({ intent: expected, delivery: { landed: true, active: false } });
+  } finally {
+    await f.close();
+  }
+});

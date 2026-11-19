@@ -12,17 +12,26 @@
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.ts",
 		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.ts",
-		"test:unit": "cd .. && scripts/node_modules/.bin/vitest run",
+		"test:unit": "cd ..",
 		"test:mutation": "node mutation.ts",
 		"check-types": "tsc --project tsconfig.json && tsc --project tsconfig.external.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts"
+		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts",
+		"test:coverage-runtime": "cd .. && node --test scripts/coverage-runtime/*.test.mjs",
+		"coverage": "node coverage-runtime/command.mjs",
+		"coverage:inventory": "cd .. && node scripts/coverage-runtime/inventory.mjs",
+		"coverage:build": "cd .. && node scripts/coverage-runtime/build.mjs",
+		"coverage:tier": "node coverage-runtime/run-tier.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
 		"istanbul-lib-coverage": "3.2.2",
 		"@stryker-mutator/core": "10.0.0",
-		"@stryker-mutator/vitest-runner": "10.0.0"
+		"@stryker-mutator/vitest-runner": "10.0.0",
+		"ast-v8-to-istanbul": "1.0.6",
+		"@vitest/coverage-v8": "5.0.2",
+		"acorn": "8.15.0",
+		"yaml": "2.9.1"
 	},
 	"devDependencies": {
 		"@wallpaperdb/vitest-config": "workspace:*",

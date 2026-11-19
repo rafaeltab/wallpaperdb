@@ -1,0 +1,21 @@
+# Coverage reporting
+
+Use `make coverage` for the configured unit and integration suites, or select one workspace with `PACKAGE`. The [Makefile](../Makefile) owns command selection. `make ci` runs this same producer after build, lint and type checks. Test-only suites, including Scripts, infra and repository integration checks, remain part of that scope. E2E runs through its existing separate workflow.
+
+`make crap` and `make check-crap CRAP_THRESHOLD=…` obtain fresh coverage through the same producer before analysis. They retain the [CRAP scope, exclusions and tier configuration](../crap.config.mts), strict counter validation and caller lock. `make coverage-summary` reads the most recent aggregate.
+
+The Scripts workspace owns the [coverage command](../scripts/coverage-runtime/command.mjs) and its [pinned dependencies](../scripts/package.json). The [inventory](../scripts/coverage-runtime/inventory.mjs) derives tier commands from workspace manifests. Node suites execute in a fresh compiled mirror with original TypeScript maps. DOM and module-reset suites retain Vite. The compiler adapts existing process entry points and transports official V8 descendant measurements without changing application sources. The [runner configuration](../scripts/coverage-runtime/vitest.config.mjs) retains configured plugins, environments, projects, source exclusions and thresholds.
+
+The mirror and attempt records live under `.coverage-runtime`, which `make clean` removes. A report binds source identity to the exact TypeScript read during compilation or JavaScript copied into the mirror. Publication rejects changed or missing source identities, failed tests and changes to maintained checkout inputs during collection. Aggregate invalidation preserves the CRAP caller's lock.
+
+Published `coverage/receipts` retain each selected tier's original report, audited report, audit entries and source hashes. The [merger](../scripts/coverage-runtime/receipts.mjs) requires every configured tier, verifies checkout and report identity, and reproduces the audit before merging. The [CI shards](../.github/workflows/ci.yml) upload their separate receipts; the aggregate job installs normal dependencies before verifying both shards. Tier JSON keeps original maps and counters except for the explicitly approved estimated arms below. Raw inputs remain in receipts and attempt directories.
+
+## Converter maintenance
+
+The [pnpm patch](../patches/ast-v8-to-istanbul-1.0.6.patch) repairs qualified awaited-conditional conversion in the locked converter. Normal frozen installation applies it through [patchedDependencies](../pnpm-workspace.yaml). No runtime download or external checkout is required. Changes to the converter, Vitest native APIs, generated mock sources or compilation strategy require rerunning the normal Scripts runtime controls and full configured coverage. Native mock adaptation rejects unqualified generated source identities rather than attributing proxy plumbing to application code.
+
+## Estimated covered decisions
+
+The [audit policy](../scripts/coverage-runtime/report-audit.mjs) permits only two pinned Factory decision families, the retained join-plan publication guard and planner completion cleanup guard. A negative inferred implicit-false count can publish boolean `1` when the exact source hash and statement locations match, the true body agrees with its measured count, and the following statement supports a positive difference. Planner also requires agreement with the final return measurement. This is an estimated covered indicator, not an exact execution frequency.
+
+Missing, ambiguous or contradictory supporting evidence publishes audited `0`. Other negative, malformed or nonfinite counts fail. Measured nonnegative counts, raw reports, statement/function counters, maps, source inventory and branch denominators remain unchanged. JSON, LCOV and HTML use the same audited result; the summary distinguishes estimates from conservative zero fallbacks. The approximation does not establish complete reporting for crashed or forcibly terminated descendants, browser E2E, or mutation execution and transport.

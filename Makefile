@@ -56,7 +56,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         format lint lint-fix check-types check run docker-status docker-run \
         infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
-        coverage-summary crap check-crap \
+        coverage coverage-summary crap check-crap \
         worktree-remove ci clean toolchain
 
 help: ## Show commands and selectors
@@ -216,6 +216,9 @@ nats-stream-list: ## List NATS streams
 nats-stream-info: ## Inspect WALLPAPER stream
 	@nats stream info WALLPAPER --server nats://localhost:$(NATS_HOST_PORT)
 
+coverage: ## Run maintained unit/integration coverage (optional PACKAGE)
+	@node scripts/coverage-runtime/command.mjs $(if $(PACKAGE),--package "$(PACKAGE)")
+
 coverage-summary: ## Summarize existing test coverage
 	@node scripts/coverage-summary.ts
 
@@ -233,8 +236,8 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@echo "E2E excluded (browser and container). GitHub Actions enforces E2E; opt in locally with make test-e2e."
 	@set -e; \
 	start_time=$$(date +%s); \
-	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
-	pnpm coverage:merge --local; \
+	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
+	$(MAKE) coverage; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \
@@ -249,7 +252,7 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning turbo caches..."
 	@rm -rf .turbo apps/*/.turbo packages/*/.turbo
 	@echo "Cleaning coverage reports..."
-	@rm -rf coverage apps/*/coverage packages/*/coverage
+	@rm -rf coverage apps/*/coverage packages/*/coverage .coverage-runtime
 	@echo "Cleaning TypeScript incremental build cache..."
 	@find . -name "*.tsbuildinfo" -not -path "*/node_modules/*" -delete
 	@echo "Cleaning generated OpenAPI specs..."

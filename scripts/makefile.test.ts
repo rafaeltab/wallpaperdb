@@ -494,19 +494,17 @@ test("one-off scripts require a package and script", () => {
 
 test("force applies to ordinary CI checks and type checks", () => {
 	const ci = output("ci", "FORCE=1");
-	expect(ci).toMatch(
-		/run build lint check-types test:unit test:integration .*--force/,
-	);
+	expect(ci).toMatch(/node scripts\/coverage-runtime\/command.mjs/);
+	expect(ci).not.toMatch(/command.mjs --package/);
+	expect(ci).toMatch(/run build lint check-types .*--force/);
 	expect(ci).not.toMatch(/run test:e2e/);
-	expect(ci).toMatch(
-		/run build lint check-types test:unit test:integration .*--concurrency=4/,
-	);
+	expect(ci).toMatch(/run build lint check-types .*--concurrency=4/);
 	expect(output("ci", "CI_CONCURRENCY=1")).toMatch(
-		/run build lint check-types test:unit test:integration .*--concurrency=1/,
+		/run build lint check-types .*--concurrency=1/,
 	);
 	const scopedCi = output("ci", "PACKAGE=web");
 	expect(scopedCi).not.toMatch(
-		/run (build lint check-types test:unit test:integration|test:e2e)[^\n]*--filter=/,
+		/run (build lint check-types|test:e2e)[^\n]*--filter=/,
 	);
 	expect(scopedCi).not.toMatch(
 		/run build --filter=@wallpaperdb\/vitest-config/,

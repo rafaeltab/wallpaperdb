@@ -237,7 +237,7 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@set -e; \
 	start_time=$$(date +%s); \
 	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
-	$(MAKE) coverage; \
+	node scripts/coverage-runtime/command.mjs; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \

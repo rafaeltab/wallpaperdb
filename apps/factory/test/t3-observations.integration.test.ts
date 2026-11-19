@@ -2,12 +2,144 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { z } from 'zod';
 import { t3Observations, ObservationUnknown } from '../src/adapters/t3/index.js';
 import { sqliteObservationCheckpoints } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 import type { ObservationCheckpointUpdate } from '../src/capabilities/observe/index.js';
 import { websocketProtocol } from './fixtures/websocket.js';
+
+it('preserves busy archived descendants discovered while shell metadata awaits family recovery', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-archive-concurrency-'));
+  initializeState(directory);
+  const row = (id: string, status = 'completed') => ({
+    id,
+    projectId: 'project',
+    title: id,
+    lineage: { parentThreadId: id === 'child' ? 'owner' : null },
+    archivedAt: id === 'child' ? '2026-11-01T00:00:00Z' : null,
+    status,
+    latestRunId: 'run',
+    activeRunId: status === 'running' ? 'run' : null,
+    blockedOnThreadWait: false,
+    pendingBackgroundTasks: [],
+    pullRequests: [],
+  });
+  let shellUpdate: ((values: unknown[]) => void) | undefined;
+  let archiveReply: (() => void) | undefined;
+  let familyReply: (() => void) | undefined;
+  let childUpdate: ((values: unknown[]) => void) | undefined;
+  const host = await websocketProtocol((raw, send) => {
+    const request = z
+      .object({
+        _tag: z.string(),
+        id: z.string().optional(),
+        tag: z.string().optional(),
+        payload: z.object({ threadId: z.string().optional() }).optional(),
+      })
+      .parse(raw);
+    if (request._tag !== 'Request') return;
+    const reply = (values: unknown[]) => send({ _tag: 'Chunk', requestId: request.id, values });
+    const result = (value: unknown) =>
+      send({ _tag: 'Exit', requestId: request.id, exit: { _tag: 'Success', value } });
+    if (request.tag === 'orchestration.subscribeShell') {
+      shellUpdate = reply;
+      reply([
+        {
+          kind: 'snapshot',
+          snapshot: { snapshotSequence: 10, threads: [row('owner')], archivedThreads: [] },
+        },
+        { kind: 'synchronized' },
+      ]);
+    } else if (request.tag === 'orchestration.getArchivedShellSnapshot') {
+      archiveReply = () => result({ snapshotSequence: 30, threads: [row('child', 'running')] });
+    } else if (request.tag === 'orchestration.getThreadFamily') {
+      familyReply = () => result({ snapshotSequence: 21, threads: [] });
+    } else if (request.tag === 'orchestration.subscribeThread') {
+      const id = request.payload?.threadId;
+      if (!id) throw new Error('Missing managed thread');
+      if (id === 'child') childUpdate = reply;
+      reply([
+        {
+          kind: 'snapshot',
+          snapshotSequence: 10,
+          projection: {
+            thread: {
+              ...row(id),
+              modelSelection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+              branch: null,
+              worktreePath: null,
+            },
+            runs: [{ id: 'run', ordinal: 1, status: id === 'child' ? 'running' : 'completed' }],
+            attempts: [],
+            runtimeRequests: [],
+            providerThreads: [],
+            messages: [],
+            turnItems: [],
+          },
+        },
+        { kind: 'synchronized' },
+      ]);
+    }
+  });
+  const checkpoints = sqliteObservationCheckpoints(directory);
+  const observer = await t3Observations({
+    origin: host.origin,
+    checkpoints,
+    credential: async () => ({ token: 'controlled-observer', expiresAt: Date.now() + 86400000 }),
+    report: () => undefined,
+  });
+  try {
+    observer.retainJob(819, 'archive-job', 'owner');
+    await vi.waitFor(() => {
+      expect(shellUpdate).toBeDefined();
+      expect(archiveReply).toBeDefined();
+      expect(observer.list('project')).toContainEqual({ threadId: 'owner', title: 'owner' });
+    });
+    shellUpdate?.([
+      { kind: 'thread.updated', sequence: 20, thread: { ...row('owner'), title: 'updated owner' } },
+      { kind: 'thread.removed', sequence: 21, threadId: 'removed' },
+    ]);
+    await vi.waitFor(() => expect(familyReply).toBeDefined());
+    archiveReply?.();
+    await vi.waitFor(async () =>
+      expect(
+        (await Effect.runPromise(checkpoints.read(`t3:${host.origin}:archive`)))?.sequence
+      ).toBe(30)
+    );
+    familyReply?.();
+    await vi.waitFor(() => {
+      expect(observer.inventoryReady()).toBe(true);
+      expect(observer.list('project')).toContainEqual({
+        threadId: 'owner',
+        title: 'updated owner',
+      });
+    });
+    expect(observer.inactive('owner', 'run')).toBe('busy');
+    expect(observer.list('project')).toContainEqual({ threadId: 'child', title: 'child' });
+    expect(observer.retireIssue(819)).toBe(false);
+    await vi.waitFor(() => expect(childUpdate).toBeDefined());
+    childUpdate?.([
+      {
+        kind: 'event',
+        sequence: 40,
+        event: {
+          threadId: 'child',
+          type: 'run.updated',
+          payload: { id: 'run', ordinal: 1, status: 'completed' },
+        },
+      },
+    ]);
+    shellUpdate?.([{ kind: 'thread.updated', sequence: 40, thread: row('child') }]);
+    await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
+    expect(observer.retireIssue(819)).toBe(true);
+  } finally {
+    await observer.close();
+    await host.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 it.each(['owner', 'child'])(
   'keeps inactivity unverified when %s watcher metadata is omitted',

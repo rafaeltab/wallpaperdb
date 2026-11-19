@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { Effect } from 'effect';
+import { Effect, Semaphore } from 'effect';
 import { z } from 'zod';
 import type { ObservationCheckpoints } from '../../capabilities/observe/index.js';
 import { t3Subscription, t3ReadRpc } from './subscription.js';
@@ -45,6 +45,14 @@ export async function t3Observations(config: {
   run?: <A>(operation: Effect.Effect<A, unknown>) => Promise<A>;
 }) {
   const run = config.run ?? Effect.runPromise;
+  // Archive merges cannot interleave with staged shell metadata or its checkpoint.
+  const metadataChanges = Semaphore.makeUnsafe(1);
+  const changeMetadata = (work: () => void | Promise<void>) =>
+    run(
+      Effect.tryPromise({ try: async () => work(), catch: (cause) => cause }).pipe(
+        metadataChanges.withPermits(1)
+      )
+    );
   const stop = new AbortController();
   const namespace = `t3:${config.origin}:`;
   const metadata = new Map<string, Shell>();
@@ -403,114 +411,115 @@ export async function t3Observations(config: {
             },
           },
         ],
-        apply: async (_id, values) => {
-          let changed = false;
-          let synchronized = metadataReady;
-          for (const raw of values) {
-            const item = z.object({ kind: z.string() }).passthrough().parse(raw);
-            if (item.kind === 'snapshot') {
-              if (item.resolvedRepositoryIdentityRoots !== undefined) continue;
-              const snapshot = z
-                .object({
-                  snapshotSequence: z.number().int().nonnegative(),
-                  threads: z.array(shell),
-                  archivedThreads: z.array(shell),
-                })
-                .parse(item.snapshot);
-              if (snapshot.snapshotSequence < metadataSequence)
-                throw new ObservationUnknown('Obsolete T3 inventory');
-              staged = new Map(metadata);
-              const present = new Set(
-                [...snapshot.threads, ...snapshot.archivedThreads].map((row) => row.id)
-              );
-              for (const row of metadata.values())
-                if (
-                  !present.has(row.id) &&
-                  row.archivedAt == null &&
-                  snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)
-                ) {
-                  staged.set(row.id, { ...row, observationMissing: true });
-                  metadataVersions.set(row.id, snapshot.snapshotSequence);
-                }
-              for (const row of [...snapshot.threads, ...snapshot.archivedThreads]) {
-                if (snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
-                  staged.set(row.id, row);
-                  metadataVersions.set(row.id, snapshot.snapshotSequence);
-                }
-              }
-              sequence = snapshot.snapshotSequence;
-              changed = true;
-            } else if (item.kind === 'synchronized') {
-              synchronized = true;
-            } else if (item.kind === 'thread.updated') {
-              const update = shell.parse(item.thread);
-              const incoming = z.number().int().nonnegative().parse(item.sequence);
-              if (incoming <= sequence) continue;
-              staged ??= new Map(metadata);
-              if (incoming >= (metadataVersions.get(update.id) ?? -1)) {
-                staged.set(update.id, update);
-                metadataVersions.set(update.id, incoming);
-              }
-              sequence = incoming;
-              changed = true;
-            } else if (item.kind === 'thread.removed') {
-              // The installed shell reports archived changes as active removals.
-              // Refine that identity through metadata, never an unrelated transcript.
-              const incoming = z.number().int().nonnegative().parse(item.sequence);
-              if (incoming > sequence) {
-                const family = z
+        apply: async (_id, values) =>
+          changeMetadata(async () => {
+            let changed = false;
+            let synchronized = metadataReady;
+            for (const raw of values) {
+              const item = z.object({ kind: z.string() }).passthrough().parse(raw);
+              if (item.kind === 'snapshot') {
+                if (item.resolvedRepositoryIdentityRoots !== undefined) continue;
+                const snapshot = z
                   .object({
                     snapshotSequence: z.number().int().nonnegative(),
                     threads: z.array(shell),
+                    archivedThreads: z.array(shell),
                   })
-                  .parse(
-                    await t3ReadRpc({
-                      origin: config.origin,
-                      token: credential.token,
-                      signal: lifetime(credential, stop.signal),
-                      method: 'orchestration.getThreadFamily',
-                      payload: { threadId: z.string().parse(item.threadId) },
-                    })
-                  );
-                staged ??= new Map(metadata);
-                const removed = metadata.get(z.string().parse(item.threadId));
-                if (
-                  removed &&
-                  !family.threads.some((row) => row.id === removed.id) &&
-                  incoming >= (metadataVersions.get(removed.id) ?? -1)
-                ) {
-                  staged.set(removed.id, { ...removed, observationMissing: true });
-                  metadataVersions.set(removed.id, incoming);
-                }
-                for (const row of family.threads)
-                  if (family.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
-                    staged.set(row.id, row);
-                    metadataVersions.set(row.id, family.snapshotSequence);
+                  .parse(item.snapshot);
+                if (snapshot.snapshotSequence < metadataSequence)
+                  throw new ObservationUnknown('Obsolete T3 inventory');
+                staged = new Map(metadata);
+                const present = new Set(
+                  [...snapshot.threads, ...snapshot.archivedThreads].map((row) => row.id)
+                );
+                for (const row of metadata.values())
+                  if (
+                    !present.has(row.id) &&
+                    row.archivedAt == null &&
+                    snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)
+                  ) {
+                    staged.set(row.id, { ...row, observationMissing: true });
+                    metadataVersions.set(row.id, snapshot.snapshotSequence);
                   }
+                for (const row of [...snapshot.threads, ...snapshot.archivedThreads]) {
+                  if (snapshot.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
+                    staged.set(row.id, row);
+                    metadataVersions.set(row.id, snapshot.snapshotSequence);
+                  }
+                }
+                sequence = snapshot.snapshotSequence;
+                changed = true;
+              } else if (item.kind === 'synchronized') {
+                synchronized = true;
+              } else if (item.kind === 'thread.updated') {
+                const update = shell.parse(item.thread);
+                const incoming = z.number().int().nonnegative().parse(item.sequence);
+                if (incoming <= sequence) continue;
+                staged ??= new Map(metadata);
+                if (incoming >= (metadataVersions.get(update.id) ?? -1)) {
+                  staged.set(update.id, update);
+                  metadataVersions.set(update.id, incoming);
+                }
                 sequence = incoming;
                 changed = true;
-              }
-            } else if (item.kind === 'project.updated' || item.kind === 'project.removed') {
-              const incoming = z.number().int().nonnegative().parse(item.sequence);
-              if (incoming > sequence) {
-                sequence = incoming;
-                changed = true;
-              }
-            } else throw new ObservationUnknown('Unsupported T3 inventory update');
-          }
-          if (changed || staged) {
-            const next = staged ?? new Map(metadata);
-            await checkpoint('inventory', metadataRevision, sequence, [...next.values()]);
-            metadataRevision++;
-            metadataSequence = sequence;
-            metadataResume = true;
-            metadata.clear();
-            for (const [id, item] of next) metadata.set(id, item);
-            staged = undefined;
-          }
-          select();
-          metadataReady = synchronized;
-        },
+              } else if (item.kind === 'thread.removed') {
+                // The installed shell reports archived changes as active removals.
+                // Refine that identity through metadata, never an unrelated transcript.
+                const incoming = z.number().int().nonnegative().parse(item.sequence);
+                if (incoming > sequence) {
+                  const family = z
+                    .object({
+                      snapshotSequence: z.number().int().nonnegative(),
+                      threads: z.array(shell),
+                    })
+                    .parse(
+                      await t3ReadRpc({
+                        origin: config.origin,
+                        token: credential.token,
+                        signal: lifetime(credential, stop.signal),
+                        method: 'orchestration.getThreadFamily',
+                        payload: { threadId: z.string().parse(item.threadId) },
+                      })
+                    );
+                  staged ??= new Map(metadata);
+                  const removed = metadata.get(z.string().parse(item.threadId));
+                  if (
+                    removed &&
+                    !family.threads.some((row) => row.id === removed.id) &&
+                    incoming >= (metadataVersions.get(removed.id) ?? -1)
+                  ) {
+                    staged.set(removed.id, { ...removed, observationMissing: true });
+                    metadataVersions.set(removed.id, incoming);
+                  }
+                  for (const row of family.threads)
+                    if (family.snapshotSequence >= (metadataVersions.get(row.id) ?? -1)) {
+                      staged.set(row.id, row);
+                      metadataVersions.set(row.id, family.snapshotSequence);
+                    }
+                  sequence = incoming;
+                  changed = true;
+                }
+              } else if (item.kind === 'project.updated' || item.kind === 'project.removed') {
+                const incoming = z.number().int().nonnegative().parse(item.sequence);
+                if (incoming > sequence) {
+                  sequence = incoming;
+                  changed = true;
+                }
+              } else throw new ObservationUnknown('Unsupported T3 inventory update');
+            }
+            if (changed || staged) {
+              const next = staged ?? new Map(metadata);
+              await checkpoint('inventory', metadataRevision, sequence, [...next.values()]);
+              metadataRevision++;
+              metadataSequence = sequence;
+              metadataResume = true;
+              metadata.clear();
+              for (const [id, item] of next) metadata.set(id, item);
+              staged = undefined;
+            }
+            select();
+            metadataReady = synchronized;
+          }),
       });
     } finally {
       metadataReady = false;
@@ -534,7 +543,7 @@ export async function t3Observations(config: {
     if (previous)
       try {
         for (const row of z.array(shell).parse(decodeObservation(previous))) rows.set(row.id, row);
-        merge();
+        await changeMetadata(merge);
       } catch {
         config.report(
           new ObservationUnknown('Unusable archived T3 checkpoint; requesting a snapshot')
@@ -560,7 +569,7 @@ export async function t3Observations(config: {
       sequence = snapshot.snapshotSequence;
       await checkpoint('archive', revision, sequence, [...rows.values()]);
       revision++;
-      merge();
+      await changeMetadata(merge);
       archiveReady = true;
       await delay(Math.max(0, nextAt - Date.now() - 1000), undefined, { signal: stop.signal });
     });

@@ -390,6 +390,7 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
   );
   const sources = ManagedRuntime.make(sourcePostgresLayer(options()));
   const cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  const fixtureAssets: string[] = [];
   try {
     const command = {
       revision: 'cleanup-1',
@@ -408,6 +409,7 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
     );
     if (created.outcome !== 'created') throw new Error('Expected Asset');
     const assetId = created.assetId;
+    fixtureAssets.push(assetId);
     const sourceId = `source_${crypto.randomUUID()}`,
       orphan = `source_${crypto.randomUUID()}`,
       candidateId = crypto.randomUUID();
@@ -484,6 +486,7 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
       )
     );
     if (adjacent.outcome !== 'created') throw new Error('Expected adjacent live Asset');
+    fixtureAssets.push(adjacent.assetId);
     const adjacentCandidateId = crypto.randomUUID();
     await sources.runPromise(
       SourceStore.use((store) =>
@@ -548,9 +551,16 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
       await lifecycle.runPromise(LifecycleStore.use((store) => store.find(assetId)))
     ).toBeNull();
   } finally {
-    await cleanup.dispose();
-    await sources.dispose();
-    await lifecycle.dispose();
+    try {
+      // A failed assertion must not leave due work for another test's global claim.
+      await pool.query('DELETE FROM source_cleanup WHERE asset_id = ANY($1::text[])', [
+        fixtureAssets,
+      ]);
+    } finally {
+      await cleanup.dispose();
+      await sources.dispose();
+      await lifecycle.dispose();
+    }
   }
 });
 

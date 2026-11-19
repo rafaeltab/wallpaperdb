@@ -34,7 +34,7 @@ function input(name, line, counts) {
 }
 const inputs = [
 		input("github/joins", 1133, [549, -310]),
-		input("t3/planner", 277, [89, -2]),
+		input("t3/planner", 272, [89, -2]),
 	],
 	before = structuredClone(inputs);
 const result = auditReports(inputs, root);
@@ -93,11 +93,11 @@ assert.deepEqual(Object.values(estimated.reports[0].data)[0].b[0], [2, 1]);
 assert.deepEqual(mixed, mixedBefore, "estimated coverage mutated raw input");
 assert.equal(estimated.audit[0].classification, "estimated-covered");
 assert.equal(estimated.audit[0].estimate.difference, 1);
-const planner = input("t3/planner", 277, [89, -2]),
+const planner = input("t3/planner", 272, [89, -2]),
 	plannerFile = Object.values(planner.data)[0];
 const plannerBranch = {
-	start: { line: 277, column: 4 },
-	end: { line: 289, column: 5 },
+	start: { line: 272, column: 4 },
+	end: { line: 285, column: 5 },
 };
 plannerFile.branchMap[0] = {
 	type: "if",
@@ -105,10 +105,29 @@ plannerFile.branchMap[0] = {
 	locations: [plannerBranch, { start: {}, end: {} }],
 };
 plannerFile.statementMap = {
-	0: { start: { line: 278, column: 6 }, end: { line: 283, column: 8 } },
-	1: { start: { line: 292, column: 20 }, end: { line: 292, column: 98 } },
-	2: { start: { line: 303, column: 4 }, end: { line: 303, column: 18 } },
+	0: { start: { line: 273, column: 6 }, end: { line: 278, column: 8 } },
+	1: { start: { line: 288, column: 20 }, end: { line: 288, column: 98 } },
+	2: { start: { line: 299, column: 4 }, end: { line: 299, column: 18 } },
 };
+// Bind the report fixture to the actual source, independently of audit policy.
+// Matching the source hash alone did not catch stale report coordinates.
+const plannerLines = readFileSync(plannerFile.path, "utf8").split("\n");
+function plannerText({ start, end }) {
+	const lines = plannerLines.slice(start.line - 1, end.line);
+	lines[lines.length - 1] = lines.at(-1).slice(0, end.column);
+	lines[0] = lines[0].slice(start.column);
+	return lines.join("\n");
+}
+assert.match(plannerText(plannerBranch), /^if \(!detail\.thread\.settled\) \{/);
+assert.equal(
+	plannerText(plannerFile.statementMap[0]).replace(/\s+/g, " "),
+	"await mcpCall( config, 't3_thread_organize', { action: 'settle', threadId: detail.thread.threadId }, signal );",
+);
+assert.equal(
+	plannerText(plannerFile.statementMap[1]),
+	"record.retired === true || consume || !successful || completedAt === undefined",
+);
+assert.equal(plannerText(plannerFile.statementMap[2]), "return result;");
 plannerFile.s = { 0: 89, 1: 92, 2: 92 };
 const plannerEstimated = auditReports([planner], root);
 assert.deepEqual(

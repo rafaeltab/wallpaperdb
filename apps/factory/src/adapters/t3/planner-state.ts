@@ -3,18 +3,35 @@ import { publisher, requiredRecord } from '../../platform/index.js';
 import { plannerSchema as schema } from '../../platform/index.js';
 export function plannerState(directory: string) {
   const publish = publisher(directory);
-  const read = async (requestId?: string) => {
-    let latest: z.infer<typeof schema> | undefined;
-    for (let revision = 0; ; revision++) {
+  // Published revisions are immutable. Validate each appended revision once per
+  // reader lifetime, retaining only indexes, never historical context payloads.
+  let revision = 0;
+  const requests = new Map<string, number>();
+  let pending: Promise<void> | undefined;
+  const refresh = async () => {
+    for (;;) {
       try {
         const record = schema.parse(await requiredRecord(directory, `planner-${revision}.json`));
-        if (!requestId || record.requestId === requestId) latest = record;
         if (record.revision !== revision) throw new Error('Invalid planner revision');
+        requests.set(record.requestId, revision);
+        revision++;
       } catch (cause) {
-        if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return latest;
+        if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT') return;
         throw cause;
       }
     }
+  };
+  const read = async (requestId?: string) => {
+    pending ??= refresh().finally(() => {
+      pending = undefined;
+    });
+    await pending;
+    const selected = requestId ? requests.get(requestId) : revision - 1;
+    if (selected === undefined || selected < 0) return undefined;
+    const record = schema.parse(await requiredRecord(directory, `planner-${selected}.json`));
+    if (record.revision !== selected || (requestId && record.requestId !== requestId))
+      throw new Error('Invalid retained planner identity');
+    return record;
   };
   return {
     read,

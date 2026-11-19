@@ -752,7 +752,8 @@ function retainedAssociation(
   return (
     pr.kind === 'found' &&
     retained?.url === pr.url &&
-    pr.reviewedCommit === (retained.reviewedCommit ?? retained.commit)
+    (pr.reviewedCommit ?? (pr.landed ? pr.commit : undefined)) ===
+      (retained.reviewedCommit ?? retained.commit)
   );
 }
 function repairComparison(

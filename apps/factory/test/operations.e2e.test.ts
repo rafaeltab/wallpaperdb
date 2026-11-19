@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, expect as browserExpect } from '@playwright/test';
 import { expect, it } from 'vitest';
@@ -599,7 +599,9 @@ it.each(['implementation', 'publication'] as const)(
         }
         const resourcePath = join(host.directory, 'resource.json');
         const resource = JSON.parse(await readFile(resourcePath, 'utf8'));
-        await writeFile(resourcePath, JSON.stringify({ ...resource, status: 'interrupted' }));
+        const interruptedPath = `${resourcePath}.interrupted`;
+        await writeFile(interruptedPath, JSON.stringify({ ...resource, status: 'interrupted' }));
+        await rename(interruptedPath, resourcePath);
         await host.save({});
         await page.reload();
         await browserExpect(

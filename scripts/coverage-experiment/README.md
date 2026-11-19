@@ -42,6 +42,8 @@ renderer succeeds are reports copied to the workspace's configured tier output
 directories. `coverage/` contains merged JSON, LCOV, HTML and summary from the
 same counters, plus `compiled-manifest.json` naming the exact selected scope.
 Merge rejects failed/incomplete generations and changed report/source hashes.
+Source identities are captured from the bytes compiled into the mirror; edits
+during execution fail publication rather than certifying a newer source version.
 Failed production removes selected canonical tier outputs and aggregate report
 artifacts while preserving the live CRAP caller's `.crap-lock`;
 there is no previous-success fallback. Do not rebuild the mirror during a run.
@@ -74,6 +76,7 @@ The reporting boundary can be checked independently:
 make run PACKAGE=root SCRIPT=experiment:coverage:report-audit
 make run PACKAGE=root SCRIPT=experiment:coverage:publication
 make run PACKAGE=root SCRIPT=experiment:coverage:publication-cleanup
+make run PACKAGE=root SCRIPT=experiment:coverage:source-identity
 ```
 
 Known V8 continuation/generator limitations and forced-termination collection

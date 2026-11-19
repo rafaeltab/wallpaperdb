@@ -12,6 +12,12 @@ import {publishReports,coverageMap} from './publish-reports.mjs';
 const root=fileURLToPath(new URL('../../',import.meta.url)),base=resolve(root,'.coverage-experiment/production');
 const pointer=resolve(base,'latest.json'),sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const json=async path=>JSON.parse(await readFile(path,'utf8'));
+export async function verifySourceIdentity(path,sourceHashes) {
+ const expected=sourceHashes[path];
+ assert.ok(typeof expected==='string',`Missing compiled source identity: ${path}`);
+ assert.equal(sha(await readFile(path)),expected,`Coverage source changed since compilation: ${path}`);
+ return expected;
+}
 export async function clearAggregate(directory=resolve(root,'coverage')) {
  // The normal CRAP caller owns this lock through coverage and analysis.
  // Clearing a report must never release that caller's concurrency contract.
@@ -74,6 +80,7 @@ async function main(){
   const filters=workspaces.map(w=>`--filter=@wallpaperdb/${w.split('/')[1]}...`).join(' ');
   make(['build',`TURBO_FLAGS=${filters} --concurrency=1`]);
   make(['run','PACKAGE=root','SCRIPT=experiment:coverage:prepare'],{COVERAGE_DELIVERY:'1'});
+  const compiledSourceHashes=await json(resolve(root,'.coverage-experiment/build/source-hashes.json'));
   const produced=[];
   for(const row of rows){
    const command=['run','PACKAGE=root','SCRIPT=experiment:coverage:repo',`ARGS=${row.id} candidate`];
@@ -82,7 +89,7 @@ async function main(){
    const exit=await json(directory+'/exit.json');assert.equal(exit.code,0);assert.equal(exit.implementationChangedDuringRun,false,'Tooling changed during coverage run');
    const tests=await json(directory+'/tests.json');assert.equal(tests.success,true,'Test report did not pass');
    const selection=await json(directory+'/selection.json'),rawPath=directory+'/coverage/coverage-final.json',data=await json(rawPath);
-   for(const [path,file]of Object.entries(data)){inside(row.workspace,path);assert.equal(file.path,path);manifest.sourceHashes[path]=sha(await readFile(path));}
+   for(const [path,file]of Object.entries(data)){inside(row.workspace,path);assert.equal(file.path,path);manifest.sourceHashes[path]=await verifySourceIdentity(path,compiledSourceHashes);}
    for(const pattern of selection.originalCoverage?.include||[]){
     const excluded=new Set();for(const p of selection.originalCoverage.exclude||[])for await(const f of glob(p,{cwd:resolve(root,row.runtime)}))excluded.add(f);
     for await(const file of glob(pattern,{cwd:resolve(root,row.runtime)}))if(!excluded.has(file))assert.ok(data[resolve(root,row.runtime,file)],`Missing original coverage source: ${file}`);

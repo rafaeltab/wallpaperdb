@@ -52,7 +52,8 @@
         "coverage:compiled": "node scripts/coverage-experiment/delivery.mjs",
         "experiment:coverage:report-audit": "node scripts/coverage-experiment/report-audit.test.mjs",
         "experiment:coverage:publication": "node scripts/coverage-experiment/publish-reports.test.mjs",
-        "experiment:coverage:publication-cleanup": "node scripts/coverage-experiment/publication-cleanup.test.mjs"
+        "experiment:coverage:publication-cleanup": "node scripts/coverage-experiment/publication-cleanup.test.mjs",
+        "experiment:coverage:source-identity": "node scripts/coverage-experiment/source-identity.test.mjs"
     },
     "peerDependencies": {
         "graphql": "16.12.0"

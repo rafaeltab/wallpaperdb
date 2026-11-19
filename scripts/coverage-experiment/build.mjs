@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
 import ts from "typescript";
 import { existsSync } from "node:fs";
 import {
@@ -14,6 +15,8 @@ import {
 import { resolve, relative, dirname, join } from "node:path";
 const root = process.cwd(),
 	out = resolve(".coverage-experiment/build");
+const sourceHashes = {};
+const sourceHash = bytes => createHash('sha256').update(bytes).digest('hex');
 const processEntries = new Set([
 	'apps/color-extractor/src/adapters/image/decoder.ts',
 	'apps/variant-generator/src/adapters/image/encoder.ts',
@@ -88,7 +91,9 @@ async function compile(dir, only) {
 				"apps/asset/test/source-confirmation.integration.test.ts",
 				"apps/asset/test/result-notification.integration.test.ts",
 			].includes(src);
-			const result = ts.transpileModule(await readFile(src, "utf8"), {
+			const source = await readFile(src, "utf8");
+			sourceHashes[resolve(src)] = sourceHash(source);
+			const result = ts.transpileModule(source, {
 				fileName: resolve(src),
 				compilerOptions: {
 					target: ts.ScriptTarget.ES2024,
@@ -380,7 +385,10 @@ async function compile(dir, only) {
 				if (p[key])
 					p[key] = JSON.parse(JSON.stringify(p[key]).replace(/\.ts"/g, '.js"'));
 			await writeFile(dest, JSON.stringify(p, null, 2));
-		} else await cp(src, dest);
+		} else {
+			await cp(src, dest);
+			if (/\.(?:[cm]?js|jsx)$/.test(src)) sourceHashes[resolve(src)] = sourceHash(await readFile(dest));
+		}
 	}
 }
 for (const w of owned.values()) {
@@ -521,3 +529,4 @@ for (const kind of ["automock", "autospy"])
 	);
 
 }
+await writeFile(join(out,'source-hashes.json'),JSON.stringify(sourceHashes));

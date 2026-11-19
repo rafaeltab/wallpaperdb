@@ -61,15 +61,20 @@ export function reconcileStages(
       )
     ) {
       const pr = yield* issues.pullRequest(intent).pipe(Effect.catch(() => Effect.succeed(null)));
-      if (pr?.kind === 'found' && pr.landed)
+      if (pr?.kind === 'found' && pr.landed && execution.isIdle) {
+        const idle = yield* execution
+          .isIdle(observation.threadId, observation.run?.id ?? null)
+          .pipe(Effect.catch(() => Effect.succeed(false)));
         return {
           stage: 'ci' as const,
           commit: pr.commit,
           pr,
           ready: false,
-          landed: true,
-          active: false,
+          landed: idle,
+          active: !idle,
+          progress: idle ? undefined : 'Landing verified; managed work is active or unverified.',
         };
+      }
     }
     if (observation.kind !== 'found') return undefined;
     yield* retainInitialStage(store, intent, initialIndex, observation.threadId);

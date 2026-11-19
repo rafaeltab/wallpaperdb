@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { z } from 'zod';
-import { t3Observations, ObservationUnknown } from '../src/adapters/t3/index.js';
+import { t3Execution, t3Observations, ObservationUnknown } from '../src/adapters/t3/index.js';
 import { sqliteObservationCheckpoints } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 import type { ObservationCheckpointUpdate } from '../src/capabilities/observe/index.js';
@@ -117,6 +117,14 @@ it('preserves busy archived descendants discovered while shell metadata awaits f
       });
     });
     expect(observer.inactive('owner', 'run')).toBe('busy');
+    const execution = t3Execution({
+      binary: 'unused',
+      project: directory,
+      projectId: 'project',
+      observations: observer,
+    });
+    if (!execution.isIdle) throw new Error('Missing receipt-independent inactivity observation');
+    expect(await Effect.runPromise(execution.isIdle('owner', 'run'))).toBe(false);
     expect(observer.list('project')).toContainEqual({ threadId: 'child', title: 'child' });
     expect(observer.retireIssue(819)).toBe(false);
     await vi.waitFor(() => expect(childUpdate).toBeDefined());
@@ -133,6 +141,7 @@ it('preserves busy archived descendants discovered while shell metadata awaits f
     ]);
     shellUpdate?.([{ kind: 'thread.updated', sequence: 40, thread: row('child') }]);
     await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
+    expect(await Effect.runPromise(execution.isIdle('owner', 'run'))).toBe(true);
     expect(observer.retireIssue(819)).toBe(true);
   } finally {
     await observer.close();

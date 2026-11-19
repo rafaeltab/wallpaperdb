@@ -1,3 +1,6 @@
+import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -1070,5 +1073,83 @@ it('bounds a Source transaction view and persisted aggregate after growing retai
     ).toEqual([{ count: 256 }]);
   } finally {
     await sources.dispose();
+  }
+});
+
+it('preserves retained replay and exact status when upgrading existing Source JSON history', async () => {
+  await pool.query('CREATE DATABASE source_upgrade');
+  const url = new URL(container.getConnectionUri());
+  url.pathname = '/source_upgrade';
+  const upgrade = new Pool({ connectionString: url.toString() });
+  const directory = await mkdtemp(join(tmpdir(), 'source-upgrade-'));
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: url.toString(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const candidate = {
+    candidateId: 'retained-before-upgrade',
+    sourceId: 'reserved-before-upgrade',
+    idempotencyKey: 'old-key',
+    operation: 'add',
+    expectedSourceSetRevision: '0',
+    status: 'rejected',
+    reason: 'geometry-limit',
+    digest: 'a'.repeat(64),
+    expiresAt: '2026-01-01T00:00:00Z',
+    orphanExpiresAt: '2026-01-01T00:00:00Z',
+    layout: 'asset-layout-1',
+  };
+  try {
+    await cp('./drizzle', directory, { recursive: true });
+    const journalPath = join(directory, 'meta/_journal.json');
+    const journal = JSON.parse(await readFile(journalPath, 'utf8'));
+    journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx <= 17);
+    await writeFile(journalPath, JSON.stringify(journal));
+    await migrate(drizzle(upgrade), { migrationsFolder: directory });
+    await upgrade.query(`INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+      VALUES ('upgrade-asset', 'wallpaper', 'wallpaper', 'clerk', 'owner')`);
+    await upgrade.query('INSERT INTO asset_source_state (asset_id, state) VALUES ($1, $2)', [
+      'upgrade-asset',
+      {
+        asset: {
+          id: 'upgrade-asset',
+          applicationId: 'wallpaper',
+          assetType: 'wallpaper',
+          owner: { namespace: 'clerk', subject: 'owner' },
+        },
+        sourceSetRevision: '0',
+        deliveryRevision: '0',
+        defaultSourceId: null,
+        initialAnalysisSourceId: null,
+        sources: [],
+        candidates: [candidate],
+        nonterminalCandidateCount: 0,
+      },
+    ]);
+    await migrate(drizzle(upgrade), { migrationsFolder: './drizzle' });
+    for (const selection of [
+      { candidateId: candidate.candidateId },
+      { idempotencyKey: candidate.idempotencyKey },
+    ]) {
+      const retained = await sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(
+            'upgrade-asset',
+            null,
+            (state) => ({ state, result: state?.candidates }),
+            selection
+          )
+        )
+      );
+      expect(retained).toEqual([candidate]);
+    }
+  } finally {
+    await sources.dispose();
+    await upgrade.end();
+    await rm(directory, { recursive: true, force: true });
   }
 });

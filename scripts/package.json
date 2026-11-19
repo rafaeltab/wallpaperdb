@@ -22,7 +22,7 @@
 		"coverage:inventory": "cd .. && node packages/coverage-runtime/dist/inventory.mjs",
 		"coverage:build": "cd .. && node scripts/dist/coverage-build.mjs",
 		"coverage:tier": "node ../packages/coverage-runtime/dist/run-tier.mjs",
-		"build": "rm -rf dist && tsc --project tsconfig.coverage.json",
+		"build": "tsc --project tsconfig.coverage.json --incremental --tsBuildInfoFile dist/build.tsbuildinfo",
 		"lint:fix": "biome lint --write ."
 	},
 	"dependencies": {

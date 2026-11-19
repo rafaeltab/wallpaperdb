@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   check,
 } from 'drizzle-orm/pg-core';
@@ -209,6 +210,32 @@ export const assetSourceState = pgTable('asset_source_state', {
   state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
 });
 /** Accepted identities can only be inserted. Conflicting replay never updates facts. */
+/** Retained replay/status records are independent of active Source state. */
+export const sourceCandidates = pgTable(
+  'source_candidates',
+  {
+    assetId: text('asset_id').notNull(),
+    candidateId: text('candidate_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    position: bigint('position', { mode: 'number' }).generatedAlwaysAsIdentity().notNull(),
+    sourceId: text('source_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    terminal: boolean('terminal').notNull(),
+    candidate: jsonb('candidate')
+      .notNull()
+      .$type<import('../capabilities/sources/index.js').Candidate>(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.candidateId] }),
+    uniqueIndex('source_candidates_replay').on(table.assetId, table.idempotencyKey),
+    index('source_candidates_page').on(table.assetId, table.position),
+    index('source_candidates_pending')
+      .on(table.assetId, table.expiresAt)
+      .where(sql`NOT ${table.terminal}`),
+    index('source_candidates_source').on(table.assetId, table.sourceId),
+  ]
+);
+
 export const immutableSources = pgTable(
   'immutable_sources',
   {

@@ -14,6 +14,7 @@ import {
   sourceCleanup,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   assetDeletions,
   sourceReads,
@@ -234,7 +235,20 @@ export function cleanupPostgresLayer(options: Options) {
                   }
                   if (record) {
                     const state = record.state;
-                    for (const pending of state.candidates) {
+                    const rows = await tx
+                      .select()
+                      .from(sourceCandidates)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, row.assetId),
+                          row.target.kind === 'candidate'
+                            ? eq(sourceCandidates.candidateId, row.target.candidateId)
+                            : row.target.kind === 'source'
+                              ? eq(sourceCandidates.sourceId, row.target.sourceId)
+                              : sql`false`
+                        )
+                      );
+                    for (const { candidate: pending } of rows) {
                       if (
                         pending.candidateId !==
                           (row.target.kind === 'candidate' ? row.target.candidateId : undefined) &&
@@ -249,6 +263,15 @@ export function cleanupPostgresLayer(options: Options) {
                             ? 'candidate-expired'
                             : 'temporary-input-expired';
                         state.nonterminalCandidateCount--;
+                        await tx
+                          .update(sourceCandidates)
+                          .set({ candidate: pending, terminal: true })
+                          .where(
+                            and(
+                              eq(sourceCandidates.assetId, row.assetId),
+                              eq(sourceCandidates.candidateId, pending.candidateId)
+                            )
+                          );
                         await tx
                           .update(sourceCleanup)
                           .set({ dueAt: sql`least(${sourceCleanup.dueAt}, ${now})` })

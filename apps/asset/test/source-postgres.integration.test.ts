@@ -960,3 +960,115 @@ it('retires the complete prior set atomically and rejects stale restoration whil
     await lifecycle.dispose();
   }
 });
+
+it('bounds a Source transaction view and persisted aggregate after growing retained candidate history', async () => {
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const assetId = 'asset_growing_history';
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+    [assetId]
+  );
+  try {
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.candidates = Array.from({ length: 256 }, (_, index) => ({
+            candidateId: `history-${index}`,
+            sourceId: `history-source-${index}`,
+            idempotencyKey: `history-key-${index}`,
+            operation: 'add',
+            expectedSourceSetRevision: '0',
+            status: 'cancelled',
+            expiresAt: '2099-01-01T00:00:00Z',
+            orphanExpiresAt: '2099-01-01T00:00:00Z',
+            layout: 'asset-layout-1',
+          }));
+          return { state, result: undefined };
+        })
+      )
+    );
+    const view = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => ({ state, result: state }))
+      )
+    );
+    expect(view?.candidates).toHaveLength(32);
+    const saved = await pool.query<{ bytes: number }>(
+      'SELECT octet_length(state::text) AS bytes FROM asset_source_state WHERE asset_id=$1',
+      [assetId]
+    );
+    expect(saved.rows[0]?.bytes).toBeLessThan(2000);
+    const selected = (
+      selection: Parameters<
+        import('../src/capabilities/sources/index.js').SourceStorePort['transact']
+      >[3]
+    ) =>
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => ({ state, result: state }), selection)
+        )
+      );
+    expect((await selected({ candidateId: 'history-0' }))?.candidates).toMatchObject([
+      { candidateId: 'history-0', status: 'cancelled' },
+    ]);
+    expect((await selected({ idempotencyKey: 'history-key-0' }))?.candidates).toHaveLength(1);
+    expect((await selected({ candidateId: 'unknown' }))?.candidates).toEqual([]);
+    expect(
+      (
+        await selected({
+          idempotencyKey: 'new-key',
+          pendingAfter: new Date().toISOString(),
+          pendingLimit: 2,
+        })
+      )?.candidates
+    ).toEqual([]);
+    const seen = new Set<string>();
+    let page = view;
+    while (page) {
+      expect(page.candidates.length).toBeLessThanOrEqual(32);
+      for (const candidate of page.candidates) {
+        expect(seen.has(candidate.candidateId)).toBe(false);
+        seen.add(candidate.candidateId);
+      }
+      if (!page.candidatePage?.nextCursor) break;
+      page = await selected({ cursor: page.candidatePage.nextCursor });
+    }
+    expect(seen.size).toBe(256);
+    expect((await selected({ cursor: '1:wrong-candidate' }))?.candidatePage?.valid).toBe(false);
+    const failed = await sources.runPromiseExit(
+      SourceStore.use((store) =>
+        store.transact(
+          assetId,
+          null,
+          (state) => {
+            if (!state) throw new Error('Expected Asset');
+            state.candidates[0].reason = 'must-roll-back';
+            state.candidates.push({ ...state.candidates[0], candidateId: 'conflicting-key' });
+            return { state, result: undefined };
+          },
+          { candidateId: 'history-0' }
+        )
+      )
+    );
+    expect(Exit.isFailure(failed)).toBe(true);
+    expect((await selected({ candidateId: 'history-0' }))?.candidates[0].reason).toBeUndefined();
+    expect(
+      (
+        await pool.query('SELECT count(*)::int AS count FROM source_candidates WHERE asset_id=$1', [
+          assetId,
+        ])
+      ).rows
+    ).toEqual([{ count: 256 }]);
+  } finally {
+    await sources.dispose();
+  }
+});

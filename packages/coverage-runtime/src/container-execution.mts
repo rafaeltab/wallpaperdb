@@ -26,6 +26,7 @@ export function containerExecution<T extends ContainerBuilder<T>>(builder: T) {
 			{ source: destination, target: destination, mode: "rw" },
 		])
 		.withEnvironment({
+			WALLPAPERDB_COVERAGE_REPO_ROOT: root,
 			NODE_OPTIONS: `--import=${fileURLToPath(new URL("./native-hook.mjs", import.meta.url))}`,
 			NODE_V8_COVERAGE: destination,
 			WALLPAPERDB_COVERAGE_V8_UID: String(process.getuid?.()),

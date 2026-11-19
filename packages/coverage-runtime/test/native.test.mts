@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { reportSchema } from "../src/json.mjs";
 import { expect } from "vitest";
 import {
@@ -261,3 +262,46 @@ for (const mode of ["manual", "automock", "spy"])
 				await rm(directory, { recursive: true, force: true });
 			}
 		});
+
+test("isolated container descendants load the compiled hook with an explicit repository root", async () => {
+	const directory = await mkdtemp(resolve(tmpdir(), "container-hook-root-"));
+	const {
+		containerExecution,
+	}: typeof import("../src/container-execution.mjs") = await import(
+		pathToFileURL(
+			resolve(root, "packages/coverage-runtime/dist/container-execution.mjs"),
+		).href
+	);
+	class ContainerConfiguration {
+		environment: NodeJS.ProcessEnv = {};
+		withBindMounts() {
+			return this;
+		}
+		withEnvironment(environment: Record<string, string>) {
+			this.environment = environment;
+			return this;
+		}
+	}
+	const previous = process.env.NODE_V8_COVERAGE;
+	try {
+		process.env.NODE_V8_COVERAGE = resolve(directory, "v8");
+		const configured = containerExecution(new ContainerConfiguration());
+		if (previous === undefined) delete process.env.NODE_V8_COVERAGE;
+		else process.env.NODE_V8_COVERAGE = previous;
+		const run = spawnSync(
+			process.execPath,
+			[
+				"--input-type=module",
+				"-e",
+				`import {repositoryRoot} from ${JSON.stringify(pathToFileURL(resolve(root, "packages/coverage-runtime/dist/repository-root.mjs")).href)}; console.log(repositoryRoot());`,
+			],
+			{ cwd: directory, encoding: "utf8", env: configured.environment },
+		);
+		expect(run.status, run.stderr).toBe(0);
+		expect(run.stdout.trim()).toBe(root.replace(/\/$/, ""));
+	} finally {
+		if (previous === undefined) delete process.env.NODE_V8_COVERAGE;
+		else process.env.NODE_V8_COVERAGE = previous;
+		await rm(directory, { recursive: true, force: true });
+	}
+});

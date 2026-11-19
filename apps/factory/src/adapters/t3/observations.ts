@@ -571,6 +571,7 @@ export async function t3Observations(config: {
         meta.observationMissing === true ||
         meta.blockedOnThreadWait === undefined ||
         meta.pendingBackgroundTasks === undefined ||
+        meta.pullRequests === undefined ||
         meta.latestRunId !== snapshot.thread.latestRunId ||
         meta.activeRunId !== null ||
         (owner === id && snapshot.thread.latestRunId !== run) ||
@@ -587,7 +588,7 @@ export async function t3Observations(config: {
       rows.push(meta);
       waiting ||=
         meta.blockedOnThreadWait ||
-        (meta.pullRequests?.some((pr) => pr.watching === true || pr.watch != null) ?? false);
+        meta.pullRequests.some((pr) => pr.watching === true || pr.watch != null);
     }
     return { sequence, rows, waiting };
   };

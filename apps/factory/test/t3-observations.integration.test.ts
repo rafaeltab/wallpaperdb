@@ -9,6 +9,112 @@ import { initializeState } from '../src/platform/index.js';
 import type { ObservationCheckpointUpdate } from '../src/capabilities/observe/index.js';
 import { websocketProtocol } from './fixtures/websocket.js';
 
+it.each(['owner', 'child'])(
+  'keeps inactivity unverified when %s watcher metadata is omitted',
+  async (missing) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-watcher-evidence-'));
+    initializeState(directory);
+    const row = (id: string, enriched = true) => ({
+      id,
+      projectId: 'project',
+      title: id,
+      lineage: { parentThreadId: id === 'child' ? 'owner' : null },
+      status: 'completed',
+      latestRunId: 'run',
+      activeRunId: null,
+      blockedOnThreadWait: false,
+      pendingBackgroundTasks: [],
+      ...(enriched ? { pullRequests: [] } : {}),
+    });
+    let update: ((value: unknown) => void) | undefined;
+    const host = await websocketProtocol((raw, send) => {
+      const request = z
+        .object({
+          _tag: z.string(),
+          id: z.string().optional(),
+          tag: z.string().optional(),
+          payload: z.object({ threadId: z.string().optional() }).optional(),
+        })
+        .parse(raw);
+      if (request._tag !== 'Request') return;
+      const reply = (values: unknown[]) => send({ _tag: 'Chunk', requestId: request.id, values });
+      if (request.tag === 'orchestration.subscribeShell') {
+        update = (value) => reply([value]);
+        reply([
+          {
+            kind: 'snapshot',
+            snapshot: {
+              snapshotSequence: 10,
+              threads: [row('owner'), row('child')],
+              archivedThreads: [],
+              projects: [],
+            },
+          },
+          { kind: 'synchronized' },
+        ]);
+      } else if (request.tag === 'orchestration.getArchivedShellSnapshot') {
+        send({
+          _tag: 'Exit',
+          requestId: request.id,
+          exit: { _tag: 'Success', value: { snapshotSequence: 10, threads: [] } },
+        });
+      } else {
+        const id = request.payload?.threadId;
+        if (!id) throw new Error('Missing managed thread');
+        reply([
+          {
+            kind: 'snapshot',
+            snapshotSequence: 10,
+            projection: {
+              thread: {
+                ...row(id),
+                modelSelection: { instanceId: 'codex', model: 'gpt-6.1-sol' },
+                branch: null,
+                worktreePath: null,
+              },
+              runs: [{ id: 'run', ordinal: 1, status: 'completed' }],
+              attempts: [],
+              runtimeRequests: [],
+              providerThreads: [],
+              messages: [],
+              turnItems: [],
+            },
+          },
+          { kind: 'synchronized' },
+        ]);
+      }
+    });
+    const observer = await t3Observations({
+      origin: host.origin,
+      checkpoints: sqliteObservationCheckpoints(directory),
+      credential: async () => ({ token: 'controlled-observer', expiresAt: Date.now() + 86400000 }),
+      report: () => undefined,
+    });
+    try {
+      observer.retainJob(819, 'watcher-job', 'owner');
+      await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
+      if (!update) throw new Error('Missing shell stream');
+      update({ kind: 'thread.updated', sequence: 15, thread: row(missing, false) });
+      await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('busy'));
+      expect(observer.retireIssue(819)).toBe(false);
+      update({
+        kind: 'thread.updated',
+        sequence: 20,
+        thread: { ...row(missing), pullRequests: [{ watching: true }] },
+      });
+      await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('waiting'));
+      expect(observer.retireIssue(819)).toBe(false);
+      update({ kind: 'thread.updated', sequence: 25, thread: row(missing) });
+      await vi.waitFor(() => expect(observer.inactive('owner', 'run')).toBe('idle'));
+      expect(observer.retireIssue(819)).toBe(true);
+    } finally {
+      await observer.close();
+      await host.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 it('observes only managed lineage, replaces historical activity by identity and retains facts across disconnect and restart', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-t3-observations-'));
   initializeState(directory);

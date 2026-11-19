@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
+import { reportInput } from "./report-input.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm, mkdir, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,5 +71,89 @@ test("merge requires every selected tier and rejects changed source/raw/publishe
 		);
 	} finally {
 		await rm(directory, { recursive: true, force: true });
+	}
+});
+
+test("cross-checkout receipt merge preserves absolute paths inside observed JavaScript bytes", async () => {
+	const temporary = await mkdtemp(resolve(tmpdir(), "coverage-portable-"));
+	const producer = resolve(temporary, "producer"),
+		receiver = resolve(temporary, "receiver");
+	try {
+		await mkdir(producer);
+		await writeFile(
+			producer + "/.gitignore",
+			".coverage-runtime/\ncoverage/\n",
+		);
+		const source = "export const value=1;\n";
+		await writeFile(producer + "/original.ts", source);
+		for (const args of [
+			["init", "-q"],
+			["add", "."],
+			[
+				"-c",
+				"user.name=Test",
+				"-c",
+				"user.email=test@example.invalid",
+				"commit",
+				"-qm",
+				"fixture",
+			],
+		])
+			execFileSync("git", args, { cwd: producer });
+		const path = producer + "/original.ts",
+			synthetic =
+				producer +
+				"/.coverage-runtime/native-sources-test/" +
+				"a".repeat(64) +
+				".js";
+		const code = `const module = getFactoryModule("file://${producer}/original.js");\n`;
+		await mkdir(resolve(synthetic, ".."), { recursive: true });
+		await writeFile(synthetic, code);
+		const loc = { start: { line: 1, column: 0 }, end: { line: 1, column: 10 } };
+		const coverage = (path) => ({
+			path,
+			statementMap: { 0: loc },
+			s: { 0: 1 },
+			fnMap: {},
+			f: {},
+			branchMap: {},
+			b: {},
+		});
+		const original = { [path]: coverage(path) },
+			raw = { ...original, [synthetic]: coverage(synthetic) },
+			row = { id: "portable-control", workspace: ".", coverage: true };
+		const partition = await reportInput(raw, producer, ".");
+		await writeReceipt(
+			producer + "/coverage/receipts",
+			producer,
+			row,
+			raw,
+			original,
+			{ [path]: hash(source) },
+			[],
+			partition.generated,
+		);
+		await cp(producer, receiver, { recursive: true });
+		await mergeReceipts(receiver, [row]);
+		const report = JSON.parse(
+			await readFile(receiver + "/coverage/coverage-final.json", "utf8"),
+		);
+		assert.deepEqual(Object.keys(report), [receiver + "/original.ts"]);
+		assert.deepEqual(report[receiver + "/original.ts"].s, { 0: 1 });
+		const receipt = JSON.parse(
+			await readFile(
+				receiver + "/coverage/receipts/portable-control.json",
+				"utf8",
+			),
+		);
+		const retained = Object.values(receipt.generated)[0];
+		assert.equal(
+			Buffer.from(retained.sourceBase64, "base64").toString("utf8"),
+			code,
+			"observed producer JS is opaque, including embedded paths",
+		);
+		assert.equal(retained.sha256, hash(code));
+	} finally {
+		await rm(temporary, { recursive: true, force: true });
 	}
 });

@@ -47,7 +47,15 @@ export async function writeReceipt(
 		raw: portable(raw, root),
 		data: portable(data, root),
 		audit: portable(audit, root),
-		generated: portable(generated, root),
+		generated: Object.fromEntries(
+			Object.entries(generated).map(([path, { source, ...entry }]) => [
+				portable(path, root),
+				{
+					...portable(entry, root),
+					sourceBase64: Buffer.from(source, "utf8").toString("base64"),
+				},
+			]),
+		),
 	};
 	receipt.reportHash = hash(JSON.stringify(receipt.data));
 	receipt.rawHash = hash(JSON.stringify(receipt.raw));
@@ -118,7 +126,24 @@ export async function mergeReceipts(
 				restored(receipt.raw, root),
 				root,
 				row.workspace,
-				restored(receipt.generated || {}, root),
+				Object.fromEntries(
+					Object.entries(restored(receipt.generated || {}, root)).map(
+						([path, { sourceBase64, ...entry }]) => {
+							assert.equal(
+								typeof sourceBase64,
+								"string",
+								"Missing opaque generated source",
+							);
+							return [
+								path,
+								{
+									...entry,
+									source: Buffer.from(sourceBase64, "base64").toString("utf8"),
+								},
+							];
+						},
+					),
+				),
 			);
 			inputs.push({ id: row.id, data: original });
 			receipts.push(receipt);

@@ -217,6 +217,7 @@ nats-stream-info: ## Inspect WALLPAPER stream
 	@nats stream info WALLPAPER --server nats://localhost:$(NATS_HOST_PORT)
 
 coverage: ## Run maintained unit/integration coverage (optional PACKAGE)
+	@$(MAKE) build PACKAGE=coverage-runtime
 	@node scripts/coverage-runtime/command.mjs $(if $(PACKAGE),--package "$(PACKAGE)")
 
 coverage-summary: ## Summarize existing test coverage

@@ -1625,6 +1625,40 @@ importers:
         specifier: 5.0.2
         version: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
 
+  packages/coverage-runtime:
+    dependencies:
+      '@vitest/coverage-v8':
+        specifier: 5.0.2
+        version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
+      acorn:
+        specifier: 8.15.0
+        version: 8.15.0
+      ast-v8-to-istanbul:
+        specifier: 1.0.6
+        version: 1.0.6(patch_hash=811b592eca8b0dd7c7d7b6ccccfcf943baa89c301efe07f5f327bcf598bc36c1)
+      istanbul-lib-coverage:
+        specifier: 3.2.2
+        version: 3.2.2
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.2
+        version: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.2
+        version: 2.6.2
+      '@types/istanbul-lib-coverage':
+        specifier: 2.0.6
+        version: 2.0.6
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+
   packages/crap-typescript-core:
     dependencies:
       typescript:
@@ -1964,6 +1998,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 5.0.2
         version: 5.0.2(patch_hash=4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b)(@vitest/browser@5.0.2)(vitest@5.0.2)
+      '@wallpaperdb/coverage-runtime':
+        specifier: workspace:*
+        version: link:../packages/coverage-runtime
       '@wallpaperdb/crap-typescript-core':
         specifier: workspace:*
         version: link:../packages/crap-typescript-core

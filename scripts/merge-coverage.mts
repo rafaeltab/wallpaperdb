@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import {
 	repositoryConfiguration,
 	mergeReceipts,
+	inventorySchema,
 } from "@wallpaperdb/coverage-runtime";
 
 // Like the original merger, operate on the caller's checkout, including fixtures.
@@ -16,7 +17,7 @@ execFileSync(
 	[
 		fileURLToPath(
 			new URL(
-				"../packages/coverage-runtime/dist/inventory.mjs",
+				"../../packages/coverage-runtime/dist/inventory.mjs",
 				import.meta.url,
 			),
 		),
@@ -31,7 +32,7 @@ execFileSync(
 		},
 	},
 );
-const { tiers } = JSON.parse(
-	await readFile(resolve(output, "matrix.json"), "utf8"),
+const { tiers } = inventorySchema.parse(
+	JSON.parse(await readFile(resolve(output, "matrix.json"), "utf8")),
 );
 await mergeReceipts(root, tiers, undefined, undefined, estimates);

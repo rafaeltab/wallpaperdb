@@ -374,7 +374,8 @@
                 "$TURBO_ROOT$/scripts/coverage-policy.mts",
                 "$TURBO_ROOT$/scripts/tsconfig.coverage.json",
                 "$TURBO_ROOT$/scripts/coverage-protocol.mts",
-                "$TURBO_ROOT$/scripts/coverage-sync-built.mts"
+                "$TURBO_ROOT$/scripts/coverage-sync-built.mts",
+                "$TURBO_ROOT$/scripts/merge-coverage.mts"
             ],
             "outputs": [
                 "coverage/unit/**"

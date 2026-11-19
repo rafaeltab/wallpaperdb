@@ -18,6 +18,11 @@ const associations = z.object({
 });
 const listing = z.array(z.object({ threadId: z.string().min(1), title: z.string() }));
 const detail = z.object({
+  recentRuns: z
+    .array(
+      z.object({ runId: z.string(), startedAt: z.string().datetime({ offset: true }).nullable() })
+    )
+    .optional(),
   thread: z.object({
     threadId: z.string().min(1),
     projectId: z.string().min(1),
@@ -156,7 +161,7 @@ ${receiptInstructions(intent, 'implementation')}`,
                 : { kind: 'ambiguous' };
             throw cause;
           }
-          const { thread } = detail.parse(observed);
+          const { thread, recentRuns } = detail.parse(observed);
           if (thread.threadId !== match.threadId || thread.projectId !== config.projectId)
             return { kind: 'ambiguous' };
           const unverified: Observation = repair
@@ -195,6 +200,9 @@ ${receiptInstructions(intent, 'implementation')}`,
             const questions = await questionObservation(config, thread, signal, intent.id);
             return {
               ...questions,
+              run: questions.run
+                ? { ...questions.run, startedAt: runStart(thread.latestRunId, recentRuns) }
+                : undefined,
               kind: 'found',
               threadId: thread.threadId,
               status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
@@ -344,4 +352,9 @@ async function verifyObservedHead(
     if (cause instanceof Error && 'code' in cause && cause.code === 1) return;
     throw cause;
   }
+}
+
+function runStart(id: string | null, runs: z.infer<typeof detail>['recentRuns']) {
+  const start = runs?.find((run) => run.runId === id)?.startedAt;
+  return start ? Date.parse(start) : undefined;
 }

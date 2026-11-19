@@ -1576,6 +1576,7 @@ export async function runProtocol(
         );
       else if (args[1] === 'show')
         reply({
+          recentRuns: config.recentRuns,
           thread: resource
             ? {
                 ...resource,

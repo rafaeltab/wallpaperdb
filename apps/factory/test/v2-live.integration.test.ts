@@ -740,7 +740,7 @@ it.each(['controlled', 'sqlite'] as const)(
     const { sqliteBoard } = await import('../src/adapters/store/index.js');
     const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
     const directory = await mkdtemp(`${tmpdir()}/factory-retry-release-`);
-    const input = stoppedImplementationSnapshot();
+    const input = { ...stoppedImplementationSnapshot() };
     const store =
       backend === 'sqlite' ? sqliteBoard(directory, 'retry-release') : controlledBoardStore();
     let effects = 0;
@@ -861,7 +861,7 @@ it.each(['controlled', 'sqlite'] as const)(
     const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
     for (const state of ['rejected', 'succeeded'] as const) {
       const directory = await mkdtemp(`${tmpdir()}/factory-retry-claimed-`);
-      const input = stoppedImplementationSnapshot();
+      const input = { ...stoppedImplementationSnapshot() };
       let effects = 0;
       const result: CommandRecord['receipt']['result'] =
         state === 'succeeded' ? { jobId: 'job:rafaeltab/wallpaperdb/1' } : null;
@@ -997,7 +997,7 @@ it('upgrades legacy Retry receipts without discarding evidence or releasing unce
       join(legacyMigrations, 'meta/_journal.json'),
       JSON.stringify({ ...journal, entries })
     );
-    const input = stoppedImplementationSnapshot();
+    const input = { ...stoppedImplementationSnapshot() };
     const cases = [
       {
         state: 'rejected',
@@ -1148,7 +1148,7 @@ it.each(['controlled', 'sqlite'] as const)(
     const { sqliteBoard } = await import('../src/adapters/store/index.js');
     const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
     const directory = await mkdtemp(`${tmpdir()}/factory-retry-claim-`);
-    const input = stoppedImplementationSnapshot();
+    const input = { ...stoppedImplementationSnapshot() };
     const shared =
       backend === 'sqlite' ? sqliteBoard(directory, 'retry-claim') : controlledBoardStore();
     const create = async () => {
@@ -4099,3 +4099,142 @@ it('keeps pending planning coverage unknown and uses only a current completed pl
   });
   board.close();
 });
+
+it.each([
+  ['implementation', undefined],
+  ['implementation', 'resume-pending'],
+  ['implementation', 'continuation-pending'],
+  ['ci', 'repairing'],
+  ['babysitting', 'repairing'],
+] as const)(
+  'reports current implementation responsibility for %s/%s through HTTP',
+  async (stage, activity) => {
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const input = { ...stoppedImplementationSnapshot(2) };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        retry: undefined,
+        execution: {
+          ...source.execution,
+          status: 'running',
+          run: { id: 'current', ordinal: 3, startedAt: 2500 },
+        },
+        delivery: {
+          stage,
+          activity,
+          active: true,
+          commit: source.intent.base,
+          ready: false,
+          landed: false,
+        },
+      },
+    ];
+    const board = await liveBoard({ scopeId: 'implementation-activity', initial: input });
+    const app = operationsServer({
+      base: source.intent.base,
+      run: Effect.runPromise,
+      job,
+      v2: board,
+    });
+    try {
+      const response = await app.inject('/api/v2/board');
+      expect(response.statusCode).toBe(200);
+      expect(response.json<FactoryV2Snapshot>().meta.activity?.items).toContainEqual({
+        id: 'implementation:parked-owner:current',
+        category: 'implementing',
+        lifecycle: 'current',
+        issue: 1,
+        pullRequest: null,
+        startedAt: '1970-01-01T00:00:02.500Z',
+        reason: activity === 'repairing' ? 'Repairing managed code' : 'Implementing admitted issue',
+      });
+      await board.publish({
+        ...input,
+        jobs: [{ ...source, execution: { ...source.execution, status: 'completed' } }],
+      });
+      expect(board.snapshot().meta.activity?.items).toEqual([]);
+    } finally {
+      board.close();
+      await app.close();
+    }
+  }
+);
+
+it.each([
+  'completed',
+  'idle',
+  'cancelled',
+  'failed',
+  'interrupted',
+  'rolled_back',
+  'waiting',
+  'waiting-for-input',
+])('never infers implementation from a retained stage on %s execution', async (status) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = { ...stoppedImplementationSnapshot() };
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  input.jobs = [
+    {
+      ...source,
+      execution: { ...source.execution, status },
+      delivery: {
+        stage: 'implementation',
+        commit: source.intent.base,
+        ready: false,
+        landed: false,
+      },
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'stopped-implementation', initial: input });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});
+
+it.each(['cancelled', 'released', 'parked', 'capacity', 'uncertain', 'unverified'] as const)(
+  'does not count %s ownership as current implementation',
+  async (condition) => {
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const input = { ...stoppedImplementationSnapshot() };
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    input.jobs = [
+      {
+        ...source,
+        execution:
+          condition === 'uncertain'
+            ? { kind: 'ambiguous' }
+            : condition === 'unverified'
+              ? { kind: 'unverified', threadId: 'owner', status: 'running' }
+              : { ...source.execution, status: 'running' },
+        delivery: {
+          stage: 'implementation',
+          active: condition === 'parked' || condition === 'capacity' ? false : true,
+          activity:
+            condition === 'parked'
+              ? 'awaiting-answer'
+              : condition === 'capacity'
+                ? 'continuation-pending'
+                : undefined,
+          commit: source.intent.base,
+          ready: false,
+          landed: false,
+        },
+      },
+    ];
+    input.localWork = input.localWork.map((work) => ({
+      ...work,
+      control: {
+        ...work.control,
+        cancelled: condition === 'cancelled',
+        released: condition === 'released',
+      },
+    }));
+    const board = await liveBoard({ scopeId: 'excluded-implementation', initial: input });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    board.close();
+  }
+);

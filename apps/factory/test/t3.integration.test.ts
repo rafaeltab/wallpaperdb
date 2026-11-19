@@ -665,3 +665,52 @@ it('targets cancellation to its owning thread with a stable job-specific native 
       },
     ]);
   }));
+
+it('translates only the current owning run start and leaves missing timing unknown', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const adapter = t3Execution({
+      ...host.mcp,
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+    });
+    const intent: Intent = {
+      id: 'timing',
+      issue: 721,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/721',
+      base: host.base,
+      context: '',
+      branch: 'factory/timing',
+      createdAt: 100,
+      expectedStage: 'implementation',
+    };
+    await host.save({ lost: false });
+    await Effect.runPromise(adapter.launch(intent));
+    await host.save({
+      overrides: { status: 'running', latestRunId: 'current-run', runCount: 2 },
+      recentRuns: [
+        { runId: 'old-run', startedAt: '2026-11-19T12:00:00Z' },
+        { runId: 'current-run', startedAt: '2026-11-19T13:00:00Z' },
+      ],
+    });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
+      kind: 'found',
+      run: { id: 'current-run', ordinal: 2, startedAt: Date.parse('2026-11-19T13:00:00Z') },
+    });
+    await host.save({
+      overrides: { status: 'running', latestRunId: 'current-run', runCount: 2 },
+      recentRuns: [{ runId: 'old-run', startedAt: '2026-11-19T12:00:00Z' }],
+    });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
+      kind: 'found',
+      run: { id: 'current-run', startedAt: undefined },
+    });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

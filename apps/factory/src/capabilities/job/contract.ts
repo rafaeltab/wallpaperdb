@@ -90,7 +90,7 @@ export type Observation =
       readonly status: string;
       /** Authenticated manual message boundary, reporting and receipt freshness only. */
       readonly manual?: { readonly runId: string };
-      readonly run?: { readonly id: string; readonly ordinal: number };
+      readonly run?: { readonly id: string; readonly ordinal: number; readonly startedAt?: number };
     }
   | {
       readonly kind: 'found';
@@ -100,7 +100,7 @@ export type Observation =
       /** A fresh state must follow this maintainer-initiated run. Never rewinds a stage. */
       readonly manual?: { readonly runId: string };
       readonly answeredQuestions?: readonly string[];
-      readonly run?: { readonly id: string; readonly ordinal: number };
+      readonly run?: { readonly id: string; readonly ordinal: number; readonly startedAt?: number };
       readonly question?: { readonly id: string; readonly text: string };
       readonly worktree: string;
       readonly branch: string;
@@ -190,7 +190,7 @@ export interface Control {
   readonly cancelled: boolean;
   readonly claimed: readonly number[];
   readonly parked?: {
-    readonly run?: { readonly id: string; readonly ordinal: number };
+    readonly run?: { readonly id: string; readonly ordinal: number; readonly startedAt?: number };
     readonly index: number;
     readonly question: { readonly id: string; readonly text: string };
   };

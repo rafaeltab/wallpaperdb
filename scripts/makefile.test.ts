@@ -254,7 +254,9 @@ test("shared tooling is invoked through the scripts workspace", () => {
 			"@wallpaperdb/gateway#lint:architecture",
 		),
 	).toBeTruthy();
-	expect(output("crap")).toMatch(/wallpaperdb-crap report/);
+	expect(output("crap")).toMatch(
+		/pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts report/,
+	);
 });
 
 test("local infrastructure owns its stream setup test", () => {
@@ -404,9 +406,11 @@ test("root workspace checks use the shared Turbo commands", () => {
 test("CRAP commands pass the optional workspace selector to the shared analyzer", () => {
 	for (const target of ["crap", "check-crap"]) {
 		expect(output(target, "PACKAGE=ingestor")).toMatch(
-			/PACKAGE="ingestor".*wallpaperdb-crap/,
+			/PACKAGE="ingestor".*pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts/,
 		);
-		expect(output(target)).toMatch(/PACKAGE="".*wallpaperdb-crap/);
+		expect(output(target)).toMatch(
+			/PACKAGE="".*pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts/,
+		);
 	}
 });
 
@@ -539,4 +543,20 @@ test("all public targets are documented, phony, and advertised", () => {
 		expect(phony.includes(name), `${name} must be phony`).toBeTruthy();
 		expect(help.stdout).toMatch(new RegExp(`^  ${name}\\s`, "m"));
 	}
+});
+
+test("normal check-crap reaches threshold validation through the Scripts-owned runner", () => {
+	const result = spawnSync(
+		"make",
+		[
+			"--no-print-directory",
+			"check-crap",
+			"PACKAGE=user",
+			"CRAP_THRESHOLD=invalid",
+		],
+		{ encoding: "utf8", env },
+	);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toContain("Usage: make check-crap");
+	expect(result.stderr).not.toContain("tsx: not found");
 });

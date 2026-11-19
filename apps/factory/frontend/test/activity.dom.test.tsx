@@ -69,3 +69,43 @@ it('advances durations and relative age locally, preserves the absolute timestam
   unmount();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('updates implementing counts and timers as newest work finishes or enters review', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-17T12:00:00Z'));
+  const first: ActivityFacts['items'][number] = {
+    id: 'one',
+    category: 'implementing',
+    lifecycle: 'current',
+    issue: 1,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Implementing',
+  };
+  const second = { ...first, id: 'two', issue: 2, startedAt: '2026-11-17T11:59:00Z' };
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const { rerender } = render(
+    <FactoryActivity
+      facts={{ ...facts, items: [first, second] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Implementing 2 issues.*1m 0s/ })).toBeTruthy();
+  fireEvent.focus(screen.getByRole('button'));
+  rerender(
+    <FactoryActivity facts={{ ...facts, items: [first] }} paused={false} refresh={refresh} />
+  );
+  expect(screen.getByRole('button', { name: /Implementing 1 issue.*2m 0s/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{ ...facts, items: [first, { ...second, category: 'reviewing' }] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Reviewing 1 issue/ })).toBeTruthy();
+  const panel = screen.getByRole('region', { name: 'Factory activity details' });
+  expect(within(panel).getByText('Implementing')).toBeTruthy();
+  expect(within(panel).getAllByText('1 issue').length).toBe(2);
+});

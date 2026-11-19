@@ -1,3 +1,4 @@
+import type { Status } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import { capacityOccupied } from '../plan/index.js';
 import type { ActivityCategory, FactoryActivity, Reason } from './model.js';
@@ -46,6 +47,28 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
   )
     uncertainty.push('Thread refresh activity coverage is incomplete.');
   const items: FactoryActivity['items'][number][] = [];
+  for (const admission of input.state.admissions) {
+    const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
+    const control = input.localWork.find((w) => w.intent?.issue === admission.issue)?.control;
+    if (control?.cancelled || control?.released || !job || !implementing(job)) continue;
+    const execution = job.execution;
+    if (execution.kind !== 'found') continue;
+    items.push({
+      id: `implementation:${job.intent.id}:${execution.run?.id ?? execution.threadId}`,
+      category: 'implementing',
+      lifecycle: 'current',
+      issue: admission.issue,
+      pullRequest:
+        job.delivery?.pr?.kind === 'found'
+          ? Number(job.delivery.pr.url.split('/').at(-1)) || null
+          : null,
+      startedAt: timestamp(execution.run?.startedAt),
+      reason:
+        job.delivery?.activity === 'repairing'
+          ? 'Repairing managed code'
+          : 'Implementing admitted issue',
+    });
+  }
   const source = input.observations;
   if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
@@ -87,4 +110,28 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
           : 'Lifecycle not yet instrumented.',
     })),
   };
+}
+
+function implementing(job: Status): job is Extract<Status, { kind: 'job' }> {
+  if (job.kind !== 'job' || job.execution.kind !== 'found') return false;
+  const delivery = job.delivery;
+  if (
+    !delivery ||
+    delivery.ready ||
+    delivery.landed ||
+    delivery.active === false ||
+    delivery.question
+  )
+    return false;
+  if (!['running', 'preparing', 'queued', 'starting'].includes(job.execution.status)) return false;
+  if (delivery.activity === 'repairing')
+    return (
+      delivery.stage === 'ci' ||
+      delivery.stage === 'babysitting' ||
+      delivery.stage === 'implementation'
+    );
+  return (
+    delivery.stage === 'implementation' &&
+    (!delivery.activity || ['resume-pending', 'continuation-pending'].includes(delivery.activity))
+  );
 }

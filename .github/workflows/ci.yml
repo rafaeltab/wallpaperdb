@@ -91,6 +91,10 @@ jobs:
             coverage/receipts/*.json
           if-no-files-found: error
 
+      - name: Verify normal CRAP reporting
+        if: matrix.shard == 'repository'
+        run: make crap PACKAGE=user
+
   ci:
     name: Build, Lint, and Test
     needs: validation

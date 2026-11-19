@@ -142,7 +142,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   });
   publishedCommit = 'c'.repeat(40);
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
-    delivery: { ready: false, landed: true, active: false, commit: publishedCommit },
+    delivery: { ready: false, landed: true, active: false, commit: 'b'.repeat(40) },
   });
 });
 

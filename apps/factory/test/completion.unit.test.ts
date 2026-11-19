@@ -724,3 +724,19 @@ it('retains landed work until the completed owner and all managed descendants ar
     await f.close();
   }
 });
+
+it('keeps verified retirement after releasing the managed observation subscription', async () => {
+  const f = await fixture();
+  try {
+    f.state({ observationStatus: 'completed', landed: true, inspectFailed: true });
+    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    expect(f.releases).toEqual([757]);
+    // Production release removes this owner's managed lineage. Subsequent
+    // inactivity queries cannot prove idle after that intentional removal.
+    f.state({ managedIdle: false });
+    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    expect(f.sends).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});

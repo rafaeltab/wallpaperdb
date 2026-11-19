@@ -145,6 +145,17 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** Durable terminal delivery authority, recorded before releasing observation.
+   * The execution snapshot is historical; no subscription is needed to retain landing. */
+  readonly retirement?: {
+    readonly publication: Pick<AcceptedPublication, 'url' | 'commit' | 'base'>;
+    readonly execution: {
+      readonly threadId: string;
+      readonly status: string;
+      readonly run?: { readonly id: string; readonly ordinal: number };
+    };
+    readonly stageIndex?: number;
+  };
   /** Reporting ownership, independent of readiness. Retained across repair and restart. */
   readonly ownership?: { readonly threadId: string; readonly prUrl?: string };
   /** Terminal ownership fence, committed atomically with dependency-admission release. */

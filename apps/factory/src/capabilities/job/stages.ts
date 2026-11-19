@@ -101,7 +101,12 @@ function deliver(store: JobStore, execution: Execution, intent: Intent, request:
     if (request.previousRunId === null || request.observedRunId) return;
     if (yield* store.claimStage(request.index)) {
       const control = yield* store.readControl();
-      if (!control.cancelled && !control.released && !control.dependencyRecovery)
+      if (
+        !control.cancelled &&
+        !control.released &&
+        !control.retirement &&
+        !control.dependencyRecovery
+      )
         yield* execution.sendStage(intent, request);
     }
   });

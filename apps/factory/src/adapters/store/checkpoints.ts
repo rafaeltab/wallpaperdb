@@ -12,7 +12,13 @@ export function sqliteObservationCheckpoints(directory: string): ObservationChec
   const operation = <A>(work: () => A) =>
     Effect.try({
       try: work,
-      catch: (cause) => new Unavailable({ operation: 'observation-checkpoint', cause }),
+      // Drizzle's wrapper includes bound transcript values. Preserve the SQLite
+      // diagnostic without exporting those private values in logs or traces.
+      catch: (cause) =>
+        new Unavailable({
+          operation: 'observation-checkpoint',
+          cause: cause instanceof Error && cause.cause instanceof Error ? cause.cause : cause,
+        }),
     }).pipe(Effect.tapError(Effect.logError), Effect.withSpan('factory.observation-checkpoint'));
   return {
     read: (stream) =>

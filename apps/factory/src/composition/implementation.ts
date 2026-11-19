@@ -169,6 +169,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   const requests = new AbortController();
   const startupCleanup: Array<() => Promise<unknown>> = [];
   try {
+    const observability = telemetry(configuration.FACTORY_OTEL_ENDPOINT);
+    const observerRuntime = ManagedRuntime.make(observability);
+    startupCleanup.push(() => observerRuntime.dispose());
     const github = githubRequests({
       project,
       directory: configuration.FACTORY_STATE,
@@ -194,6 +197,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       );
     };
     const executionObservations = await t3Observations({
+      run: (operation) => observerRuntime.runPromise(operation),
       origin: observerOrigin,
       checkpoints: sqliteObservationCheckpoints(configuration.FACTORY_STATE),
       credential: t3ObserverCredential({
@@ -529,8 +533,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         Layer.provideMerge(schedulerDeps),
         Layer.provideMerge(observationLayer),
         Layer.provideMerge(threadLayer),
-        Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
-      )
+        Layer.provideMerge(observability)
+      ),
+      { memoMap: observerRuntime.memoMap }
     );
     startupCleanup.push(() => runtime.dispose());
     const scheduler = await runtime.runPromise(Scheduler);
@@ -721,6 +726,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             await Promise.allSettled([
               github.drain(),
               runtime.dispose(),
+              observerRuntime.dispose(),
               ...[...workers.values()].map((worker) => worker.dispose()),
             ]);
             await reportingRuntime.dispose();

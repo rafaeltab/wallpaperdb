@@ -39,7 +39,9 @@ export async function t3Observations(config: {
   checkpoints: ObservationCheckpoints;
   credential: (replace?: boolean, signal?: AbortSignal) => Promise<Credential>;
   report: (error: unknown) => void;
+  run?: <A>(operation: Effect.Effect<A, unknown>) => Promise<A>;
 }) {
+  const run = config.run ?? Effect.runPromise;
   const stop = new AbortController();
   const namespace = `t3:${config.origin}:`;
   const metadata = new Map<string, Shell>();
@@ -58,7 +60,7 @@ export async function t3Observations(config: {
   let metadataRevision = 0;
   let metadataResume = false;
   let stopped = false;
-  const saved = await Effect.runPromise(config.checkpoints.read(`${namespace}inventory`));
+  const saved = await run(config.checkpoints.read(`${namespace}inventory`));
   if (saved) {
     metadataRevision = saved.revision;
     metadataSequence = saved.sequence;
@@ -88,7 +90,7 @@ export async function t3Observations(config: {
     }
     const encoded = encode(value);
     if (
-      !(await Effect.runPromise(
+      !(await run(
         config.checkpoints.publish(`${namespace}${key}`, revision, {
           sequence,
           value: encoded.value,
@@ -105,9 +107,16 @@ export async function t3Observations(config: {
     let replace = false;
     while (!signal.aborted) {
       try {
-        const credential = await config.credential(replace, signal);
-        replace = false;
-        await work(credential);
+        await run(
+          Effect.tryPromise({
+            try: async () => {
+              const credential = await config.credential(replace, signal);
+              replace = false;
+              await work(credential);
+            },
+            catch: (cause) => cause,
+          }).pipe(Effect.withSpan('factory.t3.observation.synchronize'))
+        );
       } catch (error) {
         if (signal.aborted) break;
         replace = error instanceof Error && /HTTP (401|403)/.test(error.message);
@@ -143,7 +152,7 @@ export async function t3Observations(config: {
     const cancellation = new AbortController();
     const signal = AbortSignal.any([stop.signal, cancellation.signal]);
     const work = (async () => {
-      const previous = await Effect.runPromise(config.checkpoints.read(`${namespace}thread:${id}`));
+      const previous = await run(config.checkpoints.read(`${namespace}thread:${id}`));
       let revision = previous?.revision ?? 0;
       let forceSnapshot = false;
       if (previous)
@@ -423,7 +432,7 @@ export async function t3Observations(config: {
   // The installed runtime exposes archived bootstrap metadata as a single-response
   // RPC. Incremental archived changes arrive on the shared shell as removals.
   const archived = (async () => {
-    const previous = await Effect.runPromise(config.checkpoints.read(`${namespace}archive`));
+    const previous = await run(config.checkpoints.read(`${namespace}archive`));
     let revision = previous?.revision ?? 0;
     let sequence = previous?.sequence ?? 0;
     const rows = new Map<string, Shell>();

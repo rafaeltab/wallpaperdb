@@ -27,6 +27,47 @@ it('validates host configuration before serving and composes the real driving an
     process.env.PATH = host.directory + ':' + previousPath;
     process.env.FACTORY_FIXTURE = host.configFile;
     try {
+      for (const field of ['FACTORY_T3_OBSERVER_ORIGIN', 'FACTORY_T3_MCP_ENDPOINT']) {
+        for (const scheme of ['http', 'https']) {
+          const valid = await startFactory({
+            ...configuration,
+            ...(field === 'FACTORY_T3_MCP_ENDPOINT'
+              ? { FACTORY_T3_OBSERVER_ORIGIN: undefined }
+              : {}),
+            [field]: `${scheme}://127.0.0.1:9`,
+          });
+          try {
+            expect((await valid.app.inject('/api/job')).json()).toEqual({ kind: 'empty' });
+          } finally {
+            await valid.close();
+          }
+        }
+      }
+      for (const field of ['FACTORY_T3_OBSERVER_ORIGIN', 'FACTORY_T3_MCP_ENDPOINT']) {
+        for (const value of [
+          'file:///tmp/t3',
+          'ftp://example.invalid',
+          'ws://example.invalid',
+          'wss://example.invalid',
+        ]) {
+          const result = await startFactory({
+            ...configuration,
+            ...(field === 'FACTORY_T3_MCP_ENDPOINT'
+              ? { FACTORY_T3_OBSERVER_ORIGIN: undefined }
+              : {}),
+            [field]: value,
+          }).then(
+            async (running) => {
+              await running.close();
+              return undefined;
+            },
+            (cause: unknown) => cause
+          );
+          expect(result).toMatchObject({
+            issues: expect.arrayContaining([expect.objectContaining({ path: [field] })]),
+          });
+        }
+      }
       const running = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });
       try {
         const second = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });

@@ -194,6 +194,11 @@
         "reason": "Integration exercises spawned CLI endpoints, built subprocesses and real Git worktrees; mutation activation/reset across those processes is not validated. Browser deployment uses its own E2E suite.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
+    },
+    "packages/coverage-runtime": {
+      "decision": "excluded",
+      "reason": "Native loader controls and compiled command descendants require separately qualified mutation activation; coverage collection does not establish mutation transport.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     }
   }
 }

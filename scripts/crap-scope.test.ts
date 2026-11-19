@@ -10,6 +10,10 @@ const repository = fileURLToPath(new URL("../", import.meta.url));
 function fixture(t: TestContext & object) {
 	// The analyzer core normalizes report keys to lower case on every platform.
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "crap-scope-Case-"));
+	fs.writeFileSync(
+		path.join(root, "package.json"),
+		JSON.stringify({ name: "@wallpaperdb/fixture", type: "module" }),
+	);
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	for (const directory of [
 		"scripts",
@@ -34,14 +38,22 @@ function fixture(t: TestContext & object) {
 		path.join(root, "node_modules/@wallpaperdb/crap-typescript-core"),
 	);
 	fs.symlinkSync(
+		path.join(repository, "packages/coverage-runtime"),
+		path.join(root, "node_modules/@wallpaperdb/coverage-runtime"),
+	);
+	fs.symlinkSync(
 		path.join(repository, "scripts/node_modules/istanbul-lib-coverage"),
 		path.join(root, "node_modules/istanbul-lib-coverage"),
 	);
-	fs.mkdirSync(path.join(root, "scripts/coverage-runtime"), {
+	fs.mkdirSync(path.join(root, "packages/coverage-runtime/dist"), {
 		recursive: true,
 	});
 	fs.writeFileSync(
-		path.join(root, "scripts/coverage-runtime/command.mjs"),
+		path.join(root, "packages/coverage-runtime/package.json"),
+		JSON.stringify({ name: "@wallpaperdb/coverage-runtime", scripts: {} }),
+	);
+	fs.writeFileSync(
+		path.join(root, "packages/coverage-runtime/dist/command.mjs"),
 		`#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';

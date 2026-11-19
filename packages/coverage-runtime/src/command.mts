@@ -1,3 +1,22 @@
+#!/usr/bin/env node
+import type { Generation } from "./contract.mjs";
+import type { SpawnSyncOptions } from "node:child_process";
+import type {
+	Tier,
+	Report,
+	GeneratedSources,
+	SourceIdentities,
+	AuditEntry,
+} from "./contract.mjs";
+import { z } from "zod";
+import {
+	readJson,
+	inventorySchema,
+	sourceIdentitiesSchema,
+	reportSchema,
+	selectionSchema,
+} from "./json.mjs";
+import { repositoryConfiguration, repositoryRoot } from "./repository-root.mjs";
 import { reportInput } from "./report-input.mjs";
 import { checkoutIdentity } from "./artifacts.mjs";
 // Maintained producer for the existing unit/integration report and CRAP contracts.
@@ -24,16 +43,20 @@ import {
 } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { coverageMap, publishReports } from "./publish-reports.mjs";
+import { publishReports } from "./publish-reports.mjs";
 import { mergeReceipts, writeReceipt } from "./receipts.mjs";
 import { auditReports } from "./report-audit.mjs";
 
-const root = fileURLToPath(new URL("../../", import.meta.url)),
+const root = repositoryRoot(),
 	base = resolve(root, ".coverage-runtime/production");
 const pointer = resolve(base, "latest.json"),
-	sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const json = async (path) => JSON.parse(await readFile(path, "utf8"));
-export async function verifySourceIdentity(path, sourceHashes) {
+	sha = (bytes: string | Uint8Array) =>
+		createHash("sha256").update(bytes).digest("hex");
+const json = readJson;
+export async function verifySourceIdentity(
+	path: string,
+	sourceHashes: SourceIdentities,
+) {
 	const expected = sourceHashes[path];
 	assert.ok(
 		typeof expected === "string",
@@ -54,8 +77,8 @@ export async function clearAggregate(directory = resolve(root, "coverage")) {
 		if (name !== ".crap-lock")
 			await rm(resolve(directory, name), { recursive: true, force: true });
 }
-function environment(extra = {}) {
-	const env = {
+function environment(extra: NodeJS.ProcessEnv = {}) {
+	const env: NodeJS.ProcessEnv = {
 		...process.env,
 		...extra,
 		MAKEFLAGS: (process.env.MAKEFLAGS || "").split(" -- ")[0],
@@ -71,8 +94,12 @@ function environment(extra = {}) {
 		delete env[key];
 	return env;
 }
-function make(args, extra = {}) {
-	const stdio = ["inherit", "inherit", "inherit"],
+function make(args: string[], extra: NodeJS.ProcessEnv = {}) {
+	const stdio: Exclude<SpawnSyncOptions["stdio"], string | undefined> = [
+			"inherit",
+			"inherit",
+			"inherit",
+		],
 		fd = Number(process.env.WALLPAPERDB_DOCKER_LEASE_FD);
 	try {
 		if (
@@ -95,7 +122,7 @@ function make(args, extra = {}) {
 		`Coverage command failed: make ${args.join(" ")} (${child.signal || child.status})`,
 	);
 }
-function inside(workspace, path) {
+function inside(workspace: string, path: string) {
 	const rel = relative(resolve(root, workspace), path);
 	assert.ok(
 		rel && !rel.startsWith("..") && !isAbsolute(rel),
@@ -103,8 +130,9 @@ function inside(workspace, path) {
 	);
 }
 async function main() {
+	const { estimates } = await repositoryConfiguration();
 	const args = process.argv.slice(2);
-	let selected;
+	let selected: string[] | undefined;
 	for (let i = 0; i < args.length; i++) {
 		assert.ok(
 			["--package", "--packages"].includes(args[i]),
@@ -117,30 +145,36 @@ async function main() {
 		);
 	}
 	await mkdir(base, { recursive: true });
-	const lock = base + "/producer.lock";
+	const lock = `${base}/producer.lock`;
 	try {
-		const old = JSON.parse(readFileSync(lock, "utf8"));
+		const old = z
+			.object({ pid: z.number().int().positive() })
+			.parse(JSON.parse(readFileSync(lock, "utf8")));
 		try {
 			process.kill(old.pid, 0);
 		} catch (error) {
-			if (error.code === "ESRCH") unlinkSync(lock);
+			if (error instanceof Error && "code" in error && error.code === "ESRCH")
+				unlinkSync(lock);
 			else throw error;
 		}
 	} catch (error) {
-		if (error.code !== "ENOENT") throw error;
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT"))
+			throw error;
 	}
 	const handle = openSync(lock, "wx");
 	writeFileSync(handle, JSON.stringify({ pid: process.pid }));
 	closeSync(handle);
 	const initialIdentity = checkoutIdentity(root);
-	const attempt = await mkdtemp(base + "/attempt-");
-	let outputs = [];
+	const attempt = await mkdtemp(`${base}/attempt-`);
+	let outputs: string[] = [];
 	await writeFile(pointer, JSON.stringify({ status: "running", attempt }));
 	try {
 		make(["run", "PACKAGE=scripts", "SCRIPT=coverage:inventory"], {
 			WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT: attempt,
 		});
-		const inventory = await json(attempt + "/matrix.json");
+		const inventory = inventorySchema.parse(
+			await json(`${attempt}/matrix.json`),
+		);
 		const rows = inventory.tiers.filter(
 			(r) =>
 				["test:unit", "test:integration"].includes(r.script) &&
@@ -150,7 +184,7 @@ async function main() {
 							? "root"
 							: r.workspace === "infra"
 								? "infra-local"
-								: r.workspace.split("/").at(-1),
+								: r.workspace.split("/").at(-1) || "",
 					)),
 		);
 		const shard = process.env.CI_WORKSPACE_FILTER;
@@ -186,7 +220,7 @@ async function main() {
 				resolve(root, workspace, "coverage", tier),
 			),
 		);
-		const manifest = {
+		const manifest: Generation = {
 			attempt,
 			status: "running",
 			workspaces,
@@ -214,10 +248,10 @@ async function main() {
 			.join(" ");
 		make(["build", `TURBO_FLAGS=${filters} --concurrency=1`]);
 		make(["run", "PACKAGE=scripts", "SCRIPT=coverage:build"]);
-		const compiledSourceHashes = await json(
-			resolve(root, ".coverage-runtime/build/source-hashes.json"),
+		const compiledSourceHashes = sourceIdentitiesSchema.parse(
+			await json(resolve(root, ".coverage-runtime/build/source-hashes.json")),
 		);
-		const produced = [],
+		const produced: Produced[] = [],
 			nonproducers = [];
 		for (const row of rows) {
 			const command = [
@@ -235,26 +269,35 @@ async function main() {
 					: command,
 				{ WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT: attempt },
 			);
-			const latest = await json(
-					`${attempt}/runs/${row.id}/candidate/latest.json`,
-				),
+			const latest = z
+					.object({ directory: z.string() })
+					.parse(await json(`${attempt}/runs/${row.id}/candidate/latest.json`)),
 				directory = latest.directory;
-			const exit = await json(directory + "/exit.json");
+			const exit = z
+				.object({
+					code: z.number(),
+					implementationChangedDuringRun: z.boolean(),
+				})
+				.parse(await json(`${directory}/exit.json`));
 			assert.equal(exit.code, 0);
 			assert.equal(
 				exit.implementationChangedDuringRun,
 				false,
 				"Tooling changed during coverage run",
 			);
-			const tests = await json(directory + "/tests.json");
+			const tests = z
+				.object({ success: z.boolean() })
+				.parse(await json(`${directory}/tests.json`));
 			assert.equal(tests.success, true, "Test report did not pass");
 			if (!row.coverage) {
 				nonproducers.push(row);
 				continue;
 			}
-			const selection = await json(directory + "/selection.json"),
-				rawPath = directory + "/coverage/coverage-final.json",
-				rawData = await json(rawPath);
+			const selection = selectionSchema.parse(
+					await json(`${directory}/selection.json`),
+				),
+				rawPath = `${directory}/coverage/coverage-final.json`,
+				rawData = reportSchema.parse(await json(rawPath));
 			const { original: data, generated } = await reportInput(
 				rawData,
 				root,
@@ -270,7 +313,7 @@ async function main() {
 			}
 			for (const pattern of selection.originalCoverage?.include || []) {
 				const excluded = new Set();
-				for (const p of selection.originalCoverage.exclude || [])
+				for (const p of selection.originalCoverage?.exclude || [])
 					for await (const f of glob(p, { cwd: resolve(root, row.runtime) }))
 						excluded.add(f);
 				for await (const file of glob(pattern, {
@@ -325,6 +368,7 @@ async function main() {
 		const audited = auditReports(
 			produced.map(({ id, data }) => ({ id, data })),
 			root,
+			estimates,
 		);
 		manifest.audit = audited.audit;
 		for (let i = 0; i < produced.length; i++) {
@@ -333,7 +377,7 @@ async function main() {
 				stage = resolve(attempt, "published", item.id);
 			await publishReports(data, stage);
 			await writeFile(
-				stage + "/coverage-audit.json",
+				`${stage}/coverage-audit.json`,
 				JSON.stringify(
 					{
 						rawReport: item.rawPath,
@@ -348,8 +392,9 @@ async function main() {
 		}
 		// Publish only after every test, inventory, audit and renderer succeeded.
 		for (const item of produced) {
+			assert.ok(item.stage);
 			await cp(item.stage, item.destination, { recursive: true });
-			const path = item.destination + "/coverage-final.json";
+			const path = `${item.destination}/coverage-final.json`;
 			manifest.outputs.push({
 				id: item.id,
 				workspace: item.row.workspace,
@@ -359,7 +404,7 @@ async function main() {
 			});
 		}
 		manifest.status = "success";
-		const path = attempt + "/manifest.json";
+		const path = `${attempt}/manifest.json`;
 		await writeFile(path, JSON.stringify(manifest, null, 2));
 		await writeFile(
 			pointer,
@@ -394,7 +439,7 @@ async function main() {
 				item.generated,
 			);
 		}
-		await mergeReceipts(root, rows);
+		await mergeReceipts(root, rows, undefined, undefined, estimates);
 		const estimated = manifest.audit.filter(
 			(entry) => entry.published === 1,
 		).length;
@@ -407,7 +452,11 @@ async function main() {
 		await clearAggregate();
 		await writeFile(
 			pointer,
-			JSON.stringify({ status: "failed", attempt, error: error.message }),
+			JSON.stringify({
+				status: "failed",
+				attempt,
+				error: error instanceof Error ? error.message : String(error),
+			}),
 		);
 		throw error;
 	} finally {
@@ -415,3 +464,14 @@ async function main() {
 	}
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+
+interface Produced {
+	id: string;
+	data: Report;
+	rawData: Report;
+	generated: GeneratedSources;
+	row: Tier;
+	rawPath: string;
+	destination: string;
+	stage?: string;
+}

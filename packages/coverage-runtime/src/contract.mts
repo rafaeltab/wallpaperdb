@@ -78,3 +78,19 @@ export interface AttemptDetails {
 	mode: string;
 	strategy: string;
 }
+
+export interface Generation {
+	attempt: string;
+	status: "running" | "success" | "failed";
+	workspaces: string[];
+	outputs: {
+		id: string;
+		workspace: string;
+		path: string;
+		sha256: string;
+		rawReport: string;
+	}[];
+	sourceHashes: SourceIdentities;
+	audit: AuditEntry[];
+	scope: string;
+}

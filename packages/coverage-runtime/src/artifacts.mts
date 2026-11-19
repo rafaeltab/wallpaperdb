@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { AttemptDetails } from "./contract.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -21,21 +22,20 @@ export function beginAttempt(
 	mkdirSync(base, { recursive: true });
 	const directory = mkdtempSync(resolve(base, "attempt-"));
 	const version = () => {
-		const paths = [
-			"package.json",
-			"pnpm-lock.yaml",
-			"mise.toml",
-			...readdirSync(resolve(root, "packages/coverage-runtime/dist"), {
-				recursive: true,
-				encoding: "utf8",
-			})
-				.filter((p) => /\.(mjs|ts|tsx|patch)$/.test(p))
-				.map((p) => "packages/coverage-runtime/dist/" + p),
-		];
+		const runtime = dirname(fileURLToPath(import.meta.url));
+		const paths = readdirSync(runtime, {
+			recursive: true,
+			encoding: "utf8",
+		}).filter((path) => /\.(?:mjs|js|map)$/.test(path));
 		const inputs = Object.fromEntries(
-			paths.sort().map((p) => [p, sha(readFileSync(resolve(root, p)))]),
+			paths
+				.sort()
+				.map((path) => [path, sha(readFileSync(resolve(runtime, path)))]),
 		);
-		return { sha256: sha(JSON.stringify(inputs)), inputs };
+		return {
+			sha256: sha(JSON.stringify({ checkout: checkoutIdentity(root), inputs })),
+			inputs,
+		};
 	};
 	const configPaths = [
 		details.config,

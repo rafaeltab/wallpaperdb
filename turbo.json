@@ -16,7 +16,9 @@
     },
     "globalPassThroughEnv": [
         "GITHUB_ACTIONS",
-        "COMPOSE_PROJECT_NAME"
+        "COMPOSE_PROJECT_NAME",
+        "WALLPAPERDB_COVERAGE_REPO_ROOT",
+        "WALLPAPERDB_COVERAGE_CONFIGURATION"
     ],
     "globalDependencies": [
         "packages/vitest-config/src/**",
@@ -256,7 +258,8 @@
         },
         "@wallpaperdb/scripts#test:unit": {
             "dependsOn": [
-                "^build"
+                "^build",
+                "build"
             ],
             "cache": false
         },
@@ -333,7 +336,7 @@
                 "$TURBO_ROOT$/crap.config.mts",
                 "$TURBO_ROOT$/scripts/crap.mts",
                 "$TURBO_ROOT$/scripts/lib/coverage-validation.ts",
-                "$TURBO_ROOT$/scripts/coverage-runtime/**",
+                "$TURBO_ROOT$/packages/coverage-runtime/**",
                 "$TURBO_ROOT$/scripts/operator-inbox.ts",
                 "$TURBO_ROOT$/infra/docker-compose.yml",
                 "$TURBO_ROOT$/.dockerignore",
@@ -366,7 +369,12 @@
                 "$TURBO_ROOT$/apps/*/{test,tests,specs}/**",
                 "$TURBO_ROOT$/packages/*/{test,tests,specs}/**",
                 "$TURBO_ROOT$/apps/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}",
-                "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}"
+                "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}",
+                "$TURBO_ROOT$/scripts/coverage-build.mts",
+                "$TURBO_ROOT$/scripts/coverage-policy.mts",
+                "$TURBO_ROOT$/scripts/tsconfig.coverage.json",
+                "$TURBO_ROOT$/scripts/coverage-protocol.mts",
+                "$TURBO_ROOT$/scripts/coverage-sync-built.mts"
             ],
             "outputs": [
                 "coverage/unit/**"
@@ -403,6 +411,24 @@
                 "build"
             ],
             "cache": false
+        },
+        "@wallpaperdb/coverage-runtime#test:unit": {
+            "dependsOn": [
+                "build",
+                "@wallpaperdb/scripts#build"
+            ],
+            "cache": false,
+            "outputs": [
+                "coverage/unit/**"
+            ]
+        },
+        "@wallpaperdb/coverage-runtime#check-types": {
+            "dependsOn": [
+                "^build"
+            ],
+            "inputs": [
+                "$TURBO_DEFAULT$"
+            ]
         }
     }
 }

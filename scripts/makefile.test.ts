@@ -498,7 +498,7 @@ test("one-off scripts require a package and script", () => {
 
 test("force applies to ordinary CI checks and type checks", () => {
 	const ci = output("ci", "FORCE=1");
-	expect(ci).toMatch(/node scripts\/coverage-runtime\/command.mjs/);
+	expect(ci).toMatch(/node packages\/coverage-runtime\/dist\/command.mjs/);
 	expect(ci).not.toMatch(/command.mjs --package/);
 	expect(ci).toMatch(/run build lint check-types .*--force/);
 	expect(ci).not.toMatch(/run test:e2e/);

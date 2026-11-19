@@ -10,24 +10,34 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc --project tsconfig.json",
-		"check-types": "tsc --project tsconfig.json --noEmit",
+		"build": "rm -rf dist && tsc --project tsconfig.json",
+		"check-types": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.test.json",
 		"lint": "biome lint .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"test:unit": "vitest run --coverage",
+		"test": "vitest run",
+		"lint:fix": "biome lint --write ."
 	},
 	"dependencies": {
 		"istanbul-lib-coverage": "3.2.2",
 		"@vitest/coverage-v8": "5.0.2",
 		"acorn": "8.15.0",
 		"ast-v8-to-istanbul": "1.0.6",
-		"typescript": "^5.7.2",
 		"yaml": "2.9.1",
-		"vitest": "5.0.2"
+		"vitest": "5.0.2",
+		"zod": "^3.24.1",
+		"vite": "7.3.0",
+		"@jridgewell/remapping": "2.3.5",
+		"@jridgewell/trace-mapping": "0.3.31"
 	},
 	"devDependencies": {
 		"@types/istanbul-lib-coverage": "2.0.6",
 		"@types/node": "^26.0.1",
 		"@biomejs/biome": "2.6.2",
-		"typescript": "^5.7.2"
+		"typescript": "^5.7.2",
+		"@wallpaperdb/vitest-config": "workspace:*"
+	},
+	"bin": {
+		"wallpaperdb-coverage": "./dist/command.mjs"
 	}
 }

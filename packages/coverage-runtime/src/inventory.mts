@@ -1,9 +1,15 @@
+import { z } from "zod";
+import { workspaceManifestSchema } from "./json.mjs";
+import { resolve } from "node:path";
+import { repositoryConfiguration, repositoryRoot } from "./repository-root.mjs";
 import { readFile, writeFile, readdir, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import yaml from "yaml";
-const patterns = yaml.parse(
-	await readFile("pnpm-workspace.yaml", "utf8"),
-).packages;
+process.chdir(repositoryRoot());
+const { sourceViteWorkspaces } = await repositoryConfiguration();
+const patterns = z
+	.object({ packages: z.array(z.string()) })
+	.parse(yaml.parse(await readFile("pnpm-workspace.yaml", "utf8"))).packages;
 const directories = ["."];
 for (const pattern of patterns) {
 	if (pattern.endsWith("/*")) {
@@ -17,12 +23,19 @@ for (const pattern of patterns) {
 const workspaces = [],
 	tiers = [];
 for (const workspace of directories) {
-	const manifest = JSON.parse(
-		await readFile(`${workspace}/package.json`, "utf8"),
+	const manifest = workspaceManifestSchema.parse(
+		JSON.parse(await readFile(`${workspace}/package.json`, "utf8")),
 	);
-	workspaces.push({ directory: workspace, name: manifest.name });
+	if (workspace !== "." && !manifest.name)
+		throw new Error("Missing workspace name");
+	workspaces.push({
+		directory: workspace,
+		name: manifest.name || "@wallpaperdb/root",
+	});
 	for (const script of ["test:unit", "test:integration"]) {
-		const command = manifest.scripts?.[script];
+		const command: unknown = manifest.scripts?.[script];
+		if (command !== undefined && typeof command !== "string")
+			throw new Error("Invalid test command");
 		if (!command) continue;
 		let part = 0;
 		for (const chunk of command.split("&&").map((value) => value.trim())) {
@@ -37,15 +50,8 @@ for (const workspace of directories) {
 				? args[args.indexOf("--config") + 1]
 				: "vitest.config.ts";
 			const vite =
-				[
-					".",
-					"scripts",
-					"infra",
-					"apps/web",
-					"packages/react-muuri",
-					"packages/crap-typescript-core",
-					"packages/biome-test-rules",
-				].includes(workspace) || config.startsWith("frontend/");
+				sourceViteWorkspaces.includes(workspace) ||
+				config.startsWith("frontend/");
 			tiers.push({
 				id: `${workspace === "." ? "root" : workspace.replaceAll("/", "-")}-${script.replace("test:", "")}-${++part}`,
 				workspace,
@@ -69,10 +75,10 @@ for (const workspace of directories) {
 }
 const output =
 	process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT ||
-	new URL("../../.coverage-runtime/evidence", import.meta.url).pathname;
+	resolve(repositoryRoot(), ".coverage-runtime/evidence");
 await mkdir(output, { recursive: true });
 await writeFile(
-	output + "/matrix.json",
+	`${output}/matrix.json`,
 	JSON.stringify({ workspaces, tiers }, null, 2),
 );
 console.log(

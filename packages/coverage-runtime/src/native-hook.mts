@@ -1,13 +1,19 @@
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { repositoryRoot } from "./repository-root.mjs";
 import { createHash } from "node:crypto";
 import "./native-sources.mjs";
 import { existsSync } from "node:fs";
 import { registerHooks } from "node:module";
 
-const mirror = new URL("../../.coverage-runtime/build/", import.meta.url);
+const mirror = pathToFileURL(
+	`${resolve(repositoryRoot(), ".coverage-runtime/build")}/`,
+);
 registerHooks({
 	load(url, context, next) {
 		const result = next(url, context);
 		if (url.includes("/@vitest/mocker/dist/chunk-automock.js")) {
+			if (!result.source) throw new Error("Missing mocker source");
 			const source = result.source.toString();
 			if (
 				createHash("sha256").update(source).digest("hex") !==
@@ -48,7 +54,7 @@ registerHooks({
 			const compiled = new URL(requested);
 			compiled.pathname = compiled.pathname.replace(/\.tsx?$/, ".js");
 			if (!existsSync(compiled))
-				throw new Error("UNCOMPILED_MIRROR_MODULE: " + requested.href);
+				throw new Error(`UNCOMPILED_MIRROR_MODULE: ${requested.href}`);
 			return next(compiled.href, context);
 		}
 		if (

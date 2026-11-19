@@ -19,6 +19,9 @@ OPENSEARCH_HOST_PORT ?= 8005
 OTEL_HTTP_HOST_PORT  ?= 8006
 OTEL_GRPC_HOST_PORT  ?= 8007
 
+export WALLPAPERDB_COVERAGE_REPO_ROOT := $(CURDIR)
+export WALLPAPERDB_COVERAGE_CONFIGURATION := $(CURDIR)/scripts/dist/coverage-policy.mjs
+
 export COMPOSE_PROJECT_NAME
 export INGRESS_PORT
 export CRAP_THRESHOLD
@@ -217,16 +220,18 @@ nats-stream-info: ## Inspect WALLPAPER stream
 	@nats stream info WALLPAPER --server nats://localhost:$(NATS_HOST_PORT)
 
 coverage: ## Run maintained unit/integration coverage (optional PACKAGE)
-	@$(MAKE) build PACKAGE=coverage-runtime
-	@node scripts/coverage-runtime/command.mjs $(if $(PACKAGE),--package "$(PACKAGE)")
+	@$(MAKE) build PACKAGE=scripts
+	@node packages/coverage-runtime/dist/command.mjs $(if $(PACKAGE),--package "$(PACKAGE)")
 
 coverage-summary: ## Summarize existing test coverage
 	@node scripts/coverage-summary.ts
 
 crap: ## Rank functions using fresh test coverage (optional PACKAGE)
+	@$(MAKE) build PACKAGE=scripts
 	@PACKAGE="$(PACKAGE)" pnpm --filter @wallpaperdb/scripts exec tsx crap.mts report
 
 check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
+	@$(MAKE) build PACKAGE=scripts
 	@PACKAGE="$(PACKAGE)" pnpm --filter @wallpaperdb/scripts exec tsx crap.mts check
 
 worktree-remove: ## Tear down this worktree and release its slot
@@ -238,7 +243,7 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@set -e; \
 	start_time=$$(date +%s); \
 	node scripts/docker-validation.ts --label ci -- $(TURBO) run build lint check-types --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
-	node scripts/coverage-runtime/command.mjs; \
+	node packages/coverage-runtime/dist/command.mjs; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \

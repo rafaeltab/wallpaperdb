@@ -57,6 +57,7 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
       event: { type: 'turn-item.updated', threadId: 'owner', payload: activity(status) },
     });
     const positions: (number | undefined)[] = [];
+    const boundedNegotiation: (boolean | undefined)[] = [];
     let metadataSequence = 10;
     let push!: (values: unknown[]) => void;
     let inventory!: (values: unknown[]) => void;
@@ -73,7 +74,11 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
             id: z.string().optional(),
             tag: z.string().optional(),
             payload: z
-              .object({ threadId: z.string().optional(), afterSequence: z.number().optional() })
+              .object({
+                threadId: z.string().optional(),
+                afterSequence: z.number().optional(),
+                acceptBoundedSnapshot: z.boolean().optional(),
+              })
               .optional(),
           })
           .parse(raw);
@@ -101,6 +106,7 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
           ]);
         } else if (request.tag === 'orchestration.subscribeThread') {
           positions.push(request.payload?.afterSequence);
+          boundedNegotiation.push(request.payload?.acceptBoundedSnapshot);
           push = reply;
           if (fallback && !bounded) {
             bounded = true;
@@ -179,6 +185,7 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
         expect(observer.activity('owner').items).toMatchObject([{ status: 'completed' }])
       );
       expect(positions).toEqual([undefined, 10]);
+      expect(boundedNegotiation).toEqual([true, true]);
       expect(observer.activity('owner').items).toHaveLength(1);
       expect(observer.inactive('owner', 'run')).toBe('busy');
       push([{ kind: 'synchronized' }]);

@@ -1469,6 +1469,14 @@ it('resumes the parked question on the existing implementation job through v2', 
       { timeout: 5000, interval: 40 }
     );
     await save({ activity: [], overrides: { status: 'completed', pendingRequestCount: 0 } });
+    await vi.waitFor(
+      async () => {
+        const current = (await running.app.inject('/api/job')).json();
+        expect(current.execution).toMatchObject({ kind: 'found', status: 'completed' });
+        expect(current.execution.question).toBeUndefined();
+      },
+      { timeout: 10000, interval: 40 }
+    );
     const request = {
       ...selectors,
       commandId: '00000000-0000-4000-8000-000000000034',

@@ -215,6 +215,7 @@ export async function t3Observations(config: {
                 payload: {
                   threadId: id,
                   requestCompletionMarker: true,
+                  acceptBoundedSnapshot: true,
                   ...(initial && !forceSnapshot ? { afterSequence: initial.sequence } : {}),
                 },
               },

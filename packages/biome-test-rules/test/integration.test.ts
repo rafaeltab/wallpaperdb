@@ -40,6 +40,7 @@ function isolatedRepository() {
 		"biome.json",
 		"crap.config.mts",
 		".gitignore",
+		".dockerignore",
 	])
 		copyFileSync(join(repository, name), join(directory, name));
 	// Newer Makefiles enter the locked toolchain before workspace tasks. Keep
@@ -51,6 +52,9 @@ function isolatedRepository() {
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.ts",
 		"scripts/crap.mts",
+		"scripts/lib/coverage-validation.ts",
+		"scripts/operator-inbox.ts",
+		"infra/docker-compose.yml",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
 		"scripts/lib/mutation-catalog.ts",
@@ -59,6 +63,13 @@ function isolatedRepository() {
 		mkdirSync(dirname(join(directory, name)), { recursive: true });
 		copyFileSync(join(repository, name), join(directory, name));
 	}
+	// The real CRAP CLI obtains fresh reports through the maintained producer.
+	// Keep its modules local so the fixture cannot read another checkout's inputs.
+	cpSync(
+		join(repository, "scripts/coverage-runtime"),
+		join(directory, "scripts/coverage-runtime"),
+		{ recursive: true },
+	);
 	symlinkSync(
 		join(repository, "node_modules"),
 		join(directory, "node_modules"),
@@ -472,6 +483,9 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 		".gitignore",
 		"crap.config.mts",
 		"scripts/crap.mts",
+		"scripts/lib/coverage-validation.ts",
+		"scripts/coverage-runtime/command.mjs",
+		"scripts/coverage-runtime/report-audit.mjs",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
 		"scripts/lib/mutation-catalog.ts",

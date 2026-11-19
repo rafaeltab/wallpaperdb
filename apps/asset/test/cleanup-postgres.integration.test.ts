@@ -474,8 +474,62 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
       ])
     );
     expect(work).toHaveLength(3);
-    for (const item of work)
+    const adjacent = await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          ...command,
+          canonical: 'retained-live-candidate',
+          correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+        })
+      )
+    );
+    if (adjacent.outcome !== 'created') throw new Error('Expected adjacent live Asset');
+    const adjacentCandidateId = crypto.randomUUID();
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(adjacent.assetId, null, (state) => {
+          if (!state) throw new Error('Expected adjacent Source state');
+          state.candidates = [
+            {
+              candidateId: adjacentCandidateId,
+              sourceId: crypto.randomUUID(),
+              idempotencyKey: 'retained',
+              operation: 'add',
+              expectedSourceSetRevision: '0',
+              status: 'cancelled',
+              layout: 'asset-layout-1',
+              expiresAt: '2099-01-01T00:00:00Z',
+              orphanExpiresAt: '2099-01-01T00:00:00Z',
+            },
+          ];
+          return { state, result: undefined };
+        })
+      )
+    );
+    const candidateRows = () =>
+      pool.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM source_candidates WHERE asset_id=$1',
+        [assetId]
+      );
+    for (const item of work.slice(0, -1))
       await cleanup.runPromise(CleanupStore.use((store) => store.completed(item)));
+    // Retain candidate evidence until every byte-cleanup responsibility has finished.
+    expect((await candidateRows()).rows).toEqual([{ count: 1 }]);
+    const last = work.at(-1);
+    if (!last) throw new Error('Expected final cleanup responsibility');
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(last)));
+    expect((await candidateRows()).rows).toEqual([{ count: 0 }]);
+    // Completing cleanup for a live Asset must preserve its candidate replay record.
+    for (const item of await cleanup.runPromise(CleanupStore.use((store) => store.claim(100))))
+      await cleanup.runPromise(CleanupStore.use((store) => store.completed(item)));
+    const retained = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(adjacent.assetId, null, (state) => ({ state, result: state?.candidates }), {
+          candidateId: adjacentCandidateId,
+        })
+      )
+    );
+    expect(retained).toMatchObject([{ candidateId: adjacentCandidateId, status: 'cancelled' }]);
     expect(
       (await pool.query('SELECT deleted_at FROM owned_assets WHERE id=$1', [assetId])).rows[0]
         .deleted_at

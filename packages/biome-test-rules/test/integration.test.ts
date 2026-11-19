@@ -88,10 +88,12 @@ function isolatedRepository() {
 	}
 	const rules = "packages/biome-test-rules";
 	// Keep probe diagnostics visible alongside warnings in the adapted sources.
-	const manifestPath = join(directory, rules, "package.json");
-	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-	manifest.scripts.lint += " --max-diagnostics=200";
-	writeFileSync(manifestPath, JSON.stringify(manifest));
+	for (const workspace of [rules, "scripts"]) {
+		const manifestPath = join(directory, workspace, "package.json");
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+		manifest.scripts.lint += " --max-diagnostics=200";
+		writeFileSync(manifestPath, JSON.stringify(manifest));
+	}
 	copyFileSync(
 		join(repository, rules, "vitest.config.ts"),
 		join(directory, rules, "vitest.config.ts"),

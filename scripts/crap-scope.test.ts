@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 
-function fixture(t: TestContext & object) {
+function fixture(t: TestContext & object, extension: "ts" | "mts" = "ts") {
 	// The analyzer core normalizes report keys to lower case on every platform.
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "crap-scope-Case-"));
 	fs.writeFileSync(
@@ -61,7 +61,7 @@ const filters = process.argv[3].split(',').map(name => '--filter=@wallpaperdb/' 
 fs.writeFileSync('selected.json', JSON.stringify(filters));
 for (const filter of filters) {
   const name = filter.split('/').at(-1);
-  const source = path.resolve('apps', name, 'src/index.ts');
+  const source = path.resolve('apps', name, 'src/index.${extension}');
   const output = path.join('apps', name, 'coverage/unit');
   fs.mkdirSync(output, {recursive: true});
   const span = {start: {line: 1, column: 0}, end: {line: 1, column: 40}};
@@ -87,7 +87,7 @@ for (const filter of filters) {
 			}),
 		);
 		fs.writeFileSync(
-			path.join(directory, "src/index.ts"),
+			path.join(directory, `src/index.${extension}`),
 			"export function identity() { return 1; }\n",
 		);
 	}
@@ -97,7 +97,10 @@ for (const filter of filters) {
 			source: string | NodeJS.ArrayBufferView<ArrayBufferLike>,
 			report: Record<string, any>,
 		) {
-			fs.writeFileSync(path.join(root, "apps/ingestor/src/index.ts"), source);
+			fs.writeFileSync(
+				path.join(root, `apps/ingestor/src/index.${extension}`),
+				source,
+			);
 			fs.writeFileSync(
 				path.join(root, "fixture-coverage.json"),
 				JSON.stringify(report),
@@ -355,3 +358,28 @@ for (const [name, corrupt] of [
 		expect(result.stderr).toMatch(/Cannot combine coverage/);
 	});
 }
+
+test("scoped CRAP includes maintained .mts source functions", (t) => {
+	const project = fixture(t, "mts");
+	project.coverage("export function identity() { return 1; }\n", {
+		statementMap: {
+			0: { start: { line: 1, column: 29 }, end: { line: 1, column: 38 } },
+		},
+		s: { 0: 1 },
+		branchMap: {},
+		b: {},
+		fnMap: {
+			0: {
+				name: "identity",
+				line: 1,
+				decl: { start: { line: 1, column: 16 }, end: { line: 1, column: 24 } },
+				loc: { start: { line: 1, column: 27 }, end: { line: 1, column: 40 } },
+			},
+		},
+		f: { 0: 1 },
+	});
+	const result = project.run("ingestor");
+	expect(result.status, result.stderr).toBe(0);
+	expect(result.stdout).toMatch(/apps\/ingestor\/src\/index\.mts:1/);
+	expect(result.stdout).toMatch(/100\.00%/);
+});

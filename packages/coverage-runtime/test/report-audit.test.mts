@@ -103,10 +103,20 @@ test("report-audit preserves the coverage contract", async () => {
 		1: { start: { line: 1135, column: 18 }, end: { line: 1135, column: 43 } },
 	};
 	mixedFile.s = { 0: 2, 1: 3 };
- const joinLines = readFileSync(mixedFile.path, "utf8").split("\n");
- expect(joinLines[branch.start.line - 1].slice(branch.start.column, branch.end.column)).toBe("if (proposed) await publish(dir, planName, proposed);");
- const followingJoin = mixedFile.statementMap[1];
- expect(joinLines[followingJoin.start.line - 1].slice(followingJoin.start.column, followingJoin.end.column)).toBe("await read(dir, planName)");
+	const joinLines = readFileSync(mixedFile.path, "utf8").split("\n");
+	expect(
+		joinLines[branch.start.line - 1].slice(
+			branch.start.column,
+			branch.end.column,
+		),
+	).toBe("if (proposed) await publish(dir, planName, proposed);");
+	const followingJoin = mixedFile.statementMap[1];
+	expect(
+		joinLines[followingJoin.start.line - 1].slice(
+			followingJoin.start.column,
+			followingJoin.end.column,
+		),
+	).toBe("await read(dir, planName)");
 	const mixedBefore = structuredClone(mixed),
 		estimated = auditReports([mixed], root);
 	expect(Object.values(estimated.reports[0].data)[0].b[0]).toStrictEqual([

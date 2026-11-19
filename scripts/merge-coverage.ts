@@ -1,22 +1,22 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-const root = fileURLToPath(new URL("../", import.meta.url));
+import { resolve } from "node:path";
+import { mergeReceipts } from "./coverage-runtime/receipts.mjs";
+
+// Like the original merger, operate on the caller's checkout, including fixtures.
+const root = process.cwd();
+const output = resolve(root, ".coverage-runtime/evidence");
 execFileSync(
 	process.execPath,
 	[fileURLToPath(new URL("./coverage-runtime/inventory.mjs", import.meta.url))],
-	{ cwd: root, stdio: "inherit" },
+	{
+		cwd: root,
+		stdio: "inherit",
+		env: { ...process.env, WALLPAPERDB_COVERAGE_REPO_OUTPUT_ROOT: output },
+	},
 );
 const { tiers } = JSON.parse(
-	await readFile(
-		new URL("../.coverage-runtime/evidence/matrix.json", import.meta.url),
-		"utf8",
-	),
+	await readFile(resolve(output, "matrix.json"), "utf8"),
 );
-const { mergeReceipts } = await import("./coverage-runtime/receipts.mjs");
-await mergeReceipts(
-	root,
-	tiers.filter((row: { script: string }) =>
-		["test:unit", "test:integration"].includes(row.script),
-	),
-);
+await mergeReceipts(root, tiers);

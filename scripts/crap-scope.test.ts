@@ -18,7 +18,12 @@ function fixture(t: TestContext & object) {
 	] as const) {
 		fs.mkdirSync(path.join(root, directory), { recursive: true });
 	}
-	for (const file of ["scripts/crap.mts", "crap.config.mts"] as const) {
+	fs.mkdirSync(path.join(root, "scripts/lib"), { recursive: true });
+	for (const file of [
+		"scripts/crap.mts",
+		"crap.config.mts",
+		"scripts/lib/coverage-validation.ts",
+	] as const) {
 		fs.copyFileSync(path.join(repository, file), path.join(root, file));
 	}
 	fs.mkdirSync(path.join(root, "node_modules/@wallpaperdb"), {
@@ -32,12 +37,15 @@ function fixture(t: TestContext & object) {
 		path.join(repository, "scripts/node_modules/istanbul-lib-coverage"),
 		path.join(root, "node_modules/istanbul-lib-coverage"),
 	);
+	fs.mkdirSync(path.join(root, "scripts/coverage-runtime"), {
+		recursive: true,
+	});
 	fs.writeFileSync(
-		path.join(root, "node_modules/.bin/turbo"),
+		path.join(root, "scripts/coverage-runtime/command.mjs"),
 		`#!/usr/bin/env node
-const fs = require('node:fs');
-const path = require('node:path');
-const filters = process.argv.filter((arg) => arg.startsWith('--filter='));
+import fs from 'node:fs';
+import path from 'node:path';
+const filters = process.argv[3].split(',').map(name => '--filter=@wallpaperdb/' + name);
 fs.writeFileSync('selected.json', JSON.stringify(filters));
 for (const filter of filters) {
   const name = filter.split('/').at(-1);

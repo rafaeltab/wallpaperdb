@@ -76,11 +76,8 @@ jobs:
       - name: Build, lint, and type-check
         run: make check TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
 
-      - name: Run unit tests
-        run: make test-unit TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
-
-      - name: Run integration tests
-        run: make test-integration TURBO_FLAGS="--filter=$CI_WORKSPACE_FILTER"
+      - name: Run unit and integration coverage
+        run: make coverage
 
       - name: Preserve coverage reports
         uses: actions/upload-artifact@v4
@@ -91,6 +88,7 @@ jobs:
             packages/*/coverage/**/lcov.info
             apps/*/coverage/**/coverage-final.json
             packages/*/coverage/**/coverage-final.json
+            coverage/receipts/*.json
           if-no-files-found: error
 
   ci:
@@ -117,6 +115,9 @@ jobs:
 
       - name: Verify effective tools
         run: make toolchain
+
+      - name: Install dependencies for verified coverage merge
+        run: make install
 
       - name: Restore repository coverage
         uses: actions/download-artifact@v4

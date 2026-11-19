@@ -6,6 +6,39 @@ import { expect, it } from 'vitest';
 import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { completionFixture } from './fixtures/completion.js';
 
+it.each([
+  { status: 'completed', landed: true, active: false, releases: [757] },
+  { status: 'running', landed: false, active: true, releases: [] },
+])('uses the current $status execution snapshot before persisting retirement', async (current) => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-retirement-execution-race-'));
+  const f = await completionFixture(3, fileStore(directory));
+  try {
+    for (let index = 0; index < 3; index++) {
+      f.state({ accepted: true, idle: true, observationStatus: 'completed' });
+      await f.status();
+    }
+    f.state({
+      accepted: true,
+      idle: true,
+      observationStatus: 'running',
+      observationAfterInspection: current.status,
+      landed: true,
+    });
+    expect(await f.status()).toMatchObject({
+      execution: { status: current.status },
+      delivery: { landed: current.landed, active: current.active },
+    });
+    const control = await Effect.runPromise(fileStore(directory).readControl());
+    if (current.landed)
+      expect(control).toMatchObject({ retirement: { execution: { status: current.status } } });
+    else expect(control.retirement).toBeUndefined();
+    expect(f.releases).toEqual(current.releases);
+  } finally {
+    await f.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 it('retains verified landing through SQLite reopen without requiring retired observations', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-landed-retirement-'));
   let f = await completionFixture(3, fileStore(directory));

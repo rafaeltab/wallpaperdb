@@ -105,7 +105,11 @@ test("local verified coverage includes unit and integration and flat producers b
 			);
 		const result = spawnSync(
 			process.execPath,
-			[new URL("./merge-coverage.ts", import.meta.url).pathname, "--local"],
+			[
+				"--no-experimental-strip-types",
+				new URL("./dist/merge-coverage.mjs", import.meta.url).pathname,
+				"--local",
+			],
 			{ cwd: root, encoding: "utf8" },
 		);
 		expect(result.status, result.stderr).toBe(0);
@@ -119,7 +123,11 @@ test("local verified coverage includes unit and integration and flat producers b
 		rmSync(receipt);
 		const missing = spawnSync(
 			process.execPath,
-			[new URL("./merge-coverage.ts", import.meta.url).pathname, "--local"],
+			[
+				"--no-experimental-strip-types",
+				new URL("./dist/merge-coverage.mjs", import.meta.url).pathname,
+				"--local",
+			],
 			{ cwd: root, encoding: "utf8" },
 		);
 		expect(missing.status).not.toBe(0);

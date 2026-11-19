@@ -16,3 +16,4 @@ export {
 	normalizeVitestCoverage,
 	validateFileCoverage,
 } from "./coverage-validation.js";
+export { inventorySchema } from "./json.mjs";

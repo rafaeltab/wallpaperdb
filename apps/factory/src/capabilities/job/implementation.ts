@@ -165,18 +165,20 @@ export const JobLive = Layer.effect(
                 : 'Handback verification superseded; retaining admission.',
             };
           }
-          const resume =
-            resumeCommand(control, stage, observation) ??
-            (yield* retryAction(
-              store,
-              execution,
-              issues,
-              activeIntent,
-              control,
-              stage,
-              observation,
-              delivery
-            ));
+          const publicationLanded = delivery?.pr?.kind === 'found' && delivery.pr.landed;
+          const resume = publicationLanded
+            ? undefined
+            : (resumeCommand(control, stage, observation) ??
+              (yield* retryAction(
+                store,
+                execution,
+                issues,
+                activeIntent,
+                control,
+                stage,
+                observation,
+                delivery
+              )));
           const now = yield* time.now();
           const status = {
             kind: 'job' as const,
@@ -193,14 +195,9 @@ export const JobLive = Layer.effect(
             intent: { ...intent, branch: activeIntent.branch },
             prerequisite: control.cancelled ? undefined : control.prerequisite,
             resume,
-            retry: yield* restartAction(
-              store,
-              execution,
-              activeIntent,
-              control,
-              stage,
-              observation
-            ),
+            retry: publicationLanded
+              ? undefined
+              : yield* restartAction(store, execution, activeIntent, control, stage, observation),
             execution: observation,
             delivery: delivery
               ? { ...delivery, active: delivery.active ?? !delivery.ready }

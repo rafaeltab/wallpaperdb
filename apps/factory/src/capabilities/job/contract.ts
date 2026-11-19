@@ -302,6 +302,9 @@ export const Issues = Context.Service<Issues>('wallpaperdb.factory.Issues');
 /** Launch may have succeeded on every failure. Observe must identify the exact title,
  * branch, model and isolated worktree; absence never authorizes a second launch. */
 export interface Execution {
+  /** True proves the owning run and its complete managed lineage have no active
+   * execution, background work or registered waits, independently of receipts. */
+  isIdle?: (threadId: string, runId: string | null) => Effect.Effect<boolean, Unavailable>;
   /** Verified landing permits observation release only after outstanding managed
    * responsibilities are idle. An adapter may retain supervision while evidence is unknown. */
   release?: (intent: Intent) => Effect.Effect<void, Unavailable>;

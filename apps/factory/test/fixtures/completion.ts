@@ -36,6 +36,7 @@ export async function completionFixture(
   let ready = false;
   let landed = false;
   let manual = false;
+  let managedIdle = true;
   let failed = false;
   let dependencyResult: 'valid' | 'invalid' | 'cycle' = 'valid';
   let handbackVerified = false;
@@ -85,6 +86,7 @@ export async function completionFixture(
                   }),
           }),
           Layer.succeed(Execution, {
+            isIdle: () => Effect.succeed(managedIdle),
             release: (intent) =>
               Effect.sync(() => {
                 releases.push(intent.issue);
@@ -177,6 +179,7 @@ export async function completionFixture(
       ready?: boolean;
       landed?: boolean;
       manual?: boolean;
+      managedIdle?: boolean;
       failed?: boolean;
       clean?: boolean;
       rejection?: StageEvidence['rejection'];
@@ -202,6 +205,7 @@ export async function completionFixture(
       ready = change.ready ?? ready;
       landed = change.landed ?? landed;
       manual = change.manual ?? manual;
+      managedIdle = change.managedIdle ?? managedIdle;
       failed = change.failed ?? failed;
       clean = change.clean ?? clean;
       lost = change.lost ?? lost;

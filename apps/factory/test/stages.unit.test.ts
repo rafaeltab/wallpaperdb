@@ -58,6 +58,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
         }),
     }),
     Layer.succeed(Execution, {
+      isIdle: () => Effect.succeed(true),
       release: (intent) =>
         Effect.sync(() => {
           released.push(intent.issue);

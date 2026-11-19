@@ -703,3 +703,24 @@ it.each(['unverified', 'manual-recovery', 'manual-continuation'] as const)(
     }
   }
 );
+
+it('retains landed work until the completed owner and all managed descendants are idle', async () => {
+  const f = await fixture();
+  try {
+    f.state({
+      observationStatus: 'completed',
+      landed: true,
+      managedIdle: false,
+      inspectFailed: true,
+    });
+    expect(await f.status()).toMatchObject({ delivery: { landed: false, active: true } });
+    expect(f.releases).toEqual([]);
+    expect(f.sends).toEqual([]);
+    f.state({ managedIdle: true });
+    expect(await f.status()).toMatchObject({ delivery: { landed: true, active: false } });
+    expect(f.releases).toEqual([757]);
+    expect(f.sends).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});

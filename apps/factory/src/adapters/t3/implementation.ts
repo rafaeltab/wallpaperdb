@@ -67,6 +67,15 @@ export function t3Execution(config: {
       (text) => JSON.parse(text)
     );
   };
+  const inactive = (threadId: string, runId: string | null, signal?: AbortSignal) =>
+    config.observations
+      ? Promise.resolve(config.observations.inactive(threadId, runId))
+      : inactiveLineage(
+          (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
+          threadId,
+          runId,
+          signal
+        );
   const submit = (launch: (signal?: AbortSignal) => Promise<unknown>) =>
     Effect.tryPromise({
       try: async (signal) => {
@@ -219,6 +228,14 @@ ${receiptInstructions(intent, 'implementation')}`,
   };
   return {
     ...execution,
+    isIdle: (threadId, runId) =>
+      Effect.tryPromise({
+        try: async (signal) => (await inactive(threadId, runId, signal)) === 'idle',
+        catch: (cause) => new Unavailable({ operation: 'observe-managed-inactivity', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.t3.inactivity')
+      ),
     release: (intent) =>
       Effect.sync(() => {
         config.observations?.retireIssue(intent.issue);
@@ -255,15 +272,7 @@ ${receiptInstructions(intent, 'implementation')}`,
           .map((pr) => pr.url);
       },
       (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
-      (threadId, runId, signal) =>
-        config.observations
-          ? Promise.resolve(config.observations.inactive(threadId, runId))
-          : inactiveLineage(
-              (tool, args, childSignal) => mcpCall(config, tool, args, childSignal),
-              threadId,
-              runId,
-              signal
-            ),
+      inactive,
       config.mcpEndpoint && config.mcpAuthorizationFile
         ? (intent, request, prompt, signal) =>
             mcpCall(

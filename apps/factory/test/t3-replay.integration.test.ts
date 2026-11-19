@@ -8,7 +8,13 @@ import { sqliteObservationCheckpoints } from '../src/adapters/store/index.js';
 import { initializeState } from '../src/platform/index.js';
 import { websocketProtocol } from './fixtures/websocket.js';
 
-it.each(['complete', 'stale recovery', 'bounded recovery'])(
+it.each([
+  'complete',
+  'stale recovery',
+  'bounded recovery',
+  'mismatched recovery',
+  'failed recovery',
+])(
   'resumes applied facts and recovers persistently bounded history: %s',
   async (scenario) => {
     const directory = await mkdtemp(join(tmpdir(), 'factory-replay-'));
@@ -145,6 +151,11 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
         expect(request.headers['x-t3-orchestration-protocol']).toBe('2');
         complete = () => {
           responses++;
+          if (responses === 1 && scenario === 'failed recovery') {
+            response.writeHead(503);
+            response.end('temporarily unavailable');
+            return;
+          }
           response.writeHead(200, { 'content-type': 'application/json' });
           response.end(
             JSON.stringify({
@@ -155,6 +166,9 @@ it.each(['complete', 'stale recovery', 'bounded recovery'])(
                 : {}),
               projection: {
                 ...snapshot(25, 'pending').projection,
+                ...(responses === 1 && scenario === 'mismatched recovery'
+                  ? { thread: { ...snapshot(25, 'pending').projection.thread, id: 'unrelated' } }
+                  : {}),
                 turnItems: [
                   activity('pending'),
                   { ...activity('completed'), id: 'recent', ordinal: 1 },

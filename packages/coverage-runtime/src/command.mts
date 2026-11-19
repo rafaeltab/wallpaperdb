@@ -6,7 +6,6 @@ import type {
 	Report,
 	GeneratedSources,
 	SourceIdentities,
-	AuditEntry,
 } from "./contract.mjs";
 import { z } from "zod";
 import {

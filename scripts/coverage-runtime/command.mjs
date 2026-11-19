@@ -1,3 +1,4 @@
+import { reportInput } from "./report-input.mjs";
 import { checkoutIdentity } from "./artifacts.mjs";
 // Maintained producer for the existing unit/integration report and CRAP contracts.
 import assert from "node:assert/strict";
@@ -253,7 +254,12 @@ async function main() {
 			}
 			const selection = await json(directory + "/selection.json"),
 				rawPath = directory + "/coverage/coverage-final.json",
-				data = await json(rawPath);
+				rawData = await json(rawPath);
+			const { original: data, generated } = await reportInput(
+				rawData,
+				root,
+				row.workspace,
+			);
 			for (const [path, file] of Object.entries(data)) {
 				inside(row.workspace, path);
 				assert.equal(file.path, path);
@@ -301,7 +307,15 @@ async function main() {
 				).startsWith("..") === false,
 				"Unexpected report destination",
 			);
-			produced.push({ id: row.id, data, row, rawPath, destination });
+			produced.push({
+				id: row.id,
+				data,
+				rawData,
+				generated,
+				row,
+				rawPath,
+				destination,
+			});
 		}
 		assert.equal(
 			checkoutIdentity(root),
@@ -373,10 +387,11 @@ async function main() {
 				resolve(root, "coverage/receipts"),
 				root,
 				item.row,
-				item.data,
+				item.rawData,
 				audited.reports[i].data,
 				identities,
 				manifest.audit.filter((a) => a.report === item.id),
+				item.generated,
 			);
 		}
 		await mergeReceipts(root, rows);

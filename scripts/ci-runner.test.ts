@@ -31,14 +31,16 @@ test "$stage" != "$CI_TEST_FAILURE"
 `,
 			{ mode: 0o700 },
 		);
+		mkdirSync(join(directory, "scripts/coverage-runtime"), { recursive: true });
 		writeFileSync(
-			join(directory, "pnpm"),
-			`#!/bin/sh
-echo coverage >> "$CI_TEST_LOG"
-test coverage != "$CI_TEST_FAILURE"
+			join(directory, "scripts/coverage-runtime/command.mjs"),
+			`
+import {appendFileSync} from 'node:fs';
+appendFileSync(process.env.CI_TEST_LOG, 'coverage\\n');
+process.exit(process.env.CI_TEST_FAILURE === 'coverage' ? 1 : 0);
 `,
-			{ mode: 0o700 },
 		);
+
 		const log = join(directory, "calls.log");
 		writeFileSync(log, "");
 		const result = spawnSync(

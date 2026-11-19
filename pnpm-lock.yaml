@@ -17015,7 +17015,7 @@ snapshots:
       execa: 9.6.1
       find-up: 7.0.0
       glob: 10.5.0
-      yaml: 2.9.1
+      yaml: 2.8.2
     transitivePeerDependencies:
       - monocart-coverage-reports
 

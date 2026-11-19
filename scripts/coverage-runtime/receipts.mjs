@@ -1,3 +1,4 @@
+import { reportInput } from "./report-input.mjs";
 import { checkoutIdentity } from "./artifacts.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -27,6 +28,7 @@ export async function writeReceipt(
 	data,
 	sourceHashes,
 	audit,
+	generated = {},
 ) {
 	await mkdir(directory, { recursive: true });
 	const receipt = {
@@ -45,6 +47,7 @@ export async function writeReceipt(
 		raw: portable(raw, root),
 		data: portable(data, root),
 		audit: portable(audit, root),
+		generated: portable(generated, root),
 	};
 	receipt.reportHash = hash(JSON.stringify(receipt.data));
 	receipt.rawHash = hash(JSON.stringify(receipt.raw));
@@ -111,7 +114,13 @@ export async function mergeReceipts(
 			);
 		}
 		if (row.coverage) {
-			inputs.push({ id: row.id, data: restored(receipt.raw, root) });
+			const { original } = await reportInput(
+				restored(receipt.raw, root),
+				root,
+				row.workspace,
+				restored(receipt.generated || {}, root),
+			);
+			inputs.push({ id: row.id, data: original });
 			receipts.push(receipt);
 		}
 		workspaces.add(receipt.workspace);

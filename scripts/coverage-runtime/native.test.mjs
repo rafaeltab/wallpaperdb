@@ -1,10 +1,14 @@
+import { hash, writeReceipt, mergeReceipts } from "./receipts.mjs";
+import { reportInput } from "./report-input.mjs";
+import { auditReports } from "./report-audit.mjs";
+import { publishReports } from "./publish-reports.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtemp, writeFile, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import ts from "typescript";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 test("native children and workers measure original TypeScript hits and real zero controls", async () => {
@@ -119,7 +123,7 @@ for (const mode of ["manual", "automock", "spy"])
 					directory + "/vitest.config.mjs",
 					`export default {test:{include:['control.test.js'],experimental:{viteModuleRunner:false,nodeLoader:true},coverage:{provider:'v8',enabled:true,include:['original.js'],reporter:['json'],reportsDirectory:'coverage'}}};`,
 				);
-				const sources = directory + "/sources";
+				const sources = directory + "/.coverage-runtime/native-sources-control";
 				const run = spawnSync(
 					process.execPath,
 					[resolve(root, "node_modules/vitest/vitest.mjs"), "run"],
@@ -148,6 +152,88 @@ for (const mode of ["manual", "automock", "spy"])
 				assert.ok(
 					Object.keys(report).some((path) => path.startsWith(sources + "/")),
 					"generated plumbing must retain its own identity",
+				);
+				const partition = await reportInput(report, directory, ".");
+				assert.deepEqual(partition.original[original], report[original]);
+				assert.ok(
+					Object.values(partition.generated).some((entry) =>
+						Object.values(entry.coverage.s).some((count) => count > 0),
+					),
+				);
+				assert.deepEqual(
+					{
+						...partition.original,
+						...Object.fromEntries(
+							Object.entries(partition.generated).map(([path, entry]) => [
+								path,
+								entry.coverage,
+							]),
+						),
+					},
+					report,
+					"raw source inventory/maps/counters preserved",
+				);
+				const replay = await reportInput(
+					report,
+					directory,
+					".",
+					partition.generated,
+				);
+				assert.deepEqual(replay, partition);
+				const audited = auditReports(
+					[{ id: "mock", data: partition.original }],
+					directory,
+				);
+				await publishReports(audited.reports[0].data, directory + "/published");
+				const published = JSON.parse(
+					await readFile(directory + "/published/coverage-final.json", "utf8"),
+				);
+				assert.deepEqual(published, partition.original);
+				await writeFile(
+					directory + "/.gitignore",
+					"node_modules\n.coverage-runtime/\npublished/\n",
+				);
+				for (const args of [
+					["init", "-q"],
+					["add", "."],
+					[
+						"-c",
+						"user.name=Test",
+						"-c",
+						"user.email=test@example.invalid",
+						"commit",
+						"-qm",
+						"fixture",
+					],
+				])
+					execFileSync("git", args, { cwd: directory });
+				const row = { id: "mock-control", workspace: ".", coverage: true };
+				await writeReceipt(
+					directory + "/.coverage-runtime/receipts",
+					directory,
+					row,
+					report,
+					partition.original,
+					{ [original]: hash(source) },
+					[],
+					partition.generated,
+				);
+				await mergeReceipts(
+					directory,
+					[row],
+					directory + "/.coverage-runtime/receipts",
+					directory + "/.coverage-runtime/output",
+				);
+				const receiptOutput = JSON.parse(
+					await readFile(
+						directory + "/.coverage-runtime/output/coverage-final.json",
+						"utf8",
+					),
+				);
+				assert.deepEqual(
+					receiptOutput,
+					partition.original,
+					"production receipt merge preserves original positives and zeros",
 				);
 				const file = report[original];
 				const counts = (name) =>

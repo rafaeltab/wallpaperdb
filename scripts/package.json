@@ -12,7 +12,7 @@
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && scripts/node_modules/.bin/vitest run scripts/docker-validation.test.ts",
 		"test:toolchain": "cd .. && scripts/node_modules/.bin/vitest run scripts/toolchain.test.ts",
-		"test:unit": "cd ..",
+		"test:unit": "cd .. && scripts/node_modules/.bin/vitest run",
 		"test:mutation": "node mutation.ts",
 		"check-types": "tsc --project tsconfig.json && tsc --project tsconfig.external.json",
 		"format:files": "biome format --write",

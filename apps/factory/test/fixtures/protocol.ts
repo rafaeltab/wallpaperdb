@@ -1431,6 +1431,7 @@ export async function runProtocol(
               latestRunId:
                 config.overrides?.latestRunId ?? (resourceExists ? resource.latestRunId : null),
             },
+            recentRuns: config.recentRuns,
             items: config.activity ?? [],
             hasMore: false,
             nextPosition: null,
@@ -1576,7 +1577,6 @@ export async function runProtocol(
         );
       else if (args[1] === 'show')
         reply({
-          recentRuns: config.recentRuns,
           thread: resource
             ? {
                 ...resource,

@@ -51,6 +51,12 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
     const control = input.localWork.find((w) => w.intent?.issue === admission.issue)?.control;
     if (control?.cancelled || control?.released || !job || !implementing(job)) continue;
+    const observation = input.observations.items?.[`job:${job.intent.id}`];
+    if (
+      observation?.failedAt !== undefined &&
+      observation.failedAt >= (observation.observedAt ?? 0)
+    )
+      continue;
     const execution = job.execution;
     if (execution.kind !== 'found') continue;
     items.push({

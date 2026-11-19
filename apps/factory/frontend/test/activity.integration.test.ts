@@ -50,6 +50,10 @@ it('provides keyboard and hover details, live switching and approved D layout at
     await page.route('**/api/v2/board', (route) =>
       offline ? route.abort() : route.fulfill({ json: served })
     );
+    page.on('pageerror', (error) => console.error(error));
+    page.on('console', (message) => {
+      if (message.type() === 'error') console.error(message.text());
+    });
     await page.goto(origin);
     const trigger = page.locator('.fa-summary');
     const panel = page.getByRole('region', { name: 'Factory activity details' });
@@ -67,6 +71,36 @@ it('provides keyboard and hover details, live switching and approved D layout at
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await browserExpect(panel).toBeVisible();
+    const implementing = [1, 2].map((issue) => ({
+      id: `implementation:${issue}`,
+      category: 'implementing' as const,
+      lifecycle: 'current' as const,
+      issue,
+      pullRequest: null,
+      startedAt: new Date(Date.now() - (issue === 1 ? 120000 : 60000)).toISOString(),
+      reason: 'Implementing admitted issue',
+    }));
+    served = { ...idle, meta: { ...idle.meta, activity: { ...activity, items: implementing } } };
+    await browserExpect(trigger).toContainText('Implementing 2 issues', { timeout: 5000 });
+    await page.screenshot({ path: join(evidence, 'implementing-two.png') });
+    served = {
+      ...idle,
+      meta: { ...idle.meta, activity: { ...activity, items: [implementing[0]] } },
+    };
+    await browserExpect(trigger).toContainText('Implementing 1 issue', { timeout: 5000 });
+    await browserExpect(trigger.locator('time')).toContainText('2m');
+    served = {
+      ...idle,
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          items: [implementing[0], { ...implementing[1], category: 'reviewing' }],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Reviewing 1 issue', { timeout: 5000 });
+    await page.screenshot({ path: join(evidence, 'review-handoff.png') });
     served = {
       ...idle,
       meta: {
@@ -146,4 +180,4 @@ it('provides keyboard and hover details, live switching and approved D layout at
     if (previous === undefined) delete process.env.FACTORY_BACKEND_URL;
     else process.env.FACTORY_BACKEND_URL = previous;
   }
-});
+}, 45000);

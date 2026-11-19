@@ -18,11 +18,6 @@ const associations = z.object({
 });
 const listing = z.array(z.object({ threadId: z.string().min(1), title: z.string() }));
 const detail = z.object({
-  recentRuns: z
-    .array(
-      z.object({ runId: z.string(), startedAt: z.string().datetime({ offset: true }).nullable() })
-    )
-    .optional(),
   thread: z.object({
     threadId: z.string().min(1),
     projectId: z.string().min(1),
@@ -161,7 +156,7 @@ ${receiptInstructions(intent, 'implementation')}`,
                 : { kind: 'ambiguous' };
             throw cause;
           }
-          const { thread, recentRuns } = detail.parse(observed);
+          const { thread } = detail.parse(observed);
           if (thread.threadId !== match.threadId || thread.projectId !== config.projectId)
             return { kind: 'ambiguous' };
           const unverified: Observation = repair
@@ -201,7 +196,12 @@ ${receiptInstructions(intent, 'implementation')}`,
             return {
               ...questions,
               run: questions.run
-                ? { ...questions.run, startedAt: runStart(thread.latestRunId, recentRuns) }
+                ? {
+                    ...questions.run,
+                    startedAt: questions.runStartedAt
+                      ? Date.parse(questions.runStartedAt)
+                      : undefined,
+                  }
                 : undefined,
               kind: 'found',
               threadId: thread.threadId,
@@ -312,7 +312,7 @@ async function questionObservation(
     };
   if (thread.pendingRequestCount > 0)
     throw new Error('Structured T3 MCP observation requires endpoint and authorization file');
-  return { question: undefined, run: currentRun(thread) };
+  return { question: undefined, run: currentRun(thread), runStartedAt: undefined };
 }
 function currentRun(thread: z.infer<typeof detail>['thread']) {
   return thread.latestRunId ? { id: thread.latestRunId, ordinal: thread.runCount } : undefined;
@@ -352,9 +352,4 @@ async function verifyObservedHead(
     if (cause instanceof Error && 'code' in cause && cause.code === 1) return;
     throw cause;
   }
-}
-
-function runStart(id: string | null, runs: z.infer<typeof detail>['recentRuns']) {
-  const start = runs?.find((run) => run.runId === id)?.startedAt;
-  return start ? Date.parse(start) : undefined;
 }

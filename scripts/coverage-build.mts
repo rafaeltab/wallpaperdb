@@ -481,7 +481,10 @@ async function compile(dir: string, only?: Set<string>): Promise<void> {
 			);
 			if (map)
 				await writeFile(
-					dest.replace(/\.(?:mts|tsx?)$/, outputExtension(src) + ".map"),
+					dest.replace(
+						/\.(?:mts|tsx?)$/,
+						src.endsWith(".mts") ? ".mjs.map" : ".js.map",
+					),
 					JSON.stringify(map),
 				);
 		} else if (entry.name === "package.json") {

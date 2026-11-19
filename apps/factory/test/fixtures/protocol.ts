@@ -45,6 +45,11 @@ export async function runProtocol(
   const console = output;
   try {
     const config = JSON.parse(readFileSync(process.env.FACTORY_FIXTURE!, 'utf8'));
+    const publishResource = (path: string, resource: object) => {
+      const next = `${path}.${process.pid}.next`;
+      writeFileSync(next, JSON.stringify(resource));
+      renameSync(next, path);
+    };
     const args = process.argv.slice(2);
     // Manual-operation fixtures still serve the background observation queries.
     // Reuse the project protocol without inventing discoverable admissions.
@@ -1452,14 +1457,14 @@ export async function runProtocol(
           stdio: 'pipe',
         }
       );
-      writeFileSync(
+      publishResource(
         join(
           config.directory,
           config.parallel
             ? `resource-${flag('--branch').replaceAll('/', '-')}.json`
             : 'resource.json'
         ),
-        JSON.stringify({
+        {
           instructions: [{ role: 'user', text: args[3] }],
           issue: args[3].match(/issues\/(\d+)/)?.[1],
           threadId: config.parallel ? flag('--branch') : 'thread-live',
@@ -1480,7 +1485,7 @@ export async function runProtocol(
           runCount: 1,
           pendingRequestCount: 0,
           pullRequests: [],
-        })
+        }
       );
       if (config.lost) process.exit(1);
       reply({
@@ -1527,7 +1532,7 @@ export async function runProtocol(
           writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
         resource.pullRequests = [{ url: pr.url }];
       }
-      writeFileSync(path, JSON.stringify(resource));
+      publishResource(path, resource);
       if (config.lostSend || (config.lostPublication && index === 2)) process.exit(1);
       const sent = { threadId: resource.threadId, runId: resource.latestRunId };
       reply(mcpSend ? { structuredContent: sent } : sent);

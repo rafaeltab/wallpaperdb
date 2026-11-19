@@ -97,8 +97,11 @@ A maintainer continues an implementation in its existing owning thread and workt
 The current PR comparison has satisfied its applicable acceptance, review and CI requirements. This is a delivery handoff, not proof that the issue has landed.
 _Avoid_: Landed, merged, Done
 
+**Done**:
+A Project item for which all work it currently intends to perform is complete. This does not mean its PR has merged or received GitHub review approval, and is distinct from the GitHub Project status named Done.
+
 **Landed**:
-The issue's associated PR merge result is verified as part of the repository's default-branch history. Issue closure alone is not evidence of landing.
+A Project item whose delivery satisfies the factory's landing policy. In the WDB rewrite, an associated PR reported as merged is sufficient, without independently established inclusion in the default branch; see [the accepted landing decision](./docs/adr/0011-use-reported-pr-merges-as-wdb-landing-evidence.md).
 _Avoid_: Ready for merge, closed issue
 
 **Stack**:

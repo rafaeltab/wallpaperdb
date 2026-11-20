@@ -98,8 +98,31 @@ export default async function (): Promise<ViteUserConfig> {
 		builtArtifactWorkspaces.includes(
 			process.env.WALLPAPERDB_COVERAGE_WORKSPACE || "",
 		)
-	)
-		test.coverage.include = [...(test.coverage.include || []), "dist/**/*.mjs"];
+	) {
+		const source = resolve(
+			root,
+			process.env.WALLPAPERDB_COVERAGE_WORKSPACE || "",
+		);
+		// Bundles can contain shared-package code. Apply the original workspace
+		// selection after remapping as well as selecting generated scripts first.
+		test.coverage.include = [
+			...(test.coverage.include || []),
+			"dist/**/*.mjs",
+			...(originalCoverage.include || []).map((pattern) =>
+				resolve(source, pattern),
+			),
+		];
+		test.coverage.exclude = [
+			...(test.coverage.exclude || []),
+			...(originalCoverage.exclude || []).map((pattern) =>
+				resolve(source, pattern),
+			),
+		];
+		test.coverage.excludeAfterRemap = true;
+		// Original sources are outside the relocated project root; the absolute
+		// include patterns above still restrict them to this workspace's policy.
+		test.coverage.allowExternal = true;
+	}
 	await writeFile(
 		resolve(
 			process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT || "",

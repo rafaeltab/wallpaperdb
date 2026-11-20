@@ -4193,7 +4193,11 @@ it('keeps pending planning coverage unknown and uses only a current completed pl
       input: { issues: [] },
     },
   };
-  await board.publish(input, complete);
+  const assessed: ScheduleSnapshot = {
+    ...input,
+    planningActivity: { assessment: { outcome: 'no-eligible', startedAt: 500, observedAt: 900 } },
+  };
+  await board.publish(assessed, complete);
   expect(board.snapshot().meta.activity?.admissionReasons).toContainEqual({
     code: 'planner-no-eligible',
     message: 'No eligible issues found by planner',
@@ -4201,7 +4205,10 @@ it('keeps pending planning coverage unknown and uses only a current completed pl
   expect(
     board.snapshot().meta.activity?.admissionReasons.some((r) => r.code === 'eligibility-unknown')
   ).toBe(false);
-  await board.publish({ ...input, state: { ...input.state, concurrency: 2 } }, complete);
+  await board.publish(
+    { ...assessed, observations: { ...input.observations, observedAt: 1500 } },
+    complete
+  );
   expect(board.snapshot().meta.activity?.admissionReasons).toContainEqual({
     code: 'eligibility-unknown',
     message: 'Eligibility unknown',
@@ -5668,3 +5675,57 @@ it('translates simultaneous planning facts and distinct assessment evidence thro
     await app.close();
   }
 });
+
+it.each(['Rejected unsafe selection', 'Included PR unavailable'])(
+  'keeps eligibility unknown for a retained current preview with %s',
+  async (reason) => {
+    const input: ScheduleSnapshot = { ...initial, planningActivity: {} };
+    const id = '00000000-0000-4000-8000-000000000724';
+    const board = await liveBoard({
+      scopeId: 'rejected-assessment',
+      initial: input,
+      commands: {
+        execute: () =>
+          Effect.succeed({ state: 'succeeded', result: { planId: `plan:${id}` }, reasons: [] }),
+      },
+    });
+    const action = Object.values(board.snapshot().entities.actions).find(
+      (a) => a.kind === 'preview-plan'
+    );
+    if (action?.availability.state !== 'available') throw new Error('Expected preview action');
+    await board.submit({
+      commandId: '10000000-0000-4000-8000-000000000724',
+      actionId: action.id,
+      precondition: action.availability.precondition,
+      kind: 'preview-plan',
+      payload: {},
+    });
+    await board.idle();
+    await board.publish(input, {
+      id,
+      revision: 1,
+      startedAt: 500,
+      deadline: 10000,
+      phase: 'succeeded',
+      finishedAt: 900,
+      result: {
+        kind: 'preview',
+        selected: [],
+        rejected: [{ issue: 580, reason }],
+        input: { issues: [] },
+      },
+    });
+    expect(board.snapshot().entities.plans[`plan:${id}`].applicability).toBe('current');
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const reasons = (await app.inject('/api/v2/board'))
+        .json<FactoryV2Snapshot>()
+        .meta.activity?.admissionReasons.map((r) => r.code);
+      expect(reasons).toContain('eligibility-unknown');
+      expect(reasons).not.toContain('planner-no-eligible');
+    } finally {
+      board.close();
+      await app.close();
+    }
+  }
+);

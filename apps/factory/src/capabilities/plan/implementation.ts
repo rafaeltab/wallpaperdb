@@ -217,7 +217,11 @@ export const PlanLive = Layer.effect(
                 prepared,
               });
             const proposal = yield* (discovery ? discovery.prepare(propose) : propose()).pipe(
-              Effect.ensuring(Effect.sync(() => { activity = {}; }))
+              Effect.ensuring(
+                Effect.sync(() => {
+                  activity = {};
+                })
+              )
             );
             if ('kind' in proposal) {
               if (proposal.kind === 'paused')

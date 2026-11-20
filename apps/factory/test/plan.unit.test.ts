@@ -665,6 +665,22 @@ it.each(['none', 'discovery', 'preparation'] as const)(
 it.each([false, true])('reports only model responsibility for automatic=%s', async (automatic) => {
   const { Time } = await import('../src/capabilities/job/index.js');
   let now = 1000;
+  let enterDiscovery!: () => void;
+  let releaseDiscovery!: () => void;
+  const discovering = new Promise<void>((resolve) => {
+    enterDiscovery = resolve;
+  });
+  const discovery = new Promise<void>((resolve) => {
+    releaseDiscovery = resolve;
+  });
+  let enterVerification!: () => void;
+  let releaseVerification!: () => void;
+  const verifying = new Promise<void>((resolve) => {
+    enterVerification = resolve;
+  });
+  const verification = new Promise<void>((resolve) => {
+    releaseVerification = resolve;
+  });
   let owner: import('../src/capabilities/plan/index.js').PlannerOwnership | undefined;
   let enterPreparation!: () => void;
   let releasePreparation!: () => void;
@@ -689,7 +705,9 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
           Layer.succeed(Time, { now: () => Effect.sync(() => now) }),
           Layer.succeed(PlanningSource, {
             read: () =>
-              Effect.sync(() => {
+              Effect.promise(async () => {
+                enterDiscovery();
+                await discovery;
                 now = 2000;
                 return {
                   issues: [issue],
@@ -697,7 +715,12 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
                   capacity: { concurrency: 1, admission: 1 },
                 };
               }),
-            verify: () => Effect.succeed(undefined),
+            verify: () =>
+              Effect.promise(async () => {
+                enterVerification();
+                await verification;
+                return undefined;
+              }),
           }),
           Layer.succeed(IPlanner, {
             ownership: () => Effect.sync(() => owner),
@@ -725,6 +748,9 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
     const plan = await runtime.runPromise(Plan);
     if (!plan.activity) throw new Error('Missing planning activity read port');
     const work = runtime.runPromise(plan.preview({ automatic, progress: () => Effect.void }));
+    await discovering;
+    const duringDiscovery = await runtime.runPromise(plan.activity());
+    releaseDiscovery();
     await preparing;
     const beforeHandoff = await runtime.runPromise(plan.activity());
     now = 2500;
@@ -732,12 +758,17 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
     await entered;
     const duringModel = await runtime.runPromise(plan.activity());
     now = 3000;
-    releaseModel({ selected: [], deferred: [{ issue: 580, reason: 'No eligible work' }] });
+    releaseModel(proposal);
+    await verifying;
+    const duringVerification = await runtime.runPromise(plan.activity());
+    releaseVerification();
     await work;
+    expect(duringDiscovery.current).toBeUndefined();
+    expect(duringVerification.current).toBeUndefined();
     expect(beforeHandoff.current).toBeUndefined();
     expect(duringModel.current).toEqual({ id: 'controlled-model', startedAt: 2500 });
     expect(await runtime.runPromise(plan.activity())).toMatchObject({
-      assessment: { outcome: 'no-eligible', observedAt: 3000 },
+      assessment: { outcome: 'eligible', observedAt: 3000 },
     });
   } finally {
     await runtime.dispose();
@@ -751,6 +782,7 @@ it.each([
   'rejected',
   'unverifiable',
   'eligible',
+  'no-eligible',
   'empty-filter',
 ] as const)('retains honest assessment evidence for %s outcomes', async (outcome) => {
   const { Time, Unavailable } = await import('../src/capabilities/job/index.js');
@@ -782,9 +814,11 @@ it.each([
                 if (outcome === 'stale' || outcome === 'paused')
                   return Effect.succeed({ kind: outcome });
                 return Effect.succeed(
-                  outcome === 'rejected'
-                    ? { selected: [{ ...selection, issue: 999 }], deferred: [] }
-                    : proposal
+                  outcome === 'no-eligible'
+                    ? { selected: [], deferred: [] }
+                    : outcome === 'rejected'
+                      ? { selected: [{ ...selection, issue: 999 }], deferred: [] }
+                      : proposal
                 );
               }),
           })
@@ -798,7 +832,8 @@ it.each([
     await runtime.runPromise(plan.preview().pipe(Effect.exit));
     const facts = await runtime.runPromise(plan.activity());
     expect(facts.current).toBeUndefined();
-    if (outcome === 'eligible') expect(facts.assessment?.outcome).toBe('eligible');
+    if (outcome === 'eligible' || outcome === 'no-eligible')
+      expect(facts.assessment?.outcome).toBe(outcome);
     else expect(facts.assessment).toBeUndefined();
     expect(models).toBe(outcome === 'empty-filter' ? 0 : 1);
   } finally {

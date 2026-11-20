@@ -31,17 +31,6 @@ export function includePlan(
                 ? ['Planning activity coverage is incomplete.']
                 : []),
             ],
-            admissionReasons:
-              detail.attempt.phase === 'succeeded' &&
-              detail.attempt.applicability === 'current' &&
-              detail.attempt.result?.selected.length === 0
-                ? [
-                    ...snapshot.meta.activity.admissionReasons.filter(
-                      (r) => r.code !== 'eligibility-unknown'
-                    ),
-                    { code: 'planner-no-eligible', message: 'No eligible issues found by planner' },
-                  ]
-                : snapshot.meta.activity.admissionReasons,
           }
         : undefined,
       coverage: coverageFor(detail.entities.issues, providerAvailable),

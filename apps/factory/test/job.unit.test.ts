@@ -367,7 +367,10 @@ it.each([false, true])(
   }
 );
 
-async function investigationFixture(stage: 'review' | 'publication', resume = false) {
+async function investigationFixture(
+  stage: 'implementation' | 'review' | 'publication',
+  resume = false
+) {
   const { Deferred, ManagedRuntime } = await import('effect');
   const store = controlledStore();
   const intent = {
@@ -529,7 +532,7 @@ async function investigationFixture(stage: 'review' | 'publication', resume = fa
   };
 }
 
-it.each(['review', 'publication'] as const)(
+it.each(['implementation', 'review', 'publication'] as const)(
   'keeps restored %s reconciliation in its retained responsibility throughout investigation',
   async (stage) => {
     const f = await investigationFixture(stage);
@@ -601,3 +604,147 @@ it.each([false, true])(
     }
   }
 );
+
+it('keeps uncertain fresh retries separate from the abandoned attempt responsibility', async () => {
+  const { Deferred, ManagedRuntime } = await import('effect');
+  const { AgentReconciliationPolicy } = await import('../src/capabilities/job/index.js');
+  const store = controlledStore();
+  const intent = {
+    id: 'fresh-retry-owner',
+    issue: 723,
+    issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/723',
+    branch: 'issue-723',
+    base: 'a'.repeat(40),
+    context: '',
+    createdAt: 0,
+    expectedStage: 'implementation' as const,
+  };
+  await Effect.runPromise(store.reserve(intent));
+  await Effect.runPromise(
+    store.saveStage({
+      index: 0,
+      stage: 'implementation',
+      threadId: 'old-thread',
+      commit: intent.base,
+      previousRunId: null,
+    })
+  );
+  await Effect.runPromise(
+    store.saveStage({
+      index: 1,
+      stage: 'implementation',
+      threadId: 'old-thread',
+      commit: intent.base,
+      previousRunId: 'run-1',
+      ordinal: 2,
+      resume: true,
+      receiptProtocol: 'delivery-v1',
+    })
+  );
+  const entered = await Effect.runPromise(Deferred.make<void>());
+  const release = await Effect.runPromise(Deferred.make<void>());
+  const live = new Map<string, import('../src/capabilities/job/index.js').ExecutionInvestigation>();
+  let sequence = 0;
+  let launches = 0;
+  let hold = false;
+  const runtime = ManagedRuntime.make(
+    JobLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(JobStore, store),
+          Layer.succeed(AgentReconciliationPolicy, { limit: 0 }),
+          Layer.succeed(Time, { now: () => Effect.succeed(1000) }),
+          Layer.succeed(JobReporting, {
+            begin: () => Effect.succeed(1),
+            accepted: () => Effect.void,
+            observed: () => Effect.void,
+            failed: () => Effect.void,
+            investigating: (value, stage) =>
+              Effect.sync(() => {
+                const id = `retry-investigation-${++sequence}`;
+                live.set(id, { id, issue: value.issue, stage, startedAt: 1000 });
+                return id;
+              }),
+            investigated: (id) =>
+              Effect.sync(() => {
+                live.delete(id);
+              }),
+          }),
+          Layer.succeed(Issues, {
+            pullRequest: () => Effect.succeed({ kind: 'absent' }),
+            inspect: () =>
+              Effect.succeed({
+                open: true,
+                author: 'rafaeltab',
+                labels: ['ready-for-agent'],
+                blockers: [],
+                blockersReady: true,
+                url: intent.issueUrl,
+              }),
+          }),
+          Layer.succeed(Execution, {
+            launch: () =>
+              Effect.sync(() => {
+                launches++;
+                return { kind: 'uncertain' as const };
+              }),
+            sendStage: () => Effect.void,
+            interrupt: () => Effect.void,
+            observe: (active) =>
+              Effect.gen(function* () {
+                if (hold) {
+                  yield* Deferred.succeed(entered, undefined);
+                  yield* Deferred.await(release);
+                }
+                return launches
+                  ? { kind: 'absent' as const }
+                  : {
+                      kind: 'found' as const,
+                      threadId: 'old-thread',
+                      status: 'failed',
+                      branch: active.branch,
+                      worktree: '/worker',
+                      model: 'gpt-6.1-sol',
+                      run: { id: 'run-2', ordinal: 2 },
+                    };
+              }),
+            inspectStage: (_active, request) =>
+              Effect.succeed({
+                stageIndex: request.index,
+                runId: 'run-2',
+                ordinal: 2,
+                commit: intent.base,
+                accepted: false,
+                idle: true,
+                worktreeClean: true,
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const job = await runtime.runPromise(Job);
+    const stopped = await runtime.runPromise(job.status());
+    if (stopped.kind !== 'job' || !stopped.retry) throw new Error('Missing supported fresh retry');
+    expect(
+      await runtime.runPromise(job.retry({ ...stopped.retry, jobId: intent.id }))
+    ).toMatchObject({ kind: 'job', execution: { kind: 'absent' } });
+    expect((await Effect.runPromise(store.readControl())).restart).toEqual({ index: 2 });
+    hold = true;
+    const observation = runtime.runPromise(job.status());
+    await Effect.runPromise(Deferred.await(entered));
+    expect([...live.values()]).toEqual([
+      { id: expect.any(String), issue: 723, stage: undefined, startedAt: 1000 },
+    ]);
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await observation;
+    expect([...live.values()]).toEqual([]);
+    expect(launches).toBe(1);
+    expect((await Effect.runPromise(store.readControl())).claimed).toEqual([1, 2]);
+    expect(await Effect.runPromise(store.readStage(2))).toBeNull();
+  } finally {
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await runtime.dispose();
+  }
+});

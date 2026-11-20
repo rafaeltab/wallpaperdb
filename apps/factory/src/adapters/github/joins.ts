@@ -2258,7 +2258,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         })
         .parse(await read(dir, name));
       // The recovery owner supersedes provisional reporting for its PR, including unknown outcomes.
-      if (current?.issue === value.issue && current.phase !== 'complete') continue;
+      if (
+        current?.issue === value.issue &&
+        current.phase !== 'complete' &&
+        value.phase !== 'waiting-capacity'
+      )
+        continue;
       if (await blockingFile(dir)) continue;
       result.push(value);
     }
@@ -3380,9 +3385,17 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       )) {
         if (await scratchReleased(key)) continue;
         const dir = join(config.directory, key);
-        result.push(...(await currentRestacks(dir)));
+        const recorded = await currentRestacks(dir);
+        result.push(...recorded);
         const current = await recoveryStatus(dir);
-        if (current && current.phase !== 'complete') result.push(current);
+        if (
+          current &&
+          current.phase !== 'complete' &&
+          !recorded.some(
+            (item) => item.issue === current.issue && item.phase === 'waiting-capacity'
+          )
+        )
+          result.push(current);
       }
       return result;
     },

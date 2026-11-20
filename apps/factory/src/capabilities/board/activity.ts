@@ -7,6 +7,7 @@ import { managedReviews } from './reviews.js';
 import { managedCIWaits } from './ci-waits.js';
 import type { ActivityCategory, FactoryActivity, Reason } from './model.js';
 import { timestamp } from './values.js';
+import { recoveryActivities } from './recovery.js';
 
 // Taxonomy only. Presentation order and summary selection belong to the client.
 const categories: readonly ActivityCategory[] = [
@@ -291,6 +292,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       startedAt: timestamp(input.threads.startedAt),
       reason: 'Reading routine T3 thread metadata',
     });
+  items.push(...recoveryActivities(input, items));
   const reasons: Reason[] = [];
   if (input.state.paused) reasons.push({ code: 'paused', message: 'Admissions paused' });
   if (input.state.concurrency !== -1 && capacityOccupied(input) >= input.state.concurrency)
@@ -330,6 +332,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     reasons.push({ code: 'planner-no-eligible', message: 'No eligible issues found by planner' });
   else if (!assessed) reasons.push({ code: 'eligibility-unknown', message: 'Eligibility unknown' });
   const covered = (category: ActivityCategory) =>
+    (category === 'recovering' && input.reconciliation !== undefined) ||
     category === 'refreshing-github' ||
     category === 'refreshing-t3' ||
     category === 'publishing' ||

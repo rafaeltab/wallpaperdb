@@ -15,7 +15,26 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
   const store = controlledStore();
   let launches = 0;
   let found = false;
+  let now = 1000;
+  let sequence = 0;
+  const investigations = new Map<string, { issue: number; startedAt: number }>();
   const dependencies = Layer.mergeAll(
+    Layer.succeed(JobReporting, {
+      begin: () => Effect.succeed(1),
+      accepted: () => Effect.void,
+      observed: () => Effect.void,
+      failed: () => Effect.void,
+      investigating: (intent) =>
+        Effect.sync(() => {
+          const id = String(++sequence);
+          investigations.set(id, { issue: intent.issue, startedAt: now });
+          return id;
+        }),
+      investigated: (id) =>
+        Effect.sync(() => {
+          investigations.delete(id);
+        }),
+    }),
     Layer.succeed(Time, { now: () => Clock.currentTimeMillis }),
     Layer.succeed(JobStore, store),
     Layer.succeed(Issues, {
@@ -37,25 +56,32 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
       launch: () =>
         Effect.flatMap(store.read(), (intent) =>
           Effect.sync(() => {
+            expect([...investigations.values()]).toEqual([{ issue: 576, startedAt: 1000 }]);
             expect(intent?.expectedStage).toBe('implementation');
             launches++;
             return { kind: 'uncertain' as const };
           })
         ),
       observe: () =>
-        Effect.flatMap(store.read(), (intent) =>
-          Effect.succeed(
-            found
-              ? {
-                  kind: 'found' as const,
-                  threadId: 'thread-1',
-                  status: 'running',
-                  worktree: '/isolated',
-                  branch: intent?.branch ?? '',
-                  model: 'gpt-6.1-sol',
-                }
-              : { kind: 'absent' as const }
-          )
+        Effect.flatMap(
+          Effect.sync(() => {
+            expect([...investigations.values()]).toEqual([{ issue: 576, startedAt: now }]);
+          }),
+          () =>
+            Effect.flatMap(store.read(), (intent) =>
+              Effect.succeed(
+                found
+                  ? {
+                      kind: 'found' as const,
+                      threadId: 'thread-1',
+                      status: 'running',
+                      worktree: '/isolated',
+                      branch: intent?.branch ?? '',
+                      model: 'gpt-6.1-sol',
+                    }
+                  : { kind: 'absent' as const }
+              )
+            )
         ),
     })
   );
@@ -77,12 +103,15 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
   ).toBe('occupied');
   await run(Effect.flatMap(Job, (job) => job.status()));
   expect(launches).toBe(1);
+  expect(investigations.size).toBe(0);
+  now = 2000;
   found = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     kind: 'job',
     execution: { kind: 'found', threadId: 'thread-1' },
   });
   expect(launches).toBe(1);
+  expect(investigations.size).toBe(0);
 });
 
 it.each([false, true])(

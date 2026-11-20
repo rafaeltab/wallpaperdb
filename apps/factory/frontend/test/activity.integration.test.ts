@@ -71,6 +71,29 @@ it('provides keyboard and hover details, live switching and approved D layout at
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await browserExpect(panel).toBeVisible();
+    served = {
+      ...idle,
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          items: [
+            {
+              id: 'model:724',
+              category: 'planning',
+              lifecycle: 'current',
+              issue: null,
+              pullRequest: null,
+              startedAt: new Date(Date.now() - 30000).toISOString(),
+              reason: 'Advisory model assessing eligible work',
+            },
+          ],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Planning', { timeout: 5000 });
+    await browserExpect(trigger.locator('time')).toContainText('s');
+    await page.screenshot({ path: join(evidence, 'planning.png') });
     const implementing = [1, 2].map((issue) => ({
       id: `implementation:${issue}`,
       category: 'implementing' as const,

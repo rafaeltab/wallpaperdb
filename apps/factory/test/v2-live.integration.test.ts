@@ -5614,3 +5614,57 @@ it.each([
     board.close();
   }
 });
+
+it('translates simultaneous planning facts and distinct assessment evidence through the existing endpoint', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: false,
+    planningActivity: { current: { id: 'model:724', startedAt: 500 } },
+    observations: { state: 'loading', stale: false, refreshActive: true, startedAt: 700 },
+  };
+  const board = await liveBoard({ scopeId: 'planning-activity', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(activity?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'model:724',
+          category: 'planning',
+          lifecycle: 'current',
+          startedAt: '1970-01-01T00:00:00.500Z',
+          issue: null,
+          pullRequest: null,
+        }),
+        expect.objectContaining({ category: 'refreshing-github' }),
+      ])
+    );
+    expect(activity?.coverage.find((c) => c.category === 'planning')?.state).toBe('complete');
+    expect(activity).not.toHaveProperty('summary');
+    await board.publish({
+      ...input,
+      planningActivity: { assessment: { outcome: 'no-eligible', startedAt: 500, observedAt: 900 } },
+    });
+    const assessed = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(assessed?.items.some((i) => i.category === 'planning')).toBe(false);
+    expect(assessed?.admissionReasons.map((r) => r.code)).toContain('planner-no-eligible');
+    expect(assessed?.admissionReasons.map((r) => r.code)).not.toContain('eligibility-unknown');
+    await board.publish({
+      ...input,
+      planningActivity: { assessment: { outcome: 'no-eligible', startedAt: 500, observedAt: 900 } },
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 950,
+        facts: { issues: [], pullRequests: [] },
+      },
+    });
+    const stale = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(stale?.admissionReasons.map((r) => r.code)).toContain('eligibility-unknown');
+    expect(stale?.admissionReasons.map((r) => r.code)).toContain('no-ready-matches');
+    expect(stale?.admissionReasons.map((r) => r.code)).not.toContain('planner-no-eligible');
+  } finally {
+    board.close();
+    await app.close();
+  }
+});

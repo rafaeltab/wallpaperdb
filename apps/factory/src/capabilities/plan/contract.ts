@@ -110,9 +110,19 @@ export interface Preview {
   readonly rejected: readonly { issue: number; reason: string }[];
   readonly input: PlanningInput;
 }
+export interface PlanningActivity {
+  readonly current?: { readonly id: string; readonly startedAt?: number };
+  readonly assessment?: {
+    readonly outcome: 'eligible' | 'no-eligible';
+    readonly observedAt: number;
+    readonly startedAt: number;
+  };
+}
 export interface Plan {
   /** Local live-owner evidence. No retained timestamp is treated as current work. */
   verification(): Effect.Effect<{ readonly startedAt: number } | null>;
+  /** Local lifecycle evidence only. No provider reads or execution authority. */
+  activity?(): Effect.Effect<PlanningActivity, Unavailable>;
   preview(attempt?: {
     /** Fresh discovery gathered by this scheduler invocation, never retained across cycles. */
     input?: PlanningInput;

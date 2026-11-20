@@ -6,6 +6,12 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from 'node:child_process';
+
+if (process.env.COVERAGE_MODE === 'compiled') {
+	const result = spawnSync(process.execPath, ['scripts/coverage-experiment/delivery.mjs', '--merge-only'], { stdio: 'inherit' });
+	process.exit(result.status ?? 1);
+}
 
 const local = process.argv.includes("--local");
 const reports = [];

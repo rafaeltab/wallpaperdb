@@ -13,12 +13,13 @@ function fixture(t: TestContext & object) {
 	t.onTestFinished(() => fs.rmSync(root, { recursive: true, force: true }));
 	for (const directory of [
 		"scripts",
+		"scripts/lib",
 		"packages",
 		"node_modules/.bin",
 	] as const) {
 		fs.mkdirSync(path.join(root, directory), { recursive: true });
 	}
-	for (const file of ["scripts/crap.mts", "crap.config.mts"] as const) {
+	for (const file of ["scripts/crap.mts", "scripts/lib/coverage-validation.ts", "crap.config.mts"] as const) {
 		fs.copyFileSync(path.join(repository, file), path.join(root, file));
 	}
 	fs.mkdirSync(path.join(root, "node_modules/@wallpaperdb"), {

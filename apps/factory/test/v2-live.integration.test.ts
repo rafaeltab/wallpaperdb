@@ -4415,3 +4415,42 @@ it('reports only current admitted publication, preserving its start and simultan
     await app.close();
   }
 });
+
+it.each([0, 2])(
+  'distinguishes historical and current publication parking at stage %s',
+  async (parkedIndex) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const input = parkedSnapshot(pullObservation(2), true);
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found' || !source.delivery)
+      throw new Error('Expected job fixture');
+    input.jobs = [
+      {
+        ...source,
+        stageIndex: 2,
+        publicationStartedAt: 2000,
+        execution: { ...source.execution, status: 'running' },
+        delivery: { ...source.delivery, stage: 'publication', activity: undefined, active: true },
+      },
+    ];
+    input.localWork = [
+      {
+        intent: source.intent,
+        control: {
+          revision: 1,
+          cancelled: false,
+          claimed: [2],
+          parked: { index: parkedIndex, question: { id: 'question', text: 'Retained question' } },
+        },
+      },
+    ];
+    const board = await liveBoard({ scopeId: 'publication-parking', initial: input });
+    try {
+      expect(
+        board.snapshot().meta.activity?.items.filter((i) => i.category === 'publishing')
+      ).toHaveLength(parkedIndex === 0 ? 1 : 0);
+    } finally {
+      board.close();
+    }
+  }
+);

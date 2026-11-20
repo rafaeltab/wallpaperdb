@@ -592,17 +592,29 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     let recoveringPlanner: Promise<unknown> | undefined;
     let automaticCycles = 0;
     let metadataAfterCycle = -1;
+    let metadataWaiting = false;
     const refreshes = observationWorker(() =>
       runtime.runPromise(
         Effect.all(
           [
             Effect.suspend(() => {
-              if (!github.cycleReady() || metadataAfterCycle === automaticCycles)
-                return Effect.void;
+              if (metadataAfterCycle === automaticCycles) return Effect.void;
               // One initial collection is allowed. Subsequent metadata must give
               // the automatic scheduler an opportunity before taking quota again.
               metadataAfterCycle = automaticCycles;
-              return observations.refresh();
+              // Reserve the next quota turn instead of losing it to the one-second scheduler.
+              metadataWaiting = true;
+              return Effect.tryPromise({
+                try: (signal) => github.waitForCycle(signal),
+                catch: (cause) => new Unavailable({ operation: 'metadata-quota', cause }),
+              }).pipe(
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    metadataWaiting = false;
+                  })
+                ),
+                Effect.andThen(observations.refresh())
+              );
             }),
             refreshExecutionCatalog,
           ],
@@ -688,7 +700,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       clearInterval(plannerTimer);
     });
     const observationTimer = setInterval(() => {
-      if (observing || !github.cycleReady()) return;
+      if (observing || metadataWaiting || !github.cycleReady()) return;
       automaticCycles++;
       observing = runtime
         .runPromise(

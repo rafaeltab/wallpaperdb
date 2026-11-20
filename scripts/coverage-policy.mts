@@ -27,5 +27,8 @@ export const sourceViteWorkspaces = [
 	"packages/biome-test-rules",
 ];
 
-// Deployed bundles exercised by clean-environment executable contracts.
-export const builtArtifactWorkspaces = ["apps/gateway"];
+// Built Node artifacts exercised by executable and loader contracts.
+export const builtArtifactWorkspaces = [
+	"apps/gateway",
+	"packages/coverage-runtime",
+];

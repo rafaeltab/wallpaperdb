@@ -300,10 +300,12 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     reasons.push({ code: 'no-ready-matches', message: 'No ready-filter matches' });
   // Later discovery or unavailable metadata invalidates retained assessment evidence.
   const assessment = planning?.assessment;
+  const discoveryFailedAt = input.planningDiscovery?.failedAt;
   const assessed =
     assessment &&
     !source.stale &&
     !source.error &&
+    (discoveryFailedAt === undefined || discoveryFailedAt <= assessment.observedAt) &&
     Date.parse(at) - assessment.observedAt <= observationStaleAfterMs &&
     (source.observedAt ?? 0) <= assessment.startedAt;
   if (assessed && assessment.outcome === 'no-eligible')

@@ -5729,3 +5729,56 @@ it.each(['Rejected unsafe selection', 'Included PR unavailable'])(
     }
   }
 );
+
+it.each(['eligible', 'no-eligible'] as const)(
+  'invalidates %s assessment after newer planning discovery failure and accepts a later assessment',
+  async (outcome) => {
+    const { issueObservation } = await import('./fixtures/v2.js');
+    let now = 1000;
+    const input: ScheduleSnapshot = {
+      ...initial,
+      coordinationIdle: true,
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 400,
+        facts: { issues: [issueObservation(580)], pullRequests: [] },
+      },
+      planningDiscovery: { current: [], outcome: 'ready-matches', completedAt: 450, failedAt: 300 },
+      planningActivity: { assessment: { outcome, startedAt: 500, observedAt: 900 } },
+    };
+    const board = await liveBoard({
+      scopeId: `discovery-failure-${outcome}`,
+      initial: input,
+      now: () => now,
+    });
+    const reasons = () =>
+      board.snapshot().meta.activity?.admissionReasons.map((reason) => reason.code);
+    try {
+      expect(reasons()).not.toContain('eligibility-unknown');
+      expect(reasons()?.includes('planner-no-eligible')).toBe(outcome === 'no-eligible');
+      const failed: ScheduleSnapshot = {
+        ...input,
+        planningDiscovery: { current: [], outcome: 'unknown', completedAt: 450, failedAt: 950 },
+      };
+      await board.publish(failed);
+      expect(reasons()).toContain('eligibility-unknown');
+      expect(reasons()).not.toContain('planner-no-eligible');
+      now = 1200;
+      await board.publish({
+        ...failed,
+        planningDiscovery: {
+          current: [],
+          outcome: 'ready-matches',
+          completedAt: 1050,
+          failedAt: 950,
+        },
+        planningActivity: { assessment: { outcome, startedAt: 1060, observedAt: 1100 } },
+      });
+      expect(reasons()).not.toContain('eligibility-unknown');
+      expect(reasons()?.includes('planner-no-eligible')).toBe(outcome === 'no-eligible');
+    } finally {
+      board.close();
+    }
+  }
+);

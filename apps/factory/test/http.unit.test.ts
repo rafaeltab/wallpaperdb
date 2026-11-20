@@ -222,6 +222,7 @@ it('translates plan preview and rejects foreign origins without invoking plannin
     job: idle,
     run: Effect.runPromise,
     plan: {
+      verification: () => Effect.succeed(null),
       preview: () =>
         Effect.sync(() => {
           calls++;

@@ -4033,6 +4033,7 @@ it('translates complete activity facts through the sole board endpoint without e
   const input: ScheduleSnapshot = {
     ...initial,
     coordinationIdle: true,
+    planningVerification: { startedAt: 1500 },
     observations: { state: 'loading', stale: false, refreshActive: true, startedAt: 2000 },
   };
   const board = await liveBoard({
@@ -4050,6 +4051,14 @@ it('translates complete activity facts through the sole board endpoint without e
     expect(activity).toMatchObject({
       observedAt: '1970-01-01T00:00:01.000Z',
       items: [
+        {
+          category: 'checking-plan-freshness',
+          lifecycle: 'current',
+          startedAt: '1970-01-01T00:00:01.500Z',
+          issue: null,
+          pullRequest: null,
+          reason: 'Verifying selected prerequisites using the collected planning snapshot',
+        },
         {
           category: 'refreshing-github',
           startedAt: '1970-01-01T00:00:02.000Z',
@@ -4070,6 +4079,17 @@ it('translates complete activity facts through the sole board endpoint without e
     expect(activity?.coverage).toHaveLength(12);
     expect(activity).not.toHaveProperty('status');
     expect((await app.inject('/api/v2/board')).json().meta.activity).toEqual(activity);
+    await board.publish({ ...input, planningVerification: null, coordinationIdle: false });
+    const finished = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(finished?.items.map((item) => item.category)).toEqual(['refreshing-github']);
+    expect(finished?.coverage).toContainEqual({
+      category: 'checking-plan-freshness',
+      state: 'complete',
+      reason: null,
+    });
+    expect(finished?.admissionReasons.map((reason) => reason.code)).not.toContain(
+      'no-eligible-work'
+    );
   } finally {
     board.close();
     await app.close();

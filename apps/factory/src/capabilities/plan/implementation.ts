@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Schedule } from 'effect';
+import { Clock, Effect, Layer, Option, Schedule } from 'effect';
 import { Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
@@ -151,7 +151,9 @@ export const PlanLive = Layer.effect(
     const planner = yield* IPlanner;
     const store = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleStore));
     let pending = false;
+    let verification: { readonly startedAt: number } | null = null;
     return {
+      verification: () => Effect.sync(() => verification),
       preview: (attempt) =>
         Effect.gen(function* () {
           if (pending)
@@ -194,7 +196,6 @@ export const PlanLive = Layer.effect(
             if ('kind' in proposal) {
               if (proposal.kind === 'paused')
                 return { kind: 'paused' as const, selected: [], rejected: [], input };
-              if (attempt) yield* attempt.progress('freshness');
               return {
                 kind: 'stale' as const,
                 selected: [],
@@ -215,6 +216,10 @@ export const PlanLive = Layer.effect(
                 : undefined;
             const validated = validate(proposal, input);
             const verify = source.verify;
+            if (validated.selected.length) {
+              verification = { startedAt: yield* Clock.currentTimeMillis };
+              if (attempt) yield* attempt.progress('freshness');
+            }
             const unavailable = validated.selected.length
               ? yield* Effect.forEach(validated.selected, (selection) =>
                   Effect.map(verify(selection), (reason) =>
@@ -222,7 +227,6 @@ export const PlanLive = Layer.effect(
                   )
                 )
               : [];
-            if (attempt) yield* attempt.progress('freshness');
             if (unavailable.some(Boolean))
               return {
                 kind: 'preview' as const,
@@ -243,6 +247,7 @@ export const PlanLive = Layer.effect(
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {
+                verification = null;
                 pending = false;
               })
             )

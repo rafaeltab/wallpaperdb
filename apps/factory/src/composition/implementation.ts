@@ -52,6 +52,7 @@ import {
   AttemptsLive,
   AttemptStore,
   PlanLive,
+  Plan,
   PlanningDiscovery,
   PlanningDiscoveryLive,
   PlanningSource,
@@ -637,6 +638,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
     });
     startupCleanup.push(() => attempts.close());
+    const plan = await runtime.runPromise(Plan);
     const v2 = await v2Producer({
       runSync: (effect) => runtime.runSync(effect),
       planner: await runtime.runPromise(IPlanner),
@@ -652,6 +654,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           threads: threads.snapshot(),
           safety: planningSafety.status(),
           planningOwner: planner.ownership(false),
+          planningVerification: plan.verification(),
           planningDiscovery: discovery.snapshot(),
         }).pipe(
           Effect.map(
@@ -661,8 +664,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               safety,
               executionCatalog,
               planningOwner,
+              planningVerification,
               planningDiscovery,
             }) => ({
+              planningVerification,
               executionCatalog,
               ...schedule,
               planningDiscovery,

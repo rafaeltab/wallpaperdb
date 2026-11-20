@@ -42,7 +42,10 @@ it('distinguishes busy ownership, allows late bound completion, and never retrie
         Layer.mergeAll(
           Layer.succeed(AttemptStore, store),
           Layer.succeed(IPlanner, planner),
-          Layer.succeed(Plan, { preview: () => Effect.die('No synchronous preview') }),
+          Layer.succeed(Plan, {
+            verification: () => Effect.succeed(null),
+            preview: () => Effect.die('No synchronous preview'),
+          }),
           Layer.succeed(Time, { now: () => Effect.sync(Date.now) })
         )
       )
@@ -92,7 +95,10 @@ it('returns a conflict without inventing a resource when a competing accepted at
             ownership: () => Effect.succeed(undefined),
             propose: () => Effect.die('No launch'),
           }),
-          Layer.succeed(Plan, { preview: () => Effect.die('No preview') }),
+          Layer.succeed(Plan, {
+            verification: () => Effect.succeed(null),
+            preview: () => Effect.die('No preview'),
+          }),
           Layer.succeed(Time, { now: () => Effect.succeed(1000) })
         )
       )
@@ -136,7 +142,10 @@ it('keeps an unfinished attempt observable until freshness/result persist even w
               }),
             propose: () => Effect.die('No launch'),
           }),
-          Layer.succeed(Plan, { preview: () => Effect.die('No preview') }),
+          Layer.succeed(Plan, {
+            verification: () => Effect.succeed(null),
+            preview: () => Effect.die('No preview'),
+          }),
           Layer.succeed(Time, { now: () => Effect.succeed(2000) })
         )
       )
@@ -250,6 +259,7 @@ it.each([
               propose: () => Effect.die('Expired attempt must not launch'),
             }),
             Layer.succeed(Plan, {
+              verification: () => Effect.succeed(null),
               preview: () =>
                 Effect.fail(new Unavailable({ operation: 'model-deadline', cause: null })),
             }),
@@ -318,6 +328,7 @@ it.each(['preview', 'stale'] as const)(
               propose: () => Effect.die('The Plan port already owns the proposal'),
             }),
             Layer.succeed(Plan, {
+              verification: () => Effect.succeed(null),
               preview: (attempt) =>
                 Effect.gen(function* () {
                   if (!attempt) return yield* Effect.die('Missing attempt identity');
@@ -407,6 +418,7 @@ it.each([false, true])(
               propose: () => Effect.die('No direct proposal'),
             }),
             Layer.succeed(Plan, {
+              verification: () => Effect.succeed(null),
               preview: () =>
                 Effect.fail(
                   new Unavailable({
@@ -499,7 +511,7 @@ it('emits handoff after discovery without assigning the model adapter a discover
           }),
       })
     );
-    expect(phases).toEqual(['discovery', 'handoff', 'freshness']);
+    expect(phases).toEqual(['discovery', 'handoff']);
     now = 1000;
     phases.length = 0;
     await runtime.runPromise(plan.preview());

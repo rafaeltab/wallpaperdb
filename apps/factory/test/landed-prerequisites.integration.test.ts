@@ -119,7 +119,10 @@ it('launches a new dependent with remotely landed code after the configured base
             Layer.succeed(Issues, issues),
             Layer.succeed(JobPool, { job: () => Effect.succeed(job) }),
             Layer.succeed(ScheduleStore, fileScheduleStore(join(f.host.directory, 'schedule'))),
-            Layer.succeed(Plan, { preview: () => Effect.die('Manual admission does not plan') }),
+            Layer.succeed(Plan, {
+              verification: () => Effect.succeed(null),
+              preview: () => Effect.die('Manual admission does not plan'),
+            }),
             Layer.succeed(PlanningSource, {
               verify: () => Effect.succeed(undefined),
               read: () => Effect.die('Manual admission does not discover'),
@@ -502,6 +505,7 @@ async function reservedRuntime(
           Layer.succeed(JobPool, { job: () => Effect.succeed(job) }),
           Layer.succeed(ScheduleStore, store),
           Layer.succeed(Plan, {
+            verification: () => Effect.succeed(null),
             preview: () => Effect.die('Reserved slot must reconcile before planning'),
           }),
           Layer.succeed(PlanningSource, {

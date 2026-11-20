@@ -42,6 +42,16 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
   const items: FactoryActivity['items'][number][] = [];
+  if (input.planningVerification)
+    items.push({
+      id: `plan-verification:${input.planningVerification.startedAt}`,
+      category: 'checking-plan-freshness',
+      lifecycle: 'current',
+      issue: null,
+      pullRequest: null,
+      startedAt: timestamp(input.planningVerification.startedAt),
+      reason: 'Verifying selected prerequisites using the collected planning snapshot',
+    });
   for (const admission of input.state.admissions) {
     const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
     const control = input.localWork.find((w) => w.intent?.issue === admission.issue)?.control;
@@ -168,21 +178,23 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     reasons.push({ code: 'no-ready-matches', message: 'No ready-filter matches' });
   // Candidate discovery alone cannot establish a planner assessment.
   reasons.push({ code: 'eligibility-unknown', message: 'Eligibility unknown' });
+  const covered = (category: ActivityCategory) =>
+    category === 'refreshing-github' ||
+    category === 'refreshing-t3' ||
+    category === 'publishing' ||
+    (category === 'gathering-planning-context' && !!input.planningDiscovery) ||
+    (category === 'checking-plan-freshness' && input.planningVerification !== undefined) ||
+    !uncertainty.length;
   return {
     observedAt: at,
     items,
     uncertainty,
     admissionReasons: reasons,
-    coverage: categories.map((category) => {
-      const complete =
-        category === 'refreshing-github' || category === 'refreshing-t3' || category === 'publishing' ||
-        (category === 'gathering-planning-context' && !!input.planningDiscovery) || !uncertainty.length;
-      return {
-        category,
-        state: complete ? 'complete' : 'unknown',
-        reason: complete ? null : 'Lifecycle not yet instrumented.',
-      };
-    }),
+    coverage: categories.map((category) => ({
+      category,
+      state: covered(category) ? 'complete' : 'unknown',
+      reason: covered(category) ? null : 'Lifecycle not yet instrumented.',
+    })),
   };
 }
 

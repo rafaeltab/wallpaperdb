@@ -219,6 +219,8 @@ export interface LocalWork {
   control: import('../job/index.js').Control;
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
+  /** Live Plan owner; undefined means this producer has not instrumented verification. */
+  planningVerification?: { readonly startedAt: number } | null;
   planningDiscovery?: import('../plan/index.js').PlanningDiscoveryFacts;
   executionCatalog?: import('../job/index.js').ExecutionCatalog;
   /** Local coordination owners can establish inactivity without instrumenting later categories. */

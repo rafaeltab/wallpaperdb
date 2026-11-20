@@ -160,6 +160,39 @@ it('provides keyboard and hover details, live switching and approved D layout at
       '172px 172px'
     );
     await page.screenshot({ path: join(evidence, 'activity-desktop.png') });
+    const github = served;
+    served = {
+      ...github,
+      meta: {
+        ...github.meta,
+        activity: {
+          ...activity,
+          items: [
+            ...(github.meta.activity?.items ?? []),
+            {
+              id: 'verification:live',
+              category: 'checking-plan-freshness',
+              lifecycle: 'current',
+              startedAt: new Date(Date.now() - 2000).toISOString(),
+              issue: null,
+              pullRequest: null,
+              reason: 'Verifying selected prerequisites using the collected planning snapshot',
+            },
+          ],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Checking plan freshness', { timeout: 5000 });
+    const verification = panel.getByTitle(
+      'Verifying selected prerequisites using the collected planning snapshot'
+    );
+    await browserExpect(verification).toContainText('1 operation');
+    await browserExpect(
+      verification.getByRole('img', { name: 'Active', exact: true })
+    ).toBeVisible();
+    await page.screenshot({ path: join(evidence, 'activity-verification.png') });
+    served = github;
+    await browserExpect(trigger).toContainText('Refreshing T3 information', { timeout: 5000 });
     await trigger.click();
     await page.mouse.move(1200, 700);
     await browserExpect(panel).toBeVisible();

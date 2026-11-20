@@ -78,7 +78,10 @@ it.each([1000, 900])(
           Layer.provide(
             Layer.mergeAll(
               Layer.succeed(AttemptStore, reopened),
-              Layer.succeed(Plan, { preview: () => Effect.die('pending must not plan') }),
+              Layer.succeed(Plan, {
+                verification: () => Effect.succeed(null),
+                preview: () => Effect.die('pending must not plan'),
+              }),
               Layer.succeed(IPlanner, {
                 ownership: () => Effect.succeed(undefined),
                 propose: () => Effect.die('pending must not launch'),

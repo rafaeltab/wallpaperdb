@@ -1072,7 +1072,10 @@ it.each([-1, 1, 2])(
                   admission = undefined;
                 }),
             }),
-            Layer.succeed(Plan, { preview: () => Effect.die('Paused admissions must not plan') }),
+            Layer.succeed(Plan, {
+              verification: () => Effect.succeed(null),
+              preview: () => Effect.die('Paused admissions must not plan'),
+            }),
             Layer.succeed(PlanningSource, {
               verify: () => Effect.succeed(undefined),
               read: () => Effect.die('Paused admissions must not discover'),

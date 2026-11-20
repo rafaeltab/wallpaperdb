@@ -654,6 +654,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           threads: threads.snapshot(),
           safety: planningSafety.status(),
           planningOwner: planner.ownership(false),
+          planningActivity: plan.activity ? plan.activity() : Effect.succeed(undefined),
           planningVerification: plan.verification(),
           planningDiscovery: discovery.snapshot(),
         }).pipe(
@@ -664,10 +665,12 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               safety,
               executionCatalog,
               planningOwner,
+              planningActivity,
               planningVerification,
               planningDiscovery,
             }) => ({
               planningVerification,
+              planningActivity,
               executionCatalog,
               ...schedule,
               planningDiscovery,

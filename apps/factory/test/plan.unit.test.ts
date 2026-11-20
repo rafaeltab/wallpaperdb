@@ -661,3 +661,163 @@ it.each(['none', 'discovery', 'preparation'] as const)(
     }
   }
 );
+
+it.each([false, true])('reports only model responsibility for automatic=%s', async (automatic) => {
+  const { Time } = await import('../src/capabilities/job/index.js');
+  let now = 1000;
+  let releaseModel!: (value: Proposal) => void;
+  let enterModel!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enterModel = resolve;
+  });
+  const model = new Promise<Proposal>((resolve) => {
+    releaseModel = resolve;
+  });
+  const runtime = ManagedRuntime.make(
+    PlanLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, { now: () => Effect.sync(() => now) }),
+          Layer.succeed(PlanningSource, {
+            read: () =>
+              Effect.sync(() => {
+                now = 2000;
+                return {
+                  issues: [issue],
+                  job: { kind: 'empty' as const },
+                  capacity: { concurrency: 1, admission: 1 },
+                };
+              }),
+            verify: () => Effect.succeed(undefined),
+          }),
+          Layer.succeed(IPlanner, {
+            ownership: () => Effect.succeed(undefined),
+            propose: () =>
+              Effect.promise(() => {
+                enterModel();
+                return model;
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const plan = await runtime.runPromise(Plan);
+    if (!plan.activity) throw new Error('Missing planning activity read port');
+    const work = runtime.runPromise(plan.preview({ automatic, progress: () => Effect.void }));
+    await entered;
+    expect(await runtime.runPromise(plan.activity())).toMatchObject({
+      current: { startedAt: 2000 },
+    });
+    now = 3000;
+    releaseModel({ selected: [], deferred: [{ issue: 580, reason: 'No eligible work' }] });
+    await work;
+    expect(await runtime.runPromise(plan.activity())).toMatchObject({
+      assessment: { outcome: 'no-eligible', observedAt: 3000 },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it.each([
+  'failed',
+  'stale',
+  'paused',
+  'rejected',
+  'unverifiable',
+  'eligible',
+  'empty-filter',
+] as const)('retains honest assessment evidence for %s outcomes', async (outcome) => {
+  const { Time, Unavailable } = await import('../src/capabilities/job/index.js');
+  let models = 0;
+  const runtime = ManagedRuntime.make(
+    PlanLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(Time, { now: () => Effect.succeed(2000) }),
+          Layer.succeed(PlanningSource, {
+            read: () =>
+              Effect.succeed({
+                issues: outcome === 'empty-filter' ? [] : [issue],
+                job: { kind: 'empty' as const },
+                capacity: { concurrency: 1, admission: 1 },
+              }),
+            verify: () =>
+              Effect.succeed(outcome === 'unverifiable' ? 'Missing reviewed code' : undefined),
+          }),
+          Layer.succeed(IPlanner, {
+            ownership: () => Effect.succeed(undefined),
+            propose: () =>
+              Effect.suspend((): ReturnType<IPlanner['propose']> => {
+                models++;
+                if (outcome === 'failed')
+                  return Effect.fail(
+                    new Unavailable({ operation: 'model-unavailable', cause: null })
+                  );
+                if (outcome === 'stale' || outcome === 'paused')
+                  return Effect.succeed({ kind: outcome });
+                return Effect.succeed(
+                  outcome === 'rejected'
+                    ? { selected: [{ ...selection, issue: 999 }], deferred: [] }
+                    : proposal
+                );
+              }),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const plan = await runtime.runPromise(Plan);
+    if (!plan.activity) throw new Error('Missing planning activity read port');
+    await runtime.runPromise(plan.preview().pipe(Effect.exit));
+    const facts = await runtime.runPromise(plan.activity());
+    expect(facts.current).toBeUndefined();
+    if (outcome === 'eligible') expect(facts.assessment?.outcome).toBe('eligible');
+    else expect(facts.assessment).toBeUndefined();
+    expect(models).toBe(outcome === 'empty-filter' ? 0 : 1);
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it.each(['running', 'uncertain', 'succeeded', 'failed'] as const)(
+  'uses retained model ownership after restart for %s',
+  async (phase) => {
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSource, {
+              read: () => Effect.die('Activity must not discover'),
+              verify: () => Effect.die('Activity must not verify'),
+            }),
+            Layer.succeed(IPlanner, {
+              ownership: () =>
+                Effect.succeed({
+                  requestId: 'retained-model',
+                  revision: 1,
+                  phase,
+                  modelHandedOffAt: 1234,
+                }),
+              propose: () => Effect.die('Activity must not launch'),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const plan = await runtime.runPromise(Plan);
+      if (!plan.activity) throw new Error('Missing planning activity read port');
+      const facts = await runtime.runPromise(plan.activity());
+      expect(facts.current).toEqual(
+        phase === 'running' ? { id: 'retained-model', startedAt: 1234 } : undefined
+      );
+      expect(facts.assessment).toBeUndefined();
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

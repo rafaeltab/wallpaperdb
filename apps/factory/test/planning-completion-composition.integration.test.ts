@@ -210,6 +210,21 @@ it('collects once before model handoff and retains completion across restart', a
     const handoffStart = Date.now();
     await release('planning-discovery');
     await held('planner-observation');
+    const modelStartedAt = (await details()).launch.modelHandedOffAt;
+    expect(modelStartedAt).toBeGreaterThanOrEqual(handoffStart);
+    await vi.waitFor(
+      async () => {
+        const board = (await running!.app.inject('/api/v2/board')).json();
+        expect(board.meta.activity.items).toContainEqual(
+          expect.objectContaining({
+            category: 'planning',
+            lifecycle: 'current',
+            startedAt: new Date(modelStartedAt).toISOString(),
+          })
+        );
+      },
+      { timeout: 5000, interval: 20 }
+    );
     const deadline = (await details()).deadline;
     expect(deadline).toBeGreaterThanOrEqual(handoffStart + 600_000);
     expect(deadline).toBeLessThanOrEqual(Date.now() + 600_000);
@@ -247,6 +262,11 @@ it('collects once before model handoff and retains completion across restart', a
           deadline: new Date(deadline).toISOString(),
           phase: 'succeeded',
         });
+        expect(
+          board.meta.activity.items.some(
+            (item: { category: string }) => item.category === 'planning'
+          )
+        ).toBe(false);
       },
       { timeout: 5000, interval: 20 }
     );

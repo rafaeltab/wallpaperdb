@@ -1,5 +1,5 @@
 import type { Status } from '../job/index.js';
-import type { ScheduleSnapshot } from '../observe/index.js';
+import { observationStaleAfterMs, type ScheduleSnapshot } from '../observe/index.js';
 import { answerRunCurrent } from '../job/index.js';
 import { capacityOccupied } from '../plan/index.js';
 import { managedRepairs } from './repairs.js';
@@ -134,6 +134,17 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
         !items.some((item) => item.category === repair.category && item.issue === repair.issue)
     )
   );
+  const planning = input.planningActivity;
+  if (planning?.current)
+    items.push({
+      id: planning.current.id,
+      category: 'planning',
+      lifecycle: 'current',
+      issue: null,
+      pullRequest: null,
+      startedAt: timestamp(planning.current.startedAt),
+      reason: 'Advisory model assessing eligible work',
+    });
   const source = input.observations;
   if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
@@ -287,13 +298,23 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
         !source.facts.issues.some((i) => i.open && i.candidate)
   )
     reasons.push({ code: 'no-ready-matches', message: 'No ready-filter matches' });
-  // Candidate discovery alone cannot establish a planner assessment.
-  reasons.push({ code: 'eligibility-unknown', message: 'Eligibility unknown' });
+  // Later discovery or unavailable metadata invalidates retained assessment evidence.
+  const assessment = planning?.assessment;
+  const assessed =
+    assessment &&
+    !source.stale &&
+    !source.error &&
+    Date.parse(at) - assessment.observedAt <= observationStaleAfterMs &&
+    (source.observedAt ?? 0) <= assessment.startedAt;
+  if (assessed && assessment.outcome === 'no-eligible')
+    reasons.push({ code: 'planner-no-eligible', message: 'No eligible issues found by planner' });
+  else if (!assessed) reasons.push({ code: 'eligibility-unknown', message: 'Eligibility unknown' });
   const covered = (category: ActivityCategory) =>
     category === 'refreshing-github' ||
     category === 'refreshing-t3' ||
     category === 'publishing' ||
     category === 'reviewing' ||
+    (category === 'planning' && planning !== undefined) ||
     category === 'waiting-for-ci' ||
     category === 'waiting-for-answers' ||
     (category === 'gathering-planning-context' && !!input.planningDiscovery) ||

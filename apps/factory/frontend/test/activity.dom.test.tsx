@@ -276,3 +276,48 @@ it('counts distinct reviewing issues, advances locally and recalculates after th
   if (!inactive) throw new Error('Missing review tile');
   expect(within(inactive).getByRole('img', { name: 'Inactive' })).toBeTruthy();
 });
+
+it('shows Planning with local model time and yields to managed implementation', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(facts.observedAt));
+  const planning: ActivityFacts['items'][number] = {
+    id: 'model:724',
+    category: 'planning',
+    lifecycle: 'current',
+    issue: null,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:59:30Z',
+    reason: 'Advisory model assessing eligible work',
+  };
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const { rerender } = render(
+    <FactoryActivity
+      facts={{ ...facts, items: [...facts.items, planning] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Planning.*30s/ })).toBeTruthy();
+  fireEvent.focus(screen.getByRole('button'));
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  expect(screen.getByRole('button', { name: /Planning.*32s/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{
+        ...facts,
+        items: [
+          planning,
+          { ...planning, id: 'implementation', category: 'implementing', issue: 724 },
+        ],
+      }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Implementing 1 issue/ })).toBeTruthy();
+  expect(
+    within(screen.getByRole('region', { name: 'Factory activity details' })).getByText('Planning')
+  ).toBeTruthy();
+  rerender(<FactoryActivity facts={facts} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Refreshing GitHub/ })).toBeTruthy();
+});

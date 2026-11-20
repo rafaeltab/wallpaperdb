@@ -1,5 +1,5 @@
 import { Clock, Effect, Layer, Option, Schedule } from 'effect';
-import { Unavailable, type Status } from '../job/index.js';
+import { Time, Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
@@ -10,6 +10,7 @@ import {
   type PlanningIssue,
   type Proposal,
   type Preview,
+  type PlanningActivity,
 } from './contract.js';
 const trusted = (author: string) => author === 'rafaeltab' || author === 'zero-two-rafaeltab';
 function exclusion(issue: PlanningIssue): string | undefined {
@@ -150,15 +151,40 @@ export const PlanLive = Layer.effect(
     const discovery = Option.getOrUndefined(yield* Effect.serviceOption(PlanningDiscovery));
     const planner = yield* IPlanner;
     const store = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleStore));
+    const time = Option.getOrUndefined(yield* Effect.serviceOption(Time));
+    const now = () => (time ? time.now() : Clock.currentTimeMillis);
+    let activity: PlanningActivity = {};
+    let sequence = 0;
     let pending = false;
     let verification: { readonly startedAt: number } | null = null;
     return {
       verification: () => Effect.sync(() => verification),
+      activity: () =>
+        Effect.gen(function* () {
+          // Retained model ownership also covers restart/reconciliation, without
+          // launching or scanning providers. Its timestamp is the real handoff.
+          const owner = yield* planner.ownership(false);
+          const matches = owner && (!activity.current || owner.requestId === activity.current.id);
+          if (
+            matches &&
+            !owner.retired &&
+            (owner.phase === 'running' || owner.phase === 'launch-intent')
+          )
+            return {
+              current: {
+                id: owner.requestId,
+                startedAt: owner.modelHandedOffAt ?? activity.current?.startedAt,
+              },
+            };
+          if (matches && activity.current) return {};
+          return activity;
+        }),
       preview: (attempt) =>
         Effect.gen(function* () {
           if (pending)
             return yield* Effect.fail(new Unavailable({ operation: 'plan-busy', cause: null }));
           pending = true;
+          activity = {};
           return yield* Effect.gen(function* () {
             if (attempt) yield* attempt.progress('discovery');
             const observed = attempt?.input ?? (yield* (discovery ?? source).read());
@@ -185,6 +211,10 @@ export const PlanLive = Layer.effect(
                 input,
               };
             if (attempt) yield* attempt.progress('handoff');
+            const startedAt = yield* now();
+            activity = {
+              current: { id: attempt?.requestId ?? `planning:${++sequence}`, startedAt },
+            };
             const propose = (prepared?: Effect.Effect<void>) =>
               planner.propose(input, {
                 requestId: attempt?.requestId,
@@ -192,7 +222,9 @@ export const PlanLive = Layer.effect(
                 attemptStartedAt: attempt?.attemptStartedAt,
                 prepared,
               });
-            const proposal = yield* discovery ? discovery.prepare(propose) : propose();
+            const proposal = yield* (discovery ? discovery.prepare(propose) : propose()).pipe(
+              Effect.ensuring(Effect.sync(() => { activity = {}; }))
+            );
             if ('kind' in proposal) {
               if (proposal.kind === 'paused')
                 return { kind: 'paused' as const, selected: [], rejected: [], input };
@@ -209,6 +241,7 @@ export const PlanLive = Layer.effect(
                 input,
               };
             }
+            if (attempt) yield* attempt.progress('freshness');
             const ownership = attempt?.automatic ? yield* planner.ownership(false) : undefined;
             const modelAttemptId =
               ownership?.automatic && ownership.phase === 'succeeded' && ownership.run
@@ -237,6 +270,16 @@ export const PlanLive = Layer.effect(
                 ],
                 input,
                 modelAttemptId,
+              };
+            // An empty validated selection is not evidence of an empty proposal.
+            // Invalid or unverifiable selected work must remain unknown.
+            if (validated.selected.length === proposal.selected.length)
+              activity = {
+                assessment: {
+                  outcome: validated.selected.length ? 'eligible' : 'no-eligible',
+                  observedAt: yield* now(),
+                  startedAt,
+                },
               };
             return {
               kind: 'preview' as const,

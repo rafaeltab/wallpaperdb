@@ -19,6 +19,7 @@ const configurationSchema = z.object({
 		}),
 	),
 	sourceViteWorkspaces: z.array(z.string()),
+	builtArtifactWorkspaces: z.array(z.string()).default([]),
 });
 export async function repositoryConfiguration() {
 	const path = process.env.WALLPAPERDB_COVERAGE_CONFIGURATION;

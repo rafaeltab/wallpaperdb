@@ -26,3 +26,6 @@ export const sourceViteWorkspaces = [
 	"packages/crap-typescript-core",
 	"packages/biome-test-rules",
 ];
+
+// Deployed bundles exercised by clean-environment executable contracts.
+export const builtArtifactWorkspaces = ["apps/gateway"];

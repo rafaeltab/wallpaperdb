@@ -4420,7 +4420,7 @@ it.each([0, 2])(
   'distinguishes historical and current publication parking at stage %s',
   async (parkedIndex) => {
     const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
-    const input = parkedSnapshot(pullObservation(2), true);
+    const input = { ...parkedSnapshot(pullObservation(2), true) };
     const source = input.jobs[0];
     if (source.kind !== 'job' || source.execution.kind !== 'found' || !source.delivery)
       throw new Error('Expected job fixture');

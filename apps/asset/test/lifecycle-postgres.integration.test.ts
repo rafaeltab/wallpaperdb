@@ -1,3 +1,4 @@
+import { lifecycleStoreContract } from './contracts/lifecycle-store.js';
 import { once } from 'node:events';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -568,3 +569,10 @@ it('fences obsolete deletion workers and retains recorded terminal outcomes inde
     await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
   }
 });
+
+lifecycleStoreContract(async () => ({
+  port: await runtime.runPromise(LifecycleStore),
+  activate: (revision) =>
+    Effect.runPromise(activateLifecycle(container.getConnectionUri(), revision)),
+  close: () => Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1')),
+}));

@@ -1,39 +1,12 @@
+import { controlledLifecycle } from './fixtures/controlled-lifecycle.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
-import {
-  Lifecycle,
-  LifecycleStore,
-  lifecycleLayer,
-  type LifecycleStorePort,
-} from '../src/capabilities/lifecycle/index.js';
+import { Lifecycle, LifecycleStore, lifecycleLayer } from '../src/capabilities/lifecycle/index.js';
 
 it('creates a stable empty Asset whose inspection requires both Owner parts', async () => {
-  let stored: {
-    id: string;
-    applicationId: string;
-    assetType: string;
-    owner: { namespace: string; subject: string };
-  } | null = null;
-  const port: LifecycleStorePort = {
-    accept: (input) =>
-      Effect.sync(() => {
-        if (input.decision.kind !== 'create')
-          return {
-            ...input.correlation,
-            outcome: 'rejected',
-            assetId: null,
-            reason: input.decision.kind === 'reject' ? input.decision.reason : 'unavailable-asset',
-          };
-        stored = {
-          id: 'asset_assigned',
-          applicationId: input.applicationId,
-          assetType: input.decision.assetType,
-          owner: input.decision.owner,
-        };
-        return { ...input.correlation, outcome: 'created', assetId: stored.id };
-      }),
-    find: () => Effect.succeed(stored),
-  };
+  const controlled = controlledLifecycle();
+  await controlled.activate('policy-1');
+  const port = controlled.port;
   const runtime = ManagedRuntime.make(
     lifecycleLayer({
       assetTypes: {},
@@ -65,14 +38,14 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
           commandId: 'create-1',
           applicationReference: 'profile-1',
           outcome: 'created',
-          assetId: 'asset_assigned',
+          assetId: 'asset_controlled_1',
         });
         expect(
-          yield* service.inspect({ namespace: 'clerk', subject: 'owner-1' }, 'asset_assigned')
+          yield* service.inspect({ namespace: 'clerk', subject: 'owner-1' }, 'asset_controlled_1')
         ).toEqual({
           kind: 'found',
           asset: {
-            assetId: 'asset_assigned',
+            assetId: 'asset_controlled_1',
             assetType: 'picture',
             sources: [],
             defaultSourceId: null,
@@ -80,10 +53,10 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
           },
         });
         expect(
-          yield* service.inspect({ namespace: 'clerk', subject: 'other' }, 'asset_assigned')
+          yield* service.inspect({ namespace: 'clerk', subject: 'other' }, 'asset_controlled_1')
         ).toEqual({ kind: 'unavailable' });
         expect(
-          yield* service.inspect({ namespace: 'other', subject: 'owner-1' }, 'asset_assigned')
+          yield* service.inspect({ namespace: 'other', subject: 'owner-1' }, 'asset_controlled_1')
         ).toEqual({ kind: 'unavailable' });
         expect(
           yield* send('user', {
@@ -101,7 +74,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
             operation: 'delete',
             commandId: 'delete-1',
             applicationReference: 'profile-1',
-            assetId: 'asset_assigned',
+            assetId: 'asset_controlled_1',
           })
         ).toMatchObject({ outcome: 'rejected', reason: 'forbidden-operation' });
       })

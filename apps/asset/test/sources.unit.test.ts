@@ -1,3 +1,5 @@
+import { controlledBytes } from './fixtures/controlled-bytes.js';
+import { createHash } from 'node:crypto';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -28,7 +30,7 @@ it('keeps private bytes outside membership until immutable preparation and first
     nonterminalCandidateCount: 0,
   };
   const confirmations: unknown[] = [];
-  const objects = new Map<string, Uint8Array>();
+
   const store: SourceStorePort = {
     releaseRead: () => Effect.void,
     transact: (_id, _revision, change) =>
@@ -45,28 +47,7 @@ it('keeps private bytes outside membership until immutable preparation and first
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(SourceStore, store),
-          Layer.succeed(SourceBytes, {
-            put: (identity, bytes) =>
-              Effect.sync(() => {
-                objects.set(identity, bytes);
-              }),
-            prepare: (candidateId, sourceId) =>
-              Effect.sync(() => {
-                const bytes = objects.get(candidateId);
-                if (!bytes) throw new Error('Missing bytes');
-                objects.set(sourceId, bytes);
-              }),
-            read: (sourceId) =>
-              Effect.succeed({
-                bytes: (async function* () {
-                  const bytes = objects.get(sourceId);
-                  if (!bytes) throw new Error('Missing Source');
-                  yield bytes;
-                })(),
-                close: () => Effect.void,
-                closed: Effect.void,
-              }),
-          }),
+          Layer.succeed(SourceBytes, controlledBytes()),
           Layer.succeed(MandatoryInspection, {
             inspect: () =>
               Effect.succeed({
@@ -77,7 +58,9 @@ it('keeps private bytes outside membership until immutable preparation and first
                   width: 2,
                   height: 2,
                   byteLength: 4,
-                  digest: 'test-digest',
+                  digest: createHash('sha256')
+                    .update(new Uint8Array([1, 2, 3, 4]))
+                    .digest('hex'),
                 },
               }),
           })

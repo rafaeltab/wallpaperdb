@@ -16,7 +16,13 @@ import { defaultAgentReconciliationLimit, Unavailable } from '../../capabilities
 import { pendingQuestion, mcpCall } from './questions.js';
 import { inactiveLineage } from './inactivity.js';
 import { ObservationUnknown, type T3Observations } from './observations.js';
-import { receiptSchema, responseShape, latestRecoveryResponse, responseValue } from './response.js';
+import {
+  receiptSchema,
+  responseShape,
+  latestRecoveryResponse,
+  recoveryResponse,
+  responseValue,
+} from './response.js';
 import { command } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
 export interface RestackOperation {
@@ -251,7 +257,7 @@ export function t3Restacker(
         boundary = index;
     const replies = boundary >= 0 ? observed.messages.slice(boundary + 1) : observed.messages;
     const latest = latestRecoveryResponse(replies);
-    const value = latest ? responseValue(latest.text) : undefined;
+    const value = latest ? responseValue(recoveryResponse(latest.text).text) : undefined;
     const version = z.object({ version: z.unknown().optional() }).safeParse(value);
     return reconciliation.advance(
       phase,
@@ -313,7 +319,9 @@ export function t3Restacker(
     if (boundary < 0) return null;
     const replies = messages.slice(boundary + 1).filter((message) => message.role === 'assistant');
     const message = latestRecoveryResponse(replies);
-    const parsed = receiptSchema.safeParse(message ? responseValue(message.text) : null);
+    const parsed = receiptSchema.safeParse(
+      message ? responseValue(recoveryResponse(message.text).text) : null
+    );
     if (!parsed.success || parsed.data.kind !== 'state') return null;
     const state = parsed.data;
     if (
@@ -326,10 +334,9 @@ export function t3Restacker(
     )
       return null;
     const classification = replies
-      .filter((message) =>
-        ['<RESTACK>SIMPLE</RESTACK>', '<RESTACK>COMPLEX</RESTACK>'].includes(message.text)
-      )
-      .at(-1)?.text;
+      .map((message) => recoveryResponse(message.text).classification)
+      .filter((value) => value !== undefined)
+      .at(-1);
     if (phase === 'resolve' && !classification) return null;
     signal?.throwIfAborted();
     return { outcome: classification ?? '<RESTACK>COMPLEX</RESTACK>' };

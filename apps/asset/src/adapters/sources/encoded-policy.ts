@@ -120,7 +120,27 @@ function hasGainMapXmpDeclaration(payload: Buffer): boolean {
     (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
   );
   if (!xmp) return false;
-  return /xmlns(?::[\w.-]+)?\s*=\s*(['"])(?:http:\/\/ns\.adobe\.com\/hdr-gain-map\/1\.0\/|http:\/\/ns\.apple\.com\/HDRGainMap\/1\.0\/|urn:com:apple:photo:2020:aux:hdrgainmap)\1/.test(
-    payload.toString('utf8')
-  );
+  const declarations = payload
+    .toString('utf8')
+    .matchAll(/xmlns(?::[\w.-]+)?\s*=\s*(['"])([^'"]*)\1/g);
+  for (const declaration of declarations) {
+    const namespace = normalizeNamespaceCharacters(declaration[2] ?? '');
+    if (
+      [
+        'http://ns.adobe.com/hdr-gain-map/1.0/',
+        'http://ns.apple.com/HDRGainMap/1.0/',
+        'urn:com:apple:photo:2020:aux:hdrgainmap',
+      ].includes(namespace)
+    )
+      return true;
+  }
+  return false;
+}
+
+function normalizeNamespaceCharacters(value: string): string {
+  return value.replace(/&#(x[\da-fA-F]+|\d+);/g, (reference, digits: string) => {
+    const code = Number(digits.startsWith('x') ? `0${digits}` : digits);
+    // Only ASCII characters can form the recognized namespace URIs.
+    return code < 128 ? String.fromCharCode(code) : reference;
+  });
 }

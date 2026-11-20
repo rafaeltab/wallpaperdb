@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { expect, it } from 'vitest';
 import type { SourceStorePort, SourceState } from '../../src/capabilities/sources/index.js';
 export const contractSourceState: SourceState = {
@@ -36,15 +36,17 @@ export function sourceStoreContract(
         )
       ).toBeNull();
       const before = await read();
-      await expect(
-        Effect.runPromise(
-          f.port.transact('asset_contract', 'revision-1', (state) => {
-            if (!state) throw new Error('Missing Asset');
-            state.sourceSetRevision = '99';
-            throw new Error('rollback proof');
-          })
-        )
-      ).rejects.toThrow();
+      const rollback = new Error('rollback proof');
+      const failed = await Effect.runPromiseExit(
+        f.port.transact('asset_contract', 'revision-1', (state) => {
+          if (!state) throw new Error('Missing Asset');
+          state.sourceSetRevision = '99';
+          throw rollback;
+        })
+      );
+      expect(Exit.isFailure(failed)).toBe(true);
+      if (!Exit.isFailure(failed)) throw new Error('Expected rollback failure');
+      expect(Cause.squash(failed.cause)).toBe(rollback);
       expect(await read()).toEqual(before);
       const detached = await read();
       if (!detached) throw new Error('Missing Asset');

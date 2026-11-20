@@ -17,7 +17,7 @@ import {
   Unavailable,
   type ContinuationAdmission,
 } from './contract.js';
-import { watchdog } from './watchdog.js';
+import { watchdog, endWait } from './watchdog.js';
 import { stageDeliveryIndex } from './delivery.js';
 import { adoptManualRepair, recoverManualRepair, retainManualRepair } from './manual-repair.js';
 
@@ -121,8 +121,11 @@ function advance(
   time: Time
 ) {
   return Effect.gen(function* () {
+    if (waiting.stage === 'babysitting') yield* endWait(store);
     const proposed: StageRequest = {
       publicationStartedAt: waiting.stage === 'review' ? yield* time.now() : undefined,
+      ciRepair: waiting.ciRepair || waiting.stage === 'babysitting' || undefined,
+      ciStartedAt: waiting.stage === 'publication' ? yield* time.now() : undefined,
       index: waiting.index + 1,
       receiptProtocol: 'delivery-v1',
       comparison: nextComparison(waiting),
@@ -172,6 +175,20 @@ export function currentStage(store: JobStore) {
     }
   });
 }
+/** Read-only provenance for retained journals created before reporting markers existed. */
+export function ciRepairOrigin(store: JobStore, request: StageRequest | null) {
+  return Effect.gen(function* () {
+    if (!request) return false;
+    for (let index = request.index; index >= 0; index--) {
+      const source = index === request.index ? request : yield* store.readStage(index);
+      if (!source || source.threadId !== request.threadId) return false;
+      if (source.ciRepair || source.stage === 'babysitting') return true;
+      if (source.stage === 'implementation' && source.previousRunId === null) return false;
+    }
+    return false;
+  });
+}
+
 function publicationMatches(
   evidence: StageEvidence | null,
   accepted: StageRequest,
@@ -259,7 +276,27 @@ function readiness(
       };
     }
     const pending = maintenanceDelivery(pr, commit);
-    return pending ?? observedReadiness(pr, matches, commit);
+    const result = pending ?? observedReadiness(pr, matches, commit);
+    if (
+      (matches || pending !== null) &&
+      !ownerActive &&
+      pr.kind === 'found' &&
+      !result.ready &&
+      !result.landed &&
+      !pr.manualRecovery
+    )
+      return {
+        ...result,
+        activity: 'waiting-for-ci' as const,
+        // A retained ready publication ends the original interval. Its later rerun has no known start.
+        waitStartedAt:
+          pr.commit === accepted.commit &&
+          !observation?.manual &&
+          !(retained?.url === pr.url && retained.commit === pr.commit && retained.base === pr.base)
+            ? accepted.ciStartedAt
+            : undefined,
+      };
+    return result;
   });
 }
 
@@ -297,6 +334,7 @@ function dispatchRepair(
     const request: StageRequest = {
       index: accepted.index + 1,
       stage: 'babysitting',
+      ciRepair: true,
       receiptProtocol: 'delivery-v1',
       threadId: accepted.threadId,
       commit: pr.commit,
@@ -894,6 +932,7 @@ function terminalCI(
     if (!(yield* acceptedPublication(store, waiting))) return null;
     const pr = yield* issues.pullRequest(intent);
     if (!successfulPublication(pr, waiting.commit)) return null;
+    yield* endWait(store);
     return {
       stage: 'ci' as const,
       commit: waiting.commit,

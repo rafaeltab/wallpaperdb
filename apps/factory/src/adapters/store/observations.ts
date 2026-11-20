@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { Unavailable } from '../../capabilities/job/index.js';
 import {
   jobObservationIsOlder,
+  retainedWaitDelivery,
   type ObservationStore,
   type ReportingStore,
 } from '../../capabilities/observe/index.js';
@@ -120,6 +121,7 @@ export function sqliteObservations(directory: string): ObservationStore & Report
                 const priorJob = jobs.get(item.value.intent.id);
                 jobs.set(item.value.intent.id, {
                   ...item.value,
+                  delivery: retainedWaitDelivery(priorJob, item.value),
                   acknowledgement: item.value.acknowledgement ?? priorJob?.acknowledgement,
                 });
                 jobsObservedAt = Math.max(jobsObservedAt ?? 0, item.at);

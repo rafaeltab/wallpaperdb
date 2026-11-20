@@ -92,6 +92,76 @@ export function reportingStoreContract(
   name: string,
   open: () => Promise<{ store: ObservationStore & ReportingStore; close(): Promise<void> }>
 ) {
+  it(`${name} retains a validated wait while publishing a replacement completed watcher`, async () => {
+    const { store, close } = await open();
+    try {
+      const owner = parkedSnapshot(pullObservation(42), true).jobs[0];
+      if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+        throw new Error('Expected owner');
+      const generation = await Effect.runPromise(store.begin());
+      const previous = {
+        ...owner,
+        stageIndex: 4,
+        controlRevision: 3,
+        execution: {
+          ...owner.execution,
+          status: 'completed',
+          question: undefined,
+          run: { id: 'run-4', ordinal: 4 },
+        },
+        delivery: {
+          ...owner.delivery,
+          stage: 'babysitting' as const,
+          activity: 'waiting-for-github' as const,
+          question: undefined,
+          waitStartedAt: 100,
+        },
+      };
+      await Effect.runPromise(
+        store.publish(generation, [{ kind: 'job', value: previous, at: 100, sequence: 1 }])
+      );
+      const next = {
+        ...previous,
+        controlRevision: undefined,
+        execution: { ...previous.execution, run: { id: 'watcher-5', ordinal: 5 } },
+        delivery: {
+          stage: 'babysitting' as const,
+          commit: previous.delivery.commit,
+          ready: false,
+          landed: false,
+        },
+      };
+      await Effect.runPromise(
+        store.publish(generation, [{ kind: 'job', value: next, at: 200, sequence: 2 }])
+      );
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        {
+          execution: { run: { id: 'watcher-5' } },
+          delivery: { activity: 'waiting-for-github', waitStartedAt: 100 },
+        },
+      ]);
+      await Effect.runPromise(
+        store.publish(generation, [
+          {
+            kind: 'job',
+            value: {
+              ...next,
+              controlRevision: 4,
+              delivery: { ...next.delivery, ready: true },
+            },
+            at: 300,
+            sequence: 3,
+          },
+        ])
+      );
+      const ended = (await Effect.runPromise(store.read())).jobs?.[0];
+      expect(ended).toMatchObject({ delivery: { ready: true } });
+      expect(ended?.kind === 'job' && ended.delivery?.activity).toBeUndefined();
+    } finally {
+      await close();
+    }
+  });
+
   it(`${name} commits complete items independently, rejects delayed versions and retains success dates on failure`, async () => {
     const { store, close } = await open();
     try {

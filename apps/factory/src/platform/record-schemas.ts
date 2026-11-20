@@ -53,6 +53,8 @@ const reconciliationReasonSchema = z.discriminatedUnion('kind', [
 const stageSchema = z
   .object({
     publicationStartedAt: z.number().finite().optional(),
+    ciStartedAt: z.number().finite().optional(),
+    ciRepair: z.boolean().optional(),
     acceptedBase: z
       .string()
       .regex(/^[a-f0-9]{40}$/)
@@ -86,6 +88,7 @@ const stageSchema = z
   .strict();
 const waitSchema = z
   .object({
+    startedAt: z.number().finite().nullable().optional(),
     revision: z.number().int().nonnegative(),
     progress: z.string(),
     deadline: z.number().finite(),

@@ -400,6 +400,9 @@ export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' 
 export interface StageRequest {
   /** Retained publication responsibility transition time; absent for historical records. */
   readonly publicationStartedAt?: number;
+  /** Reporting provenance only; does not authorize execution or continuation. */
+  readonly ciRepair?: boolean;
+  readonly ciStartedAt?: number;
   /** Authenticated main comparison retained after an agent rebase. */
   readonly acceptedBase?: string;
   readonly handback?: readonly string[];
@@ -498,6 +501,11 @@ export type PullRequestObservation =
       readonly maintenancePending?: boolean;
     };
 export interface Delivery {
+  readonly ciRepair?: boolean;
+  /** Actual managed wait entry, absent for legacy records with unknown timing. */
+  readonly waitStartedAt?: number;
+  /** Receipt-validated wait comparison, independent of the original repair instruction. */
+  readonly waitCommit?: string;
   /** Exact uncancelled control revision under which handback was verified.
    * Informational status rereads must never replace this release authority. */
   readonly handbackRevision?: number;
@@ -507,6 +515,7 @@ export interface Delivery {
     | 'dependency-handback'
     | 'repairing'
     | 'waiting-for-github'
+    | 'waiting-for-ci'
     | 'continuation-pending'
     | 'awaiting-answer'
     | 'cancelled'
@@ -523,6 +532,8 @@ export interface Delivery {
 }
 
 export interface WaitState {
+  /** Null ends the display wait without changing the watchdog deadline. */
+  readonly startedAt?: number | null;
   readonly revision: number;
   readonly progress: string;
   readonly deadline: number;

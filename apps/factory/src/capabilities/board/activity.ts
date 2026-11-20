@@ -1,6 +1,8 @@
 import type { Status } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
 import { capacityOccupied } from '../plan/index.js';
+import { managedRepairs } from './repairs.js';
+import { managedCIWaits } from './ci-waits.js';
 import type { ActivityCategory, FactoryActivity, Reason } from './model.js';
 import { timestamp } from './values.js';
 
@@ -41,7 +43,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     input.recoveries?.some((r) => r.phase !== 'complete')
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
-  const items: FactoryActivity['items'][number][] = [];
+  const items: FactoryActivity['items'][number][] = [...managedCIWaits(input)];
   if (input.planningVerification)
     items.push({
       id: `plan-verification:${input.planningVerification.startedAt}`,
@@ -120,6 +122,9 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
           : 'Publishing reviewed issue changes',
     });
   }
+  items.push(...managedRepairs(input).filter((repair) =>
+    !items.some((item) => item.category === repair.category && item.issue === repair.issue)
+  ));
   const source = input.observations;
   if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
@@ -182,6 +187,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     category === 'refreshing-github' ||
     category === 'refreshing-t3' ||
     category === 'publishing' ||
+    category === 'waiting-for-ci' ||
     (category === 'gathering-planning-context' && !!input.planningDiscovery) ||
     (category === 'checking-plan-freshness' && input.planningVerification !== undefined) ||
     !uncertainty.length;
@@ -203,6 +209,7 @@ function implementing(job: Status): job is Extract<Status, { kind: 'job' }> {
   const delivery = job.delivery;
   if (
     !delivery ||
+    (delivery.ciRepair && job.execution.status === 'queued') ||
     delivery.ready ||
     delivery.landed ||
     delivery.active === false ||

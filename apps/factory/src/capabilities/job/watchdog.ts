@@ -31,20 +31,37 @@ export function watchdog(
       landed: false,
     };
     if (!explicitWait(observation, request, evidence))
-      return yield* suspended(store, request, delivery, observation.status === 'waiting-for-input');
+      return yield* suspended(store, issues, intent, request, delivery, observation.status);
 
-    const progress = yield* observedProgress(issues, intent, evidence.commit);
-    if (progress === null) return delivery;
+    const pr = yield* issues.pullRequest(intent);
+    if (pr.kind !== 'found' || !pr.ci || pr.commit !== evidence.commit) return delivery;
+    const progress = `${pr.commit}:${pr.ci.progress}`;
     const now = yield* time.now();
-    const saved = yield* store.readWait();
+    let saved = yield* store.readWait();
+    const waitingDelivery = { ...delivery, pr, waitCommit: evidence.commit };
+    if (saved?.startedAt === null) {
+      const next = { ...saved, revision: saved.revision + 1, startedAt: now };
+      if (yield* store.saveWait(next)) saved = next;
+    }
     if (!saved || saved.progress !== progress)
-      return yield* recordProgress(store, saved, progress, now, delivery);
+      return yield* recordProgress(store, saved, progress, now, waitingDelivery);
     if (evidence.idle === false)
-      return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };
-    if (saved.nudged) return yield* recoverContinuation(store, request, saved, delivery, send);
+      return {
+        ...waitingDelivery,
+        activity: 'waiting-for-github' as const,
+        waitStartedAt: saved.startedAt ?? undefined,
+        deadline: saved.deadline,
+      };
+    if (saved.nudged)
+      return yield* recoverContinuation(store, request, saved, waitingDelivery, send);
     if (now < saved.deadline)
-      return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };
-    return yield* continueWaiting(store, request, evidence, saved, delivery, send);
+      return {
+        ...waitingDelivery,
+        activity: 'waiting-for-github' as const,
+        waitStartedAt: saved.startedAt ?? undefined,
+        deadline: saved.deadline,
+      };
+    return yield* continueWaiting(store, request, evidence, saved, waitingDelivery, send);
   });
 }
 function explicitWait(
@@ -55,12 +72,37 @@ function explicitWait(
   if (!evidence?.waitingForGitHub) return false;
   return observation.status === 'completed' && evidence.stageIndex === request.index;
 }
-function suspended(store: JobStore, request: StageRequest, delivery: Delivery, question: boolean) {
+function suspended(
+  store: JobStore,
+  issues: Issues,
+  intent: Intent,
+  request: StageRequest,
+  delivery: Delivery,
+  status: string
+) {
   return Effect.gen(function* () {
     const saved = yield* store.readWait();
-    if (saved?.continuation?.index === request.index)
-      return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-    if (question) yield* interruptForQuestion(store, saved);
+    const pending = saved?.continuation?.index === request.index;
+    const repairing = ['running', 'preparing', 'starting'].includes(status);
+    if (
+      saved &&
+      typeof saved.startedAt === 'number' &&
+      (repairing || !pending) &&
+      status !== 'waiting-for-input'
+    )
+      yield* store.saveWait({ ...saved, revision: saved.revision + 1, startedAt: null });
+    if (status === 'waiting-for-input') yield* interruptForQuestion(store, saved);
+    if (pending) {
+      const pr =
+        !repairing && status !== 'waiting-for-input' ? yield* issues.pullRequest(intent) : null;
+      return {
+        ...delivery,
+        activity: 'continuation-pending' as const,
+        waitStartedAt: repairing ? undefined : (saved.startedAt ?? undefined),
+        pr: pr?.kind === 'found' && pr.commit === request.commit ? pr : undefined,
+        deadline: saved.deadline,
+      };
+    }
     return delivery;
   });
 }
@@ -75,11 +117,19 @@ function recordProgress(
     const next = {
       revision: (saved?.revision ?? -1) + 1,
       progress,
+      // Progress within one comparison preserves its interval; a validated new head starts another.
+      startedAt:
+        saved && saved.progress.startsWith(`${delivery.waitCommit}:`) ? saved.startedAt : now,
       deadline: now + 3600000,
       nudged: false,
     };
     if (!(yield* store.saveWait(next))) return delivery;
-    return { ...delivery, activity: 'waiting-for-github' as const, deadline: next.deadline };
+    return {
+      ...delivery,
+      activity: 'waiting-for-github' as const,
+      waitStartedAt: next.startedAt ?? undefined,
+      deadline: next.deadline,
+    };
   });
 }
 function recoverContinuation(
@@ -94,7 +144,12 @@ function recoverContinuation(
       yield* store.saveStage(saved.continuation);
       yield* send(saved.continuation);
     }
-    return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
+    return {
+      ...delivery,
+      activity: 'continuation-pending' as const,
+      waitStartedAt: saved.startedAt ?? undefined,
+      deadline: saved.deadline,
+    };
   });
 }
 function continueWaiting(
@@ -133,21 +188,32 @@ function continueWaiting(
     yield* store.saveStage(continuation);
     const winning = yield* store.readStage(continuation.index);
     if (winning) yield* send(winning);
-    return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-  });
-}
-
-function observedProgress(issues: Issues, intent: Intent, commit: string) {
-  return Effect.gen(function* () {
-    const pr = yield* issues.pullRequest(intent);
-    if (pr.kind !== 'found' || !pr.ci || pr.commit !== commit) return null;
-    return `${pr.commit}:${pr.ci.progress}`;
+    return {
+      ...delivery,
+      activity: 'continuation-pending' as const,
+      waitStartedAt: saved.startedAt ?? undefined,
+      deadline: saved.deadline,
+    };
   });
 }
 
 function interruptForQuestion(store: JobStore, saved: WaitState | null) {
   return Effect.gen(function* () {
-    if (saved && !saved.nudged && saved.progress !== '')
-      yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
+    if (saved && (typeof saved.startedAt === 'number' || (!saved.nudged && saved.progress !== '')))
+      yield* store.saveWait({
+        ...saved,
+        revision: saved.revision + 1,
+        progress: saved.nudged ? saved.progress : '',
+        startedAt: null,
+      });
+  });
+}
+
+/** End display timing independently of watchdog progress, deadlines and send claims. */
+export function endWait(store: JobStore) {
+  return Effect.gen(function* () {
+    const saved = yield* store.readWait();
+    if (saved && typeof saved.startedAt === 'number')
+      yield* store.saveWait({ ...saved, revision: saved.revision + 1, startedAt: null });
   });
 }

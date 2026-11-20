@@ -209,6 +209,49 @@ it('provides keyboard and hover details, live switching and approved D layout at
       await page.screenshot({ path: join(evidence, `activity-${width}.png`) });
     }
     served = {
+      ...idle,
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          items: [
+            {
+              id: 'ci:1',
+              category: 'waiting-for-ci',
+              lifecycle: 'current',
+              issue: 1,
+              pullRequest: 10,
+              startedAt: new Date(Date.now() - 65000).toISOString(),
+              reason: 'Managed CI observation',
+            },
+            {
+              id: 'ci:2',
+              category: 'waiting-for-ci',
+              lifecycle: 'current',
+              issue: 2,
+              pullRequest: 11,
+              startedAt: new Date(Date.now() - 10000).toISOString(),
+              reason: 'Managed GitHub wait',
+            },
+          ],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Waiting for CI 2 issues', { timeout: 5000 });
+    await trigger.hover();
+    await browserExpect(panel).toContainText('2 issues');
+    await page.screenshot({ path: join(evidence, 'activity-ci-waits.png') });
+    served = {
+      ...served,
+      meta: {
+        ...served.meta,
+        activity: { ...activity, items: served.meta.activity?.items.slice(0, 1) ?? [] },
+      },
+    };
+    await browserExpect(trigger).toContainText('Waiting for CI 1 issue', { timeout: 5000 });
+    await browserExpect(trigger.locator('time')).toContainText('1m');
+    await page.screenshot({ path: join(evidence, 'activity-ci-remaining.png') });
+    served = {
       ...served,
       meta: { ...served.meta, factory: { ...served.meta.factory, paused: true } },
     };
@@ -217,7 +260,7 @@ it('provides keyboard and hover details, live switching and approved D layout at
       'rgb(131, 131, 144)',
       { timeout: 5000 }
     );
-    await browserExpect(trigger).toContainText('Refreshing T3 information');
+    await browserExpect(trigger).toContainText('Waiting for CI 1 issue');
     served = {
       ...idle,
       meta: { ...idle.meta, activity: { ...activity, uncertainty: ['Execution unknown'] } },
@@ -243,4 +286,4 @@ it('provides keyboard and hover details, live switching and approved D layout at
     if (previous === undefined) delete process.env.FACTORY_BACKEND_URL;
     else process.env.FACTORY_BACKEND_URL = previous;
   }
-}, 45000);
+}, 60000);

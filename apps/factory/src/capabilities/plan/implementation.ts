@@ -239,7 +239,6 @@ export const PlanLive = Layer.effect(
                 input,
               };
             }
-            if (attempt) yield* attempt.progress('freshness');
             const ownership = attempt?.automatic ? yield* planner.ownership(false) : undefined;
             const modelAttemptId =
               ownership?.automatic && ownership.phase === 'succeeded' && ownership.run

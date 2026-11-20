@@ -114,49 +114,49 @@ it.each(['Frame 21495', 'Frame 21496', 'hdr-gain-map hdrgainmap hdrgm:'])(
   }
 );
 it.each([
-  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0/'],
-  ['http://ns.adobe.com/xmp/extension/\0', 'http://ns.apple.com/HDRGainMap/1.0/'],
-])(
-  'rejects a gain-map namespace declaration in a JPEG XMP packet %s',
-  async (header, namespace) => {
-    const s3 = tester.getS3();
-    const runtime = ManagedRuntime.make(
-      sourceStorageLayer({
-        endpoint: s3.endpoints.fromHost,
-        region: 'us-east-1',
-        accessKeyId: s3.options.accessKey,
-        secretAccessKey: s3.options.secretKey,
-        bucket: 'source-private',
-      })
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0/', 'rejected'],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0&#x2f;', 'rejected'],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0&#47;', 'rejected'],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/&#104;dr-gain-map/1.0/', 'rejected'],
+  ['http://ns.adobe.com/xmp/extension/\0', 'http://ns.apple.com/HDRGainMap/1.0/', 'rejected'],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://example.test/metadata/&#233;', 'verified'],
+])('classifies a JPEG XMP packet %s with namespace %s', async (header, namespace, expectedKind) => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+    .jpeg()
+    .toBuffer();
+  const payload = Buffer.from(
+    `${header}<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:gain="${namespace}"/>`
+  );
+  const marker = Buffer.from([0xff, 0xe1, 0, 0]);
+  marker.writeUInt16BE(payload.length + 2, 2);
+  const bytes = Buffer.concat([jpeg.subarray(0, 2), marker, payload, jpeg.subarray(2)]);
+  const id = `candidate_xmp_${createHash('sha256').update(bytes).digest('hex')}`;
+  try {
+    await runtime.runPromise(
+      SourceBytes.use((storage) =>
+        storage.put(id, bytes, createHash('sha256').update(bytes).digest('hex'))
+      )
     );
-    const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
-      .jpeg()
-      .toBuffer();
-    const payload = Buffer.from(
-      `${header}<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:gain="${namespace}"/>`
+    const inspected = await runtime.runPromise(
+      MandatoryInspection.use((inspector) => inspector.inspect(id, initialSourcePolicies.wallpaper))
     );
-    const marker = Buffer.from([0xff, 0xe1, 0, 0]);
-    marker.writeUInt16BE(payload.length + 2, 2);
-    const bytes = Buffer.concat([jpeg.subarray(0, 2), marker, payload, jpeg.subarray(2)]);
-    const id = `candidate_xmp_${createHash('sha256').update(bytes).digest('hex')}`;
-    try {
-      await runtime.runPromise(
-        SourceBytes.use((storage) =>
-          storage.put(id, bytes, createHash('sha256').update(bytes).digest('hex'))
-        )
-      );
-      expect(
-        await runtime.runPromise(
-          MandatoryInspection.use((inspector) =>
-            inspector.inspect(id, initialSourcePolicies.wallpaper)
-          )
-        )
-      ).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
-    } finally {
-      await runtime.dispose();
-    }
+    if (expectedKind === 'verified')
+      expect(inspected).toMatchObject({ kind: 'verified', facts: { model: 'sdr-jpeg' } });
+    else expect(inspected).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
+  } finally {
+    await runtime.dispose();
   }
-);
+});
 it('keeps HDR, unknown, malformed cICP and APNG outside supported SDR PNG inspection', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

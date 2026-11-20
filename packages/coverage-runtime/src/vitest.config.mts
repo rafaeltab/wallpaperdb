@@ -108,6 +108,7 @@ export default async function (): Promise<ViteUserConfig> {
 		test.coverage.include = [
 			...(test.coverage.include || []),
 			"dist/**/*.mjs",
+			resolve(source, "dist/**/*.mjs"),
 			...(originalCoverage.include || []).map((pattern) =>
 				resolve(source, pattern),
 			),

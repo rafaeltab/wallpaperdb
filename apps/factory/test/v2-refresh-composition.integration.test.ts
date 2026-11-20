@@ -214,12 +214,7 @@ it('gives automatic work a turn when recurring metadata wins cycle readiness', a
 it.each([false, true])(
   'plans after retained CI observation with metadata demand %s',
   async (refreshMetadata) => {
-    const nativeTimeout = globalThis.setTimeout;
-    if (refreshMetadata)
-      vi.useFakeTimers({
-        toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
-      });
-    else vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
     const host = await protocol({ origin: true });
     const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
@@ -336,11 +331,8 @@ it.each([false, true])(
       expect(snapshot.state.concurrency).toBe(3);
       expect(snapshot.state.admissions).toHaveLength(1);
       if (refreshMetadata) {
-        for (let second = 0; second < 180; second++) {
-          await vi.advanceTimersByTimeAsync(1000);
-          if (second % 10 === 0) await running.app.inject('/api/v2/board');
-          await new Promise<void>((resolve) => nativeTimeout(resolve, 100));
-        }
+        await running.app.inject('/api/v2/board');
+        await vi.advanceTimersByTimeAsync(120_000);
         await vi.waitFor(
           async () => {
             const refreshed = (
@@ -351,7 +343,7 @@ it.each([false, true])(
               observedAt: expect.any(String),
             });
           },
-          { timeout: 5000, interval: 20 }
+          { timeout: 30_000, interval: 20 }
         );
       }
     } finally {

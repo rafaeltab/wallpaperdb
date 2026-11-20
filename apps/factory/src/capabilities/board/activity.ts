@@ -123,6 +123,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     });
   }
   items.push(...managedRepairs(input).filter((repair) =>
+    repair.category !== 'publishing' &&
     !items.some((item) => item.category === repair.category && item.issue === repair.issue)
   ));
   const source = input.observations;

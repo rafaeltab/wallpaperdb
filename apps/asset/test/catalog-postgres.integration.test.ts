@@ -10,10 +10,10 @@ import {
   natsConsumerLayer,
   natsEventsLayer,
 } from '../src/adapters/events/index.js';
-import { Pool } from 'pg';
+import { Client } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CatalogOutbox,
   CatalogProjection,
@@ -40,27 +40,46 @@ const wallpaper = {
 } satisfies ProjectionInput;
 describe('PostgreSQL catalog contract', () => {
   let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
-  let pool: Pool;
+  let observer: Client;
   let runtime: ManagedRuntime.ManagedRuntime<Catalog | CatalogProjection | CatalogOutbox, unknown>;
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
-    pool = new Pool({ connectionString: container.getConnectionUri() });
-    await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+    observer = new Client({ connectionString: container.getConnectionUri() });
+    await observer.connect();
+    await migrate(drizzle(observer), { migrationsFolder: './drizzle' });
     const postgres = CatalogPostgresLayer({ databaseUrl: container.getConnectionUri() });
     runtime = ManagedRuntime.make(postgres);
   });
   beforeEach(async () => {
-    await pool.query(
+    await observer.query(
       'TRUNCATE catalog_targets, catalog_processed, catalog_outbox, variants, wallpapers, profile_picture_assets, profile_picture_heads'
     );
   });
   afterAll(async () => {
-    await runtime?.dispose();
-    await pool?.end();
-    await container?.stop();
+    try {
+      await runtime?.dispose();
+      if (observer) {
+        // Pool.end() can finish before runtime sockets close. This fixture owns
+        // the database, so wait for every other session before stopping it.
+        await vi.waitFor(async () => {
+          const sessions = await observer.query(
+            "SELECT pid FROM pg_stat_activity WHERE backend_type = 'client backend' AND pid <> pg_backend_pid()"
+          );
+          expect(sessions.rows).toEqual([]);
+        });
+      }
+    } finally {
+      try {
+        // Client.end() awaits the observer socket, unlike Pool.end().
+        await observer?.end();
+      } finally {
+        await container?.stop();
+      }
+    }
   });
   it('cancels a blocked transaction, releases its connection, and permits replay', async () => {
-    const blocker = await pool.connect();
+    const blocker = new Client({ connectionString: container.getConnectionUri() });
+    await blocker.connect();
     await blocker.query('BEGIN');
     await blocker.query('LOCK TABLE wallpapers IN ACCESS EXCLUSIVE MODE');
     const controller = new AbortController();
@@ -76,7 +95,7 @@ describe('PostgreSQL catalog contract', () => {
     try {
       await expect
         .poll(async () => {
-          const { rows } = await pool.query(
+          const { rows } = await observer.query(
             `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
           );
           return rows[0]?.count;
@@ -94,7 +113,7 @@ describe('PostgreSQL catalog contract', () => {
       ).toBe('interrupted');
       await expect
         .poll(async () => {
-          const { rows } = await pool.query(
+          const { rows } = await observer.query(
             `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
           );
           return rows[0]?.count;
@@ -102,7 +121,7 @@ describe('PostgreSQL catalog contract', () => {
         .toBe(0);
     } finally {
       await blocker.query('ROLLBACK');
-      blocker.release();
+      await blocker.end();
       await pending;
     }
     expect(
@@ -135,7 +154,8 @@ describe('PostgreSQL catalog contract', () => {
         Layer.provide(CatalogPostgresLayer({ databaseUrl: container.getConnectionUri() }))
       )
     );
-    const blocker = await pool.connect();
+    const blocker = new Client({ connectionString: container.getConnectionUri() });
+    await blocker.connect();
     try {
       await consumer.runPromise(ConsumerHealth);
       await blocker.query('BEGIN');
@@ -164,7 +184,7 @@ describe('PostgreSQL catalog contract', () => {
       );
       const blocked = async () =>
         (
-          await pool.query(
+          await observer.query(
             `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
           )
         ).rows[0]?.count;
@@ -184,7 +204,7 @@ describe('PostgreSQL catalog contract', () => {
       ).toBeNull();
     } finally {
       await blocker.query('ROLLBACK');
-      blocker.release();
+      await blocker.end();
       await consumer.dispose();
       await tester.destroy();
     }
@@ -438,7 +458,7 @@ describe('PostgreSQL catalog contract', () => {
   });
   it('reconciles a pre-migration wallpaper without changing its committed metadata', async () => {
     if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
-    await drizzle(pool)
+    await drizzle(observer)
       .insert(wallpapers)
       .values({ ...wallpaper.wallpaper, createdAt: new Date('2025-12-31T00:00:00.000Z') });
     const replay: ProjectionInput = {
@@ -473,7 +493,7 @@ describe('PostgreSQL catalog contract', () => {
 
   it('reuses pre-migration variant identity and metadata under concurrent occurrence replay', async () => {
     if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
-    const fixture = drizzle(pool);
+    const fixture = drizzle(observer);
     await fixture
       .insert(wallpapers)
       .values({ ...wallpaper.wallpaper, createdAt: new Date(wallpaper.wallpaper.createdAt) });

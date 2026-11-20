@@ -231,7 +231,12 @@ it('collects once before model handoff and retains completion across restart', a
     vi.setSystemTime(Date.now() + 9 * 60_000);
     await release('planner-observation');
     await held('prerequisite-verification');
-    expect(await details()).toMatchObject({ phase: 'freshness' });
+    await vi.waitFor(
+      async () => {
+        expect(await details()).toMatchObject({ phase: 'freshness' });
+      },
+      { timeout: 5000, interval: 20 }
+    );
     await vi.waitFor(
       async () => {
         const activity = (await running!.app.inject('/api/v2/board')).json().meta.activity;

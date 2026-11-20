@@ -177,6 +177,66 @@ it.each([
     }
   }
 );
+function extendedXmpSegment(packet: Buffer, offset: number, end: number, guid: string): Buffer {
+  const header = Buffer.from('http://ns.adobe.com/xmp/extension/\0');
+  const fields = Buffer.alloc(40);
+  fields.write(guid, 0, 'ascii');
+  fields.writeUInt32BE(packet.length, 32);
+  fields.writeUInt32BE(offset, 36);
+  const payload = Buffer.concat([header, fields, packet.subarray(offset, end)]);
+  const marker = Buffer.from([0xff, 0xe1, 0, 0]);
+  marker.writeUInt16BE(payload.length + 2, 2);
+  return Buffer.concat([marker, payload]);
+}
+it.each([
+  ['before URI', false, false, 'rejected'],
+  ['inside URI', false, false, 'rejected'],
+  ['before URI', true, false, 'rejected'],
+  ['before URI', false, true, 'verified'],
+])(
+  'inspects extended XMP split %s, reversed=%s, separate GUIDs=%s',
+  async (split, reverse, separate, expected) => {
+    const s3 = tester.getS3();
+    const runtime = ManagedRuntime.make(
+      sourceStorageLayer({
+        endpoint: s3.endpoints.fromHost,
+        region: 'us-east-1',
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'source-private',
+      })
+    );
+    const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+      .jpeg()
+      .toBuffer();
+    const packet = Buffer.from(
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:gain="http://ns.adobe.com/hdr-gain-map/1.0/"/>'
+    );
+    const offset = packet.indexOf('http://ns.adobe.com') + (split === 'inside URI' ? 18 : 0);
+    const guid = createHash('md5').update(packet).digest('hex').toUpperCase();
+    const fragments = [
+      extendedXmpSegment(packet, 0, offset, guid),
+      extendedXmpSegment(packet, offset, packet.length, separate ? '0'.repeat(32) : guid),
+    ];
+    if (reverse) fragments.reverse();
+    const bytes = Buffer.concat([jpeg.subarray(0, 2), ...fragments, jpeg.subarray(2)]);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    const id = `candidate_extended_xmp_${digest}`;
+    try {
+      await runtime.runPromise(SourceBytes.use((storage) => storage.put(id, bytes, digest)));
+      const inspected = await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect(id, initialSourcePolicies.wallpaper)
+        )
+      );
+      if (expected === 'verified')
+        expect(inspected).toMatchObject({ kind: 'verified', facts: { model: 'sdr-jpeg' } });
+      else expect(inspected).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
 it('keeps HDR, unknown, malformed cICP and APNG outside supported SDR PNG inspection', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

@@ -2782,7 +2782,7 @@ it('retains actual restack processing starts across observation and adapter repl
 });
 
 it('excludes replay review queued for capacity without changing its retained processing start', async () => {
-  const f = await fixture({ ciFails: true });
+  const f = await fixture({ ciFails: true, automaticReview: false });
   try {
     await Effect.runPromise(f.issues.prepare?.(5, () => Effect.succeed(false)) ?? Effect.void);
     const queued = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
@@ -2794,6 +2794,11 @@ it('excludes replay review queued for capacity without changing its retained pro
     await Effect.runPromise(f.issues.prepare?.(5, () => Effect.succeed(true)) ?? Effect.void);
     const later = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
     expect(later.find((item) => item.issue === queued[0]?.issue)?.startedAt).toBe(startedAt);
+    expect(later.some((item) => item.active)).toBe(true);
+    await Effect.runPromise(f.issues.prepare?.(5, () => Effect.succeed(false)) ?? Effect.void);
+    const requeued = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
+    expect(requeued.filter((item) => item.active)).toEqual([]);
+    expect(requeued[0]?.startedAt).toBe(startedAt);
   } finally {
     await f.close();
   }

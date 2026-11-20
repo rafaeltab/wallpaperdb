@@ -231,7 +231,7 @@ export function storeContract(
         stage: 'review' as const,
         observedRunId: 'answered-run-2',
         deliveryIndex: 1,
-        question: { id: 'review-q', text: 'Which review option?' },
+        question: { id: 'review-q', text: 'Which review option?', startedAt: 1700 },
         threadId: 'thread-1',
         commit: 'c'.repeat(40),
         previousRunId: 'run-1',
@@ -286,6 +286,21 @@ export function storeContract(
       await fixture.close();
     }
   });
+  it(`${name}: retains a question-free answer observation boundary across reopen`, async () => {
+    const fixture = await setup();
+    try {
+      const before = await Effect.runPromise(fixture.store.readControl());
+      const next = {
+        ...before,
+        revision: before.revision + 1,
+        answerWait: { index: 0, run: { id: 'run-6', ordinal: 6 }, closed: true },
+      };
+      expect(await Effect.runPromise(fixture.store.saveControl(next))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().readControl())).toEqual(next);
+    } finally {
+      await fixture.close();
+    }
+  });
   it(`${name}: preserves parking and serializes cancellation against delivery across reopen`, async () => {
     const fixture = await setup();
     try {
@@ -293,10 +308,17 @@ export function storeContract(
         revision: 0,
         cancelled: false,
         claimed: [],
-        parked: {
+        answerWait: {
           index: 0,
           run: { id: 'run-1', ordinal: 1 },
-          question: { id: 'q', text: 'Choose?' },
+          question: { id: 'q2', text: 'Provisional decision?', startedAt: 1700 },
+          closed: true,
+        },
+        parked: {
+          closed: true,
+          index: 0,
+          run: { id: 'run-1', ordinal: 1 },
+          question: { id: 'q', text: 'Choose?', startedAt: 1500 },
         },
       };
       expect(await Effect.runPromise(fixture.store.saveControl(control))).toBe(true);

@@ -424,6 +424,84 @@ export function reportingStoreContract(
       await close();
     }
   });
+  it.each(['replacement', 'closure', 'answer', 'timing'] as const)(
+    `${name} retains changed same-run question facts from provisional reports: %s`,
+    async (change) => {
+      const { store, close } = await open();
+      try {
+        const job = parkedSnapshot(pullObservation(42), false).jobs[0];
+        if (job.kind !== 'job' || job.execution.kind !== 'found') throw new Error('Expected job');
+        const execution = {
+          ...job.execution,
+          status: 'waiting-for-input',
+          run: { id: 'run-2', ordinal: 2 },
+          question: { id: 'q1', text: 'First decision', startedAt: 1000 },
+        };
+        const first = await Effect.runPromise(store.begin());
+        await Effect.runPromise(
+          store.publish(first, [
+            {
+              kind: 'job',
+              sequence: 1,
+              at: 10,
+              value: { ...job, stageIndex: 1, controlRevision: 1, execution },
+            },
+          ])
+        );
+        const updated = {
+          ...execution,
+          question:
+            change === 'replacement'
+              ? { id: 'q2', text: 'Replacement decision', startedAt: 2000 }
+              : change === 'timing'
+                ? { ...execution.question, startedAt: 2000 }
+                : undefined,
+          closedQuestions: change === 'closure' ? ['q1'] : undefined,
+          answeredQuestions: change === 'answer' ? ['q1'] : undefined,
+        };
+        const next = await Effect.runPromise(store.begin());
+        await Effect.runPromise(
+          store.publish(next, [
+            {
+              kind: 'job',
+              sequence: 1,
+              at: 20,
+              value: { ...job, stageIndex: 1, execution: updated },
+            },
+          ])
+        );
+        const retained = (await Effect.runPromise(store.read())).jobs?.[0];
+        if (retained?.kind !== 'job' || retained.execution.kind !== 'found')
+          throw new Error('Expected retained observation');
+        if (change === 'replacement')
+          expect(retained.execution.question).toEqual({
+            id: 'q2',
+            text: 'Replacement decision',
+            startedAt: 2000,
+          });
+        if (change === 'timing') expect(retained.execution.question?.startedAt).toBe(2000);
+        if (change === 'closure') expect(retained.execution.closedQuestions).toEqual(['q1']);
+        if (change === 'answer') expect(retained.execution.answeredQuestions).toEqual(['q1']);
+        await Effect.runPromise(
+          store.publish(next, [
+            {
+              kind: 'job',
+              sequence: 2,
+              at: 30,
+              value: {
+                ...job,
+                stageIndex: 1,
+                execution: { ...execution, run: { id: 'old-run', ordinal: 1 } },
+              },
+            },
+          ])
+        );
+        expect((await Effect.runPromise(store.read())).jobs).toEqual([retained]);
+      } finally {
+        await close();
+      }
+    }
+  );
   it(`${name} does not restore ancestry verified against an older PR comparison`, async () => {
     const { store, close } = await open();
     const pull = (

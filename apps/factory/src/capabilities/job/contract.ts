@@ -100,8 +100,14 @@ export type Observation =
       /** A fresh state must follow this maintainer-initiated run. Never rewinds a stage. */
       readonly manual?: { readonly runId: string };
       readonly answeredQuestions?: readonly string[];
+      /** Resolved or cancelled request identities, for activity reporting only. */
+      readonly closedQuestions?: readonly string[];
       readonly run?: { readonly id: string; readonly ordinal: number; readonly startedAt?: number };
-      readonly question?: { readonly id: string; readonly text: string };
+      readonly question?: {
+        readonly id: string;
+        readonly text: string;
+        readonly startedAt?: number;
+      };
       readonly worktree: string;
       readonly branch: string;
       readonly model: string;
@@ -145,6 +151,13 @@ export interface AcceptedPublication {
   readonly base?: string;
 }
 export interface Control {
+  /** Retained answer observation and run-order boundary for reporting only; never continuation authority. */
+  readonly answerWait?: {
+    readonly index: number;
+    readonly run?: { readonly id: string; readonly ordinal: number };
+    readonly question?: { readonly id: string; readonly text: string; readonly startedAt?: number };
+    readonly closed?: boolean;
+  };
   /** Durable terminal delivery authority, recorded before releasing observation.
    * The execution snapshot is historical; no subscription is needed to retain landing. */
   readonly retirement?: {
@@ -190,9 +203,11 @@ export interface Control {
   readonly cancelled: boolean;
   readonly claimed: readonly number[];
   readonly parked?: {
+    /** Reporting-only closure; never authorizes an answer continuation. */
+    readonly closed?: boolean;
     readonly run?: { readonly id: string; readonly ordinal: number; readonly startedAt?: number };
     readonly index: number;
-    readonly question: { readonly id: string; readonly text: string };
+    readonly question: { readonly id: string; readonly text: string; readonly startedAt?: number };
   };
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
@@ -215,6 +230,10 @@ export interface RecoveryStatus {
   readonly classification?: 'SIMPLE' | 'COMPLEX';
   readonly threadId?: string;
   readonly question?: string;
+  readonly questionStartedAt?: number;
+  readonly questionId?: string;
+  /** Reporting-only retained answer while the owning binding is unavailable. */
+  readonly answerWait?: { readonly id: string; readonly text: string; readonly startedAt?: number };
 }
 /** Scheduler authorization without a new issue admission. Recovery callers retain
  * their journal reservation; a validated completed-stage receipt instead asks
@@ -303,6 +322,8 @@ export interface Issues {
         readonly classification?: 'SIMPLE' | 'COMPLEX';
         readonly threadId?: string;
         readonly question?: string;
+        readonly questionStartedAt?: number;
+        readonly questionId?: string;
       };
       blockedReason?: string;
       url: string;
@@ -426,7 +447,7 @@ export interface StageRequest {
   readonly resume?: boolean;
   readonly observedRunId?: string;
   /** Question already observed on this adopted run, retained atomically with its association. */
-  readonly question?: { readonly id: string; readonly text: string };
+  readonly question?: { readonly id: string; readonly text: string; readonly startedAt?: number };
   /** Logical delivery within this attempt; adopted continuations retain it. */
   readonly deliveryIndex?: number;
   readonly stage: Stage;
@@ -522,7 +543,7 @@ export interface Delivery {
     | 'resume-pending'
     | 'manual-recovery';
   readonly active?: boolean;
-  readonly question?: { readonly id: string; readonly text: string };
+  readonly question?: { readonly id: string; readonly text: string; readonly startedAt?: number };
   readonly deadline?: number;
   readonly commit: string;
   readonly ready: boolean;

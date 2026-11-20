@@ -394,6 +394,7 @@ it('reads current structured questions, excluding historical and inherited quest
     await Effect.runPromise(adapter.launch(intent));
     const question = {
       itemId: 'question-1',
+      updatedAt: '2026-11-20T12:00:00.000Z',
       runId: 'run-1',
       type: 'user_input_request',
       status: 'waiting',
@@ -406,7 +407,11 @@ it('reads current structured questions, excluding historical and inherited quest
       overrides: { pendingRequestCount: 1, status: 'running' },
     });
     expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
-      question: { id: 'question-1', text: 'Choose the approved option?' },
+      question: {
+        id: 'question-1',
+        text: 'Choose the approved option?',
+        startedAt: Date.parse('2026-11-20T12:00:00.000Z'),
+      },
     });
     for (const change of [
       { runId: 'old-run' },
@@ -419,6 +424,8 @@ it('reads current structured questions, excluding historical and inherited quest
       await host.save({ activity: [{ ...question, ...change }] });
       const observed = await Effect.runPromise(adapter.observe(intent));
       expect(observed).not.toHaveProperty('question', expect.anything());
+      if (change.status === 'completed' || change.status === 'cancelled')
+        expect(observed).toMatchObject({ closedQuestions: ['question-1'] });
     }
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;

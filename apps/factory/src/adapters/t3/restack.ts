@@ -375,22 +375,30 @@ export function t3Restacker(
   const question = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
     if (!observed.thread.pendingRequestCount) return undefined;
     const fallback = 'Open recovery thread to answer the pending question';
-    if (!config.observations && !config.mcpEndpoint) return fallback;
+    if (!config.observations && !config.mcpEndpoint) return { text: fallback };
     return (
-      (await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal))
-        .question?.text ?? fallback
-    );
+      await pendingQuestion(config, observed.thread.threadId, observed.thread.latestRunId, signal)
+    ).question;
   };
-  const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => ({
-    phase: observed.thread.pendingRequestCount
-      ? ('awaiting-answer' as const)
-      : ('resolving' as const),
-    bindingAvailable: true,
-    progress: `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`,
-    threadId: observed.thread.threadId,
-    active: observed.thread.pendingRequestCount === 0,
-    question: await question(observed, signal),
-  });
+  const presentation = async (observed: z.infer<typeof detail>, signal?: AbortSignal) => {
+    const pending = await question(observed, signal);
+    return {
+      phase: observed.thread.pendingRequestCount
+        ? ('awaiting-answer' as const)
+        : ('resolving' as const),
+      bindingAvailable: true,
+      progress: `Recovery ${observed.thread.status}; questions ${observed.thread.pendingRequestCount}; thread ${observed.thread.threadId}`,
+      threadId: observed.thread.threadId,
+      active: observed.thread.pendingRequestCount === 0,
+      question:
+        pending?.text ??
+        (observed.thread.pendingRequestCount
+          ? 'Open recovery thread to answer the pending question'
+          : undefined),
+      questionId: pending && 'id' in pending ? pending.id : undefined,
+      questionStartedAt: pending && 'startedAt' in pending ? pending.startedAt : undefined,
+    };
+  };
   const matchingResolution = (saved: unknown, head: string) =>
     z
       .object({ commit: z.literal(head), classification: z.enum(['SIMPLE', 'COMPLEX']) })

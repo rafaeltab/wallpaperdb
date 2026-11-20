@@ -215,6 +215,7 @@ function activityItems(value: Projection) {
         runId: parsed.runId,
         type: parsed.type,
         status: parsed.status,
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : undefined,
         position: parsed.ordinal,
         text:
           typeof item.text === 'string'

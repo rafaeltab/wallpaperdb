@@ -1,5 +1,6 @@
 import type { Status } from '../job/index.js';
 import type { ScheduleSnapshot } from '../observe/index.js';
+import { answerRunCurrent } from '../job/index.js';
 import { capacityOccupied } from '../plan/index.js';
 import { managedRepairs } from './repairs.js';
 import { managedCIWaits } from './ci-waits.js';
@@ -137,6 +138,103 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       startedAt: timestamp(source.startedAt),
       reason: 'Reading repository and managed PR metadata',
     });
+  for (const admission of input.state.admissions) {
+    const work = input.localWork.find((w) => w.intent?.issue === admission.issue);
+    if (work?.control.cancelled || work?.control.retirement || work?.control.released) continue;
+    const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
+    if (job?.kind !== 'job') continue;
+    const index = job.stageIndex ?? job.resume?.index;
+    const parked = work?.control.parked;
+    const retained = work?.control.answerWait;
+    const retainedCurrent =
+      retained && (index === undefined || retained.index === index) ? retained : undefined;
+    const parkingNewer =
+      !retainedCurrent ||
+      (parked?.run &&
+        retainedCurrent.run &&
+        answerRunCurrent(retainedCurrent.run, parked.run) &&
+        parked.run.ordinal > retainedCurrent.run.ordinal);
+    const run = job.execution.kind === 'found' ? job.execution.run : undefined;
+    const stale =
+      retained &&
+      (index === undefined || retained.index === index) &&
+      run &&
+      !answerRunCurrent(retained.run, run);
+    const delivery = stale ? undefined : job.delivery;
+    if (delivery?.ready || delivery?.landed) continue;
+    // Reconciled delivery owns the question; raw execution can be from an older run.
+    // Only provisional observations need the direct execution fallback.
+    const observedQuestion =
+      !stale && job.controlRevision === undefined && job.execution.kind === 'found'
+        ? job.execution.question
+        : undefined;
+    if (delivery?.activity && delivery.activity !== 'awaiting-answer' && !observedQuestion)
+      continue;
+    const retainedQuestion =
+      retained && !retained.closed && (index === undefined || retained.index === index)
+        ? retained.question
+        : undefined;
+    const question =
+      delivery?.question ??
+      retainedQuestion ??
+      observedQuestion ??
+      (!stale &&
+      parkingNewer &&
+      (!delivery?.activity || delivery.activity === 'awaiting-answer') &&
+      parked &&
+      (index === undefined || parked.index === index)
+        ? parked.question
+        : undefined);
+    if (
+      !question ||
+      (parked?.closed && parked.question.id === question.id) ||
+      (retained?.closed && retained.question?.id === question.id) ||
+      (!stale &&
+        job.execution.kind === 'found' &&
+        (job.execution.closedQuestions?.includes(question.id) ||
+          job.execution.answeredQuestions?.includes(question.id)))
+    )
+      continue;
+    // A current answer wait supersedes provisional publication until reconciliation catches up.
+    const publication = items.findIndex((item) =>
+      item.category === 'publishing' && item.issue === admission.issue
+    );
+    if (publication !== -1) items.splice(publication, 1);
+    items.push({
+      id: `answer:${job.intent.id}/${question.id}`,
+      category: 'waiting-for-answers',
+      lifecycle: 'current',
+      issue: admission.issue,
+      pullRequest: null,
+      startedAt: timestamp(
+        question.startedAt ??
+          (retained?.question?.id === question.id ? retained.question.startedAt : undefined)
+      ),
+      reason: question.text,
+    });
+  }
+  for (const recovery of input.recoveries ?? []) {
+    const wait =
+      recovery.phase === 'awaiting-answer' && recovery.question && recovery.questionId
+        ? {
+            id: recovery.questionId,
+            text: recovery.question,
+            startedAt: recovery.questionStartedAt,
+          }
+        : recovery.phase === undefined && recovery.bindingAvailable === false
+          ? recovery.answerWait
+          : undefined;
+    if (!wait) continue;
+    items.push({
+      id: `recovery-answer:${recovery.issue}/${recovery.pr}`,
+      category: 'waiting-for-answers',
+      lifecycle: 'current',
+      issue: recovery.issue,
+      pullRequest: Number(recovery.pr.split('/').at(-1)) || null,
+      startedAt: timestamp(wait.startedAt),
+      reason: wait.text,
+    });
+  }
   for (const item of input.planningDiscovery?.current ?? [])
     items.push({
       id: item.id,
@@ -189,6 +287,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     category === 'refreshing-t3' ||
     category === 'publishing' ||
     category === 'waiting-for-ci' ||
+    category === 'waiting-for-answers' ||
     (category === 'gathering-planning-context' && !!input.planningDiscovery) ||
     (category === 'checking-plan-freshness' && input.planningVerification !== undefined) ||
     !uncertainty.length;

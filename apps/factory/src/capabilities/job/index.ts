@@ -46,3 +46,5 @@ export { AgentReconciliationPolicy, defaultAgentReconciliationLimit } from './co
 export { ExecutionConfiguration, legacyExecutionSettings } from './contract.js';
 export type { ExecutionSettings, ExecutionCatalog, ObservedExecution } from './contract.js';
 export { supportsExecutionSettings } from './settings.js';
+
+export { answerRunCurrent } from './stages.js';

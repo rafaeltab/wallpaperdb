@@ -167,3 +167,38 @@ it('counts CI waits by issue and recalculates the newest current managed wait', 
     '2026-11-17T11:58:00Z'
   );
 });
+
+it('counts distinct answer-wait issues with newest-current timing and yields to other activities', () => {
+  const wait = {
+    id: 'q1',
+    category: 'waiting-for-answers' as const,
+    lifecycle: 'current' as const,
+    issue: 1,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Choose',
+  };
+  const items = [
+    wait,
+    { ...wait, id: 'recovery', startedAt: '2026-11-17T11:59:00Z' },
+    { ...wait, id: 'q2', issue: 2 },
+  ];
+  const view = activityView({ ...facts, items }, 0);
+  expect(view.summary).toBe('Waiting for answers 2 issues');
+  expect(view.groups.at(-1)?.startedAt).toBe('2026-11-17T11:59:00Z');
+  expect(
+    activityDuration(view.selected?.startedAt ?? null, Date.parse('2026-11-17T12:00:05Z'))
+  ).toBe('1m 5s');
+  expect(activityView({ ...facts, items: [wait] }, 0).selected?.startedAt).toBe(
+    '2026-11-17T11:58:00Z'
+  );
+  expect(
+    activityView(
+      {
+        ...facts,
+        items: [...items, { ...wait, id: 'ci', category: 'waiting-for-ci', pullRequest: 2 }],
+      },
+      0
+    ).summary
+  ).toBe('Waiting for CI 1 issue');
+});

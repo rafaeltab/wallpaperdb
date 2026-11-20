@@ -335,6 +335,8 @@ it.each([false, true])(
         await vi.advanceTimersByTimeAsync(120_000);
         await vi.waitFor(
           async () => {
+            // Request reservations can continue after the initial clock jump.
+            await vi.advanceTimersByTimeAsync(1000);
             const refreshed = (
               await running!.app.inject('/api/v2/board')
             ).json<FactoryV2Snapshot>();

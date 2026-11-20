@@ -187,6 +187,10 @@ export const JobLive = Layer.effect(
             continuation,
             before,
             policy?.limit ?? defaultAgentReconciliationLimit
+          ).pipe((work) =>
+            owningStage?.previousRunId && !owningStage.observedRunId
+              ? investigate(intent, work, owningStage.stage)
+              : work
           );
           // Publish adopted-stage question retention even before another found observation.
           const reportedStage = yield* currentStage(store);

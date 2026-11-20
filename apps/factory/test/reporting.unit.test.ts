@@ -925,3 +925,47 @@ it('coalesces a same-run replacement question even after a reconciled status is 
     await runtime.dispose();
   }
 });
+
+it('keeps simultaneous investigation identities and actual starts live without restoring finished ownership', async () => {
+  const { JobReporting, Time } = await import('../src/capabilities/job/index.js');
+  const { JobReportingLive } = await import('../src/capabilities/observe/index.js');
+  let now = 1000;
+  const store = controlledObservations();
+  const layer = JobReportingLive.pipe(
+    Layer.provide(ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, store)))),
+    Layer.provide(Layer.succeed(Time, { now: () => Effect.sync(() => now) }))
+  );
+  const runtime = ManagedRuntime.make(layer);
+  const intent = {
+    id: '723',
+    issue: 723,
+    issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/723',
+    base: 'a'.repeat(40),
+    branch: 'issue-723',
+    createdAt: 1,
+    expectedStage: 'implementation' as const,
+    context: '',
+  };
+  try {
+    const reporting = await runtime.runPromise(JobReporting);
+    if (!reporting.investigating || !reporting.investigated || !reporting.investigations)
+      throw new Error('Missing live investigation owner');
+    const first = await runtime.runPromise(reporting.investigating(intent));
+    now = 2000;
+    const second = await runtime.runPromise(reporting.investigating(intent, 'review'));
+    expect(first).not.toBe(second);
+    expect(await runtime.runPromise(reporting.investigations())).toEqual([
+      { id: first, issue: 723, startedAt: 1000, stage: undefined },
+      { id: second, issue: 723, startedAt: 2000, stage: 'review' },
+    ]);
+    await runtime.runPromise(reporting.investigated(second));
+    expect(await runtime.runPromise(reporting.investigations())).toEqual([
+      { id: first, issue: 723, startedAt: 1000, stage: undefined },
+    ]);
+    await runtime.runPromise(reporting.investigated(first));
+    expect(await runtime.runPromise(reporting.investigations())).toEqual([]);
+    expect((await Effect.runPromise(store.read())).jobs).toBeUndefined();
+  } finally {
+    await runtime.dispose();
+  }
+});

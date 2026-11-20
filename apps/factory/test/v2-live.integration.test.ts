@@ -5934,7 +5934,38 @@ it('exposes live reconciliation and retains uncertainty after investigation stop
     await board.publish({ ...input, reconciliation: [] });
     expect(board.snapshot().meta.activity?.items).toEqual([]);
     expect(board.snapshot().meta.activity?.uncertainty.length).toBeGreaterThan(0);
-    await board.publish({ ...input, reconciliation: [], state: initial.state });
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const retained = parkedSnapshot(pullObservation(20), false).jobs[0];
+    if (retained.kind !== 'job' || retained.execution.kind !== 'found')
+      throw new Error('Missing managed job fixture');
+    const known = {
+      ...retained,
+      resume: undefined,
+      execution: { ...retained.execution, status: 'running' },
+      delivery: {
+        stage: 'implementation' as const,
+        commit: retained.intent.base,
+        ready: false,
+        landed: false,
+        active: true,
+      },
+    };
+    await board.publish({ ...input, reconciliation: [], jobs: [known] });
+    expect(board.snapshot().meta.activity?.items).toEqual([
+      expect.objectContaining({ category: 'implementing', issue: 1 }),
+    ]);
+    await board.publish({
+      ...input,
+      reconciliation: [],
+      jobs: [
+        {
+          ...known,
+          execution: { ...known.execution, status: 'completed' },
+          delivery: { ...known.delivery, active: false, ready: true },
+        },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
     expect(board.snapshot().meta.activity?.uncertainty).toEqual([]);
   } finally {
     await app.close();

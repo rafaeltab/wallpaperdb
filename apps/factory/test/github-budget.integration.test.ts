@@ -137,6 +137,80 @@ it('runs bounded parallel reads within a cycle and retains its next-cycle budget
     expect(reopened.cycleReady()).toBe(true);
   }));
 
+it('rechecks a refunded in-flight pagination estimate before granting the next quota turn', async () =>
+  withGithub(async (host, stop) => {
+    const startedAt = Date.UTC(2026, 10, 16, 12);
+    let now = startedAt;
+    let wake: (() => void) | undefined;
+    const clock = {
+      now: () => now,
+      wait: (delay: number, signal: AbortSignal) =>
+        new Promise<void>((resolve, reject) => {
+          const abort = () => reject(signal.reason);
+          signal.addEventListener('abort', abort, { once: true });
+          wake = () => {
+            signal.removeEventListener('abort', abort);
+            now += delay;
+            resolve();
+          };
+        }),
+    };
+    await host.nodeCommand(
+      'gh',
+      `
+      const fs = require('node:fs');
+      const directory = ${JSON.stringify(host.directory)};
+      const reset = ${startedAt / 1000 + 3600};
+      if (process.argv[3] === 'rate_limit') {
+        console.log(JSON.stringify({ resources: { core: { limit:5000, remaining:5000, reset } } }));
+      } else {
+        fs.writeFileSync(directory + '/pagination-started', 'ready');
+        const timer = setInterval(() => {
+          if (!fs.existsSync(directory + '/pagination-release')) return;
+          clearInterval(timer);
+          console.error('< HTTP/2.0 200');
+          console.error('< X-Ratelimit-Resource: core');
+          console.error('< X-Ratelimit-Limit: 5000');
+          console.error('< X-Ratelimit-Remaining: 4999');
+          console.error('< X-Ratelimit-Reset: ' + reset);
+          console.error('');
+          console.log('[]');
+        }, 10);
+      }
+    `
+    );
+    const requests = githubRequests({
+      project: host.repository,
+      directory: host.directory + '/state',
+      signal: stop.signal,
+      clock,
+    });
+    const pagination = requests(['api', 'repos/rafaeltab/wallpaperdb/issues', '--paginate']);
+    void pagination.catch(() => undefined);
+    await vi.waitFor(async () =>
+      expect(await readFile(host.directory + '/pagination-started', 'utf8')).toBe('ready')
+    );
+    let completed = false;
+    const turn = requests.waitForCycle(stop.signal).then(() => {
+      completed = true;
+    });
+    void turn.catch(() => undefined);
+    await vi.waitFor(() => expect(wake).toBeDefined());
+    await writeFile(host.directory + '/pagination-release', 'release');
+    await pagination;
+    for (let step = 0; step < 4 && !completed; step++) {
+      await vi.waitFor(() => expect(!!wake || completed).toBe(true));
+      const resume = wake;
+      wake = undefined;
+      resume?.();
+      await Promise.resolve();
+    }
+    expect(completed).toBe(true);
+    await turn;
+    expect(now - startedAt).toBeGreaterThanOrEqual(1440);
+    expect(now - startedAt).toBeLessThan(5000);
+  }));
+
 it.each([
   { firstAt: 15_000, secondAt: undefined, debtUntil: 26_000 },
   { firstAt: 5_000, secondAt: 12_500, debtUntil: 24_500 },

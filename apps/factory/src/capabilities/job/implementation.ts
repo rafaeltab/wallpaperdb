@@ -374,7 +374,9 @@ export const JobLive = Layer.effect(
         const investigateExecution = !investigationOwned && !executionKnown;
         const work = observeWork(intent, investigationOwned || investigateExecution);
         if (!investigateExecution) return yield* work;
-        const retained = yield* currentStage(store);
+        const control = yield* store.readControl();
+        const latest = yield* currentStage(store);
+        const retained = latest && latest.index >= (control.restart?.index ?? 0) ? latest : null;
         // A retained delivery identifies a responsibility; an uncertain initial
         // implementation launch still cannot establish implementation activity.
         const stage =

@@ -12,7 +12,7 @@
         "architecture:workspaces": "node scripts/check-architecture-workspaces.ts",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
-        "coverage:merge": "node scripts/merge-coverage.ts",
+        "coverage:merge": "make build PACKAGE=scripts && node scripts/dist/merge-coverage.mjs",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check-types": "tsc --project tsconfig.tooling.json",
         "lint": "biome lint test",

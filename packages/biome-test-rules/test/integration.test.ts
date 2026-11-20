@@ -194,6 +194,28 @@ function makeRuleTests(directory: string) {
 test("unit coverage combines with the CRAP TypeScript rule inventory", () => {
 	const directory = isolatedRepository();
 	try {
+		// Exercise the normal built coverage producer entirely within this fixture.
+		for (const file of [
+			".dockerignore",
+			"scripts/lib/coverage-validation.ts",
+			"scripts/coverage-build.mts",
+			"scripts/coverage-policy.mts",
+			"scripts/coverage-protocol.mts",
+			"scripts/coverage-sync-built.mts",
+			"scripts/merge-coverage.mts",
+			"scripts/tsconfig.coverage.json",
+			"scripts/operator-inbox.ts",
+			"infra/docker-compose.yml",
+			"packages/coverage-runtime/tsconfig.json",
+		]) {
+			mkdirSync(dirname(join(directory, file)), { recursive: true });
+			copyFileSync(join(repository, file), join(directory, file));
+		}
+		cpSync(
+			join(repository, "packages/coverage-runtime/src"),
+			join(directory, "packages/coverage-runtime/src"),
+			{ recursive: true },
+		);
 		const workspace = join(directory, "packages/biome-test-rules");
 		mkdirSync(join(workspace, "src"), { recursive: true });
 		mkdirSync(join(workspace, "test"));
@@ -234,8 +256,12 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		};
 		const runCollector = (mode: string) =>
 			spawnSync(
-				join(repository, "scripts/node_modules/.bin/tsx"),
-				[join(directory, "scripts/crap.mts"), mode],
+				"make",
+				[
+					mode === "report" ? "crap" : "check-crap",
+					"PACKAGE=biome-test-rules",
+					"CRAP_THRESHOLD=0",
+				],
 				{
 					cwd: directory,
 					encoding: "utf8",

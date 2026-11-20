@@ -1,3 +1,4 @@
+import { controlledBytes } from './fixtures/controlled-bytes.js';
 import { createHttpApp } from '../src/http/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { Availability } from '../src/capabilities/availability/index.js';
@@ -62,8 +63,9 @@ function fixture(
   let activeRevision = 'one';
   const confirmations: SourceConfirmation[] = [];
   const retirements: { sourceId: string; evidenceExpiresAt: string }[] = [];
-  const stored = new Map<string, Uint8Array>();
+  const bytes = controlledBytes();
   let prepare: () => Effect.Effect<void, SourceFailure> = () => Effect.void;
+  let uploadedDigest = '';
   let inspect: () => Effect.Effect<
     { kind: 'verified'; facts: SourceFacts } | { kind: 'rejected'; reason: string },
     SourceFailure
@@ -76,7 +78,7 @@ function fixture(
         model: 'sdr-png',
         mimeType: 'image/png',
         byteLength: 4,
-        digest: 'ignored',
+        digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
       },
     });
   let ambiguousCommit = false;
@@ -102,32 +104,27 @@ function fixture(
   const dependencies = Layer.mergeAll(
     Layer.succeed(SourceStore, store),
     Layer.succeed(SourceBytes, {
-      put: (id, bytes) =>
-        Effect.sync(() => {
-          stored.set(id, bytes);
-        }),
-      prepare: (candidateId, sourceId) =>
-        prepare().pipe(
-          Effect.andThen(
+      ...bytes,
+      put: (id, input, digest) =>
+        bytes.put(id, input, digest).pipe(
+          Effect.tap(() =>
             Effect.sync(() => {
-              const bytes = stored.get(candidateId);
-              if (!bytes) throw new Error('Missing candidate');
-              stored.set(sourceId, bytes);
+              uploadedDigest = digest;
             })
           )
         ),
-      read: (sourceId) =>
-        Effect.succeed({
-          bytes: (async function* () {
-            const bytes = stored.get(sourceId);
-            if (!bytes) throw new Error('Missing Source');
-            yield bytes;
-          })(),
-          close: () => Effect.void,
-          closed: Effect.void,
-        }),
+      prepare: (...args) => prepare().pipe(Effect.andThen(bytes.prepare(...args))),
     }),
-    Layer.succeed(MandatoryInspection, { inspect: () => inspect() })
+    Layer.succeed(MandatoryInspection, {
+      inspect: () =>
+        inspect().pipe(
+          Effect.map((result) =>
+            result.kind === 'verified'
+              ? { ...result, facts: { ...result.facts, digest: uploadedDigest } }
+              : result
+          )
+        ),
+    })
   );
   const runtimes = [
     ManagedRuntime.make(
@@ -293,7 +290,7 @@ describe('first Source admission decisions', () => {
               model: 'sdr-png',
               mimeType: 'image/png',
               byteLength: 4,
-              digest: 'ignored',
+              digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
             },
           };
         })
@@ -310,7 +307,7 @@ describe('first Source admission decisions', () => {
             model: 'sdr-png',
             mimeType: 'image/png',
             byteLength: 4,
-            digest: 'ignored',
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           },
         })
       );
@@ -424,7 +421,12 @@ describe('first Source admission decisions', () => {
       f.setInspect(() =>
         Effect.succeed({
           kind: 'verified',
-          facts: { ...facts, mimeType: 'image/png', byteLength: 4, digest: 'ignored' },
+          facts: {
+            ...facts,
+            mimeType: 'image/png',
+            byteLength: 4,
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
+          },
         })
       );
       expect(await upload(f, await create(f, 'one'))).toMatchObject({
@@ -487,7 +489,7 @@ it('includes the configured byte, displayed-axis and pixel boundaries without br
           width: 20000,
           height: 5000,
           byteLength: 4,
-          digest: 'ignored',
+          digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           model: 'sdr-png',
           mimeType: 'image/png',
         },
@@ -586,7 +588,7 @@ it.each([
             model: 'sdr-png',
             mimeType: 'image/png',
             byteLength: 4,
-            digest: 'ignored',
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           },
         })
       );
@@ -623,7 +625,7 @@ it('compares the full active set rather than chaining pairwise similar Sources',
           model: 'sdr-png',
           mimeType: 'image/png',
           byteLength: 4,
-          digest: 'ignored',
+          digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
         },
       })
     );
@@ -713,7 +715,7 @@ it.each(['count', 'ratio'])(
             model: 'sdr-png',
             mimeType: 'image/png',
             byteLength: 4,
-            digest: 'ignored',
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           },
         })
       );
@@ -787,7 +789,7 @@ it('recovers stopped additional inspection by same-digest replay while fencing c
           model: 'sdr-png',
           mimeType: 'image/png',
           byteLength: 4,
-          digest: 'ignored',
+          digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
         },
       })
     );
@@ -978,7 +980,7 @@ it.each([
             model: 'sdr-png',
             mimeType: 'image/png',
             byteLength: 4,
-            digest: 'ignored',
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           },
         })
       );
@@ -1101,7 +1103,7 @@ it.each(['ratio', 'count', 'operation', 'model'])(
             model: 'sdr-png',
             mimeType: 'image/png',
             byteLength: 4,
-            digest: 'ignored',
+            digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
           },
         })
       );
@@ -1335,7 +1337,7 @@ it('withdraws the first ratio constraint without restoring it through accepted r
     height: 1000,
     model: 'sdr-png',
     mimeType: 'image/png',
-    digest: 'ignored',
+    digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
     byteLength: 4,
   });
   try {
@@ -1422,7 +1424,7 @@ describe('canonical picture replacement', () => {
           model: 'sdr-webp',
           mimeType: 'image/webp',
           byteLength: 4,
-          digest: 'ignored',
+          digest: '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
         },
       })
     );
@@ -1617,12 +1619,10 @@ it.each(['rejected', 'cancelled'] as const)(
         .toEqual({ kind: 'rejected', reason: 'byte-digest-conflict' });
       const changed = await app.inject({ ...request, payload: Buffer.from([9, 8, 7]) });
       expect.soft(changed.statusCode).toBe(409);
-      expect
-        .soft(changed.json())
-        .toMatchObject({
-          status: 409,
-          type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/byte-digest-conflict.md',
-        });
+      expect.soft(changed.json()).toMatchObject({
+        status: 409,
+        type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/byte-digest-conflict.md',
+      });
       expect(await f.call((s) => s.status(owner, 'asset_one', id))).toEqual(outcome);
       expect(
         await f.call((s) =>

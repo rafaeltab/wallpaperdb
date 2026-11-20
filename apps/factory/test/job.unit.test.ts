@@ -15,6 +15,7 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
   const store = controlledStore();
   let launches = 0;
   let found = false;
+  let unavailable = false;
   let now = 1000;
   let sequence = 0;
   const investigations = new Map<string, { issue: number; startedAt: number }>();
@@ -68,20 +69,22 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
             expect([...investigations.values()]).toEqual([{ issue: 576, startedAt: now }]);
           }),
           () =>
-            Effect.flatMap(store.read(), (intent) =>
-              Effect.succeed(
-                found
-                  ? {
-                      kind: 'found' as const,
-                      threadId: 'thread-1',
-                      status: 'running',
-                      worktree: '/isolated',
-                      branch: intent?.branch ?? '',
-                      model: 'gpt-6.1-sol',
-                    }
-                  : { kind: 'absent' as const }
-              )
-            )
+            unavailable
+              ? Effect.fail(new Unavailable({ operation: 'controlled-observation', cause: null }))
+              : Effect.flatMap(store.read(), (intent) =>
+                  Effect.succeed(
+                    found
+                      ? {
+                          kind: 'found' as const,
+                          threadId: 'thread-1',
+                          status: 'running',
+                          worktree: '/isolated',
+                          branch: intent?.branch ?? '',
+                          model: 'gpt-6.1-sol',
+                        }
+                      : { kind: 'absent' as const }
+                  )
+                )
         ),
     })
   );
@@ -112,6 +115,14 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
   });
   expect(launches).toBe(1);
   expect(investigations.size).toBe(0);
+  const retained = await Effect.runPromise(store.read());
+  unavailable = true;
+  await expect(run(Effect.flatMap(Job, (job) => job.status()))).rejects.toMatchObject({
+    operation: 'controlled-observation',
+  });
+  expect(investigations.size).toBe(0);
+  expect(await Effect.runPromise(store.read())).toEqual(retained);
+  expect(launches).toBe(1);
 });
 
 it.each([false, true])(

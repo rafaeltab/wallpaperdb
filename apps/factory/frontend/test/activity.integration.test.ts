@@ -206,6 +206,61 @@ it('provides keyboard and hover details, live switching and approved D layout at
       '172px 172px'
     );
     await page.screenshot({ path: join(evidence, 'activity-desktop.png') });
+    const previousActivity = served;
+    served = {
+      ...idle,
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          items: [
+            {
+              id: 'launch-investigation:1',
+              category: 'recovering',
+              lifecycle: 'current',
+              issue: 1,
+              pullRequest: null,
+              startedAt: new Date(Date.now() - 6000).toISOString(),
+              reason: 'Establishing managed launch or resume outcome',
+            },
+          ],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Reconciling', { timeout: 5000 });
+    await browserExpect(
+      panel
+        .locator('.fa-row')
+        .filter({ hasText: 'Recovering' })
+        .getByRole('img', { name: 'Active', exact: true })
+    ).toBeVisible();
+    await page.screenshot({ path: join(evidence, 'activity-reconciling.png') });
+    served = {
+      ...idle,
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          uncertainty: ['Managed launch outcome remains unresolved.'],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Status unknown', { timeout: 5000 });
+    await page.screenshot({ path: join(evidence, 'activity-manual-uncertainty.png') });
+    served = {
+      ...served,
+      meta: {
+        ...served.meta,
+        activity: {
+          ...served.meta.activity!,
+          items: [implementing[0]],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Implementing 1 issue', { timeout: 5000 });
+    await page.screenshot({ path: join(evidence, 'activity-uncertainty-with-known-work.png') });
+    served = previousActivity;
+    await browserExpect(trigger).toContainText('Refreshing T3 information', { timeout: 5000 });
     const github = served;
     served = {
       ...github,

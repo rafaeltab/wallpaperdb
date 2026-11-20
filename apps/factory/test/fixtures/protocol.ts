@@ -728,7 +728,9 @@ export async function runProtocol(
         if (config.loseInitialReviewSend)
           throw new Error('Controlled lost initial review response');
         console.log('{}');
-      } else if (args[1] === 'list')
+      } else if (args[1] === 'list') {
+        if (args[2] !== '--project' || !args[3] || args[4] !== '--json' || args.length !== 5)
+          throw new Error('Expected t3 thread list --project <project-id> --json');
         console.log(
           JSON.stringify([
             ...(config.joinWriter ? [{ threadId: 'writer-C', title: 'Controlled writer' }] : []),
@@ -743,7 +745,7 @@ export async function runProtocol(
             ),
           ])
         );
-      else console.log(JSON.stringify(state));
+      } else console.log(JSON.stringify(state));
       process.exit(0);
     }
     if (

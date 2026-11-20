@@ -185,7 +185,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         JSON.parse(
           await command(
             config.binary,
-            ['thread', 'list', config.projectId, '--json'],
+            ['thread', 'list', '--project', config.projectId, '--json'],
             project,
             signal
           )

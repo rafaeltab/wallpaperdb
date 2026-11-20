@@ -649,6 +649,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       planningSafety,
       read: () =>
         Effect.all({
+          reconciliation: jobReporting.investigations?.() ?? Effect.succeed([]),
           executionCatalog: Effect.sync(() => executionCatalog),
           schedule: observations.schedule(),
           threads: threads.snapshot(),
@@ -660,6 +661,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           Effect.map(
             ({
               schedule,
+              reconciliation,
               threads,
               safety,
               executionCatalog,
@@ -668,6 +670,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               planningDiscovery,
             }) => ({
               planningVerification,
+              reconciliation,
               executionCatalog,
               ...schedule,
               planningDiscovery,

@@ -37,6 +37,20 @@ export const JobLive = Layer.effect(
     const policy = Option.getOrUndefined(yield* Effect.serviceOption(AgentReconciliationPolicy));
     const reporting = Option.getOrUndefined(yield* Effect.serviceOption(JobReporting));
     const continuation = Option.getOrUndefined(yield* Effect.serviceOption(ContinuationAdmission));
+    let executionKnown = false;
+    const investigate = <A, E, R>(
+      intent: Intent,
+      work: Effect.Effect<A, E, R>,
+      stage?: import('./contract.js').Stage
+    ) =>
+      Effect.gen(function* () {
+        const id = yield* reporting?.investigating?.(intent, stage) ?? Effect.succeed(undefined);
+        return yield* work.pipe(
+          Effect.ensuring(
+            id === undefined ? Effect.void : (reporting?.investigated?.(id) ?? Effect.void)
+          )
+        );
+      });
     const prepareLaunch = (intent: Intent) =>
       (
         execution.prepareLaunch?.(intent) ??
@@ -48,7 +62,7 @@ export const JobLive = Layer.effect(
       );
     const launchOwned = (intent: Intent, index: number, launch: ReturnType<Execution['launch']>) =>
       Effect.gen(function* () {
-        const result = yield* launch;
+        const result = yield* investigate(intent, launch);
         if (result.kind === 'submitted' && result.threadId) {
           // This records delivery ownership, never receipt acceptance.
           yield* retainInitialStage(store, intent, index, result.threadId);
@@ -103,6 +117,7 @@ export const JobLive = Layer.effect(
           const owningStage =
             latestStage && latestStage.index >= (before.restart?.index ?? 0) ? latestStage : null;
           const observation = yield* execution.observe(activeIntent, owningStage ?? undefined);
+          executionKnown = observation.kind === 'found';
           yield* retainQuestionClosure(store, observation);
           yield* retainAnswerWait(store, owningStage, observation);
           const owner = observation.kind === 'found' ? observation.threadId : owningStage?.threadId;
@@ -338,7 +353,15 @@ export const JobLive = Layer.effect(
             })
           )
         );
-      }).pipe(Effect.withSpan('factory.job.observe'));
+      }).pipe(
+        (work) => Effect.suspend(() => (executionKnown ? work : investigate(intent, work))),
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            executionKnown = false;
+          })
+        ),
+        Effect.withSpan('factory.job.observe')
+      );
     const resumeQuestion = (
       intent: Intent,
       command: Extract<import('./contract.js').Resume, { questionId: string }>
@@ -463,8 +486,10 @@ export const JobLive = Layer.effect(
               return { kind: 'rejected' as const };
             return yield* observe(intent);
           }
-          if ('runId' in command) return yield* retryStage(store, intent, command, observe);
-          return yield* resumeQuestion(intent, command);
+          const stage = (yield* currentStage(store))?.stage;
+          if ('runId' in command)
+            return yield* investigate(intent, retryStage(store, intent, command, observe), stage);
+          return yield* investigate(intent, resumeQuestion(intent, command), stage);
         }).pipe(Effect.withSpan('factory.job.resume')),
       cancel: (jobId) =>
         Effect.gen(function* () {

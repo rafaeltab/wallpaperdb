@@ -48,3 +48,5 @@ export type { ExecutionSettings, ExecutionCatalog, ObservedExecution } from './c
 export { supportsExecutionSettings } from './settings.js';
 
 export { answerRunCurrent } from './stages.js';
+
+export type { ExecutionInvestigation } from './contract.js';

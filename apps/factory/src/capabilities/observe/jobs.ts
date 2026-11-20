@@ -8,7 +8,21 @@ export const JobReportingLive = Layer.effect(
     const reporting = yield* Reporting;
     const time = yield* Time;
     let sequence = 0;
+    const investigations = new Map<string, import('../job/index.js').ExecutionInvestigation>();
+    let investigationSequence = 0;
     return {
+      investigating: (intent, stage) =>
+        Effect.gen(function* () {
+          const id = `execution-investigation:${intent.id}:${++investigationSequence}`;
+          const startedAt = yield* time.now();
+          investigations.set(id, { id, issue: intent.issue, startedAt, stage });
+          return id;
+        }),
+      investigated: (id) =>
+        Effect.sync(() => {
+          investigations.delete(id);
+        }),
+      investigations: () => Effect.sync(() => [...investigations.values()]),
       begin: reporting.begin,
       failed: (generation, intent, error) =>
         Effect.gen(function* () {

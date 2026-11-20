@@ -2241,7 +2241,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     };
   };
   const currentRestacks = async (dir: string) => {
-    if (await completed(dir)) return [];
+    const operation = await effective(dir);
+    // A job repair can withdraw readiness without restarting this restack responsibility.
+    if (operation && (await read(dir, completionName(operation)))) return [];
     const current = await recoveryStatus(dir);
     const result = [];
     for (const name of (await recordNames(dir)).filter((name) =>

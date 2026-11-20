@@ -120,9 +120,10 @@ function hasGainMapXmpDeclaration(payload: Buffer): boolean {
     (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
   );
   if (!xmp) return false;
+  // XML separators are ASCII; even Unicode whitespace can be a valid prefix character.
   const declarations = payload
     .toString('utf8')
-    .matchAll(/xmlns(?::[\w.-]+)?\s*=\s*(['"])([^'"]*)\1/g);
+    .matchAll(/xmlns(?::[^ \t\r\n"'<>:=/]+)?\s*=\s*(['"])([^'"]*)\1/g);
   for (const declaration of declarations) {
     const namespace = normalizeNamespaceCharacters(declaration[2] ?? '');
     if (

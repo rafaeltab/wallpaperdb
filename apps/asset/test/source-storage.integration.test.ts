@@ -120,43 +120,63 @@ it.each([
   ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/&#104;dr-gain-map/1.0/', 'rejected'],
   ['http://ns.adobe.com/xmp/extension/\0', 'http://ns.apple.com/HDRGainMap/1.0/', 'rejected'],
   ['http://ns.adobe.com/xap/1.0/\0', 'http://example.test/metadata/&#233;', 'verified'],
-])('classifies a JPEG XMP packet %s with namespace %s', async (header, namespace, expectedKind) => {
-  const s3 = tester.getS3();
-  const runtime = ManagedRuntime.make(
-    sourceStorageLayer({
-      endpoint: s3.endpoints.fromHost,
-      region: 'us-east-1',
-      accessKeyId: s3.options.accessKey,
-      secretAccessKey: s3.options.secretKey,
-      bucket: 'source-private',
-    })
-  );
-  const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
-    .jpeg()
-    .toBuffer();
-  const payload = Buffer.from(
-    `${header}<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:gain="${namespace}"/>`
-  );
-  const marker = Buffer.from([0xff, 0xe1, 0, 0]);
-  marker.writeUInt16BE(payload.length + 2, 2);
-  const bytes = Buffer.concat([jpeg.subarray(0, 2), marker, payload, jpeg.subarray(2)]);
-  const id = `candidate_xmp_${createHash('sha256').update(bytes).digest('hex')}`;
-  try {
-    await runtime.runPromise(
-      SourceBytes.use((storage) =>
-        storage.put(id, bytes, createHash('sha256').update(bytes).digest('hex'))
-      )
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0/', 'rejected', '映射'],
+  [
+    'http://ns.adobe.com/xap/1.0/\0',
+    'http://ns.adobe.com/hdr-gain-map/1.0/',
+    'rejected',
+    'a\u0301',
+  ],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/hdr-gain-map/1.0/', 'rejected', '𝒢'],
+  [
+    'http://ns.adobe.com/xap/1.0/\0',
+    'http://ns.adobe.com/hdr-gain-map/1.0/',
+    'rejected',
+    '\u1680gain',
+  ],
+  ['http://ns.adobe.com/xap/1.0/\0', 'http://example.test/metadata/', 'verified', '映射'],
+])(
+  'classifies a JPEG XMP packet %s with namespace %s',
+  async (header, namespace, expectedKind, prefix = 'gain') => {
+    const s3 = tester.getS3();
+    const runtime = ManagedRuntime.make(
+      sourceStorageLayer({
+        endpoint: s3.endpoints.fromHost,
+        region: 'us-east-1',
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'source-private',
+      })
     );
-    const inspected = await runtime.runPromise(
-      MandatoryInspection.use((inspector) => inspector.inspect(id, initialSourcePolicies.wallpaper))
+    const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+      .jpeg()
+      .toBuffer();
+    const payload = Buffer.from(
+      `${header}<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:${prefix}="${namespace}"/>`
     );
-    if (expectedKind === 'verified')
-      expect(inspected).toMatchObject({ kind: 'verified', facts: { model: 'sdr-jpeg' } });
-    else expect(inspected).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
-  } finally {
-    await runtime.dispose();
+    const marker = Buffer.from([0xff, 0xe1, 0, 0]);
+    marker.writeUInt16BE(payload.length + 2, 2);
+    const bytes = Buffer.concat([jpeg.subarray(0, 2), marker, payload, jpeg.subarray(2)]);
+    const id = `candidate_xmp_${createHash('sha256').update(bytes).digest('hex')}`;
+    try {
+      await runtime.runPromise(
+        SourceBytes.use((storage) =>
+          storage.put(id, bytes, createHash('sha256').update(bytes).digest('hex'))
+        )
+      );
+      const inspected = await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect(id, initialSourcePolicies.wallpaper)
+        )
+      );
+      if (expectedKind === 'verified')
+        expect(inspected).toMatchObject({ kind: 'verified', facts: { model: 'sdr-jpeg' } });
+      else expect(inspected).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
+    } finally {
+      await runtime.dispose();
+    }
   }
-});
+);
 it('keeps HDR, unknown, malformed cICP and APNG outside supported SDR PNG inspection', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

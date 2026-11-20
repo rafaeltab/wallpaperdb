@@ -665,6 +665,15 @@ it.each(['none', 'discovery', 'preparation'] as const)(
 it.each([false, true])('reports only model responsibility for automatic=%s', async (automatic) => {
   const { Time } = await import('../src/capabilities/job/index.js');
   let now = 1000;
+  let owner: import('../src/capabilities/plan/index.js').PlannerOwnership | undefined;
+  let enterPreparation!: () => void;
+  let releasePreparation!: () => void;
+  const preparing = new Promise<void>((resolve) => {
+    enterPreparation = resolve;
+  });
+  const preparation = new Promise<void>((resolve) => {
+    releasePreparation = resolve;
+  });
   let releaseModel!: (value: Proposal) => void;
   let enterModel!: () => void;
   const entered = new Promise<void>((resolve) => {
@@ -691,11 +700,21 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
             verify: () => Effect.succeed(undefined),
           }),
           Layer.succeed(IPlanner, {
-            ownership: () => Effect.succeed(undefined),
+            ownership: () => Effect.sync(() => owner),
             propose: () =>
-              Effect.promise(() => {
+              Effect.promise(async () => {
+                enterPreparation();
+                await preparation;
+                owner = {
+                  requestId: 'controlled-model',
+                  revision: 0,
+                  phase: 'running',
+                  modelHandedOffAt: now,
+                };
                 enterModel();
-                return model;
+                const result = await model;
+                owner = { ...owner, phase: 'succeeded' };
+                return result;
               }),
           })
         )
@@ -706,13 +725,17 @@ it.each([false, true])('reports only model responsibility for automatic=%s', asy
     const plan = await runtime.runPromise(Plan);
     if (!plan.activity) throw new Error('Missing planning activity read port');
     const work = runtime.runPromise(plan.preview({ automatic, progress: () => Effect.void }));
+    await preparing;
+    const beforeHandoff = await runtime.runPromise(plan.activity());
+    now = 2500;
+    releasePreparation();
     await entered;
-    expect(await runtime.runPromise(plan.activity())).toMatchObject({
-      current: { startedAt: 2000 },
-    });
+    const duringModel = await runtime.runPromise(plan.activity());
     now = 3000;
     releaseModel({ selected: [], deferred: [{ issue: 580, reason: 'No eligible work' }] });
     await work;
+    expect(beforeHandoff.current).toBeUndefined();
+    expect(duringModel.current).toEqual({ id: 'controlled-model', startedAt: 2500 });
     expect(await runtime.runPromise(plan.activity())).toMatchObject({
       assessment: { outcome: 'no-eligible', observedAt: 3000 },
     });

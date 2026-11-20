@@ -154,7 +154,6 @@ export const PlanLive = Layer.effect(
     const time = Option.getOrUndefined(yield* Effect.serviceOption(Time));
     const now = () => (time ? time.now() : Clock.currentTimeMillis);
     let activity: PlanningActivity = {};
-    let sequence = 0;
     let pending = false;
     let verification: { readonly startedAt: number } | null = null;
     return {
@@ -164,19 +163,17 @@ export const PlanLive = Layer.effect(
           // Retained model ownership also covers restart/reconciliation, without
           // launching or scanning providers. Its timestamp is the real handoff.
           const owner = yield* planner.ownership(false);
-          const matches = owner && (!activity.current || owner.requestId === activity.current.id);
           if (
-            matches &&
+            owner &&
             !owner.retired &&
             (owner.phase === 'running' || owner.phase === 'launch-intent')
           )
             return {
               current: {
                 id: owner.requestId,
-                startedAt: owner.modelHandedOffAt ?? activity.current?.startedAt,
+                startedAt: owner.modelHandedOffAt,
               },
             };
-          if (matches && activity.current) return {};
           return activity;
         }),
       preview: (attempt) =>
@@ -212,9 +209,6 @@ export const PlanLive = Layer.effect(
               };
             if (attempt) yield* attempt.progress('handoff');
             const startedAt = yield* now();
-            activity = {
-              current: { id: attempt?.requestId ?? `planning:${++sequence}`, startedAt },
-            };
             const propose = (prepared?: Effect.Effect<void>) =>
               planner.propose(input, {
                 requestId: attempt?.requestId,

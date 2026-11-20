@@ -4543,3 +4543,157 @@ it.each([0, 2])(
     }
   }
 );
+
+it('translates initial gathering, completion and failure independently of routine refresh', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: false,
+    planningDiscovery: { current: [{ id: 'gather-1', startedAt: 500 }], outcome: 'unknown' },
+    observations: {
+      state: 'current',
+      stale: false,
+      observedAt: 800,
+      facts: { issues: [], pullRequests: [] },
+    },
+  };
+  const board = await liveBoard({ scopeId: 'gathering-http', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(activity?.items).toEqual([
+      {
+        id: 'gather-1',
+        category: 'gathering-planning-context',
+        lifecycle: 'current',
+        startedAt: '1970-01-01T00:00:00.500Z',
+        issue: null,
+        pullRequest: null,
+        reason: 'Collecting initial planning inputs',
+      },
+    ]);
+    expect(activity?.coverage.find((c) => c.category === 'gathering-planning-context')?.state).toBe(
+      'complete'
+    );
+    expect(activity?.admissionReasons.map((r) => r.code)).not.toContain('no-ready-matches');
+    await board.publish({
+      ...input,
+      planningDiscovery: { current: [], outcome: 'no-ready-matches', completedAt: 900 },
+    });
+    const complete = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(complete?.items).toEqual([]);
+    expect(complete?.admissionReasons.map((r) => r.code)).toContain('no-ready-matches');
+    expect(complete?.admissionReasons.map((r) => r.code)).toContain('eligibility-unknown');
+    await board.publish({
+      ...input,
+      planningDiscovery: { current: [], outcome: 'unknown', failedAt: 950 },
+    });
+    const failed = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(failed?.items).toEqual([]);
+    expect(failed?.admissionReasons.map((r) => r.code)).not.toContain('no-ready-matches');
+    expect(failed?.admissionReasons.map((r) => r.code)).toContain('eligibility-unknown');
+    await board.publish({ ...input, planningDiscovery: { current: [], outcome: 'unknown' } });
+    const unattempted = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(unattempted?.admissionReasons.map((r) => r.code)).toContain('no-ready-matches');
+  } finally {
+    board.close();
+    await app.close();
+  }
+});
+
+it.each([
+  {
+    name: 'newer ready candidate',
+    observedAt: 2000,
+    candidate: true,
+    open: true,
+    stale: false,
+    error: undefined,
+    expected: false,
+  },
+  {
+    name: 'older ready candidate',
+    observedAt: 500,
+    candidate: true,
+    open: true,
+    stale: false,
+    error: undefined,
+    expected: true,
+  },
+  {
+    name: 'newer closed candidate',
+    observedAt: 2000,
+    candidate: true,
+    open: false,
+    stale: false,
+    error: undefined,
+    expected: true,
+  },
+  {
+    name: 'newer context-only issue',
+    observedAt: 2000,
+    candidate: false,
+    open: true,
+    stale: false,
+    error: undefined,
+    expected: true,
+  },
+  {
+    name: 'stale but newer candidate evidence',
+    observedAt: 2000,
+    candidate: true,
+    open: true,
+    stale: true,
+    error: undefined,
+    expected: false,
+  },
+  {
+    name: 'failed refresh retaining newer candidate evidence',
+    observedAt: 2000,
+    candidate: true,
+    open: true,
+    stale: false,
+    error: 'offline',
+    expected: false,
+  },
+])(
+  'reconciles empty initial discovery with $name without inferring eligibility',
+  async (scenario) => {
+    const { issueObservation } = await import('./fixtures/v2.js');
+    const input: ScheduleSnapshot = {
+      ...initial,
+      coordinationIdle: true,
+      planningDiscovery: { current: [], outcome: 'no-ready-matches', completedAt: 1000 },
+      observations: {
+        state: 'current',
+        stale: false,
+        observedAt: 500,
+        facts: { issues: [], pullRequests: [] },
+      },
+    };
+    const board = await liveBoard({ scopeId: 'discovery-newer-evidence', initial: input });
+    try {
+      expect(board.snapshot().meta.activity?.admissionReasons.map((r) => r.code)).toContain(
+        'no-ready-matches'
+      );
+      await board.publish({
+        ...input,
+        observations: {
+          state: scenario.error ? 'error' : 'current',
+          stale: scenario.stale,
+          error: scenario.error,
+          observedAt: scenario.observedAt,
+          facts: {
+            issues: [issueObservation(725, { open: scenario.open, candidate: scenario.candidate })],
+            pullRequests: [],
+          },
+        },
+      });
+      const codes = board.snapshot().meta.activity?.admissionReasons.map((r) => r.code);
+      expect(codes?.includes('no-ready-matches')).toBe(scenario.expected);
+      expect(codes).toContain('eligibility-unknown');
+      expect(codes).not.toContain('planner-no-eligible');
+    } finally {
+      board.close();
+    }
+  }
+);

@@ -120,3 +120,28 @@ it('selects each category ahead of every lower priority category', () => {
     expect(activityView({ ...facts, items }, 0).summary).toBe(labels[index]);
   });
 });
+
+it('keeps gathering above freshness and times the newest current collection locally', () => {
+  const item = {
+    id: 'gather',
+    category: 'gathering-planning-context',
+    lifecycle: 'current',
+    issue: null,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:59:00Z',
+    reason: 'Collecting',
+  } as const;
+  const view = activityView(
+    { ...facts, items: [item, { ...item, id: 'fresh', category: 'checking-plan-freshness' }] },
+    0
+  );
+  expect(view.summary).toBe('Gathering planning context');
+  expect(view.selected?.count).toBe(1);
+  expect(
+    activityDuration(view.selected?.startedAt ?? null, Date.parse('2026-11-17T12:00:01Z'))
+  ).toBe('1m 1s');
+  expect(
+    activityView({ ...facts, items: [item, { ...item, id: 'plan', category: 'planning' }] }, 0)
+      .summary
+  ).toBe('Planning');
+});

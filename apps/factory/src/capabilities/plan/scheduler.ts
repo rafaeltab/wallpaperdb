@@ -12,6 +12,7 @@ import {
   Plan,
   IPlanner,
   PlanningSource,
+  PlanningDiscovery,
   ScheduleStore,
   ScheduleObservations,
   JobPool,
@@ -67,6 +68,7 @@ export const SchedulerLive = Layer.effect(
     const planner = Option.getOrUndefined(yield* Effect.serviceOption(IPlanner));
     const issues = yield* Issues;
     const source = yield* PlanningSource;
+    const discovery = Option.getOrUndefined(yield* Effect.serviceOption(PlanningDiscovery));
     const time = yield* Time;
     const planningSafety = yield* PlanningSafety;
     const executionConfiguration = Option.getOrUndefined(
@@ -427,7 +429,7 @@ export const SchedulerLive = Layer.effect(
         let gathered: PlanningInput | undefined;
         if (!cycle) {
           const gatheredAt = yield* time.now();
-          const input = yield* source.poll?.() ?? source.read();
+          const input = yield* discovery?.poll() ?? source.poll?.() ?? source.read();
           if (!input || !hasFrontier(input, snapshot.state)) return snapshot;
           const signature = planningInputIdentity({ ...input, scheduleRevision: undefined });
           if (signature === lastInput) return snapshot;

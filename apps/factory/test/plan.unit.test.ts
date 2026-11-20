@@ -1,10 +1,12 @@
-import { Effect, Layer, ManagedRuntime, Option } from 'effect';
+import { Effect, Layer, ManagedRuntime, Option, Deferred } from 'effect';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
-import type { Unavailable } from '../src/capabilities/job/index.js';
+import { Time, Unavailable } from '../src/capabilities/job/index.js';
 import { expect, it } from 'vitest';
 import {
   Plan,
   PlanLive,
+  PlanningDiscovery,
+  PlanningDiscoveryLive,
   PlanningSource,
   IPlanner,
   ScheduleStore,
@@ -431,3 +433,81 @@ it('requires verification of every inclusion and retains no executable subset of
     reason: 'Included PR is not independently reviewed',
   });
 });
+
+it.each(['none', 'discovery', 'preparation'] as const)(
+  'reports actual initial gathering and clears it before the model, failure=%s',
+  async (fail) => {
+    let now = 1000;
+    const gate = Deferred.makeUnsafe<void>();
+    const entered = Deferred.makeUnsafe<void>();
+    const input: PlanningInput = {
+      issues: [issue],
+      job: { kind: 'empty' },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    let modelCalls = 0;
+    let discovery: PlanningDiscovery;
+    const deps = Layer.mergeAll(
+      Layer.succeed(Time, { now: () => Effect.sync(() => now) }),
+      Layer.succeed(PlanningSource, {
+        verify: () => Effect.succeed(undefined),
+        read: () =>
+          Effect.gen(function* () {
+            yield* Deferred.succeed(entered, undefined);
+            yield* Deferred.await(gate);
+            if (fail === 'discovery')
+              return yield* Effect.fail(
+                new Unavailable({ operation: 'discovery-offline', cause: null })
+              );
+            return input;
+          }),
+      }),
+      Layer.succeed(IPlanner, {
+        ownership: () => Effect.succeed(undefined),
+        propose: (_input, attempt) =>
+          Effect.gen(function* () {
+            modelCalls++;
+            expect((yield* discovery.snapshot()).current).toEqual([
+              { id: 'planning-preparation:2', startedAt: 5000 },
+            ]);
+            if (fail === 'preparation')
+              return yield* Effect.fail(
+                new Unavailable({ operation: 'preparation-offline', cause: null })
+              );
+            yield* attempt?.prepared ?? Effect.void;
+            const facts = yield* discovery.snapshot();
+            expect(facts.current).toEqual([]);
+            expect(facts.completedAt).toBe(5000);
+            return proposal;
+          }),
+      })
+    );
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(Layer.provideMerge(PlanningDiscoveryLive.pipe(Layer.provideMerge(deps))))
+    );
+    try {
+      discovery = await runtime.runPromise(PlanningDiscovery);
+      const pending = runtime.runPromise(
+        Effect.flatMap(Plan, (p) => p.preview()).pipe(Effect.result)
+      );
+      await runtime.runPromise(Deferred.await(entered));
+      now = 5000;
+      const facts = await runtime.runPromise(
+        Effect.flatMap(PlanningDiscovery, (d) => d.snapshot())
+      );
+      expect(facts.current).toEqual([{ id: 'planning-discovery:1', startedAt: 1000 }]);
+      await runtime.runPromise(Deferred.succeed(gate, undefined));
+      const result = await pending;
+      expect(result._tag).toBe(fail === 'none' ? 'Success' : 'Failure');
+      expect(modelCalls).toBe(fail === 'discovery' ? 0 : 1);
+      const finished = await runtime.runPromise(
+        Effect.flatMap(PlanningDiscovery, (d) => d.snapshot())
+      );
+      expect(finished.current).toEqual([]);
+      expect(finished.outcome).toBe(fail === 'none' ? 'ready-matches' : 'unknown');
+      expect(fail === 'none' ? finished.completedAt : finished.failedAt).toBe(5000);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

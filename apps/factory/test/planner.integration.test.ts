@@ -28,6 +28,10 @@ it('allows a fresh planner request after capabilities fail before a launch is se
     job: { kind: 'empty' as const },
     capacity: { concurrency: 1, admission: 1 },
   };
+  let handoffs = 0;
+  const prepared = Effect.sync(() => {
+    handoffs++;
+  });
   try {
     await host.save({
       planner: { proposal: { selected: [], deferred: [] } },
@@ -39,18 +43,22 @@ it('allows a fresh planner request after capabilities fail before a launch is se
       },
     });
     await expect(
-      Effect.runPromise(t3Planner(config).propose(input, { requestId: 'preflight-failed' }))
+      Effect.runPromise(
+        t3Planner(config).propose(input, { requestId: 'preflight-failed', prepared })
+      )
     ).rejects.toMatchObject({ _tag: 'Unavailable' });
     expect((await host.calls()).filter((call) => call.args[1] === 't3_thread_launch')).toHaveLength(
       0
     );
+    expect(handoffs).toBe(0);
     expect(await Effect.runPromise(t3Planner(config).ownership(false))).toBeUndefined();
     await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
     expect(
       await Effect.runPromise(
-        t3Planner(config).propose(input, { requestId: 'preflight-recovered' })
+        t3Planner(config).propose(input, { requestId: 'preflight-recovered', prepared })
       )
     ).toEqual({ selected: [], deferred: [] });
+    expect(handoffs).toBe(1);
     expect((await host.calls()).filter((call) => call.args[1] === 't3_thread_launch')).toHaveLength(
       1
     );
@@ -652,7 +660,14 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
       job: { kind: 'empty' as const },
       capacity: { concurrency: 1, admission: 1 },
     };
-    const attempt = { requestId: 'same-attempt', deadline: Date.now() + 60000 };
+    let handoffs = 0;
+    const attempt = {
+      requestId: 'same-attempt',
+      deadline: Date.now() + 60000,
+      prepared: Effect.sync(() => {
+        handoffs++;
+      }),
+    };
     await host.save({ planner: { proposal: { selected: [], deferred: [] } } });
     expect(await Effect.runPromise(t3Planner(config).propose(input, attempt))).toEqual({
       selected: [],
@@ -669,6 +684,7 @@ it('replays the same retired bound proposal across the proposal-to-freshness cra
       selected: [],
       deferred: [],
     });
+    expect(handoffs).toBe(2);
     expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
     await expect(
       Effect.runPromise(t3Planner(config).propose({ ...input, paused: true }, attempt))
@@ -708,7 +724,14 @@ it.each([
         job: { kind: 'empty' as const },
         capacity: { concurrency: 1, admission: 1 },
       };
-      const attempt = { requestId: 'resuming-same-attempt', deadline: Date.now() + 60000 },
+      let handoffs = 0;
+      const attempt = {
+          requestId: 'resuming-same-attempt',
+          deadline: Date.now() + 60000,
+          prepared: Effect.sync(() => {
+            handoffs++;
+          }),
+        },
         run = { threadId: 'planner-thread', runId: 'planner-run' },
         proposal = { selected: [], deferred: [] };
       await plannerState(config.stateDirectory).save({
@@ -744,6 +767,7 @@ it.each([
         (error: unknown) => ({ error })
       );
       pending.push(resumed);
+      await vi.waitFor(() => expect(handoffs).toBe(1), { timeout: 2000, interval: 20 });
       expect(await Effect.runPromise(adapter.ownership(false, attempt.requestId))).toMatchObject({
         requestId: attempt.requestId,
         deadline: attempt.deadline,

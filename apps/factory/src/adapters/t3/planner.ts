@@ -422,6 +422,11 @@ export function t3Planner(config: {
           if (busy) throw new Error('Planner request already in progress');
           busy = true;
           try {
+            const previous = attempt?.prepared ? await journal.read() : undefined;
+            // Acquisition already ended for this bound request, even if background
+            // reconciliation must settle before we can observe its result.
+            if (previous?.run && previous.requestId === attempt?.requestId && attempt?.prepared)
+              await Effect.runPromise(attempt.prepared);
             await waitForReconciliation(signal);
             const recovered = await recover(input, signal, attempt?.requestId);
             if (recovered) return recovered;
@@ -463,6 +468,7 @@ export function t3Planner(config: {
               execution,
               signal
             );
+            if (attempt?.prepared) await Effect.runPromise(attempt.prepared);
             const handedOffAt = Date.now();
             const intent = await journal.save({
               revision: (current?.revision ?? -1) + 1,

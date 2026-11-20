@@ -52,6 +52,8 @@ import {
   AttemptsLive,
   AttemptStore,
   PlanLive,
+  PlanningDiscovery,
+  PlanningDiscoveryLive,
   PlanningSource,
   IPlanner,
   Scheduler,
@@ -544,7 +546,11 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       SchedulerLive.pipe(
         Layer.provideMerge(
           AttemptsLive.pipe(
-            Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(planningDeps))),
+            Layer.provideMerge(
+              PlanLive.pipe(
+                Layer.provideMerge(PlanningDiscoveryLive.pipe(Layer.provideMerge(planningDeps)))
+              )
+            ),
             Layer.provide(
               Layer.succeed(AttemptStore, sqliteAttemptStore(configuration.FACTORY_STATE))
             )
@@ -559,6 +565,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     );
     startupCleanup.push(() => runtime.dispose());
     const scheduler = await runtime.runPromise(Scheduler);
+    const discovery = await runtime.runPromise(PlanningDiscovery);
     const planningSafety = await runtime.runPromise(PlanningSafety);
     recoveryAdmission = scheduler.authorizeRecovery;
     const job: Job = {
@@ -645,19 +652,30 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           threads: threads.snapshot(),
           safety: planningSafety.status(),
           planningOwner: planner.ownership(false),
+          planningDiscovery: discovery.snapshot(),
         }).pipe(
-          Effect.map(({ schedule, threads, safety, executionCatalog, planningOwner }) => ({
-            executionCatalog,
-            ...schedule,
-            coordinationIdle:
-              !observing &&
-              !recoveringPlanner &&
-              attempts.isIdle() &&
-              (!planningOwner || planningOwner.retired === true),
-            state: safety.schedule,
-            planningSafety: safety.planning,
-            threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
-          }))
+          Effect.map(
+            ({
+              schedule,
+              threads,
+              safety,
+              executionCatalog,
+              planningOwner,
+              planningDiscovery,
+            }) => ({
+              executionCatalog,
+              ...schedule,
+              planningDiscovery,
+              coordinationIdle:
+                !observing &&
+                !recoveringPlanner &&
+                attempts.isIdle() &&
+                (!planningOwner || planningOwner.retired === true),
+              state: safety.schedule,
+              planningSafety: safety.planning,
+              threads: { ...threads, browserOrigin: configuration.FACTORY_T3_CONNECT_ORIGIN },
+            })
+          )
         ),
       submitPlan: (parent) => attempts.submit(parent),
       observePlan: async (id) => (await attempts.observe(id))?.launch,

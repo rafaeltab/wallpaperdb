@@ -4,6 +4,8 @@ import { Effect, Layer, ManagedRuntime, Deferred } from 'effect';
 import { expect, it } from 'vitest';
 import {
   PlanLive,
+  PlanningDiscovery,
+  PlanningDiscoveryLive,
   Plan,
   PlanningSource,
   IPlanner,
@@ -175,6 +177,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
           }),
   };
   const deps = Layer.mergeAll(
+    Layer.succeed(Time, { now: () => Effect.succeed(1234) }),
     Layer.succeed(ExecutionConfiguration, {
       catalog: () =>
         Effect.succeed({
@@ -247,6 +250,7 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
         Effect.gen(function* () {
           const retained = attempt?.requestId ? proposals.get(attempt.requestId) : undefined;
           if (retained) return retained;
+          yield* attempt?.prepared ?? Effect.void;
           hooks?.propose(attempt?.deadline);
           duringPlan?.();
           yield* planGate;
@@ -278,11 +282,12 @@ function fixture(hooks?: { read: () => void; propose: (deadline?: number) => voi
         }),
     })
   );
+  const discoveryDeps = PlanningDiscoveryLive.pipe(Layer.provideMerge(deps));
   const layers = SchedulerLive.pipe(
     Layer.provide(controlledPlanningSafetyLayer),
     Layer.provide(Layer.succeed(Time, { now: () => Effect.succeed(0) })),
-    Layer.provideMerge(PlanLive.pipe(Layer.provide(deps))),
-    Layer.provide(deps)
+    Layer.provideMerge(PlanLive.pipe(Layer.provideMerge(discoveryDeps))),
+    Layer.provide(discoveryDeps)
   );
   let runtime = ManagedRuntime.make(layers);
   return {
@@ -1559,6 +1564,53 @@ it('uses the verification revision rather than newer informational control when 
     expect(result.jobs[0]).toMatchObject({
       delivery: { activity: 'continuation-pending', active: true },
     });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('reports automatic initial acquisition before planning and distinguishes empty discovery from failures', async () => {
+  const f = fixture();
+  try {
+    const discovery = await f.runtime.runPromise(PlanningDiscovery);
+    f.setIssues([]);
+    await f.run((s) =>
+      s.configure({ paused: false, concurrency: 1, allowance: 3, revision: f.snapshot().revision })
+    );
+    await f.run((s) => s.tick(base));
+    expect(await f.runtime.runPromise(discovery.snapshot())).toMatchObject({
+      current: [],
+      outcome: 'no-ready-matches',
+      completedAt: 1234,
+    });
+    f.failDiscovery();
+    await expect(f.run((s) => s.tick(base))).rejects.toBeDefined();
+    expect(await f.runtime.runPromise(discovery.snapshot())).toMatchObject({
+      current: [],
+      outcome: 'unknown',
+      failedAt: 1234,
+    });
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('exposes automatic gathering during acquisition and ends it at model handoff', async () => {
+  const observed: number[] = [];
+  const f = fixture({
+    read: () =>
+      observed.push(
+        f.runtime.runSync(Effect.flatMap(PlanningDiscovery, (d) => d.snapshot())).current.length
+      ),
+    propose: () =>
+      expect(
+        f.runtime.runSync(Effect.flatMap(PlanningDiscovery, (d) => d.snapshot())).current
+      ).toEqual([]),
+  });
+  try {
+    await f.run((s) => s.configure({ paused: false, concurrency: 1, allowance: 1, revision: -1 }));
+    await f.run((s) => s.tick(base));
+    expect(observed).toEqual([1]);
   } finally {
     await f.runtime.dispose();
   }

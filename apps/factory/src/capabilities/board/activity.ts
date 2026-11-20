@@ -84,7 +84,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       control?.cancelled ||
       control?.released ||
       control?.retirement ||
-      control?.parked ||
+      (control?.parked !== undefined && control.parked.index === job.stageIndex) ||
       control?.dependencyRecovery ||
       delivery?.stage !== 'publication' ||
       delivery.ready ||

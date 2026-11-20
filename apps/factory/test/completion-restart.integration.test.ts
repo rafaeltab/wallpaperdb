@@ -6,6 +6,30 @@ import { expect, it } from 'vitest';
 import { fileStore, fileScheduleStore } from '../src/adapters/store/index.js';
 import { completionFixture } from './fixtures/completion.js';
 
+it.each([undefined, 1000])(
+  'persists retirement run identity independently of observed timing metadata: %s',
+  async (runStartedAt) => {
+    const directory = await mkdtemp(join(tmpdir(), 'factory-run-metadata-'));
+    const f = await completionFixture(0, fileStore(directory));
+    try {
+      f.state({
+        idle: true,
+        observationStatus: 'completed',
+        landed: true,
+        run: 2,
+        runStartedAt,
+      });
+      const status = await f.status();
+      expect(status).toMatchObject({ delivery: { landed: true } });
+      const control = await Effect.runPromise(fileStore(directory).readControl());
+      expect(control.retirement?.execution.run).toEqual({ id: 'run-2', ordinal: 2 });
+    } finally {
+      await f.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 it.each([
   { status: 'completed', landed: true, active: false, releases: [757] },
   { status: 'running', landed: false, active: true, releases: [] },

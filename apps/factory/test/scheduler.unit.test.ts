@@ -883,6 +883,33 @@ it('prepares a divergent join before reserving E and launches only from its veri
   }
 });
 
+it('starts an independent selection while retaining a blocked preparation across restart', async () => {
+  const f = fixture();
+  let plans = 0;
+  f.duringPlan(() => plans++);
+  f.setIssues([
+    { ...issue(5), blockers: [3, 4], blockersReady: false, joinRequired: true },
+    issue(6),
+  ]);
+  try {
+    await f.run((s) => s.configure({ revision: -1, concurrency: 2, allowance: 3, paused: false }));
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([6]);
+    expect(f.snapshot().admissions.map((a) => a.issue)).toEqual([6]);
+    expect(f.snapshot().cycle?.selected?.map((item) => item.issue)).toEqual([5, 6]);
+    await f.reopen();
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([6]);
+    f.prepareSucceeds();
+    await f.run((s) => s.tick(base));
+    expect(f.launches).toEqual([6, 5]);
+    expect(f.snapshot().cycle).toBeUndefined();
+    expect(plans).toBe(1);
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
 it('retries selected join preparation without asking the advisory planner again for unchanged input', async () => {
   const f = fixture();
   let plans = 0;

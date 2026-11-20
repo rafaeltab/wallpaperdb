@@ -3,6 +3,7 @@ import { Unavailable, type Status } from '../job/index.js';
 import {
   Plan,
   PlanningSource,
+  PlanningDiscovery,
   IPlanner,
   ScheduleStore,
   type PlanningInput,
@@ -146,6 +147,7 @@ export const PlanLive = Layer.effect(
   Plan,
   Effect.gen(function* () {
     const source = yield* PlanningSource;
+    const discovery = Option.getOrUndefined(yield* Effect.serviceOption(PlanningDiscovery));
     const planner = yield* IPlanner;
     const store = Option.getOrUndefined(yield* Effect.serviceOption(ScheduleStore));
     let pending = false;
@@ -157,7 +159,7 @@ export const PlanLive = Layer.effect(
           pending = true;
           return yield* Effect.gen(function* () {
             if (attempt) yield* attempt.progress('discovery');
-            const observed = attempt?.input ?? (yield* source.read());
+            const observed = attempt?.input ?? (yield* (discovery ?? source).read());
             const input = boundedInput({
               ...observed,
               maximumSelections: attempt?.maximumSelections ?? observed.maximumSelections,
@@ -181,11 +183,14 @@ export const PlanLive = Layer.effect(
                 input,
               };
             if (attempt) yield* attempt.progress('handoff');
-            const proposal = yield* planner.propose(input, {
-              requestId: attempt?.requestId,
-              automatic: attempt?.automatic,
-              attemptStartedAt: attempt?.attemptStartedAt,
-            });
+            const propose = (prepared?: Effect.Effect<void>) =>
+              planner.propose(input, {
+                requestId: attempt?.requestId,
+                automatic: attempt?.automatic,
+                attemptStartedAt: attempt?.attemptStartedAt,
+                prepared,
+              });
+            const proposal = yield* discovery ? discovery.prepare(propose) : propose();
             if ('kind' in proposal) {
               if (proposal.kind === 'paused')
                 return { kind: 'paused' as const, selected: [], rejected: [], input };

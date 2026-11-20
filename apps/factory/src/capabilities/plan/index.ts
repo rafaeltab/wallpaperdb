@@ -24,3 +24,7 @@ export type {
   PlanningSafetySnapshot,
 } from './safety-contract.js';
 export { PlanningSafetyLive } from './safety.js';
+
+export { PlanningDiscovery } from './contract.js';
+export type { PlanningDiscoveryFacts } from './contract.js';
+export { PlanningDiscoveryLive } from './discovery.js';

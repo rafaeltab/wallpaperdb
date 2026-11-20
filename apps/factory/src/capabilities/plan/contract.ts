@@ -96,6 +96,8 @@ export interface IPlanner {
       requestId?: string;
       deadline?: number;
       automatic?: boolean;
+      /** Ends pre-model input acquisition immediately before launch intent. */
+      prepared?: Effect.Effect<void>;
       attemptStartedAt?: number;
     }
   ): Effect.Effect<Proposal | { readonly kind: 'paused' | 'stale' }, Unavailable>;
@@ -314,3 +316,22 @@ export type AttemptSubmission =
   | { kind: 'busy'; id: string }
   | { kind: 'conflict' }
   | { kind: 'blocked'; requestId: string; reason: 'outstanding' | 'reconciliation-required' };
+
+export interface PlanningDiscoveryFacts {
+  readonly current: readonly { readonly id: string; readonly startedAt: number }[];
+  readonly outcome: 'unknown' | 'no-ready-matches' | 'ready-matches';
+  readonly completedAt?: number;
+  readonly failedAt?: number;
+}
+/** Initial acquisition only. Freshness verification continues to use PlanningSource directly. */
+export interface PlanningDiscovery {
+  read(): Effect.Effect<PlanningInput, Unavailable>;
+  poll(): Effect.Effect<PlanningInput | undefined, Unavailable>;
+  prepare<A>(
+    work: (prepared: Effect.Effect<void>) => Effect.Effect<A, Unavailable>
+  ): Effect.Effect<A, Unavailable>;
+  snapshot(): Effect.Effect<PlanningDiscoveryFacts>;
+}
+export const PlanningDiscovery = Context.Service<PlanningDiscovery>(
+  'wallpaperdb.factory.PlanningDiscovery'
+);

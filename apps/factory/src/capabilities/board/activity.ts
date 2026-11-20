@@ -121,6 +121,16 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       startedAt: timestamp(source.startedAt),
       reason: 'Reading repository and managed PR metadata',
     });
+  for (const item of input.planningDiscovery?.current ?? [])
+    items.push({
+      id: item.id,
+      category: 'gathering-planning-context',
+      lifecycle: 'current',
+      issue: null,
+      pullRequest: null,
+      startedAt: timestamp(item.startedAt),
+      reason: 'Collecting initial planning inputs',
+    });
   if (input.threads?.refreshActive === true && input.threads.startedAt !== undefined)
     items.push({
       id: `t3-refresh:${input.threads.startedAt}`,
@@ -138,11 +148,22 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
   if (input.state.allowance !== -1 && input.state.admissions.length >= input.state.allowance)
     reasons.push({ code: 'allowance-exhausted', message: 'Admission allowance exhausted' });
   if (
-    source.facts &&
-    source.observedAt !== undefined &&
-    !source.stale &&
-    !source.error &&
-    !source.facts.issues.some((i) => i.open && i.candidate)
+    input.planningDiscovery &&
+    (input.planningDiscovery.current.length > 0 ||
+      input.planningDiscovery.completedAt !== undefined ||
+      input.planningDiscovery.failedAt !== undefined)
+      ? input.planningDiscovery.outcome === 'no-ready-matches' &&
+        !input.planningDiscovery.current.length &&
+        !(
+          source.observedAt !== undefined &&
+          source.observedAt > (input.planningDiscovery.completedAt ?? Infinity) &&
+          source.facts?.issues.some((issue) => issue.open && issue.candidate)
+        )
+      : source.facts &&
+        source.observedAt !== undefined &&
+        !source.stale &&
+        !source.error &&
+        !source.facts.issues.some((i) => i.open && i.candidate)
   )
     reasons.push({ code: 'no-ready-matches', message: 'No ready-filter matches' });
   // Candidate discovery alone cannot establish a planner assessment.
@@ -154,7 +175,8 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     admissionReasons: reasons,
     coverage: categories.map((category) => {
       const complete =
-        category === 'refreshing-github' || category === 'refreshing-t3' || category === 'publishing' || !uncertainty.length;
+        category === 'refreshing-github' || category === 'refreshing-t3' || category === 'publishing' ||
+        (category === 'gathering-planning-context' && !!input.planningDiscovery) || !uncertainty.length;
       return {
         category,
         state: complete ? 'complete' : 'unknown',

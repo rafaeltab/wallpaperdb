@@ -109,19 +109,19 @@ it('provides keyboard and hover details, live switching and approved D layout at
           ...activity,
           items: [
             {
-              id: 'github:live',
-              category: 'refreshing-github',
+              id: 'gathering:live',
+              category: 'gathering-planning-context',
               lifecycle: 'current',
               startedAt: new Date(Date.now() - 9000).toISOString(),
               issue: null,
               pullRequest: null,
-              reason: 'Reading repository and managed PR metadata',
+              reason: 'Collecting initial planning inputs',
             },
           ],
         },
       },
     };
-    await browserExpect(trigger).toContainText('Refreshing GitHub', { timeout: 5000 });
+    await browserExpect(trigger).toContainText('Gathering planning context', { timeout: 5000 });
     await browserExpect(trigger.locator('.fa-dot')).toHaveCSS('animation-name', 'fa-blink');
     served = {
       ...served,

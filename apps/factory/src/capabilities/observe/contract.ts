@@ -219,6 +219,7 @@ export interface LocalWork {
   control: import('../job/index.js').Control;
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
+  planningDiscovery?: import('../plan/index.js').PlanningDiscoveryFacts;
   executionCatalog?: import('../job/index.js').ExecutionCatalog;
   /** Local coordination owners can establish inactivity without instrumenting later categories. */
   coordinationIdle?: boolean;

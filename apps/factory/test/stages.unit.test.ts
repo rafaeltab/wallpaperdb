@@ -25,6 +25,7 @@ import { controlledStore } from './fixtures/store.js';
 it('requires fresh accepted stages and matching current CI before reporting readiness', async () => {
   const store = controlledStore();
   let stage = 0;
+  let now = 100;
   let accepted = false;
   let ci = false;
   let landed = false;
@@ -35,7 +36,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
   const released: number[] = [];
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
-    Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+    Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
       pullRequest: () =>
         !publicationAvailable
@@ -100,18 +101,25 @@ it('requires fresh accepted stages and matching current CI before reporting read
   );
   await run(Effect.flatMap(Job, (job) => job.status()));
   expect(sent).toEqual([]);
+  now = 200;
   accepted = true;
   await run(Effect.flatMap(Job, (job) => job.status()));
   expect(sent).toEqual([1]);
   await run(Effect.flatMap(Job, (job) => job.status()));
   expect(sent).toEqual([1]);
+  now = 300;
   accepted = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
-    publicationStartedAt: 100,
+    publicationStartedAt: 300,
     delivery: { stage: 'publication' },
   });
   expect(sent).toEqual([1, 2]);
-  expect(await Effect.runPromise(store.readStage(2))).toMatchObject({ publicationStartedAt: 100 });
+  expect(await Effect.runPromise(store.readStage(2))).toMatchObject({ publicationStartedAt: 300 });
+  now = 400;
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    publicationStartedAt: 300,
+    delivery: { stage: 'publication' },
+  });
   accepted = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { stage: 'ci', ready: false, landed: false },

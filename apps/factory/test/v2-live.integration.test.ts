@@ -4526,7 +4526,12 @@ it('reports only current admitted publication, preserving its start and simultan
   }
 });
 
-it.each([[0, false], [2, false], [0, true], [2, true]] as const)(
+it.each([
+  [0, false],
+  [2, false],
+  [0, true],
+  [2, true],
+] as const)(
   'distinguishes historical and current publication parking at stage %s with CI repair %s',
   async (parkedIndex, ciRepair) => {
     const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
@@ -4540,7 +4545,14 @@ it.each([[0, false], [2, false], [0, true], [2, true]] as const)(
         stageIndex: 2,
         publicationStartedAt: 2000,
         execution: { ...source.execution, status: 'running', question: undefined },
-        delivery: { ...source.delivery, question: undefined, stage: 'publication', activity: ciRepair ? 'repairing' : undefined, ciRepair, active: true },
+        delivery: {
+          ...source.delivery,
+          question: undefined,
+          stage: 'publication',
+          activity: ciRepair ? 'repairing' : undefined,
+          ciRepair,
+          active: true,
+        },
       },
     ];
     input.localWork = [
@@ -4862,7 +4874,9 @@ it('classifies running CI repair stages alongside current implementation reporti
       ...snapshot,
       jobs: [{ ...current, delivery: { ...current.delivery, ciRepair: false } }],
     });
-    expect(board.snapshot().meta.activity?.items).toMatchObject([{ category: 'implementing', issue: 1 }]);
+    expect(board.snapshot().meta.activity?.items).toMatchObject([
+      { category: 'implementing', issue: 1 },
+    ]);
     await board.publish({
       ...snapshot,
       jobs: [{ ...current, delivery: { ...current.delivery, ready: true } }],
@@ -5338,18 +5352,259 @@ it('retains provisional CI repair activity before delivery reconciliation', asyn
     scopeId: 'provisional-repair-activity',
     initial: {
       ...input,
-      localWork: input.localWork.map((work) => ({ ...work, control: { ...work.control, parked: undefined } })),
-      jobs: [{
-        ...owner,
-        execution: { ...owner.execution, status: 'running', question: undefined },
-        delivery: { stage: 'babysitting', ciRepair: true, commit: owner.delivery.commit, ready: false, landed: false },
-      }],
+      localWork: input.localWork.map((work) => ({
+        ...work,
+        control: { ...work.control, parked: undefined },
+      })),
+      jobs: [
+        {
+          ...owner,
+          execution: { ...owner.execution, status: 'running', question: undefined },
+          delivery: {
+            stage: 'babysitting',
+            ciRepair: true,
+            commit: owner.delivery.commit,
+            ready: false,
+            landed: false,
+          },
+        },
+      ],
     },
   });
   try {
     expect(board.snapshot().meta.activity?.items).toMatchObject([
       { category: 'implementing', issue: 1 },
     ]);
+  } finally {
+    board.close();
+  }
+});
+
+it('reports current independent and repair reviews with actual run starts alongside implementation and refresh', async () => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = stoppedImplementationSnapshot();
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  const review = {
+    ...source,
+    stageIndex: 2,
+    execution: {
+      ...source.execution,
+      status: 'running',
+      run: { id: 'review', ordinal: 2, startedAt: 2500 },
+    },
+    delivery: {
+      stage: 'review' as const,
+      commit: source.intent.base,
+      ready: false,
+      landed: false,
+      active: true,
+    },
+  };
+  const snapshot = {
+    ...input,
+    jobs: [review],
+    observations: { ...input.observations, refreshActive: true, startedAt: 3000 },
+  };
+  const board = await liveBoard({ scopeId: 'current-review', initial: snapshot });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const expected = {
+      category: 'reviewing',
+      lifecycle: 'current',
+      issue: 1,
+      startedAt: '1970-01-01T00:00:02.500Z',
+    };
+    expect(board.snapshot().meta.activity?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining(expected),
+        expect.objectContaining({ category: 'refreshing-github' }),
+      ])
+    );
+    expect(board.snapshot().meta.activity?.coverage).toContainEqual({
+      category: 'reviewing',
+      state: 'complete',
+      reason: null,
+    });
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    const activity = response.json<FactoryV2Snapshot>().meta.activity;
+    expect(activity).toEqual(board.snapshot().meta.activity);
+    expect(activity).not.toHaveProperty('status');
+    expect(activity).not.toHaveProperty('summary');
+    const repair = {
+      ...review,
+      delivery: { ...review.delivery, ciRepair: true, activity: 'repairing' as const },
+    };
+    await board.publish({ ...snapshot, jobs: [repair] });
+    expect(
+      board.snapshot().meta.activity?.items.filter((i) => i.category === 'reviewing')
+    ).toMatchObject([expected]);
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...review, execution: { ...review.execution, run: { id: 'legacy', ordinal: 3 } } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toContainEqual(
+      expect.objectContaining({ category: 'reviewing', startedAt: null })
+    );
+    const implementing = {
+      ...review,
+      intent: { ...review.intent, id: 'other', issue: 2 },
+      delivery: { ...review.delivery, stage: 'implementation' as const },
+    };
+    await board.publish({
+      ...snapshot,
+      state: {
+        ...snapshot.state,
+        admissions: [...snapshot.state.admissions, { ...snapshot.state.admissions[0], issue: 2 }],
+      },
+      jobs: [review, implementing],
+    });
+    expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual(
+      expect.arrayContaining(['reviewing', 'implementing', 'refreshing-github'])
+    );
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...review, delivery: { ...review.delivery, stage: 'publication' } }],
+    });
+    expect(board.snapshot().meta.activity?.items.some((i) => i.category === 'reviewing')).toBe(
+      false
+    );
+  } finally {
+    board.close();
+    await app.close();
+  }
+});
+
+it.each([
+  'queued',
+  'preparing',
+  'starting',
+  'completed',
+  'idle',
+  'cancelled',
+  'failed',
+  'interrupted',
+  'waiting',
+  'rolled_back',
+])('excludes review that is not underway: %s', async (status) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = stoppedImplementationSnapshot();
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  const board = await liveBoard({
+    scopeId: `review-${status}`,
+    initial: {
+      ...input,
+      jobs: [
+        {
+          ...source,
+          execution: { ...source.execution, status },
+          delivery: {
+            stage: 'review',
+            ciRepair: true,
+            commit: source.intent.base,
+            ready: false,
+            landed: false,
+          },
+        },
+      ],
+    },
+  });
+  try {
+    expect(board.snapshot().meta.activity?.items.filter((i) => i.category === 'reviewing')).toEqual(
+      []
+    );
+  } finally {
+    board.close();
+  }
+});
+
+it.each([
+  'unmanaged',
+  'cancelled',
+  'released',
+  'retired',
+  'parked',
+  'recovery',
+  'question',
+  'ready',
+  'landed',
+  'inactive',
+  'failed-observation',
+  'pending',
+] as const)('excludes %s review ownership', async (condition) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = stoppedImplementationSnapshot();
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+  const snapshot: ScheduleSnapshot = {
+    ...input,
+    state: { ...input.state, admissions: condition === 'unmanaged' ? [] : input.state.admissions },
+    observations:
+      condition === 'failed-observation'
+        ? {
+            ...input.observations,
+            items: {
+              [`job:${source.intent.id}`]: {
+                failedAt: 10,
+                generation: 1,
+                sequence: 1,
+                attemptedAt: 10,
+              },
+            },
+          }
+        : input.observations,
+    localWork: input.localWork.map((work) => ({
+      ...work,
+      control: {
+        ...work.control,
+        cancelled: condition === 'cancelled',
+        released: condition === 'released',
+        retirement:
+          condition === 'retired'
+            ? {
+                publication: {
+                  url: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+                  commit: source.intent.base,
+                  base: source.intent.base,
+                },
+                execution: { threadId: 'owner', status: 'completed' },
+              }
+            : undefined,
+        parked:
+          condition === 'parked' ? { index: 2, question: { id: 'q', text: 'Choose' } } : undefined,
+        dependencyRecovery:
+          condition === 'recovery'
+            ? { index: 2, run: { id: 'r', ordinal: 1 }, progress: 'recovering' }
+            : undefined,
+      },
+    })),
+    jobs: [
+      {
+        ...source,
+        stageIndex: 2,
+        execution: {
+          ...source.execution,
+          status: 'running',
+          question: condition === 'question' ? { id: 'q', text: 'Choose' } : undefined,
+        },
+        delivery: {
+          stage: 'review',
+          commit: source.intent.base,
+          ready: condition === 'ready',
+          landed: condition === 'landed',
+          active: condition !== 'inactive',
+          activity: condition === 'pending' ? 'continuation-pending' : undefined,
+        },
+      },
+    ],
+  };
+  const board = await liveBoard({ scopeId: `review-${condition}`, initial: snapshot });
+  try {
+    expect(board.snapshot().meta.activity?.items.filter((i) => i.category === 'reviewing')).toEqual(
+      []
+    );
   } finally {
     board.close();
   }

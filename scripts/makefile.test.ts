@@ -374,6 +374,21 @@ test("test task graphs do not build production images", () => {
 	}
 });
 
+for (const [target, taskName] of [
+	["test", "test"],
+	["test-unit", "test:unit"],
+]) {
+	test(`${target} prepares compiled coverage controls and repository policy`, () => {
+		const task = plannedTask(target, "coverage-runtime", taskName);
+		expect(task.dependencies).toEqual(
+			expect.arrayContaining([
+				"@wallpaperdb/coverage-runtime#build",
+				"@wallpaperdb/scripts#build",
+			]),
+		);
+	});
+}
+
 test("typecheck cache inputs include test files compiled by the workspace", () => {
 	const task = plannedTask("check-types", "asset", "check-types");
 	const tsconfig = JSON.parse(readFileSync("apps/asset/tsconfig.json", "utf8"));

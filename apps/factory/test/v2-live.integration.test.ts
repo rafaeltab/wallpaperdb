@@ -4449,9 +4449,10 @@ it('reports only current admitted publication, preserving its start and simultan
     publicationStartedAt: 2000,
     stageIndex: 2,
     acknowledgement: { stage: 'publication' as const, index: 2, acceptedAt: 2000 },
-    execution: { ...source.execution, status: 'running' },
+    execution: { ...source.execution, status: 'running', question: undefined },
     delivery: {
       ...source.delivery,
+      question: undefined,
       stage: 'publication' as const,
       activity: undefined,
       active: true,
@@ -4525,9 +4526,9 @@ it('reports only current admitted publication, preserving its start and simultan
   }
 });
 
-it.each([0, 2])(
-  'distinguishes historical and current publication parking at stage %s',
-  async (parkedIndex) => {
+it.each([[0, false], [2, false], [0, true], [2, true]] as const)(
+  'distinguishes historical and current publication parking at stage %s with CI repair %s',
+  async (parkedIndex, ciRepair) => {
     const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
     const input = { ...parkedSnapshot(pullObservation(2), true) };
     const source = input.jobs[0];
@@ -4538,8 +4539,8 @@ it.each([0, 2])(
         ...source,
         stageIndex: 2,
         publicationStartedAt: 2000,
-        execution: { ...source.execution, status: 'running' },
-        delivery: { ...source.delivery, stage: 'publication', activity: undefined, active: true },
+        execution: { ...source.execution, status: 'running', question: undefined },
+        delivery: { ...source.delivery, question: undefined, stage: 'publication', activity: ciRepair ? 'repairing' : undefined, ciRepair, active: true },
       },
     ];
     input.localWork = [

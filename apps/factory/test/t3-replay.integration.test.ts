@@ -49,7 +49,9 @@ it.each([
           branch: null,
           worktreePath: null,
         },
-        runs: [{ id: 'run', ordinal: 1, status: 'completed' }],
+        runs: [
+          { id: 'run', ordinal: 1, status: 'completed', startedAt: '2026-11-19T13:00:00Z' },
+        ],
         attempts: [],
         runtimeRequests: [],
         providerThreads: [],
@@ -191,6 +193,9 @@ it.each([
       await vi.waitFor(() =>
         expect(observer.activity('owner').items).toMatchObject([{ status: 'pending' }])
       );
+      expect(observer.activity('owner')).toMatchObject({
+        recentRuns: [{ runId: 'run', startedAt: '2026-11-19T13:00:00Z' }],
+      });
       await observer.close();
       metadataSequence = 15;
       observer = await t3Observations(configuration);

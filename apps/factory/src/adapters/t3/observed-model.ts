@@ -238,6 +238,12 @@ export function observedActivity(value: Projection, metadata?: Shell) {
   }
   return {
     thread: observedThread(value, metadata),
+    recentRuns: value.runs.map((run) => {
+      const parsed = entity
+        .extend({ startedAt: z.string().datetime({ offset: true }).nullish() })
+        .parse(run);
+      return { runId: parsed.id, startedAt: parsed.startedAt ?? null };
+    }),
     items,
     hasMore: false,
     nextPosition: items.at(-1)?.position ?? null,

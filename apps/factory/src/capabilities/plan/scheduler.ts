@@ -361,8 +361,8 @@ export const SchedulerLive = Layer.effect(
               selectionBase,
             });
           }
-          // Preparation can remain in an explicit recovery/verification state. The durable batch owns the retry.
-          if (!dispatchable(inspected, snapshot.jobs)) return;
+          // Retain blocked preparation for retry while independent selections can proceed.
+          if (!dispatchable(inspected, snapshot.jobs)) continue;
           snapshot = yield* status();
           if (snapshot.state.paused || snapshot.state.cycle?.requestId !== cycle.requestId) return;
           if (!inspected.prerequisite)

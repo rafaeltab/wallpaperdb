@@ -32,6 +32,7 @@ export async function completionFixture(
   let dependencies: readonly string[] | undefined;
   let clean = true;
   let run = 1;
+  let runStartedAt: number | undefined;
   let commit = 'b'.repeat(40);
   let prCommit = commit;
   let ready = false;
@@ -111,7 +112,11 @@ export async function completionFixture(
                     threadId: 'owner',
                     manual: manual ? { runId: `run-${run}` } : undefined,
                     status: observationStatus ?? (idle ? 'completed' : 'running'),
-                    run: { id: `run-${run}`, ordinal: run },
+                    run: {
+                      id: `run-${run}`,
+                      ordinal: run,
+                      ...(runStartedAt === undefined ? {} : { startedAt: runStartedAt }),
+                    },
                     worktree: '/owner',
                     branch: intent.branch,
                     model: 'gpt-6.1-sol',
@@ -200,12 +205,14 @@ export async function completionFixture(
       publicationUnavailable?: boolean;
       publicationAbsent?: boolean;
       run?: number;
+      runStartedAt?: number;
       observationStatus?: string;
       observationAfterInspection?: string;
       dependencyResult?: 'valid' | 'invalid' | 'cycle';
       handbackVerified?: boolean;
     }) => {
       base = change.base ?? base;
+      runStartedAt = change.runStartedAt ?? runStartedAt;
       unexpectedBase = change.unexpectedBase ?? unexpectedBase;
       dependencyResult = change.dependencyResult ?? dependencyResult;
       handbackVerified = change.handbackVerified ?? handbackVerified;

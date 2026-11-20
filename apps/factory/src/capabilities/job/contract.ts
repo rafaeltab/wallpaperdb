@@ -563,7 +563,17 @@ export interface WaitState {
 }
 
 /** Reporting is independent of execution authorization and receipt acceptance. */
+export interface ExecutionInvestigation {
+  readonly stage?: Stage;
+  readonly id: string;
+  readonly issue: number;
+  readonly startedAt: number;
+}
 export interface JobReporting {
+  /** Live ownership only. Never persisted or restored as active after restart. */
+  investigating?(intent: Intent, stage?: Stage): Effect.Effect<string, Unavailable>;
+  investigated?(id: string): Effect.Effect<void>;
+  investigations?(): Effect.Effect<readonly ExecutionInvestigation[]>;
   begin(): Effect.Effect<number, Unavailable>;
   failed(generation: number, intent: Intent, error: string): Effect.Effect<void, Unavailable>;
   observed(generation: number, status: Status): Effect.Effect<void, Unavailable>;

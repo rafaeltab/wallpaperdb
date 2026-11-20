@@ -413,6 +413,13 @@
             ],
             "cache": false
         },
+        "@wallpaperdb/coverage-runtime#test": {
+            "dependsOn": [
+                "build",
+                "@wallpaperdb/scripts#build"
+            ],
+            "cache": false
+        },
         "@wallpaperdb/coverage-runtime#test:unit": {
             "dependsOn": [
                 "build",

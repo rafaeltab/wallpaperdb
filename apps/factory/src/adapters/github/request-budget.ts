@@ -116,7 +116,8 @@ export function requestBudget(directory: string, clock: RequestClock = requestCl
         signal.throwIfAborted();
         const delay = due(cycleResources(), clock.now(), true) - clock.now();
         if (delay <= 0) return;
-        await clock.wait(delay, signal);
+        // In-flight estimates may be refunded while a caller owns the next turn.
+        await clock.wait(Math.min(delay, 1000), signal);
       }
     },
     known(names: readonly string[]) {

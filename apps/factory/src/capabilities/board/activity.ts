@@ -147,14 +147,15 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     items,
     uncertainty,
     admissionReasons: reasons,
-    coverage: categories.map((category) => ({
-      category,
-      state: category === 'refreshing-github' || category === 'publishing' || !uncertainty.length ? 'complete' : 'unknown',
-      reason:
-        category === 'refreshing-github' || category === 'publishing' || !uncertainty.length
-          ? null
-          : 'Lifecycle not yet instrumented.',
-    })),
+    coverage: categories.map((category) => {
+      const complete =
+        category === 'refreshing-github' || category === 'publishing' || !uncertainty.length;
+      return {
+        category,
+        state: complete ? 'complete' : 'unknown',
+        reason: complete ? null : 'Lifecycle not yet instrumented.',
+      };
+    }),
   };
 }
 

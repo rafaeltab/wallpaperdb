@@ -5380,101 +5380,107 @@ it('retains provisional CI repair activity before delivery reconciliation', asyn
   }
 });
 
-it('reports current independent and repair reviews with actual run starts alongside implementation and refresh', async () => {
-  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
-  const input = stoppedImplementationSnapshot();
-  const source = input.jobs[0];
-  if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
-  const review = {
-    ...source,
-    stageIndex: 2,
-    execution: {
-      ...source.execution,
-      status: 'running',
-      run: { id: 'review', ordinal: 2, startedAt: 2500 },
-    },
-    delivery: {
-      stage: 'review' as const,
-      commit: source.intent.base,
-      ready: false,
-      landed: false,
-      active: true,
-    },
-  };
-  const snapshot = {
-    ...input,
-    jobs: [review],
-    observations: { ...input.observations, refreshActive: true, startedAt: 3000 },
-  };
-  const board = await liveBoard({ scopeId: 'current-review', initial: snapshot });
-  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
-  try {
-    const expected = {
-      category: 'reviewing',
-      lifecycle: 'current',
-      issue: 1,
-      startedAt: '1970-01-01T00:00:02.500Z',
-    };
-    expect(board.snapshot().meta.activity?.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining(expected),
-        expect.objectContaining({ category: 'refreshing-github' }),
-      ])
-    );
-    expect(board.snapshot().meta.activity?.coverage).toContainEqual({
-      category: 'reviewing',
-      state: 'complete',
-      reason: null,
-    });
-    const response = await app.inject('/api/v2/board');
-    expect(response.statusCode).toBe(200);
-    const activity = response.json<FactoryV2Snapshot>().meta.activity;
-    expect(activity).toEqual(board.snapshot().meta.activity);
-    expect(activity).not.toHaveProperty('status');
-    expect(activity).not.toHaveProperty('summary');
-    const repair = {
-      ...review,
-      delivery: { ...review.delivery, ciRepair: true, activity: 'repairing' as const },
-    };
-    await board.publish({ ...snapshot, jobs: [repair] });
-    expect(
-      board.snapshot().meta.activity?.items.filter((i) => i.category === 'reviewing')
-    ).toMatchObject([expected]);
-    await board.publish({
-      ...snapshot,
-      jobs: [{ ...review, execution: { ...review.execution, run: { id: 'legacy', ordinal: 3 } } }],
-    });
-    expect(board.snapshot().meta.activity?.items).toContainEqual(
-      expect.objectContaining({ category: 'reviewing', startedAt: null })
-    );
-    const implementing = {
-      ...review,
-      intent: { ...review.intent, id: 'other', issue: 2 },
-      delivery: { ...review.delivery, stage: 'implementation' as const },
-    };
-    await board.publish({
-      ...snapshot,
-      state: {
-        ...snapshot.state,
-        admissions: [...snapshot.state.admissions, { ...snapshot.state.admissions[0], issue: 2 }],
+it.each(['running', 'waiting'])(
+  'reports current independent and repair reviews with actual run starts alongside implementation and refresh: %s',
+  async (status) => {
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const input = stoppedImplementationSnapshot();
+    const source = input.jobs[0];
+    if (source.kind !== 'job' || source.execution.kind !== 'found') throw new Error('Missing job');
+    const review = {
+      ...source,
+      stageIndex: 2,
+      execution: {
+        ...source.execution,
+        status,
+        run: { id: 'review', ordinal: 2, startedAt: 2500 },
       },
-      jobs: [review, implementing],
-    });
-    expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual(
-      expect.arrayContaining(['reviewing', 'implementing', 'refreshing-github'])
-    );
-    await board.publish({
-      ...snapshot,
-      jobs: [{ ...review, delivery: { ...review.delivery, stage: 'publication' } }],
-    });
-    expect(board.snapshot().meta.activity?.items.some((i) => i.category === 'reviewing')).toBe(
-      false
-    );
-  } finally {
-    board.close();
-    await app.close();
+      delivery: {
+        stage: 'review' as const,
+        commit: source.intent.base,
+        ready: false,
+        landed: false,
+        active: true,
+      },
+    };
+    const snapshot = {
+      ...input,
+      jobs: [review],
+      observations: { ...input.observations, refreshActive: true, startedAt: 3000 },
+    };
+    const board = await liveBoard({ scopeId: 'current-review', initial: snapshot });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const expected = {
+        category: 'reviewing',
+        lifecycle: 'current',
+        issue: 1,
+        startedAt: '1970-01-01T00:00:02.500Z',
+      };
+      expect(board.snapshot().meta.activity?.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining(expected),
+          expect.objectContaining({ category: 'refreshing-github' }),
+        ])
+      );
+      expect(board.snapshot().meta.activity?.coverage).toContainEqual({
+        category: 'reviewing',
+        state: 'complete',
+        reason: null,
+      });
+      const response = await app.inject('/api/v2/board');
+      expect(response.statusCode).toBe(200);
+      const activity = response.json<FactoryV2Snapshot>().meta.activity;
+      expect(activity).toEqual(board.snapshot().meta.activity);
+      expect(activity).not.toHaveProperty('status');
+      expect(activity).not.toHaveProperty('summary');
+      const repair = {
+        ...review,
+        delivery: { ...review.delivery, ciRepair: true, activity: 'repairing' as const },
+      };
+      await board.publish({ ...snapshot, jobs: [repair] });
+      expect(
+        board.snapshot().meta.activity?.items.filter((i) => i.category === 'reviewing')
+      ).toMatchObject([expected]);
+      await board.publish({
+        ...snapshot,
+        jobs: [
+          { ...review, execution: { ...review.execution, run: { id: 'legacy', ordinal: 3 } } },
+        ],
+      });
+      expect(board.snapshot().meta.activity?.items).toContainEqual(
+        expect.objectContaining({ category: 'reviewing', startedAt: null })
+      );
+      const implementing = {
+        ...review,
+        execution: { ...review.execution, status: 'running' },
+        intent: { ...review.intent, id: 'other', issue: 2 },
+        delivery: { ...review.delivery, stage: 'implementation' as const },
+      };
+      await board.publish({
+        ...snapshot,
+        state: {
+          ...snapshot.state,
+          admissions: [...snapshot.state.admissions, { ...snapshot.state.admissions[0], issue: 2 }],
+        },
+        jobs: [review, implementing],
+      });
+      expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual(
+        expect.arrayContaining(['reviewing', 'implementing', 'refreshing-github'])
+      );
+      await board.publish({
+        ...snapshot,
+        jobs: [{ ...review, delivery: { ...review.delivery, stage: 'publication' } }],
+      });
+      expect(board.snapshot().meta.activity?.items.some((i) => i.category === 'reviewing')).toBe(
+        false
+      );
+    } finally {
+      board.close();
+      await app.close();
+    }
   }
-});
+);
 
 it.each([
   'queued',
@@ -5485,7 +5491,6 @@ it.each([
   'cancelled',
   'failed',
   'interrupted',
-  'waiting',
   'rolled_back',
 ])('excludes review that is not underway: %s', async (status) => {
   const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');

@@ -25,7 +25,7 @@ export function managedReviews(input: ScheduleSnapshot): FactoryActivity['items'
       delivery.question ||
       (delivery.activity !== undefined && delivery.activity !== 'repairing') ||
       job.execution.kind !== 'found' ||
-      job.execution.status !== 'running' ||
+      !['running', 'waiting'].includes(job.execution.status) ||
       job.execution.question
     )
       return [];

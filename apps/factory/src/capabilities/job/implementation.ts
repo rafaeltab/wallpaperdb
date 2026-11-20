@@ -62,6 +62,8 @@ export const JobLive = Layer.effect(
       );
     const launchOwned = (intent: Intent, index: number, launch: ReturnType<Execution['launch']>) =>
       Effect.gen(function* () {
+        // A new attempt has no established execution, even if its predecessor did.
+        executionKnown = false;
         const result = yield* investigate(intent, launch);
         if (result.kind === 'submitted' && result.threadId) {
           // This records delivery ownership, never receipt acceptance.

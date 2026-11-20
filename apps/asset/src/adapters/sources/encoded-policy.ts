@@ -10,6 +10,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
     throw new Error('unsupported-source-model');
   };
   if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    const xmpPayloads: Buffer[] = [];
     let offset = 2;
     while (offset < bytes.length) {
       offset = bytes.indexOf(0xff, offset);
@@ -20,6 +21,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
       const marker = bytes[offset++];
       if (marker === 0xd9) {
         if (offset !== bytes.length) invalid();
+        if (hasExtendedGainMapDeclaration(xmpPayloads)) unsupported();
         return;
       }
       if (
@@ -38,7 +40,10 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
           data.subarray(0, isoGainMapHeader.length).equals(isoGainMapHeader))
       )
         unsupported();
-      if (marker === 0xe1 && hasGainMapXmpDeclaration(data)) unsupported();
+      if (marker === 0xe1) {
+        if (hasGainMapXmpDeclaration(data)) unsupported();
+        xmpPayloads.push(data);
+      }
       offset += length;
     }
     invalid();
@@ -114,12 +119,61 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
   }
 }
 
+interface XmpFragment {
+  length: number;
+  offset: number;
+  data: Buffer;
+}
+
+function hasExtendedGainMapDeclaration(payloads: Buffer[]): boolean {
+  const header = Buffer.from('http://ns.adobe.com/xmp/extension/\0');
+  const packets = new Map<string, XmpFragment[]>();
+  for (const payload of payloads) {
+    if (payload.length <= header.length + 40 || !payload.subarray(0, header.length).equals(header))
+      continue;
+    const guid = payload.subarray(header.length, header.length + 32).toString('hex');
+    const fragment = {
+      length: payload.readUInt32BE(header.length + 32),
+      offset: payload.readUInt32BE(header.length + 36),
+      data: payload.subarray(header.length + 40),
+    };
+    const fragments = packets.get(guid) ?? [];
+    fragments.push(fragment);
+    packets.set(guid, fragments);
+  }
+  for (const fragments of packets.values()) {
+    const packet = reconstructXmp(fragments);
+    if (packet && hasGainMapNamespace(packet)) return true;
+  }
+  return false;
+}
+
+function reconstructXmp(fragments: XmpFragment[]): Buffer | undefined {
+  fragments.sort((a, b) => a.offset - b.offset);
+  const length = fragments[0]?.length;
+  let offset = 0;
+  for (const fragment of fragments) {
+    if (fragment.length !== length || fragment.offset !== offset) return undefined;
+    offset += fragment.data.length;
+  }
+  if (offset !== length) return undefined;
+  // Allocate only the verified sum of actual payload bytes, never a claimed packet size.
+  return Buffer.concat(
+    fragments.map((fragment) => fragment.data),
+    offset
+  );
+}
+
 /** Ordinary EXIF text is not a model declaration. Inspect only identified XMP packets. */
 function hasGainMapXmpDeclaration(payload: Buffer): boolean {
   const xmp = ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/xmp/extension/\0'].some(
     (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
   );
   if (!xmp) return false;
+  return hasGainMapNamespace(payload);
+}
+
+function hasGainMapNamespace(payload: Buffer): boolean {
   // XML separators are ASCII; even Unicode whitespace can be a valid prefix character.
   const declarations = payload
     .toString('utf8')

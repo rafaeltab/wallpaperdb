@@ -271,7 +271,9 @@ export const JobLive = Layer.effect(
                   execution: {
                     threadId: latestExecution.threadId,
                     status: latestExecution.status,
-                    run: latestExecution.run,
+                    run: latestExecution.run
+                      ? { id: latestExecution.run.id, ordinal: latestExecution.run.ordinal }
+                      : undefined,
                   },
                   stageIndex: stage?.index,
                 },

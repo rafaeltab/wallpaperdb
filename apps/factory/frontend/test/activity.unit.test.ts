@@ -202,3 +202,38 @@ it('counts distinct answer-wait issues with newest-current timing and yields to 
     ).summary
   ).toBe('Waiting for CI 1 issue');
 });
+
+it('counts restacking PRs and times the newest remaining PR between implementing and recovering', () => {
+  const restack = {
+    id: 'one',
+    category: 'restacking' as const,
+    lifecycle: 'current' as const,
+    issue: 1,
+    pullRequest: 101,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Restacking',
+  };
+  const items = [
+    restack,
+    { ...restack, id: 'duplicate', issue: 2 },
+    { ...restack, id: 'two', pullRequest: 102, startedAt: '2026-11-17T11:59:00Z' },
+    { ...restack, id: 'recover', category: 'recovering' as const },
+  ];
+  const view = activityView({ ...facts, items }, 0);
+  expect(view.summary).toBe('Restacking 2 PRs');
+  expect(
+    activityDuration(view.selected?.startedAt ?? null, Date.parse('2026-11-17T12:00:01Z'))
+  ).toBe('1m 1s');
+  expect(activityView({ ...facts, items: [restack] }, 0).selected?.startedAt).toBe(
+    '2026-11-17T11:58:00Z'
+  );
+  expect(
+    activityView(
+      { ...facts, items: [...items, { ...restack, id: 'impl', category: 'implementing' }] },
+      0
+    ).summary
+  ).toBe('Implementing 1 issue');
+  expect(
+    activityView({ ...facts, items: [{ ...restack, startedAt: null }] }, 0).selected?.startedAt
+  ).toBeNull();
+});

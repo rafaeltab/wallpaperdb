@@ -357,6 +357,39 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     blocked: await blockingState(numbers),
     recovery: await recoveryProgress(directory(numbers)),
   });
+  // Reporting records never authorize execution or replace the publication journal.
+  const restackActivity = async (
+    dir: string,
+    item: Pick<Layer, 'issue' | 'url'>,
+    phase: 'resolving' | 'reviewing' | 'verifying' | 'publishing' | 'waiting-capacity'
+  ) =>
+    stateConnection(dir, (db, namespace) =>
+      db.transaction((tx) => {
+        const name = `restack-activity-${item.issue}.json`;
+        const saved = z
+          .object({ startedAt: z.number().finite() })
+          .optional()
+          .parse(
+            tx
+              .select({ value: records.value })
+              .from(records)
+              .where(and(eq(records.namespace, namespace), eq(records.name, name)))
+              .get()?.value
+          );
+        const value = {
+          issue: item.issue,
+          pr: item.url,
+          phase,
+          active: phase !== 'waiting-capacity',
+          progress: `Restack ${phase}`,
+          startedAt: saved?.startedAt ?? Date.now(),
+        };
+        tx.insert(records)
+          .values({ namespace, name, value })
+          .onConflictDoUpdate({ target: [records.namespace, records.name], set: { value } })
+          .run();
+      })
+    );
   const attemptSnapshot = async (path: string, signal?: AbortSignal) => {
     const values = [];
     for (const args of [
@@ -597,6 +630,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         write: (name, data) => publish(recoveryDir, name, data),
       }
     );
+    await restackActivity(dir, item, 'resolving');
     let reviewed = false;
     let capacityPending = false;
     let observation: import('../../capabilities/restack/index.js').Resolution | undefined;
@@ -882,7 +916,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       },
       { read: (name) => read(journal, name), write: (name, value) => publish(journal, name, value) }
     );
-    if (!(await admitRecovery(item.issue, signal))) return null;
+    if (!(await admitRecovery(item.issue, signal))) {
+      await restackActivity(dir, item, 'waiting-capacity');
+      return null;
+    }
+    await restackActivity(dir, item, 'reviewing');
     const result = await runRecovery({ ...agent, verify: () => Effect.succeed(true) }, signal);
     if (!result.ready || !result.commit) {
       await saveProgress(dir, { ...result, issue: item.issue, pr: item.url });
@@ -918,6 +956,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         target,
       };
     if (await git(['rev-list', '--merges', `${parent}..${item.commit}`], signal)) return;
+    await restackActivity(dir, item, 'resolving');
     const path = await replayAttempt(item, onto, parent, dir, signal);
     if (!path) return;
     const automatic = (await command('git', ['rev-parse', 'HEAD'], path, signal)).trim();
@@ -1293,6 +1332,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return await load(numbers);
   };
   const validate = async (item: Intent['replay'][number], dir: string, signal?: AbortSignal) => {
+    await restackActivity(dir, item, 'verifying');
     const observed = z
       .object({
         headRefOid: sha,
@@ -1637,7 +1677,10 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     return publicationSafe(operation, dir, signal);
   };
   const publishComparisons = async (operation: Intent, signal?: AbortSignal) => {
-    for (const item of operation.replay) if (!(await publishLayer(item, signal))) return false;
+    for (const item of operation.replay) {
+      await restackActivity(directory(operation.numbers), item, 'publishing');
+      if (!(await publishLayer(item, signal))) return false;
+    }
     return true;
   };
   const refreshAssertions = async (operation: Intent, dir: string, signal?: AbortSignal) => {
@@ -2151,6 +2194,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (!saved) return null;
     const progress = z
       .object({
+        startedAt: z.number().finite().optional(),
         phase: z
           .enum([
             'resolving',
@@ -2185,12 +2229,40 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     const settled = operation && (await read(dir, completionName(operation)));
     return {
       ...progress,
+      startedAt: z
+        .object({ startedAt: z.number().finite() })
+        .optional()
+        .parse((await read(dir, `restack-activity-${item.issue}.json`)) ?? undefined)?.startedAt,
       issue: item.issue,
       pr: item.url,
       phase: verified ? ('complete' as const) : progress.phase,
       progress: verified ? 'Verified; downstream readiness may proceed' : progress.progress,
       active: settled ? false : progress.active,
     };
+  };
+  const currentRestacks = async (dir: string) => {
+    if (await completed(dir)) return [];
+    const current = await recoveryStatus(dir);
+    const result = [];
+    for (const name of (await recordNames(dir)).filter((name) =>
+      /^restack-activity-\d+\.json$/.test(name)
+    )) {
+      const value = z
+        .object({
+          issue: z.number(),
+          pr: z.string(),
+          startedAt: z.number().finite(),
+          phase: z.enum(['resolving', 'reviewing', 'verifying', 'publishing', 'waiting-capacity']),
+          active: z.boolean(),
+          progress: z.string(),
+        })
+        .parse(await read(dir, name));
+      // The recovery owner supersedes provisional reporting for its PR, including unknown outcomes.
+      if (current?.issue === value.issue && current.phase !== 'complete') continue;
+      if (await blockingFile(dir)) continue;
+      result.push(value);
+    }
+    return result;
   };
   const repairRecoveries = async () => {
     const result = [];
@@ -3301,6 +3373,19 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     state,
     replayFor,
     reconcile,
+    restackActivities: async () => {
+      const result = [];
+      for (const key of (await operationDirectories()).filter(
+        (key) => /^[a-f0-9]{64}$/.test(key) || key.startsWith('repair-replay-')
+      )) {
+        if (await scratchReleased(key)) continue;
+        const dir = join(config.directory, key);
+        result.push(...(await currentRestacks(dir)));
+        const current = await recoveryStatus(dir);
+        if (current && current.phase !== 'complete') result.push(current);
+      }
+      return result;
+    },
     recoveries,
     maintain,
     repair,

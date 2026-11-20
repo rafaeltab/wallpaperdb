@@ -2759,3 +2759,42 @@ function required<T>(value: T): NonNullable<T> {
   if (value === null || value === undefined) throw new Error('Expected a required test value');
   return value;
 }
+
+it('retains actual restack processing starts across observation and adapter replacement', async () => {
+  const f = await fixture({ ciFails: true });
+  try {
+    const began = Date.now();
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const current = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
+    const processing = current.filter((item) => item.active && item.phase === 'verifying');
+    expect(processing.length).toBeGreaterThan(0);
+    for (const item of processing) {
+      expect(item.startedAt).toBeGreaterThanOrEqual(began);
+      expect(item.startedAt).toBeLessThanOrEqual(Date.now());
+    }
+    const reopened = f.reopen();
+    const again = await Effect.runPromise(reopened.restackActivities?.() ?? Effect.succeed([]));
+    expect(again.filter((item) => item.active)).toEqual(current.filter((item) => item.active));
+    process.stdout.write(`Retained managed restacks: ${JSON.stringify(processing)}\n`);
+  } finally {
+    await f.close();
+  }
+});
+
+it('excludes replay review queued for capacity without changing its retained processing start', async () => {
+  const f = await fixture({ ciFails: true });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5, () => Effect.succeed(false)) ?? Effect.void);
+    const queued = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
+    expect(queued).toContainEqual(
+      expect.objectContaining({ phase: 'waiting-capacity', active: false })
+    );
+    expect(queued.filter((item) => item.active)).toEqual([]);
+    const startedAt = queued[0]?.startedAt;
+    await Effect.runPromise(f.issues.prepare?.(5, () => Effect.succeed(true)) ?? Effect.void);
+    const later = await Effect.runPromise(f.issues.restackActivities?.() ?? Effect.succeed([]));
+    expect(later.find((item) => item.issue === queued[0]?.issue)?.startedAt).toBe(startedAt);
+  } finally {
+    await f.close();
+  }
+});

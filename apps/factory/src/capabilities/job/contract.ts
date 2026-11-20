@@ -212,6 +212,8 @@ export interface Control {
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface RecoveryStatus {
+  /** First actual processing of this PR in the retained restack operation. */
+  readonly startedAt?: number;
   readonly phase?:
     | 'resolving'
     | 'reviewing'
@@ -272,6 +274,8 @@ export interface Issues {
   /** Observe recovery state and durably retain known adverse publication changes
    * before later maintenance. Restoration or verified landing is observed before clearing them. */
   recoveries?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
+  /** Local reporting facts only; never used for capacity or execution authority. */
+  restackActivities?(): Effect.Effect<readonly RecoveryStatus[], Unavailable>;
   /** Reconcile durable joins and observe verified default-branch landings. May
    * reserve downstream maintenance from retained accepted publications, even
    * while admissions are paused or capacity is occupied. Record operation intent

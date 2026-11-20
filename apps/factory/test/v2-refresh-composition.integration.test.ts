@@ -645,3 +645,48 @@ it('publishes the real routine GitHub refresh lifetime while local reads remain 
     await host.cleanup();
   }
 });
+
+it('wires local managed restacks into the board without changing scheduler capacity', async () => {
+  const { joinFixture } = await import('./fixtures/join.js');
+  const f = await joinFixture({ inProcess: true, ciFails: true });
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const activities = await Effect.runPromise(
+      f.issues.restackActivities?.() ?? Effect.succeed([])
+    );
+    expect(activities.length).toBeGreaterThan(0);
+    await Effect.runPromise(
+      fileScheduleStore(f.host.directory).save({
+        revision: 0,
+        concurrency: 1,
+        allowance: 1,
+        paused: true,
+        admissions: [],
+      })
+    );
+    running = await startFactory({
+      FACTORY_PROJECT: f.host.repository,
+      ...f.host.mcpEnvironment,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: f.host.base,
+      FACTORY_T3_BINARY: f.host.binary,
+      FACTORY_STATE: f.host.directory,
+      FACTORY_PORT: '0',
+    });
+    const board = (await running.app.inject('/api/v2/board')).json<FactoryV2Snapshot>();
+    expect(board.meta.activity?.items).toContainEqual(
+      expect.objectContaining({
+        category: 'restacking',
+        pullRequest: 104,
+        startedAt: new Date(
+          activities.find((item) => item.issue === 4)?.startedAt ?? NaN
+        ).toISOString(),
+      })
+    );
+    expect(board.meta.factory.concurrency.occupied).toBe(0);
+  } finally {
+    await running?.close();
+    await f.close();
+  }
+});

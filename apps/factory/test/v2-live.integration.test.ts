@@ -5782,3 +5782,131 @@ it.each(['eligible', 'no-eligible'] as const)(
     }
   }
 );
+it('reports only current managed restacks through every processing phase and the HTTP contract', async () => {
+  const recovery = {
+    issue: 1,
+    pr: 'https://github.com/rafaeltab/wallpaperdb/pull/101',
+    phase: 'resolving' as const,
+    active: true,
+    progress: 'Replaying',
+    startedAt: 2000,
+  };
+  const input: ScheduleSnapshot = { ...initial, recoveries: [recovery] };
+  const board = await liveBoard({ scopeId: 'restack-activity', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    for (const phase of ['resolving', 'reviewing', 'verifying', 'publishing'] as const) {
+      await board.publish({
+        ...input,
+        recoveries: [
+          { ...recovery, phase },
+          {
+            ...recovery,
+            issue: 2,
+            pr: 'https://github.com/rafaeltab/wallpaperdb/pull/102',
+            startedAt: 3000,
+          },
+          ...Array.from({ length: 8 }, (_, i) => ({
+            ...recovery,
+            issue: i + 3,
+            phase: 'waiting-capacity' as const,
+            active: false,
+          })),
+          { ...recovery, issue: 20, phase: 'complete', active: false },
+          { ...recovery, issue: 21, phase: 'manual-recovery', active: false },
+          { ...recovery, issue: 22, bindingAvailable: false, phase: undefined },
+        ],
+      });
+      const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+      expect(activity?.items).toMatchObject([
+        {
+          category: 'restacking',
+          issue: 1,
+          pullRequest: 101,
+          startedAt: '1970-01-01T00:00:02.000Z',
+        },
+        {
+          category: 'restacking',
+          issue: 2,
+          pullRequest: 102,
+          startedAt: '1970-01-01T00:00:03.000Z',
+        },
+      ]);
+      expect(activity?.items).toHaveLength(2);
+      expect(activity).not.toHaveProperty('status');
+    }
+    await board.publish({
+      ...input,
+      recoveries: [
+        {
+          ...recovery,
+          phase: 'awaiting-answer',
+          active: false,
+          question: 'Choose',
+          questionId: 'q',
+        },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual([
+      'waiting-for-answers',
+    ]);
+    await board.publish({ ...input, recoveries: [{ ...recovery, phase: 'complete' }] });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  } finally {
+    await app.close();
+    board.close();
+  }
+});
+
+it('gives live restack ownership precedence over job publication and keeps manual outcomes uncertain', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const pull = pullObservation(101);
+  const input = { ...parkedSnapshot(pull, true) };
+  const owner = input.jobs[0];
+  if (owner.kind !== 'job' || owner.execution.kind !== 'found') throw new Error('Missing owner');
+  input.localWork = [];
+  input.jobs = [
+    {
+      ...owner,
+      execution: { ...owner.execution, status: 'running' },
+      delivery: {
+        stage: 'publication',
+        ready: false,
+        landed: false,
+        commit: pull.head,
+        pr: { kind: 'found', url: pull.url, commit: pull.head, ready: false, landed: false },
+      },
+    },
+  ];
+  input.restackActivities = [
+    {
+      issue: 1,
+      pr: pull.url,
+      phase: 'publishing',
+      active: true,
+      progress: 'Publishing',
+      startedAt: 2000,
+    },
+  ];
+  const board = await liveBoard({ scopeId: 'restack-ownership', initial: input });
+  try {
+    expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual(['restacking']);
+    await board.publish({
+      ...initial,
+      coordinationIdle: true,
+      restackActivities: [
+        {
+          issue: 1,
+          pr: pull.url,
+          phase: 'manual-recovery',
+          active: false,
+          progress: 'Manual intervention',
+        },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    expect(board.snapshot().meta.activity?.uncertainty.length).toBeGreaterThan(0);
+  } finally {
+    board.close();
+  }
+});

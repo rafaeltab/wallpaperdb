@@ -709,3 +709,93 @@ it.each([false, true])(
     }
   }
 );
+
+it('preserves publication timing when a newer running observation precedes failed receipt inspection', async () => {
+  const { Job, JobLive, JobStore, Execution, Issues, Time, Unavailable } = await import(
+    '../src/capabilities/job/index.js'
+  );
+  const { JobReportingLive } = await import('../src/capabilities/observe/index.js');
+  const { controlledStore } = await import('./fixtures/store.js');
+  const jobs = controlledStore();
+  const observations = controlledObservations();
+  const intent = {
+    id: 'publishing-owner',
+    issue: 1,
+    issueUrl: issue.url,
+    base: 'a'.repeat(40),
+    branch: 'worker',
+    context: '',
+    createdAt: 0,
+    expectedStage: 'implementation' as const,
+  };
+  await Effect.runPromise(jobs.reserve(intent));
+  await Effect.runPromise(
+    jobs.saveStage({
+      index: 0,
+      stage: 'publication',
+      threadId: 'owner',
+      commit: intent.base,
+      previousRunId: null,
+      publicationStartedAt: 2000,
+    })
+  );
+  let fail = false;
+  let ordinal = 1;
+  const time = Layer.succeed(Time, { now: () => Effect.succeed(65000) });
+  const reporting = ReportingLive.pipe(Layer.provide(Layer.succeed(ReportingStore, observations)));
+  const runtime = ManagedRuntime.make(
+    JobLive.pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(
+          reporting,
+          JobReportingLive.pipe(Layer.provide(reporting), Layer.provide(time)),
+          time,
+          Layer.succeed(JobStore, jobs),
+          Layer.succeed(Issues, {
+            inspect: () => Effect.die('No issue inspection expected'),
+            pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
+          }),
+          Layer.succeed(Execution, {
+            launch: () => Effect.die('No launch expected'),
+            interrupt: () => Effect.void,
+            sendStage: () => Effect.die('No delivery expected'),
+            observe: () =>
+              Effect.succeed({
+                kind: 'found' as const,
+                threadId: 'owner',
+                status: 'running',
+                run: { id: `run-${ordinal}`, ordinal },
+                worktree: '/worker',
+                branch: intent.branch,
+                model: 'controlled',
+              }),
+            inspectStage: () =>
+              fail
+                ? Effect.fail(new Unavailable({ operation: 'inspection-outage', cause: null }))
+                : Effect.succeed(null),
+          })
+        )
+      )
+    )
+  );
+  try {
+    const job = await runtime.runPromise(Job);
+    await runtime.runPromise(job.status());
+    await runtime.runPromise(Effect.flatMap(Reporting, (r) => r.flush()));
+    expect((await Effect.runPromise(observations.read())).jobs?.[0]).toMatchObject({
+      publicationStartedAt: 2000,
+    });
+    fail = true;
+    ordinal = 2;
+    await expect(runtime.runPromise(job.status())).rejects.toMatchObject({
+      operation: 'inspection-outage',
+    });
+    await runtime.runPromise(Effect.flatMap(Reporting, (r) => r.flush()));
+    expect((await Effect.runPromise(observations.read())).jobs?.[0]).toMatchObject({
+      publicationStartedAt: 2000,
+      execution: { kind: 'found', run: { id: 'run-2' } },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});

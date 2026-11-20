@@ -38,6 +38,9 @@ export function lifecycleStoreContract(
         outcome: 'rejected',
         reason: 'idempotency-conflict',
       });
+      const otherApplication = await accept({ ...contractAcceptance, applicationId: 'wallpaper' });
+      expect(otherApplication.outcome).toBe('created');
+      expect(otherApplication.assetId).not.toBe(created.assetId);
       const deletion: Acceptance = {
         ...contractAcceptance,
         canonical: 'delete-contract',

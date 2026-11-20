@@ -90,7 +90,7 @@ it('shows directed current dependencies and safe explicit and proposed plan cont
       resume: job.resume,
       cancel: job.cancel,
     },
-    plan: { preview: () => Effect.succeed(preview()) },
+    plan: { verification: () => Effect.succeed(null), preview: () => Effect.succeed(preview()) },
   });
   const browser = await chromium.launch({ headless: true });
   try {

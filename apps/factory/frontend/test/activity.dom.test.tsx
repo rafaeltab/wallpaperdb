@@ -23,6 +23,40 @@ const facts: ActivityFacts = {
     },
   ],
 };
+it('shows prerequisite verification ahead of GitHub refresh with its own local timer and purpose', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-17T12:01:00Z'));
+  const verification: ActivityFacts['items'][number] = {
+    id: 'verification',
+    category: 'checking-plan-freshness',
+    lifecycle: 'current',
+    startedAt: '2026-11-17T12:00:50Z',
+    issue: null,
+    pullRequest: null,
+    reason: 'Verifying selected prerequisites using the collected planning snapshot',
+  };
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const { rerender } = render(
+    <FactoryActivity
+      facts={{ ...facts, items: [...facts.items, verification] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  const button = screen.getByRole('button', { name: /Checking plan freshness/ });
+  fireEvent.focus(button);
+  const tile = screen.getByTitle(verification.reason);
+  expect(within(tile).getByRole('img', { name: 'Active' })).toBeTruthy();
+  expect(within(tile).getByText('1 operation')).toBeTruthy();
+  expect(within(tile).getByText('10s')).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  expect(within(tile).getByText('12s')).toBeTruthy();
+  rerender(<FactoryActivity facts={facts} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Refreshing GitHub/ })).toBeTruthy();
+  const inactive = screen.getByText('Checking plan freshness').parentElement;
+  if (!inactive) throw new Error('Missing verification tile');
+  expect(within(inactive).getByRole('img', { name: 'Inactive' })).toBeTruthy();
+});
 it('opens details on focus, pins on click and dismisses with Escape or outside click', () => {
   render(
     <FactoryActivity

@@ -1228,11 +1228,14 @@ export async function runProtocol(
             ...b,
           })),
         ]);
-      else
+      else {
+        if (existsSync(join(config.directory, 'planner.json')))
+          await hold('prerequisite-verification');
         reply(
           config.planning.issues.find((i: { number: number }) => i.number === Number(args[2])) ??
             config.planning.context
         );
+      }
     } else if (
       config.planner &&
       args[1] === 'start' &&

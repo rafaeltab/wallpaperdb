@@ -1,6 +1,7 @@
 import { Effect, Layer, ManagedRuntime, Option, Deferred } from 'effect';
 import { controlledScheduleStore } from './fixtures/schedule-store.js';
 import { Time, Unavailable } from '../src/capabilities/job/index.js';
+import { TestClock } from 'effect/testing';
 import { expect, it } from 'vitest';
 import {
   Plan,
@@ -33,6 +34,155 @@ const proposal: Proposal = {
   selected: [{ issue: 580, reason: 'User-facing bug', includeCodeFromIssues: [] }],
   deferred: [],
 };
+
+it.each(
+  [false, true].flatMap((automatic) =>
+    (['accepted', 'rejected', 'failed', 'cancelled'] as const).map((outcome) => ({
+      automatic,
+      outcome,
+    }))
+  )
+)(
+  'owns prerequisite verification separately from collection and model time: $automatic, $outcome',
+  async ({ automatic, outcome }) => {
+    let observe: Plan['verification'];
+    let entered = () => {};
+    let finish = () => {};
+    const enteredPromise = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const finishPromise = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const input: PlanningInput = {
+      issues: [issue],
+      job: { kind: 'empty' },
+      capacity: { concurrency: 1, admission: 1 },
+    };
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSource, {
+              read: () =>
+                Effect.gen(function* () {
+                  expect(yield* observe()).toBeNull();
+                  yield* TestClock.adjust(1000);
+                  return input;
+                }),
+              verify: () =>
+                Effect.gen(function* () {
+                  entered();
+                  yield* Effect.promise(() => finishPromise);
+                  if (outcome === 'failed')
+                    return yield* Effect.fail(
+                      new Unavailable({ operation: 'controlled-verification', cause: null })
+                    );
+                  return outcome === 'rejected' ? 'Prerequisite no longer ready' : undefined;
+                }),
+            }),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: () =>
+                Effect.gen(function* () {
+                  expect(yield* observe()).toBeNull();
+                  yield* TestClock.adjust(9000);
+                  return proposal;
+                }),
+            })
+          )
+        ),
+        Layer.provideMerge(TestClock.layer())
+      )
+    );
+    const abort = new AbortController();
+    try {
+      const plan = await runtime.runPromise(Plan);
+      expect(typeof plan.verification).toBe('function');
+      observe = plan.verification;
+      const running = runtime.runPromiseExit(
+        plan.preview(automatic ? { automatic: true, progress: () => Effect.void } : undefined),
+        { signal: abort.signal }
+      );
+      await enteredPromise;
+      expect(await runtime.runPromise(plan.verification())).toEqual({ startedAt: 10000 });
+      await runtime.runPromise(TestClock.adjust(3000));
+      expect(await runtime.runPromise(plan.verification())).toEqual({ startedAt: 10000 });
+      if (outcome === 'cancelled') abort.abort();
+      else finish();
+      const result = await running;
+      if (outcome === 'accepted' || outcome === 'rejected') {
+        expect(result._tag).toBe('Success');
+        if (result._tag === 'Success') {
+          expect(result.value.selected).toEqual(outcome === 'accepted' ? proposal.selected : []);
+          if (outcome === 'rejected')
+            expect(result.value.rejected).toContainEqual({
+              issue: 580,
+              reason: 'Prerequisite no longer ready',
+            });
+        }
+      } else expect(result._tag).toBe('Failure');
+      expect(await runtime.runPromise(plan.verification())).toBeNull();
+    } finally {
+      abort.abort();
+      finish();
+      await runtime.dispose();
+    }
+  }
+);
+
+it.each(['empty', 'invalid', 'stale', 'paused'] as const)(
+  'does not invent verification for a %s proposal',
+  async (outcome) => {
+    const phases: string[] = [];
+    const runtime = ManagedRuntime.make(
+      PlanLive.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.succeed(PlanningSource, {
+              read: () =>
+                Effect.succeed({
+                  issues: [issue],
+                  job: { kind: 'empty' as const },
+                  capacity: { concurrency: 1, admission: 1 },
+                }),
+              verify: () => Effect.die('No selected prerequisites to verify'),
+            }),
+            Layer.succeed(IPlanner, {
+              ownership: () => Effect.succeed(undefined),
+              propose: () =>
+                Effect.succeed(
+                  outcome === 'stale' || outcome === 'paused'
+                    ? { kind: outcome }
+                    : {
+                        selected: outcome === 'invalid' ? [{ ...selection, issue: 999 }] : [],
+                        deferred: [],
+                      }
+                ),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const plan = await runtime.runPromise(Plan);
+      const result = await runtime.runPromise(
+        plan.preview({
+          progress: (phase) =>
+            Effect.sync(() => {
+              phases.push(phase);
+            }),
+        })
+      );
+      expect(result.selected).toEqual([]);
+      expect(result.kind).toBe(outcome === 'stale' || outcome === 'paused' ? outcome : 'preview');
+      expect(phases).toEqual(['discovery', 'handoff']);
+      expect(await runtime.runPromise(plan.verification())).toBeNull();
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
 async function preview(
   issues = [issue],
   proposed = proposal,

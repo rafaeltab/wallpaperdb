@@ -15,7 +15,7 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
   let running: Awaited<ReturnType<typeof startFactory>> | undefined;
   try {
     await host.save({
-      hold: 'planning-discovery',
+      holds: ['planning-discovery', 'prerequisite-verification'],
       planning: {
         issues: [
           {
@@ -59,13 +59,36 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
     });
     await vi.waitFor(
       async () => {
-        expect(await readFile(`${host.directory}/held`, 'utf8')).toBe('planning-discovery');
+        expect(await readFile(`${host.directory}/held-planning-discovery`, 'utf8')).toBe(
+          'planning-discovery'
+        );
       },
       { timeout: 5000, interval: 20 }
     );
     // Model time cannot be consumed while quota-paced discovery is still held.
     vi.setSystemTime(Date.now() + 11 * 60_000);
-    await writeFile(`${host.directory}/release`, 'release discovery');
+    await writeFile(`${host.directory}/release-planning-discovery`, 'release discovery');
+    await vi.waitFor(
+      async () => {
+        expect(await readFile(`${host.directory}/held-prerequisite-verification`, 'utf8')).toBe(
+          'prerequisite-verification'
+        );
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    await vi.waitFor(
+      async () => {
+        const activity = (await running!.app.inject('/api/v2/board')).json().meta.activity;
+        expect(activity.items).toContainEqual(
+          expect.objectContaining({
+            category: 'checking-plan-freshness',
+            startedAt: expect.any(String),
+          })
+        );
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    await writeFile(`${host.directory}/release-prerequisite-verification`, 'continue');
     await vi.waitFor(
       async () => {
         expect((await running!.app.inject('/api/scheduler')).json()).toMatchObject({
@@ -95,6 +118,8 @@ it('admits an automatic proposal after discovery outlasts the model time allowan
     expect(starts.filter((call) => call.args.includes('--worktree'))).toHaveLength(1);
   } finally {
     await writeFile(`${host.directory}/release`, 'cleanup');
+    await writeFile(`${host.directory}/release-planning-discovery`, 'cleanup');
+    await writeFile(`${host.directory}/release-prerequisite-verification`, 'cleanup');
     await running?.close();
     vi.useRealTimers();
     process.env.PATH = previous.path;
@@ -121,7 +146,7 @@ it('collects once before model handoff and retains completion across restart', a
     FACTORY_STATE: `${host.directory}/state`,
     FACTORY_PORT: '0',
   };
-  const boundaries = ['planning-discovery', 'planner-observation', 'planning-freshness'];
+  const boundaries = ['planning-discovery', 'planner-observation', 'prerequisite-verification'];
   const held = async (boundary: string) =>
     vi.waitFor(
       async () => {
@@ -148,7 +173,12 @@ it('collects once before model handoff and retains completion across restart', a
           },
         ],
       },
-      planner: { proposal: { selected: [], deferred: [] } },
+      planner: {
+        proposal: {
+          selected: [{ issue: 581, reason: 'Authorized repair', includeCodeFromIssues: [] }],
+          deferred: [],
+        },
+      },
     });
     await Effect.runPromise(
       fileScheduleStore(`${host.directory}/state`).save({
@@ -185,6 +215,21 @@ it('collects once before model handoff and retains completion across restart', a
     expect(deadline).toBeLessThanOrEqual(Date.now() + 600_000);
     vi.setSystemTime(Date.now() + 9 * 60_000);
     await release('planner-observation');
+    await held('prerequisite-verification');
+    expect(await details()).toMatchObject({ phase: 'freshness' });
+    await vi.waitFor(
+      async () => {
+        const activity = (await running!.app.inject('/api/v2/board')).json().meta.activity;
+        expect(activity.items).toContainEqual(
+          expect.objectContaining({
+            category: 'checking-plan-freshness',
+            startedAt: expect.any(String),
+          })
+        );
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    await release('prerequisite-verification');
     await vi.waitFor(
       async () => {
         expect(await details()).toMatchObject({
@@ -202,6 +247,17 @@ it('collects once before model handoff and retains completion across restart', a
           deadline: new Date(deadline).toISOString(),
           phase: 'succeeded',
         });
+      },
+      { timeout: 5000, interval: 20 }
+    );
+    await vi.waitFor(
+      async () => {
+        const activity = (await running!.app.inject('/api/v2/board')).json().meta.activity;
+        expect(
+          activity.items.some(
+            (item: { category: string }) => item.category === 'checking-plan-freshness'
+          )
+        ).toBe(false);
       },
       { timeout: 5000, interval: 20 }
     );

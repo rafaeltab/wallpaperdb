@@ -111,6 +111,8 @@ export interface Preview {
   readonly input: PlanningInput;
 }
 export interface Plan {
+  /** Local live-owner evidence. No retained timestamp is treated as current work. */
+  verification(): Effect.Effect<{ readonly startedAt: number } | null>;
   preview(attempt?: {
     /** Fresh discovery gathered by this scheduler invocation, never retained across cycles. */
     input?: PlanningInput;

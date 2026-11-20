@@ -71,7 +71,8 @@ export const JobLive = Layer.effect(
                       { ...active, id: intent.id },
                       request.stage,
                       request.index,
-                      request.commit
+                      request.commit,
+                      request.publicationStartedAt
                     ) ?? Effect.void
                 )
               ),
@@ -210,6 +211,8 @@ export const JobLive = Layer.effect(
             kind: 'job' as const,
             controlRevision: control.revision,
             stageIndex: stage?.index,
+            publicationStartedAt:
+              stage?.stage === 'publication' ? stage.publicationStartedAt : undefined,
             reconciliation: control.reconciliation
               ? {
                   attempts: control.reconciliation.attempts,

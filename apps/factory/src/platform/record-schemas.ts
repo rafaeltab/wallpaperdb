@@ -52,6 +52,7 @@ const reconciliationReasonSchema = z.discriminatedUnion('kind', [
 ]);
 const stageSchema = z
   .object({
+    publicationStartedAt: z.number().finite().optional(),
     acceptedBase: z
       .string()
       .regex(/^[a-f0-9]{40}$/)

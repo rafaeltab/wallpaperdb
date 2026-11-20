@@ -109,3 +109,38 @@ it('updates implementing counts and timers as newest work finishes or enters rev
   expect(within(panel).getByText('Implementing')).toBeTruthy();
   expect(within(panel).getAllByText('1 issue').length).toBe(2);
 });
+
+it('counts current publishing issues and advances the newest timer through joins, refreshes and departures', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(facts.observedAt));
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const older: ActivityFacts['items'][number] = {
+    id: 'publish-1',
+    category: 'publishing',
+    lifecycle: 'current',
+    issue: 1,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Publishing reviewed changes',
+  };
+  const newer = { ...older, id: 'publish-2', issue: 2, startedAt: '2026-11-17T11:59:00Z' };
+  const current = { ...facts, items: [...facts.items, older, newer] };
+  const { rerender } = render(<FactoryActivity facts={current} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Publishing 2 issues.*1m 0s/ })).toBeTruthy();
+  fireEvent.focus(screen.getByRole('button', { name: /Publishing/ }));
+  const panel = screen.getByRole('region', { name: 'Factory activity details' });
+  expect(within(panel).getByText('Refreshing GitHub')).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  rerender(<FactoryActivity facts={{ ...current }} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Publishing 2 issues.*1m 2s/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{ ...facts, items: [...facts.items, older] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Publishing 1 issue.*2m 2s/ })).toBeTruthy();
+  rerender(<FactoryActivity facts={facts} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Refreshing GitHub/ })).toBeTruthy();
+});

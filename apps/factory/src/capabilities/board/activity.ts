@@ -75,6 +75,46 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
           : 'Implementing admitted issue',
     });
   }
+  for (const job of input.jobs) {
+    if (job.kind !== 'job' || !input.state.admissions.some((a) => a.issue === job.intent.issue))
+      continue;
+    const control = input.localWork.find((w) => w.intent?.id === job.intent.id)?.control;
+    const delivery = job.delivery;
+    if (
+      control?.cancelled ||
+      control?.released ||
+      control?.retirement ||
+      control?.parked ||
+      control?.dependencyRecovery ||
+      delivery?.stage !== 'publication' ||
+      delivery.ready ||
+      delivery.landed ||
+      delivery.active === false ||
+      (delivery.activity !== undefined &&
+        !['repairing', 'waiting-for-github'].includes(delivery.activity))
+    )
+      continue;
+    const executing =
+      job.execution.kind === 'found' && ['running', 'waiting'].includes(job.execution.status);
+    const accepted =
+      job.execution.kind === 'ambiguous' &&
+      job.acknowledgement?.stage === 'publication' &&
+      job.acknowledgement.index === job.stageIndex;
+    if (!executing && !accepted) continue;
+    items.push({
+      id: `publication:${job.intent.id}:${job.stageIndex ?? 'unknown'}`,
+      category: 'publishing',
+      lifecycle: 'current',
+      issue: job.intent.issue,
+      pullRequest: null,
+      startedAt:
+        job.publicationStartedAt === undefined ? null : timestamp(job.publicationStartedAt),
+      reason:
+        delivery.activity === 'repairing'
+          ? 'Publishing reviewed repair'
+          : 'Publishing reviewed issue changes',
+    });
+  }
   const source = input.observations;
   if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
@@ -109,9 +149,9 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     admissionReasons: reasons,
     coverage: categories.map((category) => ({
       category,
-      state: category === 'refreshing-github' || !uncertainty.length ? 'complete' : 'unknown',
+      state: category === 'refreshing-github' || category === 'publishing' || !uncertainty.length ? 'complete' : 'unknown',
       reason:
-        category === 'refreshing-github' || !uncertainty.length
+        category === 'refreshing-github' || category === 'publishing' || !uncertainty.length
           ? null
           : 'Lifecycle not yet instrumented.',
     })),

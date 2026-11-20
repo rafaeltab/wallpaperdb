@@ -875,3 +875,53 @@ it.each([false, true])(
     }
   }
 );
+
+it('coalesces a same-run replacement question even after a reconciled status is buffered', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const job = parkedSnapshot(pullObservation(42), false).jobs[0];
+  if (job.kind !== 'job' || job.execution.kind !== 'found') throw new Error('Expected job');
+  const { store, runtime } = setup();
+  try {
+    const reporting = await runtime.runPromise(Reporting);
+    const generation = await runtime.runPromise(reporting.begin());
+    const execution = {
+      ...job.execution,
+      run: { id: 'run-1', ordinal: 1 },
+      question: { id: 'q1', text: 'First decision', startedAt: 1000 },
+    };
+    await runtime.runPromise(
+      reporting.enqueue(generation, [
+        {
+          kind: 'job',
+          sequence: 1,
+          at: 10,
+          value: { ...job, stageIndex: 1, controlRevision: 1, execution },
+        },
+      ])
+    );
+    await runtime.runPromise(
+      reporting.enqueue(generation, [
+        {
+          kind: 'job',
+          sequence: 2,
+          at: 20,
+          value: {
+            ...job,
+            stageIndex: 1,
+            execution: {
+              ...execution,
+              question: { id: 'q2', text: 'Replacement decision', startedAt: 2000 },
+              closedQuestions: ['q1'],
+            },
+          },
+        },
+      ])
+    );
+    await runtime.runPromise(reporting.flush());
+    expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+      { execution: { question: { id: 'q2', startedAt: 2000 }, closedQuestions: ['q1'] } },
+    ]);
+  } finally {
+    await runtime.dispose();
+  }
+});

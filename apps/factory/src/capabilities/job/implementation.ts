@@ -4,9 +4,11 @@ import { Effect, Layer, Random, Option } from 'effect';
 import {
   reconcileStages,
   currentStage,
+  controlForStage,
   ciRepairOrigin,
   hasAnsweredQuestion,
   stageRunOrder,
+  answerRunCurrent,
   retainInitialStage,
 } from './stages.js';
 import {
@@ -101,6 +103,8 @@ export const JobLive = Layer.effect(
           const owningStage =
             latestStage && latestStage.index >= (before.restart?.index ?? 0) ? latestStage : null;
           const observation = yield* execution.observe(activeIntent, owningStage ?? undefined);
+          yield* retainQuestionClosure(store, observation);
+          yield* retainAnswerWait(store, owningStage, observation);
           const owner = observation.kind === 'found' ? observation.threadId : owningStage?.threadId;
           if (owner) observedOwnership = { threadId: owner };
           // Execution is an observed fact even if subsequent receipt validation fails.
@@ -112,7 +116,13 @@ export const JobLive = Layer.effect(
               .observed(generation, {
                 kind: 'job',
                 intent,
-                execution: observation,
+                execution:
+                  observation.kind === 'found' &&
+                  owningStage &&
+                  observation.run &&
+                  !currentAnswerRun(owningStage, before, observation.run)
+                    ? { ...observation, question: undefined }
+                    : observation,
                 stageIndex: stage?.index,
                 publicationStartedAt:
                   stage?.stage === 'publication' ? stage.publicationStartedAt : undefined,
@@ -130,6 +140,10 @@ export const JobLive = Layer.effect(
               // Provisional reporting cannot prevent cancellation or reconciliation.
               .pipe(Effect.catch(Effect.logError));
           }
+          // Reporting persistence may advance control without granting execution authority.
+          // Reobserve under a fresh authority snapshot rather than relabel earlier evidence.
+          if ((yield* store.readControl()).revision !== before.revision)
+            return yield* observe(intent);
           const cancelled = (yield* store.readControl()).cancelled;
           if (cancelled && observation.kind === 'found')
             yield* execution.interrupt(activeIntent, observation.threadId);
@@ -159,6 +173,12 @@ export const JobLive = Layer.effect(
             before,
             policy?.limit ?? defaultAgentReconciliationLimit
           );
+          // Publish adopted-stage question retention even before another found observation.
+          const reportedStage = yield* currentStage(store);
+          if (reportedStage) yield* controlForStage(store, reportedStage);
+          yield* retainAnswerWait(store, reportedStage, observation);
+          // Reconciliation can restore a question from an adopted immutable stage.
+          yield* retainQuestionClosure(store, observation);
           yield* retainPrerequisite(store, delivery);
           // Verified handback retains its exact revision until admission release.
           if (owner && delivery?.activity !== 'dependency-handback')
@@ -700,4 +720,98 @@ function releasedStatus(
       progress: 'Attempt released; retained for history only.',
     },
   };
+}
+
+function retainQuestionClosure(
+  store: import('./contract.js').JobStore,
+  observation: import('./contract.js').Observation
+) {
+  return Effect.gen(function* () {
+    if (observation.kind !== 'found') return;
+    for (;;) {
+      const control = yield* store.readControl();
+      const parked = control.parked;
+      if (
+        control.released ||
+        !parked ||
+        parked.closed ||
+        !(
+          observation.closedQuestions?.includes(parked.question.id) ||
+          observation.answeredQuestions?.includes(parked.question.id)
+        )
+      )
+        return;
+      if (
+        yield* store.saveControl({
+          ...control,
+          revision: control.revision + 1,
+          parked: { ...parked, closed: true },
+        })
+      )
+        return;
+    }
+  });
+}
+
+function retainAnswerWait(
+  store: import('./contract.js').JobStore,
+  stage: import('./contract.js').StageRequest | null,
+  observation: import('./contract.js').Observation
+) {
+  return Effect.gen(function* () {
+    if (observation.kind !== 'found' || !stage || stage.threadId !== observation.threadId) return;
+    for (;;) {
+      const control = yield* store.readControl();
+      if (control.cancelled || control.released || control.retirement) return;
+      const latest = yield* currentStage(store);
+      if (latest?.index !== stage.index) return;
+      const previous = control.answerWait;
+      if (observation.run && !currentAnswerRun(stage, control, observation.run)) return;
+      const isClosed = (id: string) =>
+        observation.closedQuestions?.includes(id) || observation.answeredQuestions?.includes(id);
+      let next = previous;
+      if (observation.question) {
+        const same = previous?.question?.id === observation.question.id;
+        next = {
+          index: stage.index,
+          run: observation.run,
+          question: {
+            ...observation.question,
+            startedAt:
+              observation.question.startedAt ?? (same ? previous?.question?.startedAt : undefined),
+          },
+          closed: isClosed(observation.question.id) || (same && previous?.closed) || undefined,
+        };
+      } else if (
+        (previous?.question && isClosed(previous.question.id)) ||
+        (observation.run &&
+          (!previous ||
+            previous.index !== stage.index ||
+            (previous.run && observation.run.ordinal > previous.run.ordinal)))
+      ) {
+        next = {
+          index: stage.index,
+          run: observation.run ?? previous?.run,
+          question: previous?.index === stage.index ? previous.question : undefined,
+          closed: true,
+        };
+      }
+      if (JSON.stringify(next) === JSON.stringify(previous)) return;
+      if (
+        yield* store.saveControl({ ...control, revision: control.revision + 1, answerWait: next })
+      )
+        return;
+    }
+  });
+}
+
+function currentAnswerRun(
+  stage: import('./contract.js').StageRequest,
+  control: import('./contract.js').Control,
+  run: { readonly id: string; readonly ordinal: number }
+) {
+  return (
+    stageRunOrder(stage, control, run) &&
+    (control.answerWait?.index !== stage.index || answerRunCurrent(control.answerWait.run, run))
+  );
 }

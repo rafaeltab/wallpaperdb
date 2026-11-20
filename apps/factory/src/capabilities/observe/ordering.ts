@@ -19,7 +19,8 @@ export function jobObservationIsOlder(previous: JobObservation | undefined, next
     (after.kind === 'found' || after.kind === 'unverified') &&
     before.threadId === after.threadId &&
     before.run?.id === after.run?.id &&
-    before.status === after.status
+    before.status === after.status &&
+    JSON.stringify(questionLifecycle(before)) === JSON.stringify(questionLifecycle(after))
   )
     return true;
   if (
@@ -44,6 +45,16 @@ export function jobObservationIsOlder(previous: JobObservation | undefined, next
     !!after.run &&
     before.run.ordinal > after.run.ordinal
   );
+}
+
+function questionLifecycle(execution: JobObservation['execution']) {
+  return execution.kind === 'found'
+    ? {
+        question: execution.question,
+        closed: [...(execution.closedQuestions ?? [])].sort(),
+        answered: [...(execution.answeredQuestions ?? [])].sort(),
+      }
+    : null;
 }
 
 /** A completed replacement watcher changes execution evidence, not the retained wait ownership.

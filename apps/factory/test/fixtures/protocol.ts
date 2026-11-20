@@ -467,6 +467,7 @@ export async function runProtocol(
                   ? [
                       {
                         itemId: 'restack-question',
+                        updatedAt: '2026-11-20T12:00:00.000Z',
                         type: 'user_input_request',
                         runId: state.thread.latestRunId,
                         status: 'waiting',
@@ -490,6 +491,7 @@ export async function runProtocol(
                 ? [
                     {
                       itemId: 'restack-question',
+                      updatedAt: '2026-11-20T12:00:00.000Z',
                       runId: state.thread.latestRunId,
                       type: 'user_input_request',
                       status: 'waiting',

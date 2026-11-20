@@ -344,6 +344,7 @@ it('observes only managed lineage, replaces historical activity by identity and 
                         type: 'command_execution',
                         ordinal: 0,
                         status: 'pending',
+                        updatedAt: '2026-11-20T12:00:00.000Z',
                       },
                     ]
                   : [],
@@ -374,7 +375,7 @@ it('observes only managed lineage, replaces historical activity by identity and 
     await vi.waitFor(() => expect([...requested].sort()).toEqual(['child', 'owner']));
     await vi.waitFor(() =>
       expect(observer.activity('owner').items).toMatchObject([
-        { itemId: 'historical', status: 'pending' },
+        { itemId: 'historical', status: 'pending', updatedAt: '2026-11-20T12:00:00.000Z' },
       ])
     );
     expect(observer.inactive('owner', 'run')).toBe('busy');

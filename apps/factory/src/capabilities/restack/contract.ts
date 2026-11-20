@@ -10,6 +10,8 @@ export interface Resolution {
   readonly active?: boolean;
   readonly threadId?: string;
   readonly question?: string;
+  readonly questionStartedAt?: number;
+  readonly questionId?: string;
 }
 export interface RecoveryOutcome extends Resolution {
   readonly ready: boolean;

@@ -76,6 +76,7 @@ const activity = z.object({
       sourceThreadId: z.string(),
       visibility: z.string(),
       position: z.number().optional(),
+      updatedAt: z.string().datetime({ offset: true }).optional(),
       createdBy: z.string().nullable().optional(),
       creationSource: z.string().nullable().optional(),
     })
@@ -91,8 +92,9 @@ export async function pendingQuestion(
   jobId?: string
 ) {
   let afterPosition: number | undefined = -1;
-  let question: { id: string; text: string } | undefined;
+  let question: { id: string; text: string; startedAt?: number } | undefined;
   const answeredQuestions: string[] = [];
+  const closedQuestions: string[] = [];
   const messages: z.infer<typeof activity>['items'] = [];
   for (;;) {
     const page = activity.parse(
@@ -114,10 +116,22 @@ export async function pendingQuestion(
     messages.push(...page.items);
     question = questionOnPage(page, threadId) ?? question;
     answeredQuestions.push(...answeredOnPage(page, threadId));
+    closedQuestions.push(
+      ...page.items
+        .filter(
+          (item) =>
+            item.type === 'user_input_request' &&
+            ['completed', 'cancelled'].includes(item.status) &&
+            item.sourceThreadId === threadId &&
+            item.visibility === 'local'
+        )
+        .map((item) => item.itemId)
+    );
     if (!page.hasMore)
       return {
         question,
         answeredQuestions,
+        closedQuestions,
         manual: manualBoundary(messages, threadId, jobId),
         runStartedAt: page.recentRuns?.find((run) => run.runId === expectedRunId)?.startedAt,
       };
@@ -172,7 +186,11 @@ function questionOnPage(page: z.infer<typeof activity>, threadId: string) {
     .reverse()
     .find((candidate) => isCurrentQuestion(candidate, threadId, page.thread.latestRunId));
   return item
-    ? { id: item.itemId, text: item.text ?? 'Question awaiting an answer in T3' }
+    ? {
+        id: item.itemId,
+        text: item.text ?? 'Question awaiting an answer in T3',
+        ...(item.updatedAt ? { startedAt: Date.parse(item.updatedAt) } : {}),
+      }
     : undefined;
 }
 function followingPosition(page: z.infer<typeof activity>, previous: number | undefined) {

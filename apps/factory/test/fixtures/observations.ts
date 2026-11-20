@@ -54,7 +54,19 @@ export function controlledObservations(
               (after.kind === 'found' || after.kind === 'unverified') &&
               before.threadId === after.threadId &&
               before.run?.id === after.run?.id &&
-              before.status === after.status
+              before.status === after.status &&
+              (before.kind !== 'found' ||
+                after.kind !== 'found' ||
+                JSON.stringify([
+                  before.question,
+                  [...(before.closedQuestions ?? [])].sort(),
+                  [...(before.answeredQuestions ?? [])].sort(),
+                ]) ===
+                  JSON.stringify([
+                    after.question,
+                    [...(after.closedQuestions ?? [])].sort(),
+                    [...(after.answeredQuestions ?? [])].sort(),
+                  ]))
             )
               continue;
             if (

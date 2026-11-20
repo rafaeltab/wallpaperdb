@@ -3,6 +3,7 @@ import { access, mkdtemp, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect, Layer as EffectLayer } from 'effect';
 import { z } from 'zod';
+import { and, eq } from 'drizzle-orm';
 import {
   Unavailable,
   type StageRequest,
@@ -19,7 +20,8 @@ import {
   publisher,
   readRecord,
   recordNames,
-  replaceProgress,
+  records,
+  stateConnection,
   initializeNamespace,
 } from '../../platform/index.js';
 import { t3Restacker } from '../t3/index.js';
@@ -47,6 +49,11 @@ import {
   journalIntent as intent,
 } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
+const recoveryAnswer = z.object({
+  id: z.string(),
+  text: z.string(),
+  startedAt: z.number().finite().optional(),
+});
 type Layer = z.infer<typeof layer>;
 type Intent = z.infer<typeof intent>;
 type RepairAuthority = { request: StageRequest; evidence: StageEvidence };
@@ -404,7 +411,55 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       worktree: path,
       snapshot: await attemptSnapshot(path, signal),
     });
-  const saveProgress = replaceProgress;
+  const saveProgress = async (dir: string, value: unknown) =>
+    stateConnection(dir, (db, namespace) =>
+      db.transaction((tx) => {
+        const next = z.record(z.unknown()).parse(value);
+        const previous = z
+          .object({
+            issue: z.number().optional(),
+            pr: z.string().optional(),
+            phase: z.string().optional(),
+            question: z.string().optional(),
+            questionId: z.string().optional(),
+            questionStartedAt: z.number().finite().optional(),
+            answerWait: recoveryAnswer.optional(),
+          })
+          .safeParse(
+            tx
+              .select({ value: records.value })
+              .from(records)
+              .where(
+                and(eq(records.namespace, namespace), eq(records.name, 'recovery-progress.json'))
+              )
+              .get()?.value
+          );
+        // Retain reporting facts only while the same recovery binding is unavailable.
+        // Known lifecycle transitions replace them without changing execution progress.
+        const retained =
+          next.bindingAvailable === false &&
+          next.phase === undefined &&
+          previous.success &&
+          previous.data.issue === next.issue &&
+          previous.data.pr === next.pr
+            ? (previous.data.answerWait ??
+              (previous.data.phase === 'awaiting-answer' &&
+              previous.data.questionId &&
+              previous.data.question
+                ? {
+                    id: previous.data.questionId,
+                    text: previous.data.question,
+                    startedAt: previous.data.questionStartedAt,
+                  }
+                : undefined))
+            : undefined;
+        const stored = { ...next, answerWait: retained };
+        tx.insert(records)
+          .values({ namespace, name: 'recovery-progress.json', value: stored })
+          .onConflictDoUpdate({ target: [records.namespace, records.name], set: { value: stored } })
+          .run();
+      })
+    );
   const attemptRebase = async (
     item: Layer,
     onto: string,
@@ -2114,6 +2169,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         classification: z.enum(['SIMPLE', 'COMPLEX']).optional(),
         threadId: z.string().optional(),
         question: z.string().optional(),
+        questionStartedAt: z.number().finite().optional(),
+        questionId: z.string().optional(),
+        answerWait: recoveryAnswer.optional(),
       })
       .parse(saved);
     const association = z.object({ issue: z.number() }).parse(saved);

@@ -505,12 +505,26 @@ export function stageRunOrder(
   return (
     !control.cancelled &&
     !control.released &&
-    observations.every(
-      (prior) =>
-        !prior ||
-        run.ordinal > prior.ordinal ||
-        (run.ordinal === prior.ordinal && run.id === prior.id)
-    )
+    observations.every((prior) => runNotOlder(prior, run))
+  );
+}
+
+export function runNotOlder(
+  prior: { readonly id: string; readonly ordinal: number } | undefined,
+  run: { readonly id: string; readonly ordinal: number }
+) {
+  return (
+    !prior || run.ordinal > prior.ordinal || (run.ordinal === prior.ordinal && run.id === prior.id)
+  );
+}
+
+/** Reporting rejects a contradictory ordinal for an already identified provider run. */
+export function answerRunCurrent(
+  prior: { readonly id: string; readonly ordinal: number } | undefined,
+  run: { readonly id: string; readonly ordinal: number }
+) {
+  return (
+    runNotOlder(prior, run) && (!prior || prior.id !== run.id || prior.ordinal === run.ordinal)
   );
 }
 
@@ -735,7 +749,7 @@ function adoptedDelivery(
     active: true,
   };
 }
-function controlForStage(store: JobStore, waiting: StageRequest) {
+export function controlForStage(store: JobStore, waiting: StageRequest) {
   return Effect.gen(function* () {
     const saved = yield* store.readControl();
     if (!canRestoreQuestion(saved, waiting)) return saved;

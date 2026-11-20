@@ -143,6 +143,7 @@ it.each(['absent', 'ambiguous'] as const)(
                   issue: 4,
                   active: false,
                   question: 'May I change this requirement?',
+                  questionStartedAt: Date.parse('2026-11-20T12:00:00.000Z'),
                   bindingAvailable: true,
                 },
               ],
@@ -167,6 +168,46 @@ it.each(['absent', 'ambiguous'] as const)(
               ],
             }),
           { timeout: 15000, interval: 50 }
+        );
+        await vi.waitFor(
+          async () => {
+            expect((await running.app.inject('/api/scheduler')).json()).toMatchObject({
+              recoveries: [
+                {
+                  bindingAvailable: false,
+                  answerWait: {
+                    id: 'restack-question',
+                    text: 'May I change this requirement?',
+                    startedAt: Date.parse('2026-11-20T12:00:00.000Z'),
+                  },
+                },
+              ],
+            });
+            const activity = (await running.app.inject('/api/v2/board')).json().meta.activity;
+            expect(activity.items).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({
+                  category: 'waiting-for-answers',
+                  issue: 4,
+                  startedAt: '2026-11-20T12:00:00.000Z',
+                }),
+              ])
+            );
+          },
+          { timeout: 15000, interval: 50 }
+        );
+        expect(await Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]))).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              issue: 4,
+              bindingAvailable: false,
+              answerWait: {
+                id: 'restack-question',
+                text: 'May I change this requirement?',
+                startedAt: Date.parse('2026-11-20T12:00:00.000Z'),
+              },
+            }),
+          ])
         );
         expect((await running.app.inject('/health')).json()).toEqual({ status: 'ok' });
         await vi.waitFor(
@@ -213,6 +254,17 @@ it.each(['absent', 'ambiguous'] as const)(
               !call.args.includes('--help')
           )
         ).toEqual([]);
+        await vi.waitFor(
+          async () => {
+            const activity = (await running.app.inject('/api/v2/board')).json().meta.activity;
+            expect(
+              activity.items.filter(
+                (item: { category: string }) => item.category === 'waiting-for-answers'
+              )
+            ).toEqual([]);
+          },
+          { timeout: 15000, interval: 50 }
+        );
         expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
       } finally {
         await running.close();

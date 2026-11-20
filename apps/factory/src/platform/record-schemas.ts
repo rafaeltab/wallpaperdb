@@ -77,7 +77,9 @@ const stageSchema = z
     continuation: z.boolean().optional(),
     resume: z.boolean().optional(),
     observedRunId: z.string().optional(),
-    question: z.object({ id: z.string(), text: z.string() }).optional(),
+    question: z
+      .object({ id: z.string(), text: z.string(), startedAt: z.number().finite().optional() })
+      .optional(),
     deliveryIndex: z.number().int().nonnegative().optional(),
     index: z.number().int().min(0),
     stage: z.enum(['implementation', 'review', 'publication', 'babysitting', 'ci']),
@@ -178,11 +180,30 @@ const controlSchema = z
         base: z.string().optional(),
       })
       .optional(),
-    parked: z
+    answerWait: z
       .object({
         index: z.number().int().nonnegative(),
         run: z.object({ id: z.string(), ordinal: z.number().int().positive() }).optional(),
-        question: z.object({ id: z.string(), text: z.string() }),
+        question: z
+          .object({
+            id: z.string(),
+            text: z.string(),
+            startedAt: z.number().finite().optional(),
+          })
+          .optional(),
+        closed: z.boolean().optional(),
+      })
+      .optional(),
+    parked: z
+      .object({
+        closed: z.boolean().optional(),
+        index: z.number().int().nonnegative(),
+        run: z.object({ id: z.string(), ordinal: z.number().int().positive() }).optional(),
+        question: z.object({
+          id: z.string(),
+          text: z.string(),
+          startedAt: z.number().finite().optional(),
+        }),
       })
       .optional(),
   })

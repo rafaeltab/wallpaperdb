@@ -12,6 +12,7 @@ interface Message {
 }
 interface Activity {
   itemId: string;
+  updatedAt?: string;
   runId?: string | null;
   type: string;
   status: string;
@@ -164,6 +165,7 @@ export async function observedProtocol(directory: string, configFile: string) {
       type: item.type,
       ordinal: item.position ?? turnItems.length + index,
       status: item.status,
+      updatedAt: item.updatedAt,
       text: item.text ?? null,
       ...(item.type === 'user_input_request' ? { questions: item.text } : {}),
     }));

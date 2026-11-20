@@ -4872,6 +4872,462 @@ it('classifies running CI repair stages alongside current implementation reporti
     board.close();
   }
 });
+
+it('reports retained managed answer waits independently of capacity and removes resolved responsibility', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const source = parkedSnapshot(pullObservation(2), false);
+  const current = source.jobs[0];
+  if (current.kind !== 'job' || !current.delivery) throw new Error('Expected managed job');
+  const question = { id: 'q1', text: 'Choose', startedAt: 1500 };
+  const input: ScheduleSnapshot = {
+    ...source,
+    coordinationIdle: true,
+    jobs: [{ ...current, delivery: { ...current.delivery, question } }],
+  };
+  const board = await liveBoard({ scopeId: 'answer-waits', initial: input });
+  const expected = [
+    { category: 'waiting-for-answers', issue: 1, startedAt: '1970-01-01T00:00:01.500Z' },
+  ];
+  expect(board.snapshot().meta.activity?.items).toMatchObject(expected);
+  expect(Object.values(board.snapshot().entities.jobs)[0].occupiesCapacity).toBe(false);
+  await board.publish({ ...input, observations: { ...input.observations, observedAt: 9000 } });
+  expect(board.snapshot().meta.activity?.items).toMatchObject(expected);
+  for (const activity of ['resume-pending', 'manual-recovery'] as const) {
+    await board.publish({
+      ...input,
+      jobs: [{ ...current, delivery: { ...current.delivery, question: undefined, activity } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  }
+  await board.publish({
+    ...input,
+    jobs: [{ ...current, delivery: { ...current.delivery, question, ready: true } }],
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});
+
+it('exposes simultaneous job and recovery answer waits with their own timestamps through HTTP', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input: ScheduleSnapshot = {
+    ...parkedSnapshot(pullObservation(2), false),
+    recoveries: [
+      {
+        issue: 1,
+        pr: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+        phase: 'awaiting-answer',
+        active: false,
+        question: 'Approve recovery?',
+        questionId: 'recovery-question',
+        questionStartedAt: 2500,
+        progress: 'Parked',
+      },
+    ],
+  };
+  const board = await liveBoard({ scopeId: 'answer-http', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(activity?.items).toMatchObject([
+      { category: 'waiting-for-answers', issue: 1, startedAt: null },
+      {
+        category: 'waiting-for-answers',
+        issue: 1,
+        pullRequest: 2,
+        startedAt: '1970-01-01T00:00:02.500Z',
+      },
+    ]);
+    expect(activity).not.toHaveProperty('summary');
+    for (const phase of ['waiting-capacity', 'complete', 'manual-recovery'] as const) {
+      await board.publish({
+        ...input,
+        jobs: [],
+        localWork: [],
+        recoveries: input.recoveries?.map((r) => ({ ...r, phase })),
+      });
+      expect(board.snapshot().meta.activity?.items).toEqual([]);
+    }
+  } finally {
+    board.close();
+    await app.close();
+  }
+});
+
+it.each(['answered', 'cancelled', 'retired', 'stale-stage', 'unmanaged'])(
+  'excludes %s answer waits',
+  async (state) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const input = parkedSnapshot(pullObservation(2), false);
+    const current = input.jobs[0];
+    if (current.kind !== 'job' || current.execution.kind !== 'found')
+      throw new Error('Expected job');
+    const board = await liveBoard({
+      scopeId: `exclude-${state}`,
+      initial: {
+        ...input,
+        state: { ...input.state, admissions: state === 'unmanaged' ? [] : input.state.admissions },
+        jobs: [
+          {
+            ...current,
+            stageIndex: state === 'stale-stage' ? 2 : 0,
+            execution: {
+              ...current.execution,
+              closedQuestions: state === 'answered' ? ['q1'] : [],
+            },
+            delivery: state === 'stale-stage' ? undefined : current.delivery,
+          },
+        ],
+        localWork: input.localWork.map((w) => ({
+          ...w,
+          control: {
+            ...w.control,
+            cancelled: state === 'cancelled',
+            released: state === 'retired',
+          },
+        })),
+      },
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    board.close();
+  }
+);
+
+it('does not revive a closed parked request when execution becomes unavailable', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2), false);
+  const current = input.jobs[0];
+  if (current.kind !== 'job') throw new Error('Expected job');
+  const localWork = input.localWork.map((w) => ({
+    ...w,
+    control: {
+      ...w.control,
+      parked: w.control.parked ? { ...w.control.parked, closed: true } : undefined,
+    },
+  }));
+  const board = await liveBoard({
+    scopeId: 'closed-unavailable',
+    initial: { ...input, localWork },
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  await board.publish({
+    ...input,
+    localWork,
+    jobs: [
+      {
+        ...current,
+        delivery: undefined,
+        execution: { kind: 'unverified', threadId: 't1', status: 'unknown' },
+      },
+    ],
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  const nextQuestion = { id: 'q2', text: 'New decision?', startedAt: 5000 };
+  await board.publish({
+    ...input,
+    localWork,
+    jobs: [
+      {
+        ...current,
+        delivery: {
+          stage: 'implementation',
+          commit: current.intent.base,
+          ready: false,
+          landed: false,
+          question: nextQuestion,
+        },
+      },
+    ],
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    {
+      category: 'waiting-for-answers',
+      reason: 'New decision?',
+      startedAt: '1970-01-01T00:00:05.000Z',
+    },
+  ]);
+  board.close();
+});
+
+it('reports a directly observed managed question before publication reconciliation can park it', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const source = parkedSnapshot(pullObservation(2), false);
+  const current = source.jobs[0];
+  if (current.kind !== 'job' || current.execution.kind !== 'found') throw new Error('Expected job');
+  const question = {
+    id: 'publication-question',
+    text: 'Choose publication behavior?',
+    startedAt: 7000,
+  };
+  const board = await liveBoard({
+    scopeId: 'observed-answer',
+    initial: {
+      ...source,
+      localWork: source.localWork.map((w) => ({
+        ...w,
+        control: { ...w.control, parked: undefined },
+      })),
+      jobs: [
+        {
+          ...current,
+          stageIndex: 2,
+          resume: undefined,
+          execution: { ...current.execution, question },
+          delivery: {
+            stage: 'publication',
+            commit: current.intent.base,
+            ready: false,
+            landed: false,
+          },
+        },
+      ],
+    },
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    {
+      category: 'waiting-for-answers',
+      issue: 1,
+      startedAt: '1970-01-01T00:00:07.000Z',
+      reason: 'Choose publication behavior?',
+    },
+  ]);
+  board.close();
+});
+
+it('keeps the reconciled current question ahead of an older execution question', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2), false);
+  const current = input.jobs[0];
+  if (current.kind !== 'job' || current.execution.kind !== 'found' || !current.delivery)
+    throw new Error('Expected job');
+  const oldQuestion = { id: 'old', text: 'Old decision', startedAt: 1000 };
+  const currentQuestion = { id: 'new', text: 'Current decision', startedAt: 2000 };
+  const board = await liveBoard({
+    scopeId: 'ordered-question',
+    initial: {
+      ...input,
+      jobs: [
+        {
+          ...current,
+          controlRevision: 1,
+          execution: {
+            ...current.execution,
+            question: oldQuestion,
+            run: { id: 'run-1', ordinal: 1 },
+          },
+          delivery: { ...current.delivery, question: currentQuestion },
+        },
+      ],
+    },
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    { reason: 'Current decision', startedAt: '1970-01-01T00:00:02.000Z' },
+  ]);
+  await board.publish({
+    ...input,
+    jobs: [
+      {
+        ...current,
+        controlRevision: 1,
+        execution: { ...current.execution, question: oldQuestion },
+        delivery: { ...current.delivery, question: undefined, activity: 'resume-pending' },
+      },
+    ],
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});
+
+it('uses retained answer observation and timing while unavailable instead of stale execution parking', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42), false);
+  const current = input.jobs[0];
+  if (current.kind !== 'job') throw new Error('Expected job');
+  const localWork = input.localWork.map((w) => ({
+    ...w,
+    control: {
+      ...w.control,
+      answerWait: {
+        index: 0,
+        run: { id: 'run-2', ordinal: 2 },
+        question: { id: 'q2', text: 'Current wait', startedAt: 2000 },
+      },
+    },
+  }));
+  const jobs: ScheduleSnapshot['jobs'] = [
+    {
+      ...current,
+      stageIndex: 0,
+      delivery: undefined,
+      execution: { kind: 'unverified', threadId: 't1', status: 'unknown' },
+    },
+  ];
+  const board = await liveBoard({
+    scopeId: 'retained-answer',
+    initial: { ...input, localWork, jobs },
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    { reason: 'Current wait', startedAt: '1970-01-01T00:00:02.000Z' },
+  ]);
+  await board.publish({
+    ...input,
+    localWork,
+    jobs: [
+      {
+        ...current,
+        stageIndex: 0,
+        delivery: {
+          stage: 'implementation',
+          commit: current.intent.base,
+          ready: false,
+          landed: false,
+          question: { id: 'q2', text: 'Current wait' },
+        },
+      },
+    ],
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    { startedAt: '1970-01-01T00:00:02.000Z' },
+  ]);
+  await board.publish({
+    ...input,
+    jobs,
+    localWork: localWork.map((w) => ({
+      ...w,
+      control: {
+        ...w.control,
+        answerWait: { ...w.control.answerWait, closed: true },
+        parked: undefined,
+      },
+    })),
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  board.close();
+});
+
+it('applies retained answer-run freshness to reconciled delivery and legacy parked fallback', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(42), false);
+  const current = input.jobs[0];
+  if (current.kind !== 'job' || current.execution.kind !== 'found' || !current.delivery)
+    throw new Error('Expected job');
+  const jobs: ScheduleSnapshot['jobs'] = [
+    {
+      ...current,
+      stageIndex: 0,
+      controlRevision: 1,
+      execution: { ...current.execution, run: { id: 'old-run', ordinal: 1 } },
+      delivery: {
+        ...current.delivery,
+        question: { id: 'stale-question', text: 'Stale', startedAt: 1000 },
+      },
+    },
+  ];
+  const localWork = input.localWork.map((w) => ({
+    ...w,
+    control: {
+      ...w.control,
+      answerWait: {
+        index: 0,
+        run: { id: 'run-2', ordinal: 2 },
+        question: { id: 'q2', text: 'Current', startedAt: 2000 },
+        closed: true,
+      },
+    },
+  }));
+  const board = await liveBoard({
+    scopeId: 'retained-run-freshness',
+    initial: { ...input, jobs, localWork },
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  const unavailableJobs: ScheduleSnapshot['jobs'] = [
+    {
+      ...current,
+      stageIndex: 0,
+      delivery: undefined,
+      execution: { kind: 'unverified', threadId: 't1', status: 'unknown' },
+    },
+  ];
+  const staleParking = localWork.map((w) => ({
+    ...w,
+    control: {
+      ...w.control,
+      parked: {
+        index: 0,
+        run: { id: 'old-run', ordinal: 1 },
+        question: { id: 'stale-parked', text: 'Stale parked decision', startedAt: 500 },
+      },
+    },
+  }));
+  await board.publish({ ...input, jobs: unavailableJobs, localWork: staleParking });
+  expect(board.snapshot().meta.activity?.items).toEqual([]);
+  await board.publish({
+    ...input,
+    jobs: unavailableJobs,
+    localWork: localWork.map((w) => ({
+      ...w,
+      control: {
+        ...w.control,
+        parked: {
+          index: 0,
+          run: { id: 'new-run', ordinal: 3 },
+          question: { id: 'new-parked', text: 'New parked decision', startedAt: 3000 },
+        },
+      },
+    })),
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    { reason: 'New parked decision', startedAt: '1970-01-01T00:00:03.000Z' },
+  ]);
+  await board.publish({
+    ...input,
+    jobs,
+    localWork: localWork.map((w) => ({
+      ...w,
+      control: { ...w.control, answerWait: { ...w.control.answerWait, closed: false } },
+    })),
+  });
+  expect(board.snapshot().meta.activity?.items).toMatchObject([
+    { reason: 'Current', startedAt: '1970-01-01T00:00:02.000Z' },
+  ]);
+  board.close();
+});
+
+it('translates retained recovery answers while binding is unavailable and excludes confirmed transitions', async () => {
+  const recovery = {
+    issue: 4,
+    pr: 'https://github.com/rafaeltab/wallpaperdb/pull/104',
+    progress: 'Recovery launch pending reconciliation',
+    bindingAvailable: false,
+    answerWait: { id: 'recovery-q', text: 'Choose recovery behavior?', startedAt: 2000 },
+  };
+  const board = await liveBoard({
+    scopeId: 'retained-recovery-answer',
+    initial: { ...initial, recoveries: [recovery] },
+  });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<FactoryV2Snapshot>().meta.activity?.items).toMatchObject([
+      {
+        category: 'waiting-for-answers',
+        issue: 4,
+        startedAt: '1970-01-01T00:00:02.000Z',
+        reason: 'Choose recovery behavior?',
+      },
+    ]);
+    for (const phase of ['waiting-capacity', 'manual-recovery', 'complete'] as const) {
+      await board.publish({ ...initial, recoveries: [{ ...recovery, phase }] });
+      expect(board.snapshot().meta.activity?.items).toEqual([]);
+    }
+    await board.publish({ ...initial, recoveries: [{ ...recovery, bindingAvailable: true }] });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  } finally {
+    await app.close();
+    board.close();
+  }
+});
+
 it('retains provisional CI repair activity before delivery reconciliation', async () => {
   const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
   const input = parkedSnapshot(pullObservation(2), true);

@@ -7,6 +7,7 @@ import {
   Job,
   JobLive,
   JobStore,
+  JobReporting,
   Time,
   Unavailable,
 } from '../src/capabilities/job/index.js';
@@ -160,6 +161,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
 
 async function stagesFixture(admission?: ContinuationAdmission) {
   const store = controlledStore();
+  const reports: import('../src/capabilities/job/index.js').Status[] = [];
   let ordinal = 1;
   let runId = 'run-1';
   let commit = 'b'.repeat(40);
@@ -192,9 +194,18 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let stageIndex: number | undefined;
   let manual = false;
   let responseObserved = false;
-  let question: { id: string; text: string } | undefined;
+  let question: { id: string; text: string; startedAt?: number } | undefined;
   const baseDeps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
+    Layer.succeed(JobReporting, {
+      begin: () => Effect.succeed(1),
+      failed: () => Effect.void,
+      accepted: () => Effect.void,
+      observed: (_generation, status) =>
+        Effect.sync(() => {
+          reports.push(status);
+        }),
+    }),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
       claimPublicationRetry: (_intent, request, evidence) =>
@@ -299,6 +310,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   return {
     retry: () => Effect.die('Unexpected fresh retry in this fixture'),
     repairs: () => repairs,
+    reports: () => reports,
     publicationRetries: () => publicationRetries,
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
     status: () => run((job) => job.status()),
@@ -333,7 +345,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       waiting?: boolean;
       status?: string;
       stageIndex?: number;
-      question?: { id: string; text: string };
+      question?: { id: string; text: string; startedAt?: number };
       answeredQuestions?: readonly string[];
     }) => {
       runningAfterSend = value.runningAfterSend ?? runningAfterSend;
@@ -866,9 +878,15 @@ it.each(['manual', 'answer'])(
     });
     await job.status();
     if (mode === 'answer') {
+      const priorReports = job.reports().length;
       job.change({ runId: 'stale-question-9', ordinal: 9, question: { id: 'old', text: 'Old?' } });
       expect(await job.status()).toMatchObject({
         delivery: { question: { id: 'q2' }, activity: 'awaiting-answer' },
+      });
+      const provisional = job.reports()[priorReports];
+      expect(provisional).toMatchObject({
+        kind: 'job',
+        execution: { kind: 'found', question: undefined },
       });
     }
     job.change({
@@ -1901,6 +1919,55 @@ it('does not accept publication against a different authoritative replayed head'
   expect(await job.status()).toMatchObject({
     delivery: { stage: 'publication', ready: false },
   });
+});
+
+it('retains an adopted successor question when the next observation is unavailable', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  await job.start();
+  job.change({
+    answeredQuestions: ['q1'],
+    runId: 'answer-2',
+    ordinal: 2,
+    question: { id: 'q2', text: 'Second?' },
+  });
+  expect(await job.status()).toMatchObject({ stageIndex: 1, delivery: { question: { id: 'q2' } } });
+  expect((await Effect.runPromise(job.store.readControl())).parked).toMatchObject({
+    index: 1,
+    question: { id: 'q2' },
+  });
+  job.change({ ambiguous: true });
+  expect(await job.status()).toMatchObject({ execution: { kind: 'ambiguous' } });
+  expect((await Effect.runPromise(job.store.readControl())).parked).toMatchObject({
+    index: 1,
+    question: { id: 'q2' },
+  });
+  expect(job.sends()).toBe(0);
+});
+
+it('retains newly learned timing for the same parked question through unavailable observation', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'Choose?' },
+  });
+  await job.start();
+  job.change({ question: { id: 'q1', text: 'Choose?', startedAt: 2000 } });
+  await job.status();
+  expect((await Effect.runPromise(job.store.readControl())).answerWait).toMatchObject({
+    question: { id: 'q1', startedAt: 2000 },
+  });
+  job.change({ ambiguous: true });
+  await job.status();
+  expect((await Effect.runPromise(job.store.readControl())).answerWait).toMatchObject({
+    question: { id: 'q1', startedAt: 2000 },
+  });
+  expect(job.sends()).toBe(0);
 });
 
 it('reports validated managed GitHub waits with stable starts across progress and runtime replacement', async () => {

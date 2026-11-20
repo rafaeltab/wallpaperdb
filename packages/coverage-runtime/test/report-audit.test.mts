@@ -52,7 +52,7 @@ test("report-audit preserves the coverage contract", async () => {
 		};
 	}
 	const inputs = [
-			input("github/joins", 1134, [549, -310]),
+			input("github/joins", 1189, [549, -310]),
 			input("t3/planner", 272, [89, -2]),
 		],
 		before = structuredClone(inputs);
@@ -76,7 +76,7 @@ test("report-audit preserves the coverage contract", async () => {
 		[0, 3],
 		[0, 0],
 	]) {
-		const x = [input("github/joins", 1134, counts)];
+		const x = [input("github/joins", 1189, counts)];
 		expect(auditReports(x, root)).toStrictEqual({ reports: x, audit: [] });
 	}
 	expect(() => auditReports([...inputs, inputs[0]], root)).toThrow(
@@ -87,11 +87,11 @@ test("report-audit preserves the coverage contract", async () => {
 	).toThrow(/Unaudited/);
 	// Three completed calls: two true visits and one false visit. The incoming
 	// continuation reports one visit, producing [2,-1]; following read runs three times.
-	const mixed = input("github/joins", 1134, [2, -1]);
+	const mixed = input("github/joins", 1189, [2, -1]);
 	const mixedFile = Object.values(mixed.data)[0];
 	const branch = {
-		start: { line: 1134, column: 4 },
-		end: { line: 1134, column: 57 },
+		start: { line: 1189, column: 4 },
+		end: { line: 1189, column: 57 },
 	};
 	mixedFile.branchMap[0] = {
 		type: "if",
@@ -99,8 +99,8 @@ test("report-audit preserves the coverage contract", async () => {
 		locations: [branch, { start: {}, end: {} }],
 	};
 	mixedFile.statementMap = {
-		0: { start: { line: 1134, column: 18 }, end: { line: 1134, column: 57 } },
-		1: { start: { line: 1135, column: 18 }, end: { line: 1135, column: 43 } },
+		0: { start: { line: 1189, column: 18 }, end: { line: 1189, column: 57 } },
+		1: { start: { line: 1190, column: 18 }, end: { line: 1190, column: 43 } },
 	};
 	mixedFile.s = { 0: 2, 1: 3 };
 	const joinLines = readFileSync(mixedFile.path, "utf8").split("\n");
@@ -369,7 +369,7 @@ test("report-audit preserves the coverage contract", async () => {
 			-0.5,
 			...(kind === "b" ? [] : [-1]),
 		]) {
-			const x = input("github/joins", 1134, [1, 0]);
+			const x = input("github/joins", 1189, [1, 0]);
 			Object.values(x.data)[0][kind][0] = kind === "b" ? [1, bad] : bad;
 			expect(() => auditReports([x], root)).toThrow(
 				/Invalid|invalid|Nonfinite/,

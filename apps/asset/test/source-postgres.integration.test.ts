@@ -1,3 +1,4 @@
+import { sourceStoreContract } from './contracts/source-store.js';
 import { mkdtemp, cp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1152,4 +1153,27 @@ it('preserves retained replay and exact status when upgrading existing Source JS
     await upgrade.end();
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+sourceStoreContract(async () => {
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject) VALUES ('asset_contract', 'wallpaper', 'wallpaper', 'clerk', 'owner')`
+  );
+  const runtime = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  return {
+    port: await runtime.runPromise(SourceStore),
+    activate: (revision) =>
+      Effect.runPromise(activateLifecycle(container.getConnectionUri(), revision)),
+    close: async () => {
+      await runtime.dispose();
+      await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
+    },
+  };
 });

@@ -1,3 +1,4 @@
+import { controlledSources } from './fixtures/controlled-sources.js';
 import { controlledBytes } from './fixtures/controlled-bytes.js';
 import { createHash } from 'node:crypto';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -9,12 +10,11 @@ import {
   MandatoryInspection,
   sourcesLayer,
   type SourceState,
-  type SourceStorePort,
 } from '../src/capabilities/sources/index.js';
 import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 
 it('keeps private bytes outside membership until immutable preparation and first acceptance commit', async () => {
-  let state: SourceState = {
+  const initial: SourceState = {
     asset: {
       id: 'asset_1',
       applicationId: 'wallpaper',
@@ -31,17 +31,15 @@ it('keeps private bytes outside membership until immutable preparation and first
   };
   const confirmations: unknown[] = [];
 
-  const store: SourceStorePort = {
-    releaseRead: () => Effect.void,
-    transact: (_id, _revision, change) =>
+  const controlled = controlledSources(
+    initial,
+    () => 'policy-1',
+    (changed) =>
       Effect.sync(() => {
-        const changed = change(structuredClone(state));
-        if (!changed.state) throw new Error('Unexpected missing Asset');
-        state = changed.state;
         if (changed.confirmation) confirmations.push(changed.confirmation);
-        return changed.result;
-      }),
-  };
+      })
+  );
+  const store = controlled.port;
   const runtime = ManagedRuntime.make(
     sourcesLayer({ revision: 'policy-1', types: initialSourcePolicies }).pipe(
       Layer.provide(
@@ -82,7 +80,7 @@ it('keeps private bytes outside membership until immutable preparation and first
     expect(candidate.kind).toBe('candidate');
     if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
     const id = candidate.candidate.candidateId;
-    expect(state.sources).toEqual([]);
+    expect(controlled.state.sources).toEqual([]);
     expect(
       await runtime.runPromise(
         Sources.use((s) =>
@@ -100,7 +98,7 @@ it('keeps private bytes outside membership until immutable preparation and first
         )
       )
     ).toMatchObject({ kind: 'candidate', candidate: { status: 'ready' } });
-    expect(state.sources).toEqual([]);
+    expect(controlled.state.sources).toEqual([]);
     expect(
       await runtime.runPromise(
         Sources.use((s) =>
@@ -111,9 +109,9 @@ it('keeps private bytes outside membership until immutable preparation and first
       kind: 'candidate',
       candidate: { status: 'accepted', sourceSetRevision: '1' },
     });
-    expect(state.defaultSourceId).toBe(state.sources[0]?.sourceId);
-    expect(state.initialAnalysisSourceId).toBe(state.defaultSourceId);
-    expect(state.deliveryRevision).toBe('1');
+    expect(controlled.state.defaultSourceId).toBe(controlled.state.sources[0]?.sourceId);
+    expect(controlled.state.initialAnalysisSourceId).toBe(controlled.state.defaultSourceId);
+    expect(controlled.state.deliveryRevision).toBe('1');
     expect(confirmations).toHaveLength(1);
     expect(confirmations[0]).toMatchObject({
       assetId: 'asset_1',

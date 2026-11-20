@@ -1,3 +1,4 @@
+import { controlledSources } from './fixtures/controlled-sources.js';
 import { controlledBytes } from './fixtures/controlled-bytes.js';
 import { createHttpApp } from '../src/http/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
@@ -14,7 +15,6 @@ import {
   SourceFailure,
   sourcesLayer,
   type SourceState,
-  type SourceStorePort,
   type SourceConfirmation,
   type SourceFacts,
   type SourcesPort,
@@ -50,7 +50,7 @@ function fixture(
   assetType = 'wallpaper',
   initialSources: SourceState['sources'] = []
 ) {
-  let state: SourceState = {
+  const initial: SourceState = {
     asset: { id: 'asset_one', applicationId: 'wallpaper', assetType, owner },
     sourceSetRevision: initialSources.length ? '1' : '0',
     deliveryRevision: initialSources.length ? '1' : '0',
@@ -65,7 +65,7 @@ function fixture(
   const retirements: { sourceId: string; evidenceExpiresAt: string }[] = [];
   const bytes = controlledBytes();
   let prepare: () => Effect.Effect<void, SourceFailure> = () => Effect.void;
-  let uploadedDigest = '';
+  const uploadedDigests = new Map<string, string>();
   let inspect: () => Effect.Effect<
     { kind: 'verified'; facts: SourceFacts } | { kind: 'rejected'; reason: string },
     SourceFailure
@@ -82,14 +82,11 @@ function fixture(
       },
     });
   let ambiguousCommit = false;
-  const store: SourceStorePort = {
-    releaseRead: () => Effect.void,
-    transact: (assetId, revision, change) =>
+  const controlled = controlledSources(
+    initial,
+    () => activeRevision,
+    (changed) =>
       Effect.suspend(() => {
-        if (revision !== null && revision !== activeRevision)
-          return Effect.fail(new SourceFailure({ operation: 'inactive-policy', cause: null }));
-        const changed = change(assetId === state.asset.id ? structuredClone(state) : null);
-        if (changed.state) state = structuredClone(changed.state);
         if (changed.retirement) retirements.push(changed.retirement);
         retirements.push(...(changed.retirements ?? []));
         if (changed.confirmation && !confirmations.some((c) => c.id === changed.confirmation?.id))
@@ -98,9 +95,10 @@ function fixture(
           ambiguousCommit = false;
           return Effect.fail(new SourceFailure({ operation: 'lost-commit-response', cause: null }));
         }
-        return Effect.succeed(changed.result);
-      }),
-  };
+        return Effect.void;
+      })
+  );
+  const store = controlled.port;
   const dependencies = Layer.mergeAll(
     Layer.succeed(SourceStore, store),
     Layer.succeed(SourceBytes, {
@@ -109,18 +107,18 @@ function fixture(
         bytes.put(id, input, digest).pipe(
           Effect.tap(() =>
             Effect.sync(() => {
-              uploadedDigest = digest;
+              uploadedDigests.set(id, digest);
             })
           )
         ),
       prepare: (...args) => prepare().pipe(Effect.andThen(bytes.prepare(...args))),
     }),
     Layer.succeed(MandatoryInspection, {
-      inspect: () =>
+      inspect: (id) =>
         inspect().pipe(
           Effect.map((result) =>
             result.kind === 'verified'
-              ? { ...result, facts: { ...result.facts, digest: uploadedDigest } }
+              ? { ...result, facts: { ...result.facts, digest: uploadedDigests.get(id) ?? '' } }
               : result
           )
         ),
@@ -143,7 +141,7 @@ function fixture(
         { signal }
       ),
     get state() {
-      return state;
+      return controlled.state;
     },
     services: sourcesLayer({ revision: 'one', types: { [assetType]: policy } }).pipe(
       Layer.provide(dependencies)

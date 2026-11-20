@@ -45,6 +45,7 @@ export function sourceBytesContract(
           })
         )
       ).rejects.toThrow();
+      await expect(Effect.runPromise(f.port.read('source', 'other-asset'))).rejects.toThrow();
       const read = await Effect.runPromise(f.port.read('source', 'asset'));
       try {
         const chunks: number[] = [];

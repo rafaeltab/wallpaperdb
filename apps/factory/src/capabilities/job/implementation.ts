@@ -70,8 +70,9 @@ export const JobLive = Layer.effect(
         }
         return result;
       });
-    const observe = (
-      intent: Intent
+    const observeWork = (
+      intent: Intent,
+      investigationOwned: boolean
     ): Effect.Effect<Extract<Status, { kind: 'job' }>, Unavailable> =>
       Effect.gen(function* () {
         const generation = reporting ? yield* reporting.begin() : 0;
@@ -158,7 +159,7 @@ export const JobLive = Layer.effect(
           // Reporting persistence may advance control without granting execution authority.
           // Reobserve under a fresh authority snapshot rather than relabel earlier evidence.
           if ((yield* store.readControl()).revision !== before.revision)
-            return yield* observe(intent);
+            return yield* observe(intent, investigationOwned);
           const cancelled = (yield* store.readControl()).cancelled;
           if (cancelled && observation.kind === 'found')
             yield* execution.interrupt(activeIntent, observation.threadId);
@@ -188,7 +189,7 @@ export const JobLive = Layer.effect(
             before,
             policy?.limit ?? defaultAgentReconciliationLimit
           ).pipe((work) =>
-            owningStage?.previousRunId && !owningStage.observedRunId
+            !investigationOwned && owningStage?.previousRunId && !owningStage.observedRunId
               ? investigate(intent, work, owningStage.stage)
               : work
           );
@@ -208,7 +209,7 @@ export const JobLive = Layer.effect(
             );
           const control = yield* store.readControl();
           if ((control.restart?.index ?? 0) !== (before.restart?.index ?? 0))
-            return yield* observe(intent);
+            return yield* observe(intent, investigationOwned);
           if (control.released) {
             const status = releasedStatus(intent, control, yield* time.now());
             if (reporting) yield* reporting.observed(generation, status);
@@ -336,7 +337,7 @@ export const JobLive = Layer.effect(
                 },
               }))
             )
-              return yield* observe(intent);
+              return yield* observe(intent, investigationOwned);
             status.controlRevision = control.revision + 1;
             yield* execution.release?.(activeIntent) ?? Effect.void;
           }
@@ -358,7 +359,6 @@ export const JobLive = Layer.effect(
           )
         );
       }).pipe(
-        (work) => Effect.suspend(() => (executionKnown ? work : investigate(intent, work))),
         Effect.tapError(() =>
           Effect.sync(() => {
             executionKnown = false;
@@ -366,6 +366,26 @@ export const JobLive = Layer.effect(
         ),
         Effect.withSpan('factory.job.observe')
       );
+    const observe = (
+      intent: Intent,
+      investigationOwned = false
+    ): Effect.Effect<Extract<Status, { kind: 'job' }>, Unavailable> =>
+      Effect.gen(function* () {
+        const investigateExecution = !investigationOwned && !executionKnown;
+        const work = observeWork(intent, investigationOwned || investigateExecution);
+        if (!investigateExecution) return yield* work;
+        const retained = yield* currentStage(store);
+        // A retained delivery identifies a responsibility; an uncertain initial
+        // implementation launch still cannot establish implementation activity.
+        const stage =
+          retained &&
+          (retained.stage !== 'implementation' ||
+            retained.previousRunId !== null ||
+            retained.observedRunId)
+            ? retained.stage
+            : undefined;
+        return yield* investigate(intent, work, stage);
+      });
     const resumeQuestion = (
       intent: Intent,
       command: Extract<import('./contract.js').Resume, { questionId: string }>
@@ -377,7 +397,7 @@ export const JobLive = Layer.effect(
         if (!waiting) return { kind: 'rejected' as const };
         if (!matchesResume(intent, waiting, control, command)) return { kind: 'rejected' as const };
         const observed = yield* execution.observe(activeIntent, waiting);
-        if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent);
+        if (hasAnsweredQuestion(observed, command.questionId)) return yield* observe(intent, true);
         if (!resumable(observed, waiting)) return { kind: 'rejected' as const };
         const evidence = yield* resumeEvidence(store, execution, activeIntent, waiting, observed);
         if (!evidence) return { kind: 'rejected' as const };
@@ -393,7 +413,7 @@ export const JobLive = Layer.effect(
           deliveryIndex: undefined,
         };
         yield* store.saveStage(request);
-        return yield* observe(intent);
+        return yield* observe(intent, true);
       });
     return {
       retry: (command) =>
@@ -492,7 +512,11 @@ export const JobLive = Layer.effect(
           }
           const stage = (yield* currentStage(store))?.stage;
           if ('runId' in command)
-            return yield* investigate(intent, retryStage(store, intent, command, observe), stage);
+            return yield* investigate(
+              intent,
+              retryStage(store, intent, command, (active) => observe(active, true)),
+              stage
+            );
           return yield* investigate(intent, resumeQuestion(intent, command), stage);
         }).pipe(Effect.withSpan('factory.job.resume')),
       cancel: (jobId) =>

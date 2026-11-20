@@ -366,3 +366,238 @@ it.each([false, true])(
     }
   }
 );
+
+async function investigationFixture(stage: 'review' | 'publication', resume = false) {
+  const { Deferred, ManagedRuntime } = await import('effect');
+  const store = controlledStore();
+  const intent = {
+    id: 'reconciliation-owner',
+    issue: 723,
+    issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/723',
+    branch: 'issue-723',
+    base: 'a'.repeat(40),
+    context: '',
+    createdAt: 0,
+    expectedStage: 'implementation' as const,
+  };
+  await Effect.runPromise(store.reserve(intent));
+  await Effect.runPromise(
+    store.saveStage({
+      index: 0,
+      stage: 'implementation',
+      threadId: 'thread-723',
+      commit: intent.base,
+      previousRunId: null,
+    })
+  );
+  await Effect.runPromise(
+    store.saveStage({
+      index: 1,
+      stage,
+      threadId: 'thread-723',
+      commit: intent.base,
+      previousRunId: resume ? 'run-0' : 'run-1',
+      ordinal: resume ? 1 : 2,
+      resume: true,
+      receiptProtocol: 'delivery-v1',
+    })
+  );
+  if (resume)
+    await Effect.runPromise(
+      store.saveControl({
+        revision: 0,
+        cancelled: false,
+        claimed: [],
+        parked: {
+          index: 1,
+          run: { id: 'run-1', ordinal: 1 },
+          question: { id: 'question-1', text: 'Continue?' },
+          closed: true,
+        },
+      })
+    );
+  const observed = await Effect.runPromise(Deferred.make<void>());
+  const observeRelease = await Effect.runPromise(Deferred.make<void>());
+  const inspected = await Effect.runPromise(Deferred.make<void>());
+  const inspectRelease = await Effect.runPromise(Deferred.make<void>());
+  const investigations = new Map<
+    string,
+    import('../src/capabilities/job/index.js').ExecutionInvestigation
+  >();
+  let sequence = 0;
+  let now = 1000;
+  let fail = false;
+  let sends = 0;
+  const runtime = ManagedRuntime.make(
+    JobLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          Layer.succeed(JobStore, store),
+          Layer.succeed(Time, { now: () => Effect.sync(() => now) }),
+          Layer.succeed(JobReporting, {
+            begin: () => Effect.succeed(1),
+            accepted: () => Effect.void,
+            observed: () => Effect.void,
+            failed: () => Effect.void,
+            investigating: (value, responsibility) =>
+              Effect.sync(() => {
+                const id = `investigation-${++sequence}`;
+                investigations.set(id, {
+                  id,
+                  issue: value.issue,
+                  stage: responsibility,
+                  startedAt: now,
+                });
+                return id;
+              }),
+            investigated: (id) =>
+              Effect.sync(() => {
+                investigations.delete(id);
+              }),
+          }),
+          Layer.succeed(Issues, {
+            inspect: () => Effect.die('No new admission during reconciliation'),
+            pullRequest: () => Effect.succeed({ kind: 'absent' }),
+          }),
+          Layer.succeed(Execution, {
+            launch: () => Effect.die('Uncertain effects must not be repeated'),
+            interrupt: () => Effect.void,
+            sendStage: () =>
+              Effect.sync(() => {
+                sends++;
+              }),
+            observe: (_intent, request) =>
+              Effect.gen(function* () {
+                if (resume && request?.index === 1)
+                  return {
+                    kind: 'found' as const,
+                    threadId: 'thread-723',
+                    status: 'completed',
+                    branch: intent.branch,
+                    worktree: '/worker',
+                    model: 'gpt-6.1-sol',
+                    run: { id: 'run-1', ordinal: 1 },
+                  };
+                yield* Deferred.succeed(observed, undefined);
+                yield* Deferred.await(observeRelease);
+                return {
+                  kind: 'found' as const,
+                  threadId: 'thread-723',
+                  status: 'running',
+                  branch: intent.branch,
+                  worktree: '/worker',
+                  model: 'gpt-6.1-sol',
+                  run: { id: 'run-2', ordinal: 2 },
+                };
+              }),
+            inspectStage: () =>
+              Effect.gen(function* () {
+                yield* Deferred.succeed(inspected, undefined);
+                yield* Deferred.await(inspectRelease);
+                if (fail)
+                  return yield* Effect.fail(
+                    new Unavailable({ operation: 'controlled-inspection', cause: null })
+                  );
+                return null;
+              }),
+          })
+        )
+      )
+    )
+  );
+  return {
+    intent,
+    store,
+    runtime,
+    facts: () => [...investigations.values()],
+    clock: (value: number) => {
+      now = value;
+    },
+    fail: () => {
+      fail = true;
+    },
+    sends: () => sends,
+    observed: () => Effect.runPromise(Deferred.await(observed)),
+    inspected: () => Effect.runPromise(Deferred.await(inspected)),
+    releaseObservation: () => Effect.runPromise(Deferred.succeed(observeRelease, undefined)),
+    releaseInspection: () => Effect.runPromise(Deferred.succeed(inspectRelease, undefined)),
+    close: async () => {
+      await Effect.runPromise(Deferred.succeed(observeRelease, undefined));
+      await Effect.runPromise(Deferred.succeed(inspectRelease, undefined));
+      await runtime.dispose();
+    },
+  };
+}
+
+it.each(['review', 'publication'] as const)(
+  'keeps restored %s reconciliation in its retained responsibility throughout investigation',
+  async (stage) => {
+    const f = await investigationFixture(stage);
+    try {
+      const operation = f.runtime.runPromise(Effect.flatMap(Job, (job) => job.status()));
+      await f.observed();
+      expect(f.facts()).toEqual([{ id: expect.any(String), issue: 723, stage, startedAt: 1000 }]);
+      const current = f.facts();
+      f.clock(2000);
+      await f.releaseObservation();
+      await f.inspected();
+      expect(f.facts()).toEqual(current);
+      await f.releaseInspection();
+      expect(await operation).toMatchObject({ kind: 'job', delivery: { stage } });
+      expect(f.facts()).toEqual([]);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each([false, true])(
+  'owns resumed review investigation until settlement, failure=%s',
+  async (failure) => {
+    const f = await investigationFixture('review', true);
+    try {
+      if (failure) f.fail();
+      const operation = f.runtime
+        .runPromise(
+          Effect.flatMap(Job, (job) =>
+            job.resume({
+              jobId: f.intent.id,
+              index: 1,
+              questionId: 'question-1',
+            })
+          )
+        )
+        .then(
+          (value) => ({ kind: 'success' as const, value }),
+          (error) => ({ kind: 'failure' as const, error })
+        );
+      await f.observed();
+      expect(f.facts()).toEqual([
+        { id: expect.any(String), issue: 723, stage: 'review', startedAt: 1000 },
+      ]);
+      const current = f.facts();
+      f.clock(2000);
+      await f.releaseObservation();
+      await f.inspected();
+      expect(f.facts()).toEqual(current);
+      await f.releaseInspection();
+      const result = await operation;
+      if (failure)
+        expect(result).toMatchObject({
+          kind: 'failure',
+          error: { operation: 'controlled-inspection' },
+        });
+      else
+        expect(result).toMatchObject({
+          kind: 'success',
+          value: { kind: 'job', delivery: { stage: 'review' } },
+        });
+      expect(f.facts()).toEqual([]);
+      expect(f.sends()).toBe(1);
+      expect(await Effect.runPromise(f.store.read())).toEqual(f.intent);
+      expect((await Effect.runPromise(f.store.readControl())).claimed).toContain(2);
+    } finally {
+      await f.close();
+    }
+  }
+);

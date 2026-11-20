@@ -12,7 +12,7 @@ const categories: readonly { category: Category; name: string; noun?: string }[]
   { category: 'checking-plan-freshness', name: 'Checking plan freshness' },
   { category: 'refreshing-github', name: 'Refreshing GitHub' },
   { category: 'refreshing-t3', name: 'Refreshing T3 information' },
-  { category: 'waiting-for-ci', name: 'Waiting for CI', noun: 'PR' },
+  { category: 'waiting-for-ci', name: 'Waiting for CI', noun: 'issue' },
   { category: 'waiting-for-answers', name: 'Waiting for answers', noun: 'issue' },
 ];
 export function activityView(facts: ActivityFacts | undefined, failures: number) {

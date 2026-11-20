@@ -173,6 +173,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
   let interrupts = 0;
   let answeredQuestions: readonly string[] = [];
   let failed = false;
+  let pending = false;
   let maintenancePending = false;
   let manualRecovery = false;
   let repairAllowed = true;
@@ -228,7 +229,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
                 base: 'D',
                 maintenancePending,
                 manualRecovery,
-                ready: !failed,
+                ready: !failed && !pending,
                 ci: { failed, progress },
                 landed: false,
               }
@@ -322,6 +323,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       owningHeads?: readonly string[];
       prKind?: typeof prKind;
       failed?: boolean;
+      pending?: boolean;
       maintenancePending?: boolean;
       manualRecovery?: boolean;
       repairAllowed?: boolean;
@@ -351,6 +353,7 @@ async function stagesFixture(admission?: ContinuationAdmission) {
       owningHeads = value.owningHeads ?? owningHeads;
       prKind = value.prKind ?? prKind;
       failed = value.failed ?? failed;
+      pending = value.pending ?? pending;
       maintenancePending = value.maintenancePending ?? maintenancePending;
       manualRecovery = value.manualRecovery ?? manualRecovery;
       repairAllowed = value.repairAllowed ?? repairAllowed;
@@ -1899,3 +1902,233 @@ it('does not accept publication against a different authoritative replayed head'
     delivery: { stage: 'publication', ready: false },
   });
 });
+
+it('reports validated managed GitHub waits with stable starts across progress and runtime replacement', async () => {
+  const job = await waitingJob();
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', waitStartedAt: 100, pr: { kind: 'found' } },
+  });
+  job.change({ now: 500, progress: 'more-progress' });
+  expect(await job.status()).toMatchObject({ delivery: { waitStartedAt: 100 } });
+  job.change({ now: 600, status: 'running', waiting: false });
+  const repair = await job.status();
+  expect(repair.kind === 'job' && repair.delivery?.waitStartedAt).toBeUndefined();
+  job.change({ now: 700, status: 'completed', waiting: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', waitStartedAt: 700 },
+  });
+});
+
+it('keeps factory CI observation current after publication and removes it when checks complete', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ pending: true, now: 200 });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'ci', activity: 'waiting-for-ci', waitStartedAt: 200 },
+  });
+  job.change({ now: 900 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-ci', waitStartedAt: 200 },
+  });
+  job.change({ pending: false });
+  const done = await job.status();
+  expect(done).toMatchObject({ delivery: { ready: true } });
+  expect(done.kind === 'job' && done.delivery?.waitStartedAt).toBeUndefined();
+});
+
+it('retains GitHub wait responsibility during watchdog continuation delivery until repair starts', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600100 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'continuation-pending', waitStartedAt: 100, pr: { kind: 'found' } },
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'continuation-pending', waitStartedAt: 100, pr: { kind: 'found' } },
+  });
+  job.change({ status: 'running', waiting: false });
+  const repair = await job.status();
+  expect(repair.kind === 'job' && repair.delivery?.waitStartedAt).toBeUndefined();
+  expect(repair.kind === 'job' && repair.delivery?.pr).toBeUndefined();
+});
+
+it('observes factory-owned maintenance comparisons without borrowing the old comparison start', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ pending: true });
+  await job.status();
+  job.change({ prCommit: 'c'.repeat(40), maintenancePending: true });
+  const current = await job.status();
+  expect(current).toMatchObject({
+    delivery: { stage: 'ci', activity: 'waiting-for-ci', commit: 'c'.repeat(40) },
+  });
+  expect(current.kind === 'job' && current.delivery?.waitStartedAt).toBeUndefined();
+});
+
+it('starts a new wait after a completed repair delivery enters CI and needs another repair', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ accepted: true, waiting: false, failed: false, now: 500 });
+  await job.status();
+  await job.status();
+  job.change({ failed: true });
+  await job.status();
+  job.change({ accepted: false, waiting: true, now: 900 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', waitStartedAt: 900 },
+  });
+});
+
+it('reports the receipt-validated wait comparison while preserving the original repair instruction binding', async () => {
+  const job = await waitingJob();
+  job.change({ commit: 'c'.repeat(40), prCommit: 'c'.repeat(40) });
+  expect(await job.status()).toMatchObject({
+    delivery: {
+      activity: 'waiting-for-github',
+      commit: 'b'.repeat(40),
+      waitCommit: 'c'.repeat(40),
+      pr: { kind: 'found', commit: 'c'.repeat(40) },
+    },
+  });
+});
+
+it('ends the CI display interval for a question after the watchdog nudged a continuation', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600100 });
+  await job.status();
+  const before = await Effect.runPromise(job.store.readWait());
+  job.change({
+    now: 3600200,
+    status: 'waiting-for-input',
+    question: { id: 'q5', text: 'Choose?' },
+  });
+  expect(await job.status()).toMatchObject({ delivery: { activity: 'awaiting-answer' } });
+  expect(await Effect.runPromise(job.store.readWait())).toMatchObject({
+    startedAt: null,
+    deadline: before?.deadline,
+    nudged: true,
+    continuation: before?.continuation,
+  });
+  job.change({
+    now: 4000000,
+    status: 'completed',
+    runId: 'answer-6',
+    ordinal: 6,
+    answeredQuestions: ['q5'],
+    waiting: true,
+    stageIndex: 6,
+  });
+  await job.status();
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'continuation-pending', waitStartedAt: 4000000 },
+  });
+});
+
+it('does not reuse a completed CI interval when the ready comparison becomes pending again', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ pending: true, now: 200 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-ci', waitStartedAt: 200 },
+  });
+  job.change({ pending: false, now: 500 });
+  expect(await job.status()).toMatchObject({ delivery: { ready: true } });
+  job.change({ pending: true, now: 900 });
+  const current = await job.status();
+  expect(current).toMatchObject({ delivery: { activity: 'waiting-for-ci' } });
+  // The retained ready publication proves the first interval ended, but does not date a provider rerun.
+  expect(current.kind === 'job' && current.delivery?.waitStartedAt).toBeUndefined();
+});
+
+it('retains CI repair provenance through its review and publication without admitting ordinary delivery work', async () => {
+  const repair = await waitingJob();
+  repair.change({ waiting: false, status: 'running' });
+  expect(await repair.status()).toMatchObject({
+    delivery: { stage: 'babysitting', ciRepair: true },
+  });
+  repair.change({ status: 'completed', accepted: true, failed: false });
+  expect(await repair.status()).toMatchObject({ delivery: { stage: 'review', ciRepair: true } });
+  expect(await repair.status()).toMatchObject({
+    delivery: { stage: 'publication', ciRepair: true },
+  });
+  const regular = await stagesFixture();
+  regular.change({ status: 'running', accepted: false });
+  const current = await regular.start();
+  expect(current.kind === 'job' && current.delivery?.ciRepair).not.toBe(true);
+});
+
+it('starts a new managed wait for a receipt-validated changed head between completed watcher observations', async () => {
+  const job = await waitingJob();
+  expect(await job.status()).toMatchObject({
+    delivery: { waitCommit: 'b'.repeat(40), waitStartedAt: 100 },
+  });
+  job.change({
+    now: 900,
+    commit: 'c'.repeat(40),
+    prCommit: 'c'.repeat(40),
+    runId: 'replacement-9',
+    ordinal: 9,
+    status: 'completed',
+    waiting: true,
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: {
+      activity: 'waiting-for-github',
+      commit: 'b'.repeat(40),
+      waitCommit: 'c'.repeat(40),
+      waitStartedAt: 900,
+      deadline: 3600900,
+    },
+  });
+  job.change({ now: 1200, progress: 'more-progress-on-c' });
+  expect(await job.status()).toMatchObject({ delivery: { waitStartedAt: 900 } });
+});
+
+it.each([
+  ['repair', 'review'],
+  ['repair', 'publication'],
+  ['ordinary', 'review'],
+  ['ordinary', 'publication'],
+  ['fresh-attempt', 'review'],
+  ['fresh-attempt', 'publication'],
+] as const)(
+  'derives retained %s %s reporting provenance without rewriting the journal',
+  async (origin, finalStage) => {
+    const job = await stagesFixture();
+    job.change({ status: 'running', accepted: false });
+    await job.start();
+    const prefix: import('../src/capabilities/job/index.js').Stage[] =
+      origin === 'ordinary' ? [] : ['review', 'publication', 'ci', 'babysitting'];
+    if (origin === 'fresh-attempt') prefix.push('review', 'publication', 'ci', 'implementation');
+    const stages = [
+      ...prefix,
+      'review' as const,
+      ...(finalStage === 'publication' ? ['publication' as const] : []),
+    ];
+    let index = 0;
+    for (const stage of stages) {
+      index++;
+      await Effect.runPromise(
+        job.store.saveStage({
+          index,
+          stage,
+          threadId: 'thread',
+          commit: 'b'.repeat(40),
+          previousRunId: stage === 'implementation' ? null : 'predecessor',
+          observedRunId: 'retained-current',
+          ordinal: 20,
+          receiptProtocol: 'delivery-v1',
+        })
+      );
+    }
+    job.change({ runId: 'retained-current', ordinal: 20, stageIndex: index });
+    const result = await job.status();
+    expect(result).toMatchObject({ delivery: { stage: finalStage } });
+    expect(result.kind === 'job' && result.delivery?.ciRepair === true).toBe(origin === 'repair');
+    expect((await Effect.runPromise(job.store.readStage(index)))?.ciRepair).toBeUndefined();
+  }
+);

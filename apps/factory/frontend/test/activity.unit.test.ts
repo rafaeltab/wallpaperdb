@@ -104,7 +104,7 @@ it('selects each category ahead of every lower priority category', () => {
     'Checking plan freshness',
     'Refreshing GitHub',
     'Refreshing T3 information',
-    'Waiting for CI 1 PR',
+    'Waiting for CI 1 issue',
     'Waiting for answers 1 issue',
   ];
   order.forEach((_category, index) => {
@@ -144,4 +144,26 @@ it('keeps gathering above freshness and times the newest current collection loca
     activityView({ ...facts, items: [item, { ...item, id: 'plan', category: 'planning' }] }, 0)
       .summary
   ).toBe('Planning');
+});
+
+it('counts CI waits by issue and recalculates the newest current managed wait', () => {
+  const wait = {
+    id: 'one',
+    category: 'waiting-for-ci' as const,
+    lifecycle: 'current' as const,
+    issue: 1,
+    pullRequest: 10,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Managed CI',
+  };
+  const items = [
+    wait,
+    { ...wait, id: 'duplicate', pullRequest: 11 },
+    { ...wait, id: 'two', issue: 2, startedAt: '2026-11-17T11:59:00Z' },
+  ];
+  expect(activityView({ ...facts, items }, 0).summary).toBe('Waiting for CI 2 issues');
+  expect(activityView({ ...facts, items }, 0).selected?.startedAt).toBe('2026-11-17T11:59:00Z');
+  expect(activityView({ ...facts, items: items.slice(0, 2) }, 0).selected?.startedAt).toBe(
+    '2026-11-17T11:58:00Z'
+  );
 });

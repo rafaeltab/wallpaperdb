@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { retainedWaitDelivery } from '../../src/capabilities/observe/index.js';
 import type {
   ObservationState,
   ObservationStore,
@@ -115,6 +116,7 @@ export function controlledObservations(
             const previousJob = jobs.get(item.value.intent.id);
             jobs.set(item.value.intent.id, {
               ...item.value,
+              delivery: retainedWaitDelivery(previousJob, item.value),
               acknowledgement: item.value.acknowledgement ?? previousJob?.acknowledgement,
             });
           }

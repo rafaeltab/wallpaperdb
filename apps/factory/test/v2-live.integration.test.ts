@@ -4717,3 +4717,183 @@ it.each([
     }
   }
 );
+
+it('reports only current retained managed CI waits through the detailed endpoint', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2, { ci: 'PENDING' }), true);
+  const owner = input.jobs[0];
+  if (owner.kind !== 'job' || !owner.delivery) throw new Error('Expected job');
+  const delivery = {
+    ...owner.delivery,
+    stage: 'ci' as const,
+    activity: 'waiting-for-ci' as const,
+    ready: false,
+    landed: false,
+    waitStartedAt: 2000,
+    pr: {
+      kind: 'found' as const,
+      url: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+      commit: owner.delivery.commit,
+      ready: false,
+      landed: false,
+    },
+  };
+  const current = { ...owner, delivery };
+  const snapshot = { ...input, jobs: [current] };
+  const board = await liveBoard({ scopeId: 'ci-waits', initial: snapshot });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    expect(board.snapshot().meta.activity?.items).toMatchObject([
+      {
+        category: 'waiting-for-ci',
+        issue: 1,
+        pullRequest: 2,
+        startedAt: '1970-01-01T00:00:02.000Z',
+      },
+    ]);
+    const response = await app.inject('/api/v2/board');
+    expect(response.statusCode).toBe(200);
+    expect(response.json<FactoryV2Snapshot>().meta.activity).toEqual(
+      board.snapshot().meta.activity
+    );
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...current, delivery: { ...delivery, ready: true } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    await board.publish({
+      ...snapshot,
+      jobs: [
+        { ...current, delivery: { ...delivery, activity: 'repairing', stage: 'babysitting' } },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    await board.publish({
+      ...snapshot,
+      jobs: [
+        {
+          ...current,
+          delivery: {
+            ...delivery,
+            activity: 'waiting-for-github',
+            stage: 'babysitting',
+            active: false,
+          },
+        },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items).toHaveLength(1);
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...current, delivery: { ...delivery, pr: { ...delivery.pr, commit: 'wrong' } } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    await board.publish({
+      ...snapshot,
+      jobs: [
+        {
+          ...current,
+          delivery: {
+            ...delivery,
+            waitCommit: 'validated-head',
+            pr: { ...delivery.pr, commit: 'validated-head' },
+          },
+        },
+      ],
+    });
+    expect(board.snapshot().meta.activity?.items).toHaveLength(1);
+    await board.publish({ ...snapshot, state: { ...snapshot.state, admissions: [] } });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  } finally {
+    board.close();
+    await app.close();
+  }
+});
+
+it('classifies running CI repair stages alongside current implementation reporting', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2), true);
+  const owner = input.jobs[0];
+  if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+    throw new Error('Expected owner');
+  const current = {
+    ...owner,
+    execution: { ...owner.execution, status: 'running', question: undefined },
+    delivery: {
+      ...owner.delivery,
+      ciRepair: true,
+      activity: 'repairing' as const,
+      stage: 'babysitting' as const,
+      question: undefined,
+      active: true,
+    },
+  };
+  const snapshot = {
+    ...input,
+    localWork: input.localWork.map((work) => ({
+      ...work,
+      control: { ...work.control, parked: undefined },
+    })),
+    jobs: [current],
+  };
+  const board = await liveBoard({ scopeId: 'repair-responsibility', initial: snapshot });
+  try {
+    expect(board.snapshot().meta.activity?.items).toMatchObject([
+      { category: 'implementing', issue: 1, startedAt: null },
+    ]);
+    for (const [stage, category] of [
+      ['implementation', 'implementing'],
+      ['review', 'reviewing'],
+      ['publication', 'publishing'],
+    ] as const) {
+      await board.publish({
+        ...snapshot,
+        jobs: [{ ...current, delivery: { ...current.delivery, stage } }],
+      });
+      expect(board.snapshot().meta.activity?.items).toMatchObject([{ category, issue: 1 }]);
+    }
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...current, execution: { ...current.execution, status: 'queued' } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...current, delivery: { ...current.delivery, ciRepair: false } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toMatchObject([{ category: 'implementing', issue: 1 }]);
+    await board.publish({
+      ...snapshot,
+      jobs: [{ ...current, delivery: { ...current.delivery, ready: true } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+  } finally {
+    board.close();
+  }
+});
+it('retains provisional CI repair activity before delivery reconciliation', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2), true);
+  const owner = input.jobs[0];
+  if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+    throw new Error('Expected managed owner');
+  const board = await liveBoard({
+    scopeId: 'provisional-repair-activity',
+    initial: {
+      ...input,
+      localWork: input.localWork.map((work) => ({ ...work, control: { ...work.control, parked: undefined } })),
+      jobs: [{
+        ...owner,
+        execution: { ...owner.execution, status: 'running', question: undefined },
+        delivery: { stage: 'babysitting', ciRepair: true, commit: owner.delivery.commit, ready: false, landed: false },
+      }],
+    },
+  });
+  try {
+    expect(board.snapshot().meta.activity?.items).toMatchObject([
+      { category: 'implementing', issue: 1 },
+    ]);
+  } finally {
+    board.close();
+  }
+});

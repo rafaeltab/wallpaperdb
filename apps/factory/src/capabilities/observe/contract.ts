@@ -150,6 +150,7 @@ export type ItemObservation = {
 );
 /** Generations survive restart. Each batch atomically accepts only newer item versions.
  * Failures retain the previous complete value and successful observation date.
+ * Provisional completed watcher observations retain a same-stage validated wait until an owning outcome replaces it.
  * Publication never grants execution authority or removes absent items.
  */
 export interface ReportingStore {

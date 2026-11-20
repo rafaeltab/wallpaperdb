@@ -23,7 +23,7 @@ export type { ItemFreshness, ItemObservation, ReportingState } from './contract.
 export { Reporting } from './contract.js';
 export { ReportingLive } from './publication.js';
 export { JobReportingLive } from './jobs.js';
-export { jobObservationIsOlder } from './ordering.js';
+export { jobObservationIsOlder, retainedWaitDelivery } from './ordering.js';
 
 export type { CollectedObservation } from './contract.js';
 export type {

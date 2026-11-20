@@ -5,6 +5,37 @@ export function storeContract(
   name: string,
   setup: () => Promise<{ store: JobStore; reopen: () => JobStore; close: () => Promise<void> }>
 ) {
+  it(`${name}: preserves optional CI lifecycle timestamps across reopening`, async () => {
+    const fixture = await setup();
+    try {
+      const stage = {
+        index: 0,
+        stage: 'ci' as const,
+        threadId: 'owner',
+        commit: 'a'.repeat(40),
+        previousRunId: 'run',
+        ciStartedAt: 1234,
+        ciRepair: true,
+      };
+      await Effect.runPromise(fixture.store.saveStage(stage));
+      expect(await Effect.runPromise(fixture.reopen().readStage(0))).toEqual(stage);
+      const wait = {
+        revision: 0,
+        progress: 'checks',
+        deadline: 3600500,
+        nudged: false,
+        startedAt: 500,
+      };
+      await Effect.runPromise(fixture.store.saveWait(wait));
+      expect(await Effect.runPromise(fixture.reopen().readWait())).toEqual(wait);
+      await Effect.runPromise(fixture.store.saveWait({ ...wait, revision: 1, startedAt: null }));
+      expect(await Effect.runPromise(fixture.reopen().readWait())).toMatchObject({
+        startedAt: null,
+      });
+    } finally {
+      await fixture.close();
+    }
+  });
   it.each(['reserve', 'occupied', 'stale', 'mismatch', 'race-reserve', 'race-stage'] as const)(
     `${name}: atomically reserves a reconciliation stage with its budget: %s`,
     async (kind) => {

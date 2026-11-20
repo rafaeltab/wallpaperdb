@@ -45,3 +45,33 @@ export function jobObservationIsOlder(previous: JobObservation | undefined, next
     before.run.ordinal > after.run.ordinal
   );
 }
+
+/** A completed replacement watcher changes execution evidence, not the retained wait ownership.
+ * Explicit delivery outcomes, active repairs, questions and stage changes end that retention. */
+export function retainedWaitDelivery(previous: JobObservation | undefined, next: JobObservation) {
+  const delivery = previous?.delivery;
+  const before = previous?.execution;
+  const after = next.execution;
+  if (
+    next.controlRevision !== undefined ||
+    next.delivery?.activity !== undefined ||
+    previous?.intent.id !== next.intent.id ||
+    previous?.stageIndex !== next.stageIndex ||
+    !delivery ||
+    delivery.ready ||
+    delivery.landed ||
+    !['waiting-for-ci', 'waiting-for-github', 'continuation-pending'].includes(
+      delivery.activity ?? ''
+    ) ||
+    delivery.pr?.kind !== 'found' ||
+    (next.delivery?.commit !== delivery.commit && next.delivery?.commit !== delivery.waitCommit) ||
+    before?.kind !== 'found' ||
+    after.kind !== 'found' ||
+    before.threadId !== after.threadId ||
+    !['completed', 'idle'].includes(after.status) ||
+    after.question ||
+    after.manual
+  )
+    return next.delivery;
+  return delivery;
+}

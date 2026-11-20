@@ -799,3 +799,79 @@ it('preserves publication timing when a newer running observation precedes faile
     await runtime.dispose();
   }
 });
+it.each([false, true])(
+  'keeps a managed wait through a provisional completed watcher with prior flush=%s',
+  async (flushed) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const owner = parkedSnapshot(pullObservation(2), true).jobs[0];
+    if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+      throw new Error('Expected managed owner');
+    const delivery = {
+      ...owner.delivery,
+      stage: 'babysitting' as const,
+      activity: 'waiting-for-github' as const,
+      waitStartedAt: 100,
+      question: undefined,
+    };
+    const execution = {
+      ...owner.execution,
+      status: 'completed',
+      question: undefined,
+      run: { id: 'watcher-4', ordinal: 4 },
+    };
+    const previous = { ...owner, controlRevision: 3, stageIndex: 4, delivery, execution };
+    const provisional = {
+      ...previous,
+      controlRevision: undefined,
+      execution: { ...execution, run: { id: 'watcher-5', ordinal: 5 } },
+      delivery: {
+        stage: 'babysitting' as const,
+        commit: delivery.commit,
+        ready: false,
+        landed: false,
+      },
+    };
+    const { store, runtime } = setup();
+    try {
+      const reporting = await runtime.runPromise(Reporting);
+      const generation = await runtime.runPromise(reporting.begin());
+      await runtime.runPromise(
+        reporting.enqueue(generation, [{ kind: 'job', value: previous, at: 100, sequence: 1 }])
+      );
+      if (flushed) await runtime.runPromise(reporting.flush());
+      await runtime.runPromise(
+        reporting.enqueue(generation, [{ kind: 'job', value: provisional, at: 200, sequence: 2 }])
+      );
+      await runtime.runPromise(reporting.flush());
+      expect((await Effect.runPromise(store.read())).jobs).toMatchObject([
+        {
+          execution: { run: { id: 'watcher-5' } },
+          delivery: { activity: 'waiting-for-github', waitStartedAt: 100 },
+        },
+      ]);
+      await runtime.runPromise(
+        reporting.enqueue(generation, [
+          {
+            kind: 'job',
+            value: {
+              ...provisional,
+              execution: {
+                ...provisional.execution,
+                status: 'running',
+                run: { id: 'repair-6', ordinal: 6 },
+              },
+            },
+            at: 300,
+            sequence: 3,
+          },
+        ])
+      );
+      await runtime.runPromise(reporting.flush());
+      const current = (await Effect.runPromise(store.read())).jobs?.[0];
+      expect(current?.kind === 'job' && current.delivery?.activity).toBeUndefined();
+      expect(current).toMatchObject({ execution: { status: 'running' } });
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);

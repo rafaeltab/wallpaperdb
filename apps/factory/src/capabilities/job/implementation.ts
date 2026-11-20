@@ -4,6 +4,7 @@ import { Effect, Layer, Random, Option } from 'effect';
 import {
   reconcileStages,
   currentStage,
+  ciRepairOrigin,
   hasAnsweredQuestion,
   stageRunOrder,
   retainInitialStage,
@@ -106,6 +107,7 @@ export const JobLive = Layer.effect(
           // Publish it before any external validation or continuation can fail.
           if (reporting) {
             const stage = yield* currentStage(store);
+            const ciRepair = yield* ciRepairOrigin(store, stage);
             yield* reporting
               .observed(generation, {
                 kind: 'job',
@@ -116,7 +118,13 @@ export const JobLive = Layer.effect(
                   stage?.stage === 'publication' ? stage.publicationStartedAt : undefined,
                 elapsedMs: Math.max(0, (yield* time.now()) - intent.createdAt),
                 delivery: stage
-                  ? { stage: stage.stage, commit: stage.commit, ready: false, landed: false }
+                  ? {
+                      stage: stage.stage,
+                      commit: stage.commit,
+                      ready: false,
+                      landed: false,
+                      ciRepair: ciRepair || undefined,
+                    }
                   : undefined,
               })
               // Provisional reporting cannot prevent cancellation or reconciliation.
@@ -209,6 +217,7 @@ export const JobLive = Layer.effect(
                 delivery
               )));
           const now = yield* time.now();
+          const ciRepair = yield* ciRepairOrigin(store, stage);
           const status = {
             kind: 'job' as const,
             controlRevision: control.revision,
@@ -231,7 +240,11 @@ export const JobLive = Layer.effect(
               : yield* restartAction(store, execution, activeIntent, control, stage, observation),
             execution: observation,
             delivery: delivery
-              ? { ...delivery, active: delivery.active ?? !delivery.ready }
+              ? {
+                  ...delivery,
+                  active: delivery.active ?? !delivery.ready,
+                  ciRepair: ciRepair || undefined,
+                }
               : delivery,
             elapsedMs: Math.max(0, now - intent.createdAt),
           };

@@ -101,6 +101,29 @@ it('provides keyboard and hover details, live switching and approved D layout at
     };
     await browserExpect(trigger).toContainText('Reviewing 1 issue', { timeout: 5000 });
     await page.screenshot({ path: join(evidence, 'review-handoff.png') });
+    const reviews = implementing.map((item) => ({
+      ...item,
+      id: `review:${item.issue}`,
+      category: 'reviewing' as const,
+    }));
+    served = {
+      ...idle,
+      meta: { ...idle.meta, activity: { ...activity, items: [implementing[0], ...reviews] } },
+    };
+    await browserExpect(trigger).toContainText('Reviewing 2 issues', { timeout: 5000 });
+    const reviewTile = panel.locator('.fa-row').filter({ hasText: 'Reviewing' });
+    await browserExpect(reviewTile.getByRole('img', { name: 'Active', exact: true })).toBeVisible();
+    await browserExpect(reviewTile).toContainText('2 issues');
+    await browserExpect(trigger.locator('time')).toContainText('1m');
+    await page.screenshot({ path: join(evidence, 'reviewing-two.png') });
+    served = {
+      ...idle,
+      meta: { ...idle.meta, activity: { ...activity, items: [implementing[0], reviews[0]] } },
+    };
+    await browserExpect(trigger).toContainText('Reviewing 1 issue', { timeout: 5000 });
+    await browserExpect(trigger.locator('time')).toContainText('2m');
+    await page.screenshot({ path: join(evidence, 'reviewing-newest-departed.png') });
+
     served = {
       ...idle,
       meta: {

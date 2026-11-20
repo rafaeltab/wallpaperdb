@@ -3,6 +3,7 @@ import type { ScheduleSnapshot } from '../observe/index.js';
 import { answerRunCurrent } from '../job/index.js';
 import { capacityOccupied } from '../plan/index.js';
 import { managedRepairs } from './repairs.js';
+import { managedReviews } from './reviews.js';
 import { managedCIWaits } from './ci-waits.js';
 import type { ActivityCategory, FactoryActivity, Reason } from './model.js';
 import { timestamp } from './values.js';
@@ -44,7 +45,10 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     input.recoveries?.some((r) => r.phase !== 'complete')
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
-  const items: FactoryActivity['items'][number][] = [...managedCIWaits(input)];
+  const items: FactoryActivity['items'][number][] = [
+    ...managedCIWaits(input),
+    ...managedReviews(input),
+  ];
   if (input.planningVerification)
     items.push({
       id: `plan-verification:${input.planningVerification.startedAt}`,
@@ -123,10 +127,13 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
           : 'Publishing reviewed issue changes',
     });
   }
-  items.push(...managedRepairs(input).filter((repair) =>
-    repair.category !== 'publishing' &&
-    !items.some((item) => item.category === repair.category && item.issue === repair.issue)
-  ));
+  items.push(
+    ...managedRepairs(input).filter(
+      (repair) =>
+        repair.category !== 'publishing' &&
+        !items.some((item) => item.category === repair.category && item.issue === repair.issue)
+    )
+  );
   const source = input.observations;
   if (source.refreshActive === true && source.startedAt !== undefined)
     items.push({
@@ -196,8 +203,8 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     )
       continue;
     // A current answer wait supersedes provisional publication until reconciliation catches up.
-    const publication = items.findIndex((item) =>
-      item.category === 'publishing' && item.issue === admission.issue
+    const publication = items.findIndex(
+      (item) => item.category === 'publishing' && item.issue === admission.issue
     );
     if (publication !== -1) items.splice(publication, 1);
     items.push({
@@ -286,6 +293,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     category === 'refreshing-github' ||
     category === 'refreshing-t3' ||
     category === 'publishing' ||
+    category === 'reviewing' ||
     category === 'waiting-for-ci' ||
     category === 'waiting-for-answers' ||
     (category === 'gathering-planning-context' && !!input.planningDiscovery) ||

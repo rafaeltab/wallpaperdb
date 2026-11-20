@@ -6,7 +6,6 @@ import type { ActivityCategory, FactoryActivity } from './model.js';
 const responsibility: Partial<Record<Stage, { category: ActivityCategory; reason: string }>> = {
   implementation: { category: 'implementing', reason: 'Repairing managed CI failures' },
   babysitting: { category: 'implementing', reason: 'Repairing managed CI failures' },
-  review: { category: 'reviewing', reason: 'Reviewing CI repairs' },
   publication: { category: 'publishing', reason: 'Publishing CI repairs' },
 };
 export function managedRepairs(input: ScheduleSnapshot): FactoryActivity['items'][number][] {

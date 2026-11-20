@@ -215,3 +215,64 @@ it('counts current publishing issues and advances the newest timer through joins
   rerender(<FactoryActivity facts={facts} paused={false} refresh={refresh} />);
   expect(screen.getByRole('button', { name: /Refreshing GitHub/ })).toBeTruthy();
 });
+
+it('counts distinct reviewing issues, advances locally and recalculates after the newest review leaves', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(facts.observedAt));
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const older: ActivityFacts['items'][number] = {
+    id: 'review-1',
+    category: 'reviewing',
+    lifecycle: 'current',
+    issue: 1,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:58:00Z',
+    reason: 'Reviewing',
+  };
+  const newer = { ...older, id: 'review-2', issue: 2, startedAt: '2026-11-17T11:59:00Z' };
+  const implementation = {
+    ...older,
+    id: 'implementation',
+    issue: 3,
+    category: 'implementing' as const,
+  };
+  const items = [older, newer, { ...older, id: 'duplicate' }, implementation, ...facts.items];
+  const { rerender } = render(
+    <FactoryActivity facts={{ ...facts, items }} paused={false} refresh={refresh} />
+  );
+  expect(screen.getByRole('button', { name: /Reviewing 2 issues.*1m 0s/ })).toBeTruthy();
+  fireEvent.focus(screen.getByRole('button'));
+  const tile = screen.getByText('Reviewing').parentElement;
+  if (!tile) throw new Error('Missing review tile');
+  expect(within(tile).getByRole('img', { name: 'Active' })).toBeTruthy();
+  expect(within(tile).getByText('2 issues')).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  expect(screen.getByRole('button', { name: /Reviewing 2 issues.*1m 2s/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{ ...facts, items: [older, implementation] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Reviewing 1 issue.*2m 2s/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{ ...facts, items: [older, implementation, { ...newer, category: 'publishing' }] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Publishing 1 issue/ })).toBeTruthy();
+  rerender(
+    <FactoryActivity
+      facts={{ ...facts, items: [implementation] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Implementing 1 issue/ })).toBeTruthy();
+  const inactive = screen.getByText('Reviewing').parentElement;
+  if (!inactive) throw new Error('Missing review tile');
+  expect(within(inactive).getByRole('img', { name: 'Inactive' })).toBeTruthy();
+});

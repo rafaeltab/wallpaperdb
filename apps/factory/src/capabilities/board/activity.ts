@@ -42,12 +42,29 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     unfinished ||
     input.state.recovering?.length ||
     input.state.resuming?.length ||
-    input.recoveries?.some((r) => r.phase !== 'complete')
+    input.recoveries?.some((r) => r.phase !== 'complete') ||
+    input.restackActivities?.some((r) => r.phase !== 'complete')
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
+  const restacks = (input.restackActivities ?? input.recoveries ?? []).filter(
+    (recovery) =>
+      recovery.active !== false &&
+      recovery.bindingAvailable !== false &&
+      ['resolving', 'reviewing', 'verifying', 'publishing'].includes(recovery.phase ?? '')
+  );
+  const restackPRs = new Set(restacks.map((recovery) => recovery.pr));
   const items: FactoryActivity['items'][number][] = [
     ...managedCIWaits(input),
     ...managedReviews(input),
+    ...restacks.map((recovery) => ({
+      id: `restack:${recovery.issue}/${recovery.pr}`,
+      category: 'restacking' as const,
+      lifecycle: 'current' as const,
+      issue: recovery.issue,
+      pullRequest: Number(recovery.pr.split('/').at(-1)) || null,
+      startedAt: timestamp(recovery.startedAt),
+      reason: `Managed restack ${recovery.phase}`,
+    })),
   ];
   if (input.planningVerification)
     items.push({
@@ -98,6 +115,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       control?.retirement ||
       (control?.parked !== undefined && control.parked.index === job.stageIndex) ||
       control?.dependencyRecovery ||
+      (delivery?.pr?.kind === 'found' && restackPRs.has(delivery.pr.url)) ||
       delivery?.stage !== 'publication' ||
       delivery.ready ||
       delivery.landed ||
@@ -317,6 +335,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     category === 'publishing' ||
     category === 'reviewing' ||
     (category === 'planning' && planning !== undefined) ||
+    category === 'restacking' ||
     category === 'waiting-for-ci' ||
     category === 'waiting-for-answers' ||
     (category === 'gathering-planning-context' && !!input.planningDiscovery) ||

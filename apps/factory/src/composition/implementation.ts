@@ -639,6 +639,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     });
     startupCleanup.push(() => attempts.close());
     const plan = await runtime.runPromise(Plan);
+    const activitySource = githubIssues(githubConfig());
     const v2 = await v2Producer({
       runSync: (effect) => runtime.runSync(effect),
       planner: await runtime.runPromise(IPlanner),
@@ -649,6 +650,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       planningSafety,
       read: () =>
         Effect.all({
+          restackActivities: activitySource.restackActivities?.() ?? Effect.succeed([]),
           executionCatalog: Effect.sync(() => executionCatalog),
           schedule: observations.schedule(),
           threads: threads.snapshot(),
@@ -661,6 +663,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           Effect.map(
             ({
               schedule,
+              restackActivities,
               threads,
               safety,
               executionCatalog,
@@ -671,6 +674,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             }) => ({
               planningVerification,
               planningActivity,
+              restackActivities,
               executionCatalog,
               ...schedule,
               planningDiscovery,

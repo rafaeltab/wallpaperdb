@@ -303,6 +303,11 @@ export function githubIssues(
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.github.publication-retry')
       ),
+    restackActivities: () =>
+      Effect.tryPromise({
+        try: () => joins?.restackActivities() ?? Promise.resolve([]),
+        catch: (cause) => new Unavailable({ operation: 'read-restack-activity', cause }),
+      }),
     recoveries: () =>
       contextualPromise({
         try: (signal) => joins?.recoveries(signal) ?? Promise.resolve([]),

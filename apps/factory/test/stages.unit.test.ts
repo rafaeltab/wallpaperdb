@@ -106,8 +106,12 @@ it('requires fresh accepted stages and matching current CI before reporting read
   await run(Effect.flatMap(Job, (job) => job.status()));
   expect(sent).toEqual([1]);
   accepted = true;
-  await run(Effect.flatMap(Job, (job) => job.status()));
+  expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
+    publicationStartedAt: 100,
+    delivery: { stage: 'publication' },
+  });
   expect(sent).toEqual([1, 2]);
+  expect(await Effect.runPromise(store.readStage(2))).toMatchObject({ publicationStartedAt: 100 });
   accepted = true;
   expect(await run(Effect.flatMap(Job, (job) => job.status()))).toMatchObject({
     delivery: { stage: 'ci', ready: false, landed: false },

@@ -69,6 +69,7 @@ export function storeContract(
       const pending = {
         index: 7,
         stage: 'publication' as const,
+        publicationStartedAt: 1234,
         threadId: 'owner',
         commit: 'a'.repeat(40),
         previousRunId: 'run-12',

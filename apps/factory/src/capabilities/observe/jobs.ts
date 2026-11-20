@@ -29,7 +29,7 @@ export const JobReportingLive = Layer.effect(
             { kind: 'job', value, at: yield* time.now(), sequence: ++sequence },
           ]);
         }),
-      accepted: (intent, stage, index, commit) =>
+      accepted: (intent, stage, index, commit, publicationStartedAt) =>
         Effect.gen(function* () {
           const generation = yield* reporting.begin();
           const at = yield* time.now();
@@ -41,6 +41,7 @@ export const JobReportingLive = Layer.effect(
               value: {
                 kind: 'job',
                 stageIndex: index,
+                publicationStartedAt,
                 intent,
                 execution: { kind: 'ambiguous' },
                 elapsedMs: Math.max(0, at - intent.createdAt),

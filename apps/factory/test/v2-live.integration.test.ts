@@ -4328,3 +4328,90 @@ it('translates a current implementing item through the existing board endpoint',
     await app.close();
   }
 });
+
+it('reports only current admitted publication, preserving its start and simultaneous refresh through HTTP', async () => {
+  const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+  const input = parkedSnapshot(pullObservation(2), true);
+  const source = input.jobs[0];
+  if (source.kind !== 'job' || source.execution.kind !== 'found' || !source.delivery)
+    throw new Error('Expected job fixture');
+  const publishing = {
+    ...source,
+    publicationStartedAt: 2000,
+    stageIndex: 2,
+    acknowledgement: { stage: 'publication' as const, index: 2, acceptedAt: 2000 },
+    execution: { ...source.execution, status: 'running' },
+    delivery: {
+      ...source.delivery,
+      stage: 'publication' as const,
+      activity: undefined,
+      active: true,
+    },
+  };
+  const current: ScheduleSnapshot = {
+    ...input,
+    localWork: [],
+    jobs: [publishing],
+    observations: { ...input.observations, refreshActive: true, startedAt: 3000 },
+  };
+  const board = await liveBoard({ scopeId: 'publishing-activity', initial: current });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(activity?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'publishing',
+          issue: 1,
+          startedAt: '1970-01-01T00:00:02.000Z',
+        }),
+        expect.objectContaining({ category: 'refreshing-github' }),
+      ])
+    );
+    expect(activity?.coverage).toContainEqual({
+      category: 'publishing',
+      state: 'complete',
+      reason: null,
+    });
+    expect(activity).not.toHaveProperty('summary');
+    await board.publish({
+      ...current,
+      observations: { ...current.observations, observedAt: 9000 },
+    });
+    expect(
+      board.snapshot().meta.activity?.items.find((i) => i.category === 'publishing')?.startedAt
+    ).toBe('1970-01-01T00:00:02.000Z');
+    for (const changed of [
+      { ...publishing, execution: { ...publishing.execution, status: 'completed' } },
+      { ...publishing, delivery: { ...publishing.delivery, active: false } },
+      { ...publishing, delivery: { ...publishing.delivery, ready: true } },
+      { ...publishing, delivery: { ...publishing.delivery, landed: true } },
+      { ...publishing, delivery: { ...publishing.delivery, activity: 'cancelled' as const } },
+      {
+        ...publishing,
+        delivery: { ...publishing.delivery, activity: 'continuation-pending' as const },
+      },
+      { ...publishing, delivery: { ...publishing.delivery, activity: 'awaiting-answer' as const } },
+      { ...publishing, delivery: { ...publishing.delivery, stage: 'review' as const } },
+    ]) {
+      await board.publish({ ...current, jobs: [changed] });
+      expect(board.snapshot().meta.activity?.items.some((i) => i.category === 'publishing')).toBe(
+        false
+      );
+    }
+    await board.publish({
+      ...current,
+      jobs: [{ ...publishing, delivery: { ...publishing.delivery, activity: 'repairing' } }],
+    });
+    expect(board.snapshot().meta.activity?.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ category: 'publishing', issue: 1 })])
+    );
+    await board.publish({ ...current, state: { ...current.state, admissions: [] } });
+    expect(board.snapshot().meta.activity?.items.some((i) => i.category === 'publishing')).toBe(
+      false
+    );
+  } finally {
+    board.close();
+    await app.close();
+  }
+});

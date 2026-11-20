@@ -117,10 +117,12 @@ function advance(
   issues: Issues,
   intent: Intent,
   waiting: StageRequest,
-  evidence: StageEvidence
+  evidence: StageEvidence,
+  time: Time
 ) {
   return Effect.gen(function* () {
     const proposed: StageRequest = {
+      publicationStartedAt: waiting.stage === 'review' ? yield* time.now() : undefined,
       index: waiting.index + 1,
       receiptProtocol: 'delivery-v1',
       comparison: nextComparison(waiting),
@@ -421,7 +423,7 @@ function reconcileStage(
       return { ...delivery, active: false };
     if (!(yield* continuationAllowed(intent, waiting, verified, continuation)))
       return { ...delivery, active: false };
-    return yield* advance(store, execution, issues, intent, waiting, verified);
+    return yield* advance(store, execution, issues, intent, waiting, verified, time);
   });
 }
 

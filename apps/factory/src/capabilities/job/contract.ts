@@ -368,6 +368,7 @@ export type Status =
       kind: 'job';
       readonly controlRevision?: number;
       stageIndex?: number;
+      publicationStartedAt?: number;
       reconciliation?: {
         readonly attempts: number;
         readonly limit: number;
@@ -397,6 +398,8 @@ export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
 /** Immutable stage association, written before any delivery. Delivery identity survives continuation turns; observed ordinals can reject older results, never predict one exact completion run. */
 export interface StageRequest {
+  /** Retained publication responsibility transition time; absent for historical records. */
+  readonly publicationStartedAt?: number;
   /** Authenticated main comparison retained after an agent rebase. */
   readonly acceptedBase?: string;
   readonly handback?: readonly string[];
@@ -536,7 +539,8 @@ export interface JobReporting {
     intent: Intent,
     stage: Stage,
     index: number,
-    commit?: string
+    commit?: string,
+    publicationStartedAt?: number
   ): Effect.Effect<void, Unavailable>;
 }
 export const JobReporting = Context.Service<JobReporting>('wallpaperdb.factory.JobReporting');

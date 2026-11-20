@@ -13,6 +13,7 @@ import {
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+import { copyBuiltArtifacts } from "@wallpaperdb/coverage-runtime";
 
 const root = process.env.WALLPAPERDB_COVERAGE_REPO_ROOT || process.cwd(),
 	out = resolve(root, ".coverage-runtime/build");
@@ -114,6 +115,7 @@ async function compile(dir: string, only?: Set<string>): Promise<void> {
 			const cleanCli = [
 				"apps/asset/test/source-confirmation.integration.test.ts",
 				"apps/asset/test/result-notification.integration.test.ts",
+				"apps/gateway/test/search/server.integration.test.ts",
 			].includes(src);
 			const source = await readFile(src, "utf8");
 			sourceHashes[resolve(src)] = sourceHash(source);
@@ -257,13 +259,7 @@ async function compile(dir: string, only?: Set<string>): Promise<void> {
 										cleanCli &&
 										ts.isPropertyAssignment(node) &&
 										ts.isIdentifier(node.name) &&
-										node.name.text === "env" &&
-										ts.isObjectLiteralExpression(node.initializer) &&
-										node.initializer.properties.some(
-											(p) =>
-												ts.isPropertyAssignment(p) &&
-												p.name.getText() === "DATABASE_URL",
-										)
+										node.name.text === "env"
 									)
 										return ts.factory.updatePropertyAssignment(
 											node,
@@ -503,7 +499,7 @@ async function compile(dir: string, only?: Set<string>): Promise<void> {
 for (const w of owned.values()) {
 	if (w !== "." && w !== "scripts") {
 		await compile(w);
-		await cp(join(w, "dist"), join(out, w, "dist"), { recursive: true }).catch(
+		await copyBuiltArtifacts(join(w, "dist"), join(out, w, "dist")).catch(
 			(e) => {
 				if (e.code !== "ENOENT") throw e;
 			},

@@ -1,4 +1,4 @@
-import { repositoryRoot } from "./repository-root.mjs";
+import { repositoryRoot, repositoryConfiguration } from "./repository-root.mjs";
 import type { ViteUserConfig } from "vitest/config";
 import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -92,6 +92,14 @@ export default async function (): Promise<ViteUserConfig> {
 				test.coverage[k] = test.coverage[k]
 					.map(rewrite)
 					.map((p) => p.replaceAll(".js", ".{js,mjs,cjs}"));
+	const { builtArtifactWorkspaces } = await repositoryConfiguration();
+	if (
+		native &&
+		builtArtifactWorkspaces.includes(
+			process.env.WALLPAPERDB_COVERAGE_WORKSPACE || "",
+		)
+	)
+		test.coverage.include = [...(test.coverage.include || []), "dist/**/*.mjs"];
 	await writeFile(
 		resolve(
 			process.env.WALLPAPERDB_COVERAGE_REPO_OUTPUT || "",

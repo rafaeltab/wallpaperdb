@@ -17,3 +17,5 @@ export {
 	validateFileCoverage,
 } from "./coverage-validation.js";
 export { inventorySchema } from "./json.mjs";
+
+export { copyBuiltArtifacts } from "./copy-built.mjs";

@@ -1,8 +1,10 @@
-import { repositoryRoot } from "@wallpaperdb/coverage-runtime";
+import {
+	repositoryRoot,
+	copyBuiltArtifacts,
+} from "@wallpaperdb/coverage-runtime";
 // A nested real Make build runs in the source checkout. Its resulting artifact
 // must then be the artifact launched by the mirror's deployment contracts.
 import { existsSync } from "node:fs";
-import { cp, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = repositoryRoot();
@@ -14,5 +16,4 @@ const workspace = ["apps", "packages"]
 	.find((w) => existsSync(resolve(root, w, "package.json")));
 if (!workspace) throw new Error(`Unknown build workspace ${name}`);
 const destination = resolve(root, ".coverage-runtime/build", workspace, "dist");
-await rm(destination, { recursive: true, force: true });
-await cp(resolve(root, workspace, "dist"), destination, { recursive: true });
+await copyBuiltArtifacts(resolve(root, workspace, "dist"), destination);

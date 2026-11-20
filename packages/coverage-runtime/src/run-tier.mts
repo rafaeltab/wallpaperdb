@@ -47,6 +47,7 @@ const source = resolve(root, row.runtime),
 			: source;
 Object.assign(process.env, {
 	WALLPAPERDB_COVERAGE_REPO_ROOT: root,
+	WALLPAPERDB_COVERAGE_WORKSPACE: row.workspace,
 	WALLPAPERDB_COVERAGE_REPO_CONFIG: resolve(
 		cwd,
 		strategy === "compiled-native"

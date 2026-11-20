@@ -2803,3 +2803,33 @@ it('excludes replay review queued for capacity without changing its retained pro
     await f.close();
   }
 });
+
+it('keeps completed restack reporting retired while an owning CI repair is only reserved', async () => {
+  const f = await fixture();
+  try {
+    await Effect.runPromise(required(f.issues.prepare)(5));
+    expect(await Effect.runPromise(required(f.issues.restackActivities)())).toEqual([]);
+    const path = join(f.host.directory, 'join-live.json');
+    const live = JSON.parse(await readFile(path, 'utf8'));
+    await writeFile(path, JSON.stringify({ ...live, newCI: 'FAILURE' }));
+    const intent = {
+      id: 'C-reporting',
+      issue: 4,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+      base: f.host.base,
+      branch: 'C',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const current = await Effect.runPromise(f.issues.pullRequest(intent));
+    if (current.kind !== 'found') throw new Error('Missing completed replay PR');
+    expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, current.commit))).toBe(
+      true
+    );
+    expect(await Effect.runPromise(required(f.issues.restackActivities)())).toEqual([]);
+    expect(await Effect.runPromise(required(f.reopen().restackActivities)())).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});

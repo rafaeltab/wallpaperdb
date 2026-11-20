@@ -1,9 +1,13 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { NodeSDK } from '@opentelemetry/sdk-node';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import { recordCounter } from '@wallpaperdb/core/telemetry';
+import { recordCounter, TelemetryExportTransport } from '@wallpaperdb/core/telemetry';
 import { createNatsContainer } from '@wallpaperdb/testcontainers';
 import { Effect, Layer, Metric } from 'effect';
 import { connect } from 'nats';
@@ -22,11 +26,114 @@ afterEach(() => {
   context.disable();
   propagation.disable();
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 it('exports production Effect traces, logs and metrics with incoming HTTP trace context through the owning SDK', async () => {
+  const started = performance.now();
+  const timeline: { elapsedMs: number; event: string; error?: string }[] = [];
+  const record = (event: string, error?: string) => {
+    timeline.push({ elapsedMs: Math.round(performance.now() - started), event, error });
+  };
+  const closeTransport = TelemetryExportTransport.prototype.close;
+  vi.spyOn(TelemetryExportTransport.prototype, 'close').mockImplementation(async function (
+    this: TelemetryExportTransport
+  ) {
+    record('transport.close.start');
+    await closeTransport.call(this);
+    record('transport.close.complete');
+  });
+  const shutdown = NodeSDK.prototype.shutdown;
+  vi.spyOn(NodeSDK.prototype, 'shutdown').mockImplementation(async function (this: NodeSDK) {
+    record('sdk.shutdown.start');
+    try {
+      await shutdown.call(this);
+      record('sdk.shutdown.complete');
+    } catch (error) {
+      record('sdk.shutdown.failed', String(error));
+      throw error;
+    }
+  });
+  const tracesExport = OTLPTraceExporter.prototype.export;
+  vi.spyOn(OTLPTraceExporter.prototype, 'export').mockImplementation(function (
+    this: OTLPTraceExporter,
+    items,
+    callback
+  ) {
+    record('traces.export.start');
+    return tracesExport.call(this, items, (result) => {
+      record(`traces.export.result.${result.code}`, result.error?.message);
+      callback(result);
+    });
+  });
+  const tracesFlush = OTLPTraceExporter.prototype.forceFlush;
+  vi.spyOn(OTLPTraceExporter.prototype, 'forceFlush').mockImplementation(async function (
+    this: OTLPTraceExporter
+  ) {
+    record('traces.flush.start');
+    try {
+      await tracesFlush.call(this);
+      record('traces.flush.complete');
+    } catch (error) {
+      record('traces.flush.failed', String(error));
+      throw error;
+    }
+  });
+  const logsExport = OTLPLogExporter.prototype.export;
+  vi.spyOn(OTLPLogExporter.prototype, 'export').mockImplementation(function (
+    this: OTLPLogExporter,
+    items,
+    callback
+  ) {
+    record('logs.export.start');
+    return logsExport.call(this, items, (result) => {
+      record(`logs.export.result.${result.code}`, result.error?.message);
+      callback(result);
+    });
+  });
+  const logsFlush = OTLPLogExporter.prototype.forceFlush;
+  vi.spyOn(OTLPLogExporter.prototype, 'forceFlush').mockImplementation(async function (
+    this: OTLPLogExporter
+  ) {
+    record('logs.flush.start');
+    try {
+      await logsFlush.call(this);
+      record('logs.flush.complete');
+    } catch (error) {
+      record('logs.flush.failed', String(error));
+      throw error;
+    }
+  });
+  const metricsExport = OTLPMetricExporter.prototype.export;
+  vi.spyOn(OTLPMetricExporter.prototype, 'export').mockImplementation(function (
+    this: OTLPMetricExporter,
+    items,
+    callback
+  ) {
+    record('metrics.export.start');
+    return metricsExport.call(this, items, (result) => {
+      record(`metrics.export.result.${result.code}`, result.error?.message);
+      callback(result);
+    });
+  });
+  const metricsFlush = OTLPMetricExporter.prototype.forceFlush;
+  vi.spyOn(OTLPMetricExporter.prototype, 'forceFlush').mockImplementation(async function (
+    this: OTLPMetricExporter
+  ) {
+    record('metrics.flush.start');
+    try {
+      await metricsFlush.call(this);
+      record('metrics.flush.complete');
+    } catch (error) {
+      record('metrics.flush.failed', String(error));
+      throw error;
+    }
+  });
   const exported = new Map<string, string[]>();
   const collector = createServer((request, response) => {
+    record(`collector.received.${request.url}`);
+    response.once('finish', () => record(`collector.completed.${request.url}`));
+    request.once('aborted', () => record(`collector.aborted.${request.url}`));
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
     request.on('end', () => {
@@ -51,15 +158,30 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
         recordCounter('telemetry.sdk.contract', 1);
         const database = yield* Effect.acquireRelease(
           Effect.promise(() => new PostgreSqlContainer('postgres:16-alpine').start()),
-          (container) => Effect.promise(() => container.stop())
+          (container) =>
+            Effect.promise(async () => {
+              record('postgres.stop.start');
+              await container.stop();
+              record('postgres.stop.complete');
+            })
         );
         const nats = yield* Effect.acquireRelease(
           Effect.promise(() => createNatsContainer()),
-          (container) => Effect.promise(() => container.stop())
+          (container) =>
+            Effect.promise(async () => {
+              record('nats.stop.start');
+              await container.stop();
+              record('nats.stop.complete');
+            })
         );
         const sql = yield* Effect.acquireRelease(
           Effect.sync(() => postgres(database.getConnectionUri())),
-          (sql) => Effect.promise(() => sql.end())
+          (sql) =>
+            Effect.promise(async () => {
+              record('sql.end.start');
+              await sql.end();
+              record('sql.end.complete');
+            })
         );
         const directory = new URL('../drizzle/', import.meta.url);
         for (const name of readdirSync(directory)
@@ -68,7 +190,12 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
           yield* Effect.promise(() => sql.unsafe(readFileSync(new URL(name, directory), 'utf8')));
         const connection = yield* Effect.acquireRelease(
           Effect.promise(() => connect({ servers: nats.getConnectionUrl() })),
-          (connection) => Effect.promise(() => connection.close())
+          (connection) =>
+            Effect.promise(async () => {
+              record('connection.close.start');
+              await connection.close();
+              record('connection.close.complete');
+            })
         );
         const manager = yield* Effect.promise(() => connection.jetstreamManager());
         yield* Effect.promise(() =>
@@ -109,7 +236,12 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
         ).pipe(Layer.provideMerge(userLayer(config, { workers: false, otelHealthy: true })));
         const app = yield* Effect.acquireRelease(
           Effect.promise(() => createHttpApp(config, services)),
-          (app) => Effect.promise(() => app.close())
+          (app) =>
+            Effect.promise(async () => {
+              record('app.close.start');
+              await app.close();
+              record('app.close.complete');
+            })
         );
         const response = yield* Effect.promise(() =>
           app.inject({
@@ -122,6 +254,7 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
         return status;
       }).pipe(Effect.scoped)
     );
+    record('scope.complete');
     expect(status).toEqual({ _tag: 'Started' });
     expect(exported.get('/v1/traces')?.join()).toContain('telemetry.sdk.contract');
     expect(exported.get('/v1/logs')?.join()).toContain('Telemetry contract');
@@ -158,6 +291,9 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
       })
     );
   } finally {
+    // Vitest retains this output on failure. Observe the real SDK without changing
+    // its deadlines or treating successful shutdown as proof that export succeeded.
+    console.info('User telemetry contract timeline', JSON.stringify(timeline));
     collector.closeAllConnections();
     await new Promise<void>((resolve, reject) =>
       collector.close((error) => (error ? reject(error) : resolve()))

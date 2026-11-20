@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"skipLibCheck": true,
+		"rootDir": ".",
+		"outDir": "dist",
+		"sourceMap": true,
+		"inlineSources": true
+	},
+	"include": [
+		"coverage-build.mts",
+		"coverage-policy.mts",
+		"coverage-protocol.mts",
+		"coverage-sync-built.mts",
+		"merge-coverage.mts"
+	]
+}

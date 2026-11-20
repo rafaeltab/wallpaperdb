@@ -40,6 +40,7 @@ function isolatedRepository() {
 		"biome.json",
 		"crap.config.mts",
 		".gitignore",
+		".dockerignore",
 	])
 		copyFileSync(join(repository, name), join(directory, name));
 	// Newer Makefiles enter the locked toolchain before workspace tasks. Keep
@@ -51,6 +52,16 @@ function isolatedRepository() {
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.ts",
 		"scripts/crap.mts",
+		"scripts/lib/coverage-validation.ts",
+		"scripts/coverage-build.mts",
+		"scripts/coverage-policy.mts",
+		"scripts/coverage-protocol.mts",
+		"scripts/coverage-sync-built.mts",
+		"scripts/tsconfig.coverage.json",
+		"packages/coverage-runtime/tsconfig.json",
+		"packages/coverage-runtime/tsconfig.test.json",
+		"scripts/operator-inbox.ts",
+		"infra/docker-compose.yml",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
 		"scripts/lib/mutation-catalog.ts",
@@ -59,6 +70,13 @@ function isolatedRepository() {
 		mkdirSync(dirname(join(directory, name)), { recursive: true });
 		copyFileSync(join(repository, name), join(directory, name));
 	}
+	// The real CRAP CLI obtains fresh reports through the maintained producer.
+	// Keep its modules local so the fixture cannot read another checkout's inputs.
+	cpSync(
+		join(repository, "packages/coverage-runtime/src"),
+		join(directory, "packages/coverage-runtime/src"),
+		{ recursive: true },
+	);
 	symlinkSync(
 		join(repository, "node_modules"),
 		join(directory, "node_modules"),
@@ -77,10 +95,12 @@ function isolatedRepository() {
 	}
 	const rules = "packages/biome-test-rules";
 	// Keep probe diagnostics visible alongside warnings in the adapted sources.
-	const manifestPath = join(directory, rules, "package.json");
-	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-	manifest.scripts.lint += " --max-diagnostics=200";
-	writeFileSync(manifestPath, JSON.stringify(manifest));
+	for (const workspace of [rules, "scripts"]) {
+		const manifestPath = join(directory, workspace, "package.json");
+		const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+		manifest.scripts.lint += " --max-diagnostics=200";
+		writeFileSync(manifestPath, JSON.stringify(manifest));
+	}
 	copyFileSync(
 		join(repository, rules, "vitest.config.ts"),
 		join(directory, rules, "vitest.config.ts"),
@@ -234,8 +254,12 @@ test('executes measured source', () => expect(measured()).toBe(42));`,
 		};
 		const runCollector = (mode: string) =>
 			spawnSync(
-				join(repository, "scripts/node_modules/.bin/tsx"),
-				[join(directory, "scripts/crap.mts"), mode],
+				"make",
+				[
+					mode === "report" ? "crap" : "check-crap",
+					"PACKAGE=biome-test-rules",
+					"CRAP_THRESHOLD=0",
+				],
 				{
 					cwd: directory,
 					encoding: "utf8",
@@ -472,6 +496,16 @@ describe("rule-test cache tracks copied configuration and ignore policy", () => 
 		".gitignore",
 		"crap.config.mts",
 		"scripts/crap.mts",
+		"scripts/lib/coverage-validation.ts",
+		"scripts/coverage-build.mts",
+		"scripts/coverage-policy.mts",
+		"scripts/coverage-protocol.mts",
+		"scripts/coverage-sync-built.mts",
+		"scripts/tsconfig.coverage.json",
+		"packages/coverage-runtime/tsconfig.json",
+		"packages/coverage-runtime/tsconfig.test.json",
+		"packages/coverage-runtime/src/command.mts",
+		"packages/coverage-runtime/src/report-audit.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.ts",
 		"scripts/lib/mutation-catalog.ts",

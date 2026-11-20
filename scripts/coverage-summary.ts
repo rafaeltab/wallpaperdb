@@ -3,6 +3,19 @@ import fs from "node:fs";
 import path from "node:path";
 
 const coveragePath = path.join(process.cwd(), "coverage/coverage-summary.json");
+const manifestPath = path.join(
+	process.cwd(),
+	"coverage/compiled-manifest.json",
+);
+if (fs.existsSync(manifestPath)) {
+	const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+	const estimated = manifest.audit.filter(
+		(entry: { published: number }) => entry.published === 1,
+	).length;
+	console.log(
+		`Compiled coverage scope: ${manifest.workspaces.join(", ")}; audited branch arms: ${manifest.audit.length}; estimated-covered: ${estimated}; conservatively uncovered: ${manifest.audit.length - estimated}`,
+	);
+}
 
 if (!fs.existsSync(coveragePath)) {
 	console.log("No coverage found. Run: make test-unit test-integration");

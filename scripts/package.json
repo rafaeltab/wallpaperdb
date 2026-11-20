@@ -16,13 +16,22 @@
 		"test:mutation": "node mutation.ts",
 		"check-types": "tsc --project tsconfig.json && tsc --project tsconfig.external.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts"
+		"test:operator-inbox": "cd .. && scripts/node_modules/.bin/vitest run scripts/operator-inbox.test.ts",
+		"test:coverage-runtime": "cd .. && make test-unit PACKAGE=coverage-runtime",
+		"coverage": "node ../packages/coverage-runtime/dist/command.mjs",
+		"coverage:inventory": "cd .. && node packages/coverage-runtime/dist/inventory.mjs",
+		"coverage:build": "cd .. && node scripts/dist/coverage-build.mjs",
+		"coverage:tier": "node ../packages/coverage-runtime/dist/run-tier.mjs",
+		"build": "tsc --project tsconfig.coverage.json --incremental --tsBuildInfoFile dist/build.tsbuildinfo",
+		"lint:fix": "biome lint --write ."
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
 		"istanbul-lib-coverage": "3.2.2",
 		"@stryker-mutator/core": "10.0.0",
-		"@stryker-mutator/vitest-runner": "10.0.0"
+		"@stryker-mutator/vitest-runner": "10.0.0",
+		"@wallpaperdb/coverage-runtime": "workspace:*",
+		"ast-v8-to-istanbul": "1.0.6"
 	},
 	"devDependencies": {
 		"@wallpaperdb/vitest-config": "workspace:*",

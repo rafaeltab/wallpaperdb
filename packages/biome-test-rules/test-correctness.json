@@ -5,8 +5,8 @@
 			"path": "./src/correctness.ts",
 			"resolutionKind": "config",
 			"includes": [
-				"**/*.{test,spec}.{js,mjs,ts,tsx}",
-				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
+				"**/*.{test,spec}.{js,mjs,ts,mts,tsx}",
+				"**/{test,tests,specs}/**/*.{js,mjs,ts,mts,tsx}",
 				"!**/node_modules/**",
 				"!**/{dist,build,coverage,.next,.output}/**",
 				"!**/test/fixtures/crap/**"
@@ -16,8 +16,8 @@
 	"overrides": [
 		{
 			"includes": [
-				"**/*.{test,spec}.{js,mjs,ts,tsx}",
-				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
+				"**/*.{test,spec}.{js,mjs,ts,mts,tsx}",
+				"**/{test,tests,specs}/**/*.{js,mjs,ts,mts,tsx}",
 				"!**/node_modules/**",
 				"!**/{dist,build,coverage,.next,.output}/**",
 				"!**/test/fixtures/crap/**"

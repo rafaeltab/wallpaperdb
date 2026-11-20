@@ -362,10 +362,11 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     dir: string,
     item: Pick<Layer, 'issue' | 'url'>,
     phase: 'resolving' | 'reviewing' | 'verifying' | 'publishing' | 'waiting-capacity'
-  ) =>
-    stateConnection(dir, (db, namespace) =>
+  ) => {
+    const generation = (await effective(dir))?.generation ?? 'initial';
+    return stateConnection(dir, (db, namespace) =>
       db.transaction((tx) => {
-        const name = `restack-activity-${item.issue}.json`;
+        const name = `restack-activity-${generation}-${item.issue}.json`;
         const saved = z
           .object({ startedAt: z.number().finite() })
           .optional()
@@ -390,6 +391,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
           .run();
       })
     );
+  };
   const attemptSnapshot = async (path: string, signal?: AbortSignal) => {
     const values = [];
     for (const args of [
@@ -2232,7 +2234,12 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
       startedAt: z
         .object({ startedAt: z.number().finite() })
         .optional()
-        .parse((await read(dir, `restack-activity-${item.issue}.json`)) ?? undefined)?.startedAt,
+        .parse(
+          (await read(
+            dir,
+            `restack-activity-${operation?.generation ?? 'initial'}-${item.issue}.json`
+          )) ?? undefined
+        )?.startedAt,
       issue: item.issue,
       pr: item.url,
       phase: verified ? ('complete' as const) : progress.phase,
@@ -2246,8 +2253,9 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     if (operation && (await read(dir, completionName(operation)))) return [];
     const current = await recoveryStatus(dir);
     const result = [];
+    const generation = operation?.generation ?? 'initial';
     for (const name of (await recordNames(dir)).filter((name) =>
-      /^restack-activity-\d+\.json$/.test(name)
+      name.startsWith(`restack-activity-${generation}-`)
     )) {
       const value = z
         .object({

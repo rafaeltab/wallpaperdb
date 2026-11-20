@@ -2833,3 +2833,59 @@ it('keeps completed restack reporting retired while an owning CI repair is only 
     await f.close();
   }
 });
+
+it('starts successor restack timing independently of the completed generation', async () => {
+  const f = await fixture();
+  try {
+    await Effect.runPromise(required(f.issues.prepare)(5));
+    expect(await Effect.runPromise(required(f.issues.restackActivities)())).toEqual([]);
+    const path = join(f.host.directory, 'join-live.json');
+    const live = JSON.parse(await readFile(path, 'utf8'));
+    await writeFile(path, JSON.stringify({ ...live, newCI: 'FAILURE' }));
+    const intent = {
+      id: 'C-generation',
+      issue: 4,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/4',
+      base: f.host.base,
+      branch: 'C',
+      context: '',
+      createdAt: 0,
+      expectedStage: 'implementation' as const,
+    };
+    const current = await Effect.runPromise(f.issues.pullRequest(intent));
+    if (current.kind !== 'found') throw new Error('Missing replay');
+    expect(await Effect.runPromise(required(f.issues.repairReplay)(intent, current.commit))).toBe(
+      true
+    );
+    const began = Date.now();
+    f.git('switch', '--detach', current.commit);
+    await writeFile(join(f.host.repository, 'generation.txt'), 'CI repair');
+    f.git('add', '.');
+    f.git('commit', '-m', 'repair C');
+    const repaired = f.git('rev-parse', 'HEAD');
+    f.git(
+      'push',
+      `--force-with-lease=refs/heads/C:${current.commit}`,
+      'origin',
+      `${repaired}:refs/heads/C`
+    );
+    await writeFile(path, JSON.stringify({ ...live, newCI: 'SUCCESS' }));
+    expect(
+      await Effect.runPromise(required(f.issues.repairReplay)(intent, current.commit, repaired))
+    ).toBe(true);
+    await writeFile(path, JSON.stringify({ ...live, newCI: 'FAILURE' }));
+    await Effect.runPromise(required(f.issues.reconcile)());
+    const active = (await Effect.runPromise(required(f.issues.restackActivities)())).filter(
+      (item) => item.active
+    );
+    expect(active).toHaveLength(1);
+    expect(active[0].startedAt).toBeGreaterThanOrEqual(began);
+    expect(
+      (await Effect.runPromise(required(f.reopen().restackActivities)())).filter(
+        (item) => item.active
+      )
+    ).toEqual(active);
+  } finally {
+    await f.close();
+  }
+});

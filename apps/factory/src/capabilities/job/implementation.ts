@@ -112,6 +112,8 @@ export const JobLive = Layer.effect(
                 intent,
                 execution: observation,
                 stageIndex: stage?.index,
+                publicationStartedAt:
+                  stage?.stage === 'publication' ? stage.publicationStartedAt : undefined,
                 elapsedMs: Math.max(0, (yield* time.now()) - intent.createdAt),
                 delivery: stage
                   ? { stage: stage.stage, commit: stage.commit, ready: false, landed: false }

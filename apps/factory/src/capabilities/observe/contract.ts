@@ -275,6 +275,8 @@ export interface ThreadState {
   facts?: ThreadFacts;
 }
 export type ThreadSnapshot = ThreadState & {
+  /** True only while this service owns a routine metadata refresh. Never persisted. */
+  refreshActive?: boolean;
   state: 'initial' | 'loading' | 'current' | 'stale' | 'error';
   ageMs?: number;
   stale: boolean;

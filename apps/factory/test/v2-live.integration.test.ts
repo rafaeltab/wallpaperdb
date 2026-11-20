@@ -3954,13 +3954,94 @@ it('removes completed or failed refreshes and reports all independent admission 
   board.close();
 });
 
+it('reports independent current T3 refreshes and removes finished attempts without hiding provider failure', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: true,
+    threads: { state: 'loading', stale: false, startedAt: 3000, refreshActive: true },
+    observations: { state: 'loading', stale: false, startedAt: 2000, refreshActive: true },
+  };
+  const board = await liveBoard({ scopeId: 'activity-t3', initial: input });
+  try {
+    expect(board.snapshot().meta.activity?.items).toMatchObject([
+      { category: 'refreshing-github', startedAt: '1970-01-01T00:00:02.000Z' },
+      {
+        id: 't3-refresh:3000',
+        category: 'refreshing-t3',
+        lifecycle: 'current',
+        startedAt: '1970-01-01T00:00:03.000Z',
+        issue: null,
+        pullRequest: null,
+      },
+    ]);
+    expect(
+      board.snapshot().meta.activity?.coverage.find((c) => c.category === 'refreshing-t3')?.state
+    ).toBe('complete');
+    expect(board.snapshot().meta.activity?.uncertainty).toEqual([]);
+    for (const state of ['current', 'error'] as const) {
+      await board.publish({
+        ...input,
+        threads: {
+          state,
+          stale: state === 'error',
+          startedAt: 3000,
+          observedAt: 3000,
+          failedAt: state === 'error' ? 3000 : undefined,
+          error: state === 'error' ? 't3-metadata' : undefined,
+          refreshActive: false,
+        },
+      });
+      expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual([
+        'refreshing-github',
+      ]);
+      expect(board.snapshot().entities.sources['source:t3'].refresh).toBe(
+        state === 'error' ? 'failed' : 'idle'
+      );
+    }
+    await board.publish({
+      ...input,
+      threads: {
+        state: 'loading',
+        stale: false,
+        refreshActive: true,
+        startedAt: 3000,
+        observedAt: 3000,
+      },
+    });
+    expect(board.snapshot().entities.sources['source:t3'].refresh).toBe('refreshing');
+    // Historical interrupted refresh timestamps do not establish an owned live operation.
+    await board.publish({
+      ...input,
+      threads: {
+        state: 'stale',
+        stale: true,
+        startedAt: 4000,
+        observedAt: 3000,
+        refreshActive: false,
+      },
+    });
+    expect(board.snapshot().meta.activity?.items.map((i) => i.category)).toEqual([
+      'refreshing-github',
+    ]);
+    expect(board.snapshot().entities.sources['source:t3'].refresh).toBe('idle');
+  } finally {
+    board.close();
+  }
+});
+
 it('translates complete activity facts through the sole board endpoint without external work', async () => {
   const input: ScheduleSnapshot = {
     ...initial,
     coordinationIdle: true,
     observations: { state: 'loading', stale: false, refreshActive: true, startedAt: 2000 },
   };
-  const board = await liveBoard({ scopeId: 'activity-http', initial: input });
+  const board = await liveBoard({
+    scopeId: 'activity-http',
+    initial: {
+      ...input,
+      threads: { state: 'loading', stale: false, startedAt: 3000, refreshActive: true },
+    },
+  });
   const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
   try {
     const response = await app.inject('/api/v2/board');
@@ -3975,6 +4056,14 @@ it('translates complete activity facts through the sole board endpoint without e
           issue: null,
           pullRequest: null,
           reason: 'Reading repository and managed PR metadata',
+        },
+        {
+          category: 'refreshing-t3',
+          lifecycle: 'current',
+          startedAt: '1970-01-01T00:00:03.000Z',
+          issue: null,
+          pullRequest: null,
+          reason: 'Reading routine T3 thread metadata',
         },
       ],
     });

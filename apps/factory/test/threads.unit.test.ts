@@ -16,6 +16,8 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
   const store = controlledThreads();
   let now = 100;
   let calls = 0;
+  const gate: { release?: () => void } = {};
+  const release = () => gate.release?.();
   const runtime = ManagedRuntime.make(
     ThreadsLive.pipe(
       Layer.provide(
@@ -37,24 +39,33 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
           Layer.succeed(ThreadSource, {
             read: () => {
               calls++;
-              return calls === 1
-                ? Effect.succeed({
-                    environmentId: 'env',
-                    projectId: 'project',
-                    threads: [
-                      {
-                        threadId: 't',
-                        title: 'Issue #648 is only a title',
-                        createdAt: null,
-                        updatedAt: null,
-                        status: 'running',
-                        branch: null,
-                        worktree: null,
-                        pullRequests: [],
-                      },
-                    ],
+              return Effect.promise(
+                () =>
+                  new Promise<void>((resolve) => {
+                    gate.release = resolve;
                   })
-                : Effect.fail(new Unavailable({ operation: 't3-metadata', cause: 'secret' }));
+              ).pipe(
+                Effect.flatMap(() =>
+                  calls === 1
+                    ? Effect.succeed({
+                        environmentId: 'env',
+                        projectId: 'project',
+                        threads: [
+                          {
+                            threadId: 't',
+                            title: 'Issue #648 is only a title',
+                            createdAt: null,
+                            updatedAt: null,
+                            status: 'running',
+                            branch: null,
+                            worktree: null,
+                            pullRequests: [],
+                          },
+                        ],
+                      })
+                    : Effect.fail(new Unavailable({ operation: 't3-metadata', cause: 'secret' }))
+                )
+              );
             },
           })
         )
@@ -64,16 +75,35 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
   try {
     const service = await runtime.runPromise(Threads);
     expect((await runtime.runPromise(service.snapshot())).state).toBe('initial');
-    await runtime.runPromise(service.refresh());
+    const first = runtime.runPromise(service.refresh());
+    await expect.poll(() => !!gate.release).toBe(true);
+    expect(await runtime.runPromise(service.snapshot())).toMatchObject({
+      refreshActive: true,
+      startedAt: 100,
+    });
+    release();
+    await first;
     expect(await runtime.runPromise(service.snapshot())).toMatchObject({
       state: 'current',
+      refreshActive: false,
       observedAt: 100,
       facts: { environmentId: 'env' },
     });
+    // A new attempt may start at the exact same clock tick as prior completion.
+    gate.release = undefined;
+    const failed = runtime.runPromise(service.refresh());
+    await expect.poll(() => !!gate.release).toBe(true);
+    expect(await runtime.runPromise(service.snapshot())).toMatchObject({
+      state: 'loading',
+      refreshActive: true,
+      startedAt: 100,
+    });
     now = 300_000;
-    await runtime.runPromise(service.refresh());
+    release();
+    await failed;
     expect(await runtime.runPromise(service.snapshot())).toMatchObject({
       state: 'error',
+      refreshActive: false,
       stale: true,
       observedAt: 100,
       failedAt: 300_000,
@@ -81,7 +111,18 @@ it('keeps last-known thread metadata dated on failure and never calls T3 from re
       facts: { threads: [{ threadId: 't' }] },
     });
     expect(calls).toBe(2);
+    gate.release = undefined;
+    const abort = new AbortController();
+    const interrupted = runtime.runPromise(service.refresh(), { signal: abort.signal });
+    const outcome = interrupted.catch(() => undefined);
+    await expect.poll(() => !!gate.release).toBe(true);
+    expect((await runtime.runPromise(service.snapshot())).refreshActive).toBe(true);
+    abort.abort();
+    await outcome;
+    expect((await runtime.runPromise(service.snapshot())).refreshActive).toBe(false);
+    expect(calls).toBe(3);
   } finally {
+    release();
     await runtime.dispose();
   }
 });

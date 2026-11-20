@@ -70,6 +70,43 @@ it('advances durations and relative age locally, preserves the absolute timestam
   expect(vi.getTimerCount()).toBe(0);
 });
 
+it('renders T3 refresh with its own local timer below GitHub priority and clears it on completion', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(facts.observedAt));
+  const t3: ActivityFacts['items'][number] = {
+    id: 't3',
+    category: 'refreshing-t3',
+    lifecycle: 'current',
+    startedAt: '2026-11-17T11:59:50Z',
+    issue: null,
+    pullRequest: null,
+    reason: 'Reading routine T3 thread metadata',
+  };
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const { rerender } = render(
+    <FactoryActivity
+      facts={{ ...facts, items: [t3, ...facts.items] }}
+      paused={false}
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByRole('button', { name: /Refreshing GitHub/ })).toBeTruthy();
+  fireEvent.focus(screen.getByRole('button', { name: /Refreshing GitHub/ }));
+  const tile = screen.getByText('Refreshing T3 information').closest('div');
+  if (!tile) throw new Error('Missing T3 detail tile');
+  expect(within(tile).getByRole('img', { name: 'Active' })).toBeTruthy();
+  expect(within(tile).getByText('1 operation')).toBeTruthy();
+  expect(within(tile).getByText('10s')).toBeTruthy();
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  expect(within(tile).getByText('12s')).toBeTruthy();
+  rerender(<FactoryActivity facts={{ ...facts, items: [t3] }} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Refreshing T3 information.*12s/ })).toBeTruthy();
+  rerender(<FactoryActivity facts={{ ...facts, items: [] }} paused={false} refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Idle/ })).toBeTruthy();
+  expect(within(tile).getByRole('img', { name: 'Inactive' })).toBeTruthy();
+  expect(screen.queryByText(/Disconnected/)).toBeNull();
+});
+
 it('updates implementing counts and timers as newest work finishes or enters review', () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-17T12:00:00Z'));

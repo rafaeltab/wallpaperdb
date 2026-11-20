@@ -237,3 +237,29 @@ it('counts restacking PRs and times the newest remaining PR between implementing
     activityView({ ...facts, items: [{ ...restack, startedAt: null }] }, 0).selected?.startedAt
   ).toBeNull();
 });
+
+it('shows Reconciling only during investigation and preserves known summaries during manual uncertainty', () => {
+  const recovery: Facts['items'][number] = {
+    id: 'launch-1',
+    category: 'recovering',
+    lifecycle: 'current',
+    issue: 1,
+    pullRequest: null,
+    startedAt: '2026-11-17T11:59:00Z',
+    reason: 'Investigating',
+  };
+  const uncertain = { ...facts, uncertainty: ['Launch outcome unresolved'] };
+  expect(activityView({ ...uncertain, items: [recovery] }, 0).summary).toBe('Reconciling');
+  expect(
+    activityDuration(
+      activityView({ ...facts, items: [recovery] }, 0).selected!.startedAt,
+      Date.parse('2026-11-17T12:00:01Z')
+    )
+  ).toBe('1m 1s');
+  expect(activityView(uncertain, 0).summary).toBe('Status unknown');
+  expect(
+    activityView({ ...uncertain, items: [{ ...recovery, category: 'implementing' }] }, 0).summary
+  ).toBe('Implementing 1 issue');
+  expect(activityView({ ...uncertain, items: [recovery] }, 3).summary).toBe('Disconnected');
+  expect(activityView(facts, 0).summary).toBe('Idle');
+});

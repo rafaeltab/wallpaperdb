@@ -5910,3 +5910,84 @@ it('gives live restack ownership precedence over job publication and keeps manua
     board.close();
   }
 });
+
+it('exposes live reconciliation and retains uncertainty after investigation stops', async () => {
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: true,
+    reconciliation: [{ id: 'launch:1', issue: 1, startedAt: 2000 }],
+    state: { ...initial.state, admissions: [{ issue: 1, base: 'a'.repeat(40), context: '' }] },
+  };
+  const board = await liveBoard({ scopeId: 'recovery-activity', initial: input });
+  const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+  try {
+    const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+    expect(activity?.items).toContainEqual({
+      id: 'launch:1',
+      category: 'recovering',
+      lifecycle: 'current',
+      issue: 1,
+      pullRequest: null,
+      startedAt: '1970-01-01T00:00:02.000Z',
+      reason: 'Establishing managed launch or resume outcome',
+    });
+    await board.publish({ ...input, reconciliation: [] });
+    expect(board.snapshot().meta.activity?.items).toEqual([]);
+    expect(board.snapshot().meta.activity?.uncertainty.length).toBeGreaterThan(0);
+    await board.publish({ ...input, reconciliation: [], state: initial.state });
+    expect(board.snapshot().meta.activity?.uncertainty).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+it('classifies known delivery reconciliation and restack responsibility without counting queued or manual recovery', async () => {
+  const board = await liveBoard({
+    scopeId: 'recovery-classification',
+    initial: {
+      ...initial,
+      coordinationIdle: true,
+      reconciliation: [{ id: 'resume-review', issue: 1, startedAt: 2000, stage: 'review' }],
+      recoveries: [
+        {
+          issue: 2,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/20',
+          active: true,
+          bindingAvailable: true,
+          phase: 'resolving',
+          progress: 'Resolving restack',
+        },
+        {
+          issue: 3,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/30',
+          active: false,
+          phase: 'waiting-capacity',
+          progress: 'Queued',
+        },
+        {
+          issue: 4,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/40',
+          active: false,
+          phase: 'manual-recovery',
+          progress: 'Manual intervention',
+        },
+      ],
+    },
+  });
+  expect(board.snapshot().meta.activity?.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        category: 'reviewing',
+        issue: 1,
+        startedAt: '1970-01-01T00:00:02.000Z',
+      }),
+      expect.objectContaining({
+        category: 'restacking',
+        issue: 2,
+        pullRequest: 20,
+        startedAt: null,
+      }),
+    ])
+  );
+  expect(board.snapshot().meta.activity?.items).toHaveLength(2);
+});

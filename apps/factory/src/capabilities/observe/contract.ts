@@ -221,6 +221,8 @@ export interface LocalWork {
 }
 export interface ScheduleSnapshot extends ScheduleStatus {
   restackActivities?: readonly import('../job/index.js').RecoveryStatus[];
+  /** Current launch/resume investigation owners. Empty means no live investigation. */
+  reconciliation?: readonly import('../job/index.js').ExecutionInvestigation[];
   /** Live Plan owner; undefined means this producer has not instrumented verification. */
   planningVerification?: { readonly startedAt: number } | null;
   planningDiscovery?: import('../plan/index.js').PlanningDiscoveryFacts;

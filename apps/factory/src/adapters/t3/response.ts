@@ -57,15 +57,21 @@ export function latestRecoveryResponse(
   messages: readonly { readonly role: string; readonly text: string }[]
 ) {
   return [...messages].reverse().find((message) => {
-    if (latestStructured([message])) return true;
     if (message.role !== 'assistant') return false;
-    const value = responseValue(message.text);
+    const reply = recoveryResponse(message.text);
+    if (latestStructured([{ ...message, text: reply.text }])) return true;
+    const value = responseValue(reply.text);
     if (value === undefined)
-      return malformedResponse(message.text, (key) => key === 'operation' || key === 'outcome');
+      return malformedResponse(reply.text, (key) => key === 'operation' || key === 'outcome');
     return (
       value !== null && typeof value === 'object' && ('operation' in value || 'outcome' in value)
     );
   });
+}
+/** Recovery classification may be its own message or a line before the JSON receipt. */
+export function recoveryResponse(text: string) {
+  const prefix = /^\s*(<RESTACK>(?:SIMPLE|COMPLEX)<\/RESTACK>)(?:\r?\n|$)/.exec(text);
+  return { classification: prefix?.[1], text: prefix ? text.slice(prefix[0].length) : text };
 }
 export function responseValue(text: string): unknown {
   try {

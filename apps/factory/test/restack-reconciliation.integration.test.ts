@@ -137,7 +137,48 @@ const prepare = (f: Awaited<ReturnType<typeof joinFixture>>) =>
 const recoveries = (f: Awaited<ReturnType<typeof joinFixture>>) =>
   Effect.runPromise(f.reopen().recoveries?.() ?? Effect.succeed([]));
 
-it.each(['state', 'dependencies', 'legacy', 'notification'])(
+it.each([true, false])(
+  'validates a combined recovery classification and receipt without accepting incomplete checks: %s',
+  async (complete) => {
+    const f = await joinFixture({
+      inProcess: true,
+      conflict: true,
+      restack: { outcome: 'COMPLEX', review: true },
+    });
+    try {
+      await configure(f, { recoveryStatus: 'running' });
+      await prepare(f);
+      await prepare(f);
+      const { path, state } = await worker(f);
+      const reply = state.messages.at(-1);
+      const receipt = JSON.parse(reply.text);
+      receipt.checks.tests = complete;
+      state.messages = state.messages.filter(
+        (message: { text: string }) => message.text !== '<RESTACK>COMPLEX</RESTACK>'
+      );
+      reply.text = `<RESTACK>COMPLEX</RESTACK>\n${JSON.stringify(receipt)}`;
+      state.thread.status = 'completed';
+      await writeFile(path, JSON.stringify(state));
+      await configure(f, { recoveryStatus: 'completed' });
+      await prepare(f);
+      const reconciliation = (await f.host.calls()).filter(
+        (call) => call.args[1] === 'send' && call.args[3].includes('Restack reconciliation ')
+      );
+      expect(reconciliation).toHaveLength(complete ? 0 : 1);
+      if (complete) {
+        expect(await recoveries(f)).toContainEqual(
+          expect.objectContaining({ classification: 'COMPLEX' })
+        );
+      } else {
+        expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(false);
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each(['state', 'combined-state', 'dependencies', 'legacy', 'notification'])(
   'keeps latest $0 recovery evidence coherent across malformed input and restart',
   async (kind) => {
     const f = await joinFixture({
@@ -163,7 +204,7 @@ it.each(['state', 'dependencies', 'legacy', 'notification'])(
               ? `{"operation":${JSON.stringify(state.operation)},"outcome":`
               : kind === 'dependencies'
                 ? '{"version":1,"kind":"dependencies","requireUnimplementedIssues":["758"],'
-                : '{"version":1,"kind":"state","checks":{"lint":false},',
+                : `${kind === 'combined-state' ? '<RESTACK>COMPLEX</RESTACK>\n' : ''}{"version":1,"kind":"state","checks":{"lint":false},`,
       });
       await writeFile(path, JSON.stringify(state));
       await configure(f, { recoveryStatus: 'completed' });

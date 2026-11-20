@@ -7,7 +7,13 @@ export const gh = 'source:github',
 export const repositoryId = 'repository:rafaeltab/wallpaperdb';
 export function source(
   kind: Source['kind'],
-  input: { observedAt?: number; startedAt?: number; failedAt?: number; error?: string }
+  input: {
+    observedAt?: number;
+    startedAt?: number;
+    failedAt?: number;
+    error?: string;
+    refreshActive?: boolean;
+  }
 ): Source {
   return entity({
     id: `source:${kind}` as const,
@@ -18,8 +24,9 @@ export function source(
         ? null
         : timestamp(input.observedAt + 240000),
     refresh:
-      input.startedAt !== undefined &&
-      input.startedAt > Math.max(input.observedAt ?? -1, input.failedAt ?? -1)
+      (input.refreshActive ??
+      (input.startedAt !== undefined &&
+        input.startedAt > Math.max(input.observedAt ?? -1, input.failedAt ?? -1)))
         ? ('refreshing' as const)
         : input.error
           ? ('failed' as const)

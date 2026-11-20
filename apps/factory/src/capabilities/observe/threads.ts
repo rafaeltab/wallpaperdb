@@ -18,6 +18,7 @@ export const ThreadsLive = Layer.effect(
     const local = yield* LocalSnapshot;
     const github = yield* ObservationStore;
     const lock = yield* Semaphore.make(1);
+    let refreshActive = false;
     return {
       snapshot: () =>
         Effect.gen(function* () {
@@ -26,11 +27,10 @@ export const ThreadsLive = Layer.effect(
           const ageMs =
             value.observedAt === undefined ? undefined : Math.max(0, now - value.observedAt);
           const stale = ageMs !== undefined && ageMs > observationStaleAfterMs;
-          const loading =
-            value.startedAt !== undefined &&
-            value.startedAt > Math.max(value.observedAt ?? -1, value.failedAt ?? -1);
+          const loading = refreshActive;
           return {
             ...value,
+            refreshActive,
             ageMs,
             stale,
             state: loading
@@ -49,6 +49,9 @@ export const ThreadsLive = Layer.effect(
           const previous = yield* store.read();
           const startedAt = yield* time.now();
           yield* store.save({ ...previous, startedAt });
+          yield* Effect.sync(() => {
+            refreshActive = true;
+          });
           yield* source.read().pipe(
             Effect.flatMap((facts) =>
               Effect.gen(function* () {
@@ -68,7 +71,15 @@ export const ThreadsLive = Layer.effect(
               )
             )
           );
-        }).pipe(lock.withPermits(1), Effect.withSpan('factory.threads.refresh')),
+        }).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              refreshActive = false;
+            })
+          ),
+          lock.withPermits(1),
+          Effect.withSpan('factory.threads.refresh')
+        ),
     } satisfies Threads;
   })
 );

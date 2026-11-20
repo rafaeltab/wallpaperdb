@@ -123,6 +123,36 @@ it('provides keyboard and hover details, live switching and approved D layout at
     };
     await browserExpect(trigger).toContainText('Refreshing GitHub', { timeout: 5000 });
     await browserExpect(trigger.locator('.fa-dot')).toHaveCSS('animation-name', 'fa-blink');
+    served = {
+      ...served,
+      meta: {
+        ...served.meta,
+        activity: {
+          ...activity,
+          items: [
+            {
+              id: 't3:live',
+              category: 'refreshing-t3',
+              lifecycle: 'current',
+              startedAt: new Date(Date.now() - 9000).toISOString(),
+              issue: null,
+              pullRequest: null,
+              reason: 'Reading routine T3 thread metadata',
+            },
+          ],
+        },
+      },
+    };
+    await browserExpect(trigger).toContainText('Refreshing T3 information', { timeout: 5000 });
+    const t3Tile = panel.locator('.fa-row').filter({ hasText: 'Refreshing T3 information' });
+    await browserExpect(t3Tile.getByRole('img', { name: 'Active', exact: true })).toBeVisible();
+    await browserExpect(t3Tile).toContainText('1 operation');
+    await browserExpect(
+      panel
+        .locator('.fa-row')
+        .filter({ hasText: 'Refreshing GitHub' })
+        .getByRole('img', { name: 'Inactive', exact: true })
+    ).toBeVisible();
     await browserExpect(trigger).toHaveCSS('font-size', '11px');
     await browserExpect(trigger.locator('time')).toHaveCSS('color', 'rgb(131, 131, 144)');
     await browserExpect(panel.locator('.fa-rows')).toHaveCSS(
@@ -154,7 +184,7 @@ it('provides keyboard and hover details, live switching and approved D layout at
       'rgb(131, 131, 144)',
       { timeout: 5000 }
     );
-    await browserExpect(trigger).toContainText('Refreshing GitHub');
+    await browserExpect(trigger).toContainText('Refreshing T3 information');
     served = {
       ...idle,
       meta: { ...idle.meta, activity: { ...activity, uncertainty: ['Execution unknown'] } },

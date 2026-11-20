@@ -41,11 +41,6 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     input.recoveries?.some((r) => r.phase !== 'complete')
   )
     uncertainty.push('Managed execution or wait coverage is incomplete.');
-  if (
-    input.threads?.startedAt !== undefined &&
-    input.threads.startedAt > Math.max(input.threads.observedAt ?? -1, input.threads.failedAt ?? -1)
-  )
-    uncertainty.push('Thread refresh activity coverage is incomplete.');
   const items: FactoryActivity['items'][number][] = [];
   for (const admission of input.state.admissions) {
     const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
@@ -126,6 +121,16 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       startedAt: timestamp(source.startedAt),
       reason: 'Reading repository and managed PR metadata',
     });
+  if (input.threads?.refreshActive === true && input.threads.startedAt !== undefined)
+    items.push({
+      id: `t3-refresh:${input.threads.startedAt}`,
+      category: 'refreshing-t3',
+      lifecycle: 'current',
+      issue: null,
+      pullRequest: null,
+      startedAt: timestamp(input.threads.startedAt),
+      reason: 'Reading routine T3 thread metadata',
+    });
   const reasons: Reason[] = [];
   if (input.state.paused) reasons.push({ code: 'paused', message: 'Admissions paused' });
   if (input.state.concurrency !== -1 && capacityOccupied(input) >= input.state.concurrency)
@@ -149,7 +154,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     admissionReasons: reasons,
     coverage: categories.map((category) => {
       const complete =
-        category === 'refreshing-github' || category === 'publishing' || !uncertainty.length;
+        category === 'refreshing-github' || category === 'refreshing-t3' || category === 'publishing' || !uncertainty.length;
       return {
         category,
         state: complete ? 'complete' : 'unknown',

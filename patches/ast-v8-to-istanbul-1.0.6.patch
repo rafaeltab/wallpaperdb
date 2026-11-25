@@ -189,10 +189,10 @@ new file mode 100644
 +						if (uncertainBinding) {
 +							// Failed bindings are included in the continuation prefix. Use
 +							// only body evidence, never those unproven guard evaluations.
-+							const yes = bodyEntry(next.consequent),
-+								no = next.alternate && bodyEntry(next.alternate);
-+							if (yes !== undefined && typeof no === "number" && yes + no > 0)
-+								setEntry(next, yes + no);
++							const no = next.alternate && count(next.alternate.start + wrapper +
++								(next.alternate.type === "BlockStatement" ? 1 : 0));
++							if (typeof no === "number" && bodyCount + no > 0)
++								setEntry(next, bodyCount + no);
 +							else if (!next.alternate && range?.startOffset === boundary &&
 +								bodyCount > range.count && !entries.has(next))
 +								setEntry(next, bodyCount);

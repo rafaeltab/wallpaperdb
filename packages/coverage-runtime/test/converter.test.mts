@@ -149,23 +149,33 @@ for (const declaration of [
 	"const [item] = 'x';",
 	"const object = {}; const {item = true} = object;",
 ])
-	test(`explicit else retains measured guard execution after ${declaration}`, async () => {
-		const code = `export async function example(flag) {
+	for (const [decision, expected] of [
+		[
+			"if (item) { await Promise.resolve(); } else { await Promise.resolve(); }",
+			[1, 0],
+		],
+		["if (!item) { return; } else { await Promise.resolve(); }", [0, 1]],
+		["if (item) { return; } else { await Promise.resolve(); }", [1, 0]],
+		["if (!item) { await Promise.resolve(); } else { return; }", [0, 1]],
+		["if (item) { await Promise.resolve(); } else { return; }", [1, 0]],
+	] as const)
+		test(`explicit else retains measured guard execution after ${declaration}: ${decision}`, async () => {
+			const code = `export async function example(flag) {
  const value = flag ? await Promise.resolve(true) : await Promise.resolve(false);
  ${declaration}
- if (item) { await Promise.resolve(); } else { await Promise.resolve(); }
+ ${decision}
 }`;
-		const file = await measuredSource(code, [true]);
-		const branch = Object.keys(file.branchMap).find(
-			(id) => file.branchMap[id].type === "if",
-		);
-		const statement = Object.entries(file.statementMap).find(
-			([, loc]) => loc.start.line === 4 && loc.start.column === 1,
-		);
-		if (!branch || !statement) throw new Error("Missing if measurement");
-		expect(file.b[branch]).toStrictEqual([1, 0]);
-		expect(file.s[statement[0]]).toBe(1);
-	});
+			const file = await measuredSource(code, [true]);
+			const branch = Object.keys(file.branchMap).find(
+				(id) => file.branchMap[id].type === "if",
+			);
+			const statement = Object.entries(file.statementMap).find(
+				([, loc]) => loc.start.line === 4 && loc.start.column === 1,
+			);
+			if (!branch || !statement) throw new Error("Missing if measurement");
+			expect(file.b[branch]).toStrictEqual(expected);
+			expect(file.s[statement[0]]).toBe(1);
+		});
 
 test("mixed completed and throwing bindings preserve an uncovered false arm", async () => {
 	const code = `export async function example(flag, source) {

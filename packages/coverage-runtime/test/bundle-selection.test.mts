@@ -11,13 +11,20 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+import { transformWithEsbuild } from "vite";
 import { expect, test } from "vitest";
 import { repositoryRoot } from "../src/repository-root.mjs";
 import { reportInput } from "../src/report-input.mjs";
 
-test.each(["mirror", "producer"])(
-	"%s bundles preserve owned hits and zeros",
-	async (mode) => {
+test.each([
+	{ mode: "mirror", execution: "module" },
+	{ mode: "producer", execution: "module" },
+	{ mode: "mirror", execution: "child" },
+	{ mode: "producer", execution: "child" },
+	{ mode: "mirror", execution: "both" },
+])(
+	"$execution with $mode bundles reports logical hits and zeros once",
+	async ({ mode, execution }) => {
 		const tooling = repositoryRoot();
 		const root = await mkdtemp(join(tmpdir(), "bundle-selection-"));
 		const workspace = "apps/service";
@@ -37,12 +44,16 @@ test.each(["mirror", "producer"])(
 			for (const [source, target] of [
 				[original, join(built, "entry.mjs")],
 				[
+					join(root, workspace, "src/unimported.ts"),
+					join(built, "unimported.mjs"),
+				],
+				[
 					join(root, "packages/shared/src/foreign.ts"),
 					join(built, "foreign.mjs"),
 				],
 			]) {
 				const code =
-					"export function executed() { return 1; }\nexport function untouched() { return 0; }\n";
+					"export function executed(flag: boolean): number { return flag ? 1 : 2; }\nexport function untouched(flag: boolean): number { return flag ? 0 : 3; } export function nearby(): number { return 4; }\n";
 				await mkdir(dirname(source), { recursive: true });
 				await writeFile(source, code);
 				const compiled = ts.transpileModule(code, {
@@ -54,15 +65,27 @@ test.each(["mirror", "producer"])(
 						inlineSources: true,
 					},
 				});
-				const map = JSON.parse(compiled.sourceMapText || "null");
+				const local = join(
+					mirror,
+					"src",
+					basename(source).replace(".ts", ".js"),
+				);
+				await mkdir(dirname(local), { recursive: true });
+				const localMap = JSON.parse(compiled.sourceMapText || "null");
+				localMap.sources = [source];
+				localMap.sourceRoot = "";
+				await writeFile(local, compiled.outputText);
+				await writeFile(`${local}.map`, JSON.stringify(localMap));
+				const bundled = await transformWithEsbuild(code, source, {
+					loader: "ts",
+					sourcemap: true,
+					target: "esnext",
+				});
+				const map = bundled.map;
 				map.sources = [source];
-				map.sourceRoot = "";
 				await writeFile(
 					target,
-					compiled.outputText.replace(
-						/sourceMappingURL=.*/,
-						`sourceMappingURL=${basename(target)}.map`,
-					),
+					`${bundled.code}\n//# sourceMappingURL=${basename(target)}.map`,
 				);
 				await writeFile(`${target}.map`, JSON.stringify(map));
 			}
@@ -74,9 +97,13 @@ test.each(["mirror", "producer"])(
 				join(mirror, "vitest.config.mjs"),
 				"export default {test:{include:['control.test.js'],coverage:{provider:'v8',include:['src/**/*.ts'],reporter:['json']}}};",
 			);
+			const call =
+				execution === "module"
+					? `import {executed} from ${JSON.stringify(pathToFileURL(join(mirror, "src/entry.js")).href)};test('module call',()=>expect(executed(true)).toBe(1));`
+					: `import {spawnSync} from 'node:child_process';test('deployed child call',()=>{const child=spawnSync(process.execPath,['--input-type=module','-e',${JSON.stringify(`import {executed} from ${JSON.stringify(pathToFileURL(join(built, "entry.mjs")).href)}; if(executed(true)!==1) throw new Error('bad result');`)}],{encoding:'utf8'});expect(child.status,child.stderr).toBe(0);});`;
 			await writeFile(
 				join(mirror, "control.test.js"),
-				`import {test,expect} from 'vitest';import {executed} from ${JSON.stringify(pathToFileURL(join(built, "entry.mjs")).href)};import {executed as foreign} from ${JSON.stringify(pathToFileURL(join(built, "foreign.mjs")).href)};test('bundled calls',()=>{expect(executed()).toBe(1);expect(foreign()).toBe(1);});`,
+				`import {test,expect} from 'vitest';${call}${execution === "both" ? `import {executed as direct} from ${JSON.stringify(pathToFileURL(join(mirror, "src/entry.js")).href)};test("direct",()=>expect(direct(true)).toBe(1));` : ""}`,
 			);
 			const run = spawnSync(
 				process.execPath,
@@ -93,7 +120,7 @@ test.each(["mirror", "producer"])(
 					timeout: 60000,
 					env: {
 						...process.env,
-						NODE_OPTIONS: "",
+						NODE_OPTIONS: `--import=${join(tooling, "packages/coverage-runtime/dist/native-hook.mjs")}`,
 						WALLPAPERDB_COVERAGE_REPO_ROOT: root,
 						WALLPAPERDB_COVERAGE_CONFIGURATION: join(root, "policy.mjs"),
 						WALLPAPERDB_COVERAGE_WORKSPACE: workspace,
@@ -111,8 +138,30 @@ test.each(["mirror", "producer"])(
 				root,
 				workspace,
 			);
-			expect(Object.keys(report)).toStrictEqual([original]);
-			expect(Object.values(report[original].f)).toStrictEqual([1, 0]);
+			expect(Object.keys(report).sort()).toStrictEqual(
+				[original, join(root, workspace, "src/unimported.ts")].sort(),
+			);
+			expect(Object.values(report[original].f)).toStrictEqual([
+				execution === "both" ? 2 : 1,
+				0,
+				0,
+			]);
+			expect(
+				Object.values(report[original].branchMap).map((branch) => branch.type),
+			).toStrictEqual(["cond-expr", "cond-expr"]);
+			expect(Object.values(report[original].b)).toStrictEqual([
+				[execution === "both" ? 2 : 1, 0],
+				[0, 0],
+			]);
+			expect(
+				Object.values(report[join(root, workspace, "src/unimported.ts")].f),
+			).toStrictEqual([0, 0, 0]);
+			expect(
+				Object.values(report[join(root, workspace, "src/unimported.ts")].b),
+			).toStrictEqual([
+				[0, 0],
+				[0, 0],
+			]);
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}

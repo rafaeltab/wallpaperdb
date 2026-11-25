@@ -6022,3 +6022,41 @@ it('classifies known delivery reconciliation and restack responsibility without 
   );
   expect(board.snapshot().meta.activity?.items).toHaveLength(2);
 });
+
+it('keeps live restack retirement authoritative while launch reconciliation is active', async () => {
+  const recovery = {
+    issue: 2,
+    pr: 'https://github.com/rafaeltab/wallpaperdb/pull/20',
+    phase: 'resolving' as const,
+    active: true,
+    bindingAvailable: true,
+    progress: 'Resolving restack',
+    startedAt: 2000,
+  };
+  const input: ScheduleSnapshot = {
+    ...initial,
+    coordinationIdle: true,
+    reconciliation: [{ id: 'launch:1', issue: 1, startedAt: 1000 }],
+    recoveries: [recovery],
+    restackActivities: [],
+  };
+  const board = await liveBoard({ scopeId: 'reconciliation-live-restack', initial: input });
+  try {
+    expect(board.snapshot().meta.activity?.items).toEqual([
+      expect.objectContaining({ category: 'recovering', issue: 1 }),
+    ]);
+    await board.publish({ ...input, restackActivities: [recovery] });
+    const items = board.snapshot().meta.activity?.items;
+    expect(items).toHaveLength(2);
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        category: 'restacking',
+        issue: 2,
+        pullRequest: 20,
+        startedAt: '1970-01-01T00:00:02.000Z',
+      })
+    );
+  } finally {
+    board.close();
+  }
+});

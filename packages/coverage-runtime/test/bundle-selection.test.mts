@@ -53,7 +53,7 @@ test.each([
 				],
 			]) {
 				const code =
-					"export function executed(flag: boolean): number { return flag ? Math.abs(-1) : 2; }\nexport function untouched(flag: boolean): number { return flag ? 0 : 3; } export function nearby(): number { return 4; }\nexport const multiline = (flag: boolean): number => (\n (flag ? false : true) ? (flag ? 5 : 6) : (flag ? 7 : 8)\n);\nexport function choices(flag: number): number {\n if (flag === 1) { return 7; }\n else if (flag === 2) { return 8; }\n return 9;\n}\n";
+					"export function executed(flag: boolean): number { const first: number = 1; const second = 0; return flag ? Math.abs(-objectValue().value + first - second - 1) : 2; }\nexport function untouched(flag: boolean): number { return flag ? 0 : 3; } export function nearby(): number { return 4; }\nexport const multiline = (flag: boolean): number => (\n (flag ? false : true) ? (flag ? 5 : 6) : (flag ? 7 : 8)\n);\nexport function choices(flag: number): number {\n if (flag === 1) { return 7; }\n else if (flag === 2) { return 8; }\n return 9;\n}\nexport function objectValue(): { value: number } {\n return {\n  value: 1,\n };\n}\nexport const configured = Object.assign(\n Object.fromEntries([\n  ['value', 1],\n  ['other', 2],\n ]),\n { extra: 0 }\n);\n";
 				await mkdir(dirname(source), { recursive: true });
 				await writeFile(source, code);
 				const compiled = ts.transpileModule(code, {
@@ -141,12 +141,33 @@ test.each([
 			expect(Object.keys(report).sort()).toStrictEqual(
 				[original, join(root, workspace, "src/unimported.ts")].sort(),
 			);
+			expect(
+				Object.values(report[original].statementMap).map(
+					(span) => span.start.line,
+				),
+				JSON.stringify(report[original]),
+			).toStrictEqual([1, 1, 1, 2, 2, 3, 4, 7, 7, 8, 8, 9, 12, 16]);
+			const hits = execution === "both" ? 2 : 1;
+			expect(
+				Object.entries(report[original].statementMap)
+					.filter(([, span]) => [1, 12, 16].includes(span.start.line))
+					.map(([id]) => report[original].s[id]),
+			).toStrictEqual([hits, hits, hits, hits, hits]);
+			expect(
+				Object.entries(report[original].statementMap)
+					.filter(([, span]) => [2, 7, 8, 9].includes(span.start.line))
+					.map(([id]) => report[original].s[id]),
+			).toStrictEqual([0, 0, 0, 0, 0, 0, 0]);
+			expect(
+				Object.values(report[join(root, workspace, "src/unimported.ts")].s),
+			).toStrictEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 			expect(Object.values(report[original].f)).toStrictEqual([
 				execution === "both" ? 2 : 1,
 				0,
 				0,
 				0,
 				0,
+				hits,
 			]);
 			expect(
 				Object.values(report[original].branchMap).map((branch) => branch.type),
@@ -173,7 +194,7 @@ test.each([
 			]);
 			expect(
 				Object.values(report[join(root, workspace, "src/unimported.ts")].f),
-			).toStrictEqual([0, 0, 0, 0, 0]);
+			).toStrictEqual([0, 0, 0, 0, 0, 0]);
 			expect(
 				Object.values(report[join(root, workspace, "src/unimported.ts")].b),
 			).toStrictEqual([

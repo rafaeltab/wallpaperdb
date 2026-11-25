@@ -60,6 +60,15 @@ function overlaps(left: Range, right: Range) {
 	return before(left.start, right.end) && before(right.start, left.end);
 }
 
+function sameRange(left: Range, right: Range) {
+	return (
+		left.start.line === right.start.line &&
+		left.start.column === right.start.column &&
+		left.end.line === right.end.line &&
+		left.end.column === right.end.column
+	);
+}
+
 // Use the verified per-source compilation as the location vocabulary for every
 // representation of that original module, including deployed bundles. Resolve
 // syntax identities before Istanbul merges; retain all measured V8 counters.
@@ -85,6 +94,7 @@ export async function originalLocations(
 					/^[\s);}]*else\s*$/.test(lines.join("\n").slice(start, end)))
 			);
 		};
+		const anchors: { mapped: Range; original: Range }[] = [];
 		for (const [id, fn] of Object.entries(file.fnMap)) {
 			const matches = Object.values(syntax.fnMap).filter(
 				(node) =>
@@ -96,7 +106,10 @@ export async function originalLocations(
 						(!Number.isFinite(fn.loc.end.column) &&
 							fn.loc.end.line === node.loc.end.line + 1)),
 			);
-			if (matches.length === 1) file.fnMap[id] = structuredClone(matches[0]);
+			if (matches.length === 1) {
+				anchors.push({ mapped: fn.loc, original: matches[0].loc });
+				file.fnMap[id] = structuredClone(matches[0]);
+			}
 		}
 		for (const [id, branch] of Object.entries(file.branchMap)) {
 			const matches = Object.values(syntax.branchMap).filter(
@@ -112,8 +125,29 @@ export async function originalLocations(
 						overlaps(arm, branch.locations[index]),
 					),
 			);
-			if (matches.length === 1)
+			if (matches.length === 1) {
+				anchors.push({ mapped: branch.loc, original: matches[0].loc });
 				file.branchMap[id] = structuredClone(matches[0]);
+			}
+		}
+		for (const [id, statement] of Object.entries(file.statementMap)) {
+			const anchored = anchors.filter((anchor) =>
+				sameRange(anchor.mapped, statement),
+			);
+			const matches = Object.values(syntax.statementMap).filter(
+				(node) =>
+					// An implicit arrow return or else-if can inherit the enclosing
+					// function/decision anchor instead of its own source start.
+					anchored.some((anchor) => sameRange(anchor.original, node)) ||
+					(node.start.line === statement.start.line &&
+						node.start.column === statement.start.column &&
+						overlaps(node, statement) &&
+						(statement.end.line <= node.end.line ||
+							(!Number.isFinite(statement.end.column) &&
+								statement.end.line === node.end.line + 1))),
+			);
+			if (matches.length === 1)
+				file.statementMap[id] = structuredClone(matches[0]);
 		}
 	}
 	return data;

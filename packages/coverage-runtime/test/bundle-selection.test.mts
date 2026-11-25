@@ -53,7 +53,7 @@ test.each([
 				],
 			]) {
 				const code =
-					"export function executed(flag: boolean): number { return flag ? 1 : 2; }\nexport function untouched(flag: boolean): number { return flag ? 0 : 3; } export function nearby(): number { return 4; }\n";
+					"export function executed(flag: boolean): number { return flag ? Math.abs(-1) : 2; }\nexport function untouched(flag: boolean): number { return flag ? 0 : 3; } export function nearby(): number { return 4; }\nexport const multiline = (flag: boolean): number => (\n (flag ? false : true) ? 5 : 6\n);\nexport function choices(flag: number): number {\n if (flag === 1) { return 7; }\n else if (flag === 2) { return 8; }\n return 9;\n}\n";
 				await mkdir(dirname(source), { recursive: true });
 				await writeFile(source, code);
 				const compiled = ts.transpileModule(code, {
@@ -145,20 +145,38 @@ test.each([
 				execution === "both" ? 2 : 1,
 				0,
 				0,
+				0,
+				0,
 			]);
 			expect(
 				Object.values(report[original].branchMap).map((branch) => branch.type),
-			).toStrictEqual(["cond-expr", "cond-expr"]);
+				JSON.stringify(report[original].branchMap),
+			).toStrictEqual([
+				"cond-expr",
+				"cond-expr",
+				"cond-expr",
+				"cond-expr",
+				"if",
+				"if",
+			]);
 			expect(Object.values(report[original].b)).toStrictEqual([
 				[execution === "both" ? 2 : 1, 0],
+				[0, 0],
+				[0, 0],
+				[0, 0],
+				[0, 0],
 				[0, 0],
 			]);
 			expect(
 				Object.values(report[join(root, workspace, "src/unimported.ts")].f),
-			).toStrictEqual([0, 0, 0]);
+			).toStrictEqual([0, 0, 0, 0, 0]);
 			expect(
 				Object.values(report[join(root, workspace, "src/unimported.ts")].b),
 			).toStrictEqual([
+				[0, 0],
+				[0, 0],
+				[0, 0],
+				[0, 0],
 				[0, 0],
 				[0, 0],
 			]);

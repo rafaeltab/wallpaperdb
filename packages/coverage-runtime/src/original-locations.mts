@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { relative, resolve } from "node:path";
 import { parse } from "acorn";
+import type { Range } from "istanbul-lib-coverage";
 import type candidate from "ast-v8-to-istanbul";
 import { sourceMapSchema } from "./json.mjs";
 import { repositoryRoot } from "./repository-root.mjs";
@@ -47,6 +48,18 @@ async function original(path: string, convert: typeof candidate) {
 	return (await result)[path];
 }
 
+// Arm anchors may point at an object or its property, or at `else` rather
+// than the nested `if`. Require overlap for every corresponding arm, in
+// addition to the decision's type, range and arm count. Ambiguous matches stay unchanged.
+function overlaps(left: Range, right: Range) {
+	if (!left.start.line || !right.start.line)
+		return left.start.line === right.start.line;
+	const before = (start: Range["start"], end: Range["end"]) =>
+		start.line < end.line ||
+		(start.line === end.line && start.column <= end.column);
+	return before(left.start, right.end) && before(right.start, left.end);
+}
+
 // Use the verified per-source compilation as the location vocabulary for every
 // representation of that original module, including deployed bundles. Resolve
 // syntax identities before Istanbul merges; retain all measured V8 counters.
@@ -58,13 +71,30 @@ export async function originalLocations(
 		if (!/\.m?ts$/.test(path)) continue;
 		const syntax = await original(path, convert);
 		if (!syntax) continue;
+		const lines = (await readFile(path, "utf8")).split("\n");
+		const offset = (position: Range["start"]) =>
+			lines
+				.slice(0, position.line - 1)
+				.reduce((n, line) => n + line.length + 1, 0) + position.column;
+		const ifStart = (node: Range, mapped: Range) => {
+			const start = offset(mapped.start),
+				end = offset(node.start);
+			return (
+				start === end ||
+				(start < end &&
+					/^[\s);}]*else\s*$/.test(lines.join("\n").slice(start, end)))
+			);
+		};
 		for (const [id, fn] of Object.entries(file.fnMap)) {
 			const matches = Object.values(syntax.fnMap).filter(
 				(node) =>
 					node.decl.start.line === fn.decl.start.line &&
 					node.decl.start.column === fn.decl.start.column &&
 					fn.loc.start.line >= node.decl.start.line &&
-					fn.loc.end.line <= node.loc.end.line,
+					overlaps(node.loc, fn.loc) &&
+					(fn.loc.end.line <= node.loc.end.line ||
+						(!Number.isFinite(fn.loc.end.column) &&
+							fn.loc.end.line === node.loc.end.line + 1)),
 			);
 			if (matches.length === 1) file.fnMap[id] = structuredClone(matches[0]);
 		}
@@ -72,14 +102,14 @@ export async function originalLocations(
 			const matches = Object.values(syntax.branchMap).filter(
 				(node) =>
 					node.type === branch.type &&
-					node.loc.start.line === branch.loc.start.line &&
-					node.loc.start.column === branch.loc.start.column &&
+					(node.type !== "if" || ifStart(node.loc, branch.loc)) &&
+					overlaps(node.loc, branch.loc) &&
 					node.locations.length === branch.locations.length &&
-					branch.loc.end.line <= node.loc.end.line &&
-					node.locations.every(
-						(arm, index) =>
-							arm.start.line === branch.locations[index].start.line &&
-							arm.start.column === branch.locations[index].start.column,
+					(branch.loc.end.line <= node.loc.end.line ||
+						(!Number.isFinite(branch.loc.end.column) &&
+							branch.loc.end.line === node.loc.end.line + 1)) &&
+					node.locations.every((arm, index) =>
+						overlaps(arm, branch.locations[index]),
 					),
 			);
 			if (matches.length === 1)

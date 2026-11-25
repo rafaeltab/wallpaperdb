@@ -3886,6 +3886,47 @@ it.each([
   }
 );
 
+it('reports complete implementation coverage for known unfinished work', async () => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const source = stoppedImplementationSnapshot();
+  const owner = source.jobs[0];
+  if (owner.kind !== 'job' || owner.execution.kind !== 'found') throw new Error('Missing owner');
+  const board = await liveBoard({
+    scopeId: 'implementation-coverage',
+    initial: {
+      ...source,
+      coordinationIdle: true,
+      jobs: [
+        {
+          ...owner,
+          retry: undefined,
+          execution: { ...owner.execution, status: 'running' },
+          delivery: {
+            stage: 'implementation',
+            commit: owner.intent.base,
+            ready: false,
+            landed: false,
+            active: true,
+          },
+        },
+      ],
+    },
+  });
+  try {
+    expect(board.snapshot().meta.activity).toMatchObject({
+      uncertainty: [],
+      items: [expect.objectContaining({ category: 'implementing', issue: 1 })],
+    });
+    expect(board.snapshot().meta.activity?.coverage).toContainEqual({
+      category: 'implementing',
+      state: 'complete',
+      reason: null,
+    });
+  } finally {
+    board.close();
+  }
+});
+
 it('reports routine refresh facts without selecting a summary or confusing missing coverage with inactivity', async () => {
   const input: ScheduleSnapshot = { ...initial, coordinationIdle: true };
   const board = await liveBoard({ scopeId: 'activity', initial: input });

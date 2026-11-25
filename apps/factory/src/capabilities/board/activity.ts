@@ -8,6 +8,7 @@ import { managedCIWaits } from './ci-waits.js';
 import type { ActivityCategory, FactoryActivity, Reason } from './model.js';
 import { timestamp } from './values.js';
 import { recoveryActivities } from './recovery.js';
+import { managedCoverage } from './activity-coverage.js';
 
 // Taxonomy only. Presentation order and summary selection belong to the client.
 const categories: readonly ActivityCategory[] = [
@@ -28,25 +29,6 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
   const uncertainty: string[] = [];
   if (input.coordinationIdle !== true || input.state.cycle)
     uncertainty.push('Coordination activity coverage is incomplete.');
-  const unfinished = input.state.admissions.some((admission) => {
-    const work = input.localWork.find((w) => w.intent?.issue === admission.issue);
-    if (work?.control.cancelled || work?.control.retirement) return false;
-    const job = input.jobs.find((j) => j.kind === 'job' && j.intent.issue === admission.issue);
-    return (
-      job?.kind !== 'job' ||
-      !(job.delivery?.ready || job.delivery?.landed) ||
-      job.execution.kind !== 'found' ||
-      !['completed', 'idle', 'cancelled', 'rolled_back'].includes(job.execution.status)
-    );
-  });
-  if (
-    unfinished ||
-    input.state.recovering?.length ||
-    input.state.resuming?.length ||
-    input.recoveries?.some((r) => r.phase !== 'complete') ||
-    input.restackActivities?.some((r) => r.phase !== 'complete')
-  )
-    uncertainty.push('Managed execution or wait coverage is incomplete.');
   const restacks = (input.restackActivities ?? input.recoveries ?? []).filter(
     (recovery) =>
       recovery.active !== false &&
@@ -293,6 +275,8 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
       reason: 'Reading routine T3 thread metadata',
     });
   items.push(...recoveryActivities(input, items));
+  const managed = managedCoverage(input, items);
+  uncertainty.push(...managed.uncertainty);
   const reasons: Reason[] = [];
   if (input.state.paused) reasons.push({ code: 'paused', message: 'Admissions paused' });
   if (input.state.concurrency !== -1 && capacityOccupied(input) >= input.state.concurrency)
@@ -332,6 +316,7 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     reasons.push({ code: 'planner-no-eligible', message: 'No eligible issues found by planner' });
   else if (!assessed) reasons.push({ code: 'eligibility-unknown', message: 'Eligibility unknown' });
   const covered = (category: ActivityCategory) =>
+    (managed.categories.includes(category) && managed.complete) ||
     (category === 'recovering' && input.reconciliation !== undefined) ||
     category === 'refreshing-github' ||
     category === 'refreshing-t3' ||
@@ -350,11 +335,15 @@ export function activityFacts(input: ScheduleSnapshot, at: string): FactoryActiv
     uncertainty,
     admissionReasons: reasons,
     coverage: categories.map((category) => {
-      const complete = covered(category);
+      const complete = managed.categories.includes(category) ? managed.complete : covered(category);
       return {
         category,
         state: complete ? 'complete' : 'unknown',
-        reason: complete ? null : 'Lifecycle not yet instrumented.',
+        reason: complete
+          ? null
+          : managed.categories.includes(category)
+            ? 'Managed lifecycle observations are missing or incomplete.'
+            : 'Lifecycle not yet instrumented.',
       };
     }),
   };

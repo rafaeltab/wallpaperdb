@@ -364,10 +364,42 @@ it('provides keyboard and hover details, live switching and approved D layout at
     await browserExpect(trigger).toContainText('Waiting for CI 1 issue');
     served = {
       ...idle,
-      meta: { ...idle.meta, activity: { ...activity, uncertainty: ['Execution unknown'] } },
+      meta: {
+        ...idle.meta,
+        activity: {
+          ...activity,
+          uncertainty: [
+            'Managed execution outcome requires reconciliation or manual intervention.',
+          ],
+        },
+      },
     };
     await browserExpect(trigger).toContainText('Status unknown', { timeout: 5000 });
+    await trigger.hover();
+    await browserExpect(panel).toContainText(
+      'Managed execution outcome requires reconciliation or manual intervention.'
+    );
+    await browserExpect(panel).not.toContainText('Activity coverage incomplete.');
     await page.screenshot({ path: join(evidence, 'activity-unknown.png') });
+    served = {
+      ...served,
+      meta: {
+        ...served.meta,
+        activity: {
+          ...activity,
+          coverage: [
+            {
+              category: 'implementing',
+              state: 'unknown',
+              reason: 'Missing managed lifecycle observations',
+            },
+          ],
+          uncertainty: ['Managed execution or wait coverage is incomplete.'],
+        },
+      },
+    };
+    await browserExpect(panel).toContainText('Activity coverage incomplete.', { timeout: 5000 });
+    await page.screenshot({ path: join(evidence, 'activity-coverage-incomplete.png') });
     offline = true;
     await browserExpect(trigger).toContainText('Disconnected', { timeout: 15000 });
     await trigger.hover();

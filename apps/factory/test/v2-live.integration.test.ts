@@ -3927,6 +3927,160 @@ it('reports complete implementation coverage for known unfinished work', async (
   }
 });
 
+it.each(['found', 'unverified'] as const)(
+  'keeps completed manual recovery observable without claiming incomplete instrumentation: %s',
+  async (kind) => {
+    const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+    const source = stoppedImplementationSnapshot();
+    const owner = source.jobs[0];
+    if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+      throw new Error('Missing owner');
+    const board = await liveBoard({
+      scopeId: `manual-coverage-${kind}`,
+      initial: {
+        ...source,
+        coordinationIdle: true,
+        planningActivity: {},
+        planningDiscovery: { current: [], outcome: 'unknown' },
+        planningVerification: null,
+        jobs: [
+          {
+            ...owner,
+            execution: { ...owner.execution, kind },
+            delivery: { ...owner.delivery, stage: 'review' },
+          },
+        ],
+      },
+    });
+    const app = operationsServer({ base: 'a'.repeat(40), run: Effect.runPromise, job, v2: board });
+    try {
+      const activity = (await app.inject('/api/v2/board')).json<FactoryV2Snapshot>().meta.activity;
+      expect(activity?.items).toEqual([]);
+      expect(activity?.uncertainty).toEqual([
+        'Managed execution outcome requires reconciliation or manual intervention.',
+      ]);
+      expect(activity?.coverage.every((entry) => entry.state === 'complete')).toBe(true);
+    } finally {
+      await app.close();
+      board.close();
+    }
+  }
+);
+
+it.each(['answer', 'ci', 'restack', 'queued-restack', 'resume'] as const)(
+  'keeps known managed %s lifecycles covered',
+  async (scenario) => {
+    const { parkedSnapshot, pullObservation } = await import('./fixtures/v2.js');
+    const input = parkedSnapshot(pullObservation(2), true);
+    const owner = input.jobs[0];
+    if (owner.kind !== 'job' || owner.execution.kind !== 'found' || !owner.delivery)
+      throw new Error('Missing owner');
+    let current: ScheduleSnapshot = { ...input, coordinationIdle: true };
+    if (scenario === 'ci') {
+      current.localWork = [];
+      current = {
+        ...current,
+        jobs: [
+          {
+            ...owner,
+            execution: { ...owner.execution, status: 'completed' },
+            delivery: {
+              ...owner.delivery,
+              question: undefined,
+              stage: 'ci',
+              activity: 'waiting-for-ci',
+              commit: 'a'.repeat(40),
+            },
+          },
+        ],
+      };
+    } else if (scenario === 'restack' || scenario === 'queued-restack') {
+      current = { ...current, state: { ...current.state, admissions: [], recovering: [1] } };
+      current = { ...current, jobs: [] };
+      current.localWork = [];
+      current.restackActivities = [
+        {
+          issue: 1,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/2',
+          progress: 'Known restack',
+          phase: scenario === 'restack' ? 'resolving' : 'waiting-capacity',
+          active: scenario === 'restack',
+        },
+      ];
+    } else if (scenario === 'resume') {
+      current = { ...current, state: { ...current.state, resuming: [{ issue: 1, index: 0 }] } };
+      current.reconciliation = [
+        { id: 'resume:1', issue: 1, stage: 'implementation', startedAt: 1000 },
+      ];
+    }
+    const board = await liveBoard({ scopeId: `known-${scenario}-coverage`, initial: current });
+    try {
+      expect(board.snapshot().meta.activity?.uncertainty).toEqual([]);
+      expect(board.snapshot().meta.activity?.coverage).toContainEqual({
+        category: 'implementing',
+        state: 'complete',
+        reason: null,
+      });
+    } finally {
+      board.close();
+    }
+  }
+);
+
+it.each([
+  'absent',
+  'ambiguous',
+  'failed-observation',
+  'missing-delivery',
+  'unknown-status',
+] as const)('retains incomplete coverage for missing lifecycle evidence: %s', async (scenario) => {
+  const { stoppedImplementationSnapshot } = await import('./fixtures/v2.js');
+  const input = stoppedImplementationSnapshot();
+  const owner = input.jobs[0];
+  if (owner.kind !== 'job' || owner.execution.kind !== 'found') throw new Error('Missing owner');
+  let current: ScheduleSnapshot = { ...input, coordinationIdle: true };
+  if (scenario === 'failed-observation')
+    current.observations = {
+      ...current.observations,
+      items: {
+        [`job:${owner.intent.id}`]: {
+          generation: 1,
+          sequence: 1,
+          attemptedAt: 3000,
+          observedAt: 2000,
+          failedAt: 3000,
+        },
+      },
+    };
+  else
+    current = {
+      ...current,
+      jobs: [
+        {
+          ...owner,
+          delivery: scenario === 'missing-delivery' ? undefined : owner.delivery,
+          execution:
+            scenario === 'absent' || scenario === 'ambiguous'
+              ? { kind: scenario }
+              : { ...owner.execution, status: 'unknown' },
+        },
+      ],
+    };
+  const board = await liveBoard({ scopeId: `unknown-${scenario}-coverage`, initial: current });
+  try {
+    expect(board.snapshot().meta.activity?.uncertainty).toContain(
+      'Managed execution or wait coverage is incomplete.'
+    );
+    expect(board.snapshot().meta.activity?.coverage).toContainEqual({
+      category: 'implementing',
+      state: 'unknown',
+      reason: 'Managed lifecycle observations are missing or incomplete.',
+    });
+  } finally {
+    board.close();
+  }
+});
+
 it('reports routine refresh facts without selecting a summary or confusing missing coverage with inactivity', async () => {
   const input: ScheduleSnapshot = { ...initial, coordinationIdle: true };
   const board = await liveBoard({ scopeId: 'activity', initial: input });

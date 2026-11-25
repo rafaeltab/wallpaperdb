@@ -23,6 +23,34 @@ const facts: ActivityFacts = {
     },
   ],
 };
+it('distinguishes unresolved outcomes from missing activity coverage in details', () => {
+  const uncertain = {
+    ...facts,
+    items: [],
+    uncertainty: ['Managed execution outcome requires reconciliation or manual intervention.'],
+  };
+  const refresh = { failures: 0, lastSuccess: Date.parse(facts.observedAt) };
+  const { rerender } = render(<FactoryActivity facts={uncertain} paused refresh={refresh} />);
+  fireEvent.focus(screen.getByRole('button', { name: /Status unknown/ }));
+  expect(screen.getByText(uncertain.uncertainty[0])).toBeTruthy();
+  expect(screen.queryByText(/Activity coverage incomplete/)).toBeNull();
+  rerender(
+    <FactoryActivity
+      facts={{
+        ...uncertain,
+        coverage: [
+          { category: 'implementing', state: 'unknown', reason: 'Missing lifecycle observation' },
+        ],
+      }}
+      paused
+      refresh={refresh}
+    />
+  );
+  expect(screen.getByText(/Activity coverage incomplete/)).toBeTruthy();
+  rerender(<FactoryActivity facts={{ ...facts, items: [] }} paused refresh={refresh} />);
+  expect(screen.getByRole('button', { name: /Idle/ })).toBeTruthy();
+});
+
 it('shows prerequisite verification ahead of GitHub refresh with its own local timer and purpose', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-11-17T12:01:00Z'));

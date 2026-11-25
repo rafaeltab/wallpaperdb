@@ -27,7 +27,7 @@ export function managedCoverage(input: ScheduleSnapshot, items: FactoryActivity[
     if (
       (observation?.failedAt !== undefined &&
         observation.failedAt >= (observation.observedAt ?? 0)) ||
-      job.execution.kind !== 'found' ||
+      (job.execution.kind !== 'found' && job.execution.kind !== 'unverified') ||
       !job.delivery
     ) {
       complete = false;
@@ -57,7 +57,14 @@ export function managedCoverage(input: ScheduleSnapshot, items: FactoryActivity[
     ...(input.state.resuming ?? []).map((claim) => claim.issue),
   ];
   for (const issue of claims) {
-    if (!input.reconciliation?.some((owner) => owner.issue === issue)) complete = false;
+    const recovery = (input.restackActivities ?? input.recoveries ?? []).find(
+      (owner) => owner.issue === issue
+    );
+    if (
+      !input.reconciliation?.some((owner) => owner.issue === issue) &&
+      !(recovery?.phase && recovery.bindingAvailable !== false)
+    )
+      complete = false;
   }
   const uncertainty: string[] = [];
   if (!complete) uncertainty.push('Managed execution or wait coverage is incomplete.');

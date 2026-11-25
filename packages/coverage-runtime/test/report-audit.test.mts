@@ -26,6 +26,7 @@ baseTest.each([
 		site: "apps/factory/src/adapters/github/joins.ts:1189:4",
 		branch: "if (proposed) await publish(dir, planName, proposed);",
 		following: "await read(dir, planName)",
+		finalReturn: undefined,
 	},
 	{
 		name: "planner",
@@ -34,10 +35,11 @@ baseTest.each([
 		branch: /^if \(!detail\.thread\.settled\) \{/,
 		following:
 			"record.retired === true || consume || !successful || completedAt === undefined",
+		finalReturn: [299, 4, 299, 18],
 	},
 ])(
 	"$name audit policy remains bound to the actual application source",
-	({ path, site, branch, following }) => {
+	({ path, site, branch, following, finalReturn }) => {
 		const source = readFileSync(resolve(repositoryRoot(), path), "utf8");
 		const policy = estimates[site];
 		const text = (span: number[]) => {
@@ -50,11 +52,12 @@ baseTest.each([
 		if (typeof branch === "string") expect(text(policy.branch)).toBe(branch);
 		else expect(text(policy.branch)).toMatch(branch);
 		expect(text(policy.following)).toBe(following);
-		if (policy.finalReturn) {
+		expect(policy.finalReturn).toStrictEqual(finalReturn);
+		if (finalReturn) {
 			expect(text(policy.body).replace(/\s+/g, " ")).toBe(
 				"await mcpCall( config, 't3_thread_organize', { action: 'settle', threadId: detail.thread.threadId }, signal );",
 			);
-			expect(text(policy.finalReturn)).toBe("return result;");
+			expect(text(finalReturn)).toBe("return result;");
 		}
 	},
 );

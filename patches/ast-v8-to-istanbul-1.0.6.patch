@@ -45,7 +45,7 @@ diff --git a/dist/await-entries.js b/dist/await-entries.js
 new file mode 100644
 --- /dev/null
 +++ b/dist/await-entries.js
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,237 @@
 +// Interpret the split continuation region emitted for two awaited conditional
 +// arms. Only correct entries owned by that exact recorded region. New control
 +// flow or another range ends propagation; compact layouts retain stock counts.
@@ -176,7 +176,7 @@ new file mode 100644
 +				const first = count(init.consequent.end + wrapper);
 +				if (!first) continue;
 +				const boundary = previous.end + wrapper;
-+				let uncertainAssignment = false;
++				let uncertainAssignment = false, uncertainBinding = false;
 +				for (let j = i + 1; j < node.body.length; j++) {
 +					const next = node.body[j];
 +					if (next.type === "IfStatement") {
@@ -186,7 +186,19 @@ new file mode 100644
 +								wrapper +
 +								(next.consequent.type === "BlockStatement" ? 1 : 0),
 +						);
-+						// A binding or member write can throw. Only repair the original malformed
++						if (uncertainBinding) {
++							// Failed bindings are included in the continuation prefix. Use
++							// only body evidence, never those unproven guard evaluations.
++							const yes = bodyEntry(next.consequent),
++								no = next.alternate && bodyEntry(next.alternate);
++							if (yes !== undefined && typeof no === "number" && yes + no > 0)
++								setEntry(next, yes + no);
++							else if (!next.alternate && range?.startOffset === boundary &&
++								bodyCount > range.count && !entries.has(next))
++								setEntry(next, bodyCount);
++							break;
++						}
++						// A member write can throw. Across one, only repair the original malformed
 +						// implicit-false family, never replace a stock-valid entry by inference.
 +						if (
 +							uncertainAssignment &&
@@ -225,7 +237,7 @@ new file mode 100644
 +											(property.value.type === "AssignmentPattern" &&
 +												property.value.left.type === "Identifier" &&
 +												property.value.right.type === "Literal"))));
-+							if (!safe) uncertainAssignment = true;
++							if (!safe) uncertainBinding = true;
 +						}
 +						const inert = next.declarations.every(
 +							(d) =>

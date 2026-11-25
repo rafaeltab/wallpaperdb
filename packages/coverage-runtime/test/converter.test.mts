@@ -11,7 +11,10 @@ const candidate = pathToFileURL(require.resolve("ast-v8-to-istanbul")).href;
 const acorn = pathToFileURL(require.resolve("acorn")).href;
 async function measuredSource(
 	code: string,
-	calls: readonly boolean[],
+	calls: readonly (
+		| boolean
+		| { flag: boolean; source: Record<string, never> | null; rejects: boolean }
+	)[],
 	outcome: { rejects: boolean; reached: boolean } | undefined = undefined,
 ) {
 	const directory = await mkdtemp(join(tmpdir(), "converter-"));
@@ -36,9 +39,11 @@ try {
  await session.post('Profiler.enable');
  await session.post('Profiler.startPreciseCoverage',{callCount:true,detailed:true});
  const module=await import(url);
- for(const flag of ${JSON.stringify(calls)}) {
-  if (${outcome?.rejects || false}) await assert.rejects(module.example(flag), Error);
-  else await module.example(flag);
+ for(const call of ${JSON.stringify(calls)}) {
+  const args = typeof call === 'boolean' ? [call] : [call.flag,call.source];
+  const rejects = typeof call === 'boolean' ? ${outcome?.rejects || false} : call.rejects;
+  if (rejects) await assert.rejects(module.example(...args), Error);
+  else await module.example(...args);
  }
  ${outcome ? `assert.equal(module.reached, ${outcome.reached});` : ""}
  const raw=await session.post('Profiler.takePreciseCoverage');
@@ -139,3 +144,46 @@ export async function example(flag) {
 		if (!statement) throw new Error("Missing measured if statement");
 		expect(file.s[statement[0]]).toBe(throws ? 0 : 1);
 	});
+
+for (const declaration of [
+	"const [item] = 'x';",
+	"const object = {}; const {item = true} = object;",
+])
+	test(`explicit else retains measured guard execution after ${declaration}`, async () => {
+		const code = `export async function example(flag) {
+ const value = flag ? await Promise.resolve(true) : await Promise.resolve(false);
+ ${declaration}
+ if (item) { await Promise.resolve(); } else { await Promise.resolve(); }
+}`;
+		const file = await measuredSource(code, [true]);
+		const branch = Object.keys(file.branchMap).find(
+			(id) => file.branchMap[id].type === "if",
+		);
+		const statement = Object.entries(file.statementMap).find(
+			([, loc]) => loc.start.line === 4 && loc.start.column === 1,
+		);
+		if (!branch || !statement) throw new Error("Missing if measurement");
+		expect(file.b[branch]).toStrictEqual([1, 0]);
+		expect(file.s[statement[0]]).toBe(1);
+	});
+
+test("mixed completed and throwing bindings preserve an uncovered false arm", async () => {
+	const code = `export async function example(flag, source) {
+ const value = flag ? await Promise.resolve(true) : await Promise.resolve(false);
+ const {item = true} = source;
+ if (item) { await Promise.resolve(); }
+}`;
+	const file = await measuredSource(code, [
+		{ flag: true, source: {}, rejects: false },
+		{ flag: true, source: null, rejects: true },
+	]);
+	const branch = Object.keys(file.branchMap).find(
+		(id) => file.branchMap[id].type === "if",
+	);
+	const statement = Object.entries(file.statementMap).find(
+		([, loc]) => loc.start.line === 4 && loc.start.column === 1,
+	);
+	if (!branch || !statement) throw new Error("Missing if measurement");
+	expect(file.b[branch]).toStrictEqual([1, 0]);
+	expect(file.s[statement[0]]).toBe(1);
+});

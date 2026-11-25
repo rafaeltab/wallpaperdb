@@ -78,34 +78,38 @@ for (const [name, calls, condition, expected] of [
 		expect(Object.values(file.f)).toStrictEqual([calls.length, 0]);
 	});
 
-for (const [name, declaration, throws] of [
-	["array destructuring", "const [item] = null;", true],
-	["object destructuring", "const {item} = null;", true],
+for (const [name, declaration, condition, throws, expected] of [
+	["array destructuring", "const [item] = null;", "value", true, [0, 0]],
+	["object destructuring", "const {item} = null;", "value", true, [0, 0]],
 	[
 		"binding default",
 		"const {item = (() => { throw new Error('binding'); })()} = {};",
+		"value",
 		true,
+		[0, 0],
 	],
-	["ordinary declaration", "const item = value;", false],
+	["ordinary declaration", "const item = value;", "value", false, [1, 0]],
+	["valid object binding", "const {item} = {};", "item", false, [0, 1]],
+	["valid binding default", "const {item = true} = {};", "item", false, [1, 0]],
 ] as const)
 	test(`awaited continuation preserves ${name} reachability`, async () => {
 		const code = `export let reached = false;
 export async function example(flag) {
  const value = flag ? await Promise.resolve(true) : await Promise.resolve(false);
  ${declaration}
- if (value) { reached = true; await Promise.resolve(); }
+ if (${condition}) { reached = true; await Promise.resolve(); }
 }
 `;
 		const file = await measuredSource(code, [true], {
 			rejects: throws,
-			reached: !throws,
+			reached: expected[0] > 0,
 		});
 
 		const id = Object.keys(file.branchMap).find(
 			(id) => file.branchMap[id].type === "if",
 		);
 		if (!id) throw new Error("Missing measured branch");
-		expect(file.b[id]).toStrictEqual(throws ? [0, 0] : [1, 0]);
+		expect(file.b[id]).toStrictEqual(expected);
 		const statement = Object.entries(file.statementMap).find(
 			([, loc]) => loc.start.line === 5 && loc.start.column === 1,
 		);

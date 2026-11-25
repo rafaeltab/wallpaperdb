@@ -211,9 +211,13 @@ it('gives automatic work a turn when recurring metadata wins cycle readiness', a
   }
 });
 
-it.each([false, true])(
-  'plans after retained CI observation with metadata demand %s',
-  async (refreshMetadata) => {
+it.each([
+  { refreshMetadata: false, remaining: 1000 },
+  { refreshMetadata: true, remaining: 5000 },
+  { refreshMetadata: true, remaining: 1000 },
+])(
+  'plans after retained CI observation with metadata demand $refreshMetadata and remaining quota $remaining',
+  async ({ refreshMetadata, remaining }) => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     vi.setSystemTime(Date.UTC(2026, 10, 7, 12));
     const host = await protocol({ origin: true });
@@ -280,7 +284,7 @@ it.each([false, true])(
       await host.save({
         githubRate: {
           limit: refreshMetadata ? 5000 : 1000,
-          remaining: refreshMetadata ? 5000 : 1000,
+          remaining,
           reset: Date.now() / 1000 + 3600,
         },
         planning: {
@@ -335,6 +339,8 @@ it.each([false, true])(
         await vi.advanceTimersByTimeAsync(120_000);
         await vi.waitFor(
           async () => {
+            // Drive quota deadlines and board publication while real child I/O settles.
+            await vi.advanceTimersByTimeAsync(1000);
             const refreshed = (
               await running!.app.inject('/api/v2/board')
             ).json<FactoryV2Snapshot>();

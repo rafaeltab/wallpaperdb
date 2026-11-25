@@ -13,6 +13,17 @@ const categories: readonly ActivityCategory[] = [
 
 /** Coverage describes observed lifecycles, independently of delivery acceptance. */
 export function managedCoverage(input: ScheduleSnapshot, items: FactoryActivity['items']) {
+  // Live restack facts supersede cached facts for that owner, but the cache also
+  // contains independent publication and boundary recoveries absent from restacks.
+  const recoveries = [
+    ...(input.restackActivities ?? []),
+    ...(input.recoveries ?? []).filter(
+      (recovery) =>
+        !input.restackActivities?.some(
+          (live) => live.issue === recovery.issue && live.pr === recovery.pr
+        )
+    ),
+  ];
   let complete = true;
   let unresolved = false;
   for (const admission of input.state.admissions) {
@@ -45,7 +56,7 @@ export function managedCoverage(input: ScheduleSnapshot, items: FactoryActivity[
       complete = false;
     }
   }
-  for (const recovery of input.restackActivities ?? input.recoveries ?? []) {
+  for (const recovery of recoveries) {
     if (recovery.phase === 'complete') continue;
     if (recovery.phase === undefined || recovery.bindingAvailable === false) complete = false;
     else if (recovery.phase === 'manual-recovery') unresolved = true;
@@ -57,9 +68,7 @@ export function managedCoverage(input: ScheduleSnapshot, items: FactoryActivity[
     ...(input.state.resuming ?? []).map((claim) => claim.issue),
   ];
   for (const issue of claims) {
-    const recovery = (input.restackActivities ?? input.recoveries ?? []).find(
-      (owner) => owner.issue === issue
-    );
+    const recovery = recoveries.find((owner) => owner.issue === issue);
     if (
       !input.reconciliation?.some((owner) => owner.issue === issue) &&
       !(recovery?.phase && recovery.bindingAvailable !== false)

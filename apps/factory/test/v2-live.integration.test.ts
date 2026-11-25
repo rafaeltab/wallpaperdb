@@ -6218,6 +6218,56 @@ it('classifies known delivery reconciliation and restack responsibility without 
   expect(board.snapshot().meta.activity?.items).toHaveLength(2);
 });
 
+it.each(['manual-recovery', undefined] as const)(
+  'retains recovery-only uncertainty alongside an empty live restack list: %s',
+  async (phase) => {
+    const input: ScheduleSnapshot = {
+      ...initial,
+      coordinationIdle: true,
+      planningActivity: {},
+      planningDiscovery: { current: [], outcome: 'unknown' },
+      planningVerification: null,
+      restackActivities: [],
+      recoveries: [
+        {
+          issue: 99,
+          pr: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+          phase,
+          active: false,
+          progress: 'Publication boundary requires manual recovery',
+        },
+      ],
+    };
+    const board = await liveBoard({ scopeId: `recovery-only-${phase}`, initial: input });
+    try {
+      expect(board.snapshot().meta.activity?.items).toEqual([]);
+      const expected =
+        phase === 'manual-recovery'
+          ? 'Managed execution outcome requires reconciliation or manual intervention.'
+          : 'Managed execution or wait coverage is incomplete.';
+      expect(board.snapshot().meta.activity?.uncertainty).toEqual([expected]);
+      await board.publish({ ...input, state: { ...input.state, recovering: [99] } });
+      expect(board.snapshot().meta.activity?.uncertainty).toEqual([expected]);
+      await board.publish({
+        ...input,
+        restackActivities: [
+          {
+            issue: 99,
+            pr: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+            phase: 'complete',
+            active: false,
+            progress: 'Verified complete',
+          },
+        ],
+      });
+      expect(board.snapshot().meta.activity?.uncertainty).toEqual([]);
+      expect(board.snapshot().meta.activity?.items).toEqual([]);
+    } finally {
+      board.close();
+    }
+  }
+);
+
 it('keeps live restack retirement authoritative while launch reconciliation is active', async () => {
   const recovery = {
     issue: 2,

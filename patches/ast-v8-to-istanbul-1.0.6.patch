@@ -45,7 +45,7 @@ diff --git a/dist/await-entries.js b/dist/await-entries.js
 new file mode 100644
 --- /dev/null
 +++ b/dist/await-entries.js
-@@ -0,0 +1,209 @@
+@@ -0,0 +1,211 @@
 +// Interpret the split continuation region emitted for two awaited conditional
 +// arms. Only correct entries owned by that exact recorded region. New control
 +// flow or another range ends propagation; compact layouts retain stock counts.
@@ -213,6 +213,8 @@ new file mode 100644
 +					if (next.type === "VariableDeclaration") {
 +						const inert = next.declarations.every(
 +							(d) =>
++								// Binding patterns can throw even with a literal initializer.
++								d.id.type === "Identifier" && (
 +								!d.init ||
 +								[
 +									"Identifier",
@@ -221,7 +223,7 @@ new file mode 100644
 +									"FunctionExpression",
 +								].includes(d.init.type) ||
 +								(d.init.type === "ObjectExpression" &&
-+									d.init.properties.length === 0),
++									d.init.properties.length === 0)),
 +						);
 +						if (inert) continue;
 +						break;

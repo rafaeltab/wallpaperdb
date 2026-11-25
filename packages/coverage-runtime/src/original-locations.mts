@@ -1,13 +1,10 @@
 import { readFile } from "node:fs/promises";
-import { stripTypeScriptTypes } from "node:module";
 import { pathToFileURL } from "node:url";
+import { relative, resolve } from "node:path";
 import { parse } from "acorn";
-import {
-	encodedMap,
-	TraceMap,
-	type SourceMapSegment,
-} from "@jridgewell/trace-mapping";
 import type candidate from "ast-v8-to-istanbul";
+import { sourceMapSchema } from "./json.mjs";
+import { repositoryRoot } from "./repository-root.mjs";
 
 type MapData = Awaited<ReturnType<typeof candidate>>;
 const sources = new Map<string, Promise<MapData>>();
@@ -16,27 +13,33 @@ async function original(path: string, convert: typeof candidate) {
 	let result = sources.get(path);
 	if (!result) {
 		result = (async () => {
-			const code = stripTypeScriptTypes(await readFile(path, "utf8"));
+			const module = resolve(
+				repositoryRoot(),
+				".coverage-runtime/build",
+				relative(repositoryRoot(), path),
+			)
+				.replace(/\.mts$/, ".mjs")
+				.replace(/\.ts$/, ".js");
+			let code: string;
+			try {
+				code = await readFile(module, "utf8");
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					"code" in error &&
+					error.code === "ENOENT"
+				)
+					return {};
+				throw error;
+			}
+			const sourceMap = sourceMapSchema.parse(
+				JSON.parse(await readFile(`${module}.map`, "utf8")),
+			);
 			return convert({
 				code,
-				sourceMap: encodedMap(
-					new TraceMap({
-						version: 3,
-						sources: [path],
-						sourcesContent: [code],
-						names: [],
-						mappings: code
-							.split("\n")
-							.map((line, row) =>
-								Array.from(
-									{ length: line.length + 1 },
-									(_, column): SourceMapSegment => [column, 0, row, column],
-								),
-							),
-					}),
-				),
+				sourceMap,
 				ast: parse(code, { ecmaVersion: "latest", sourceType: "module" }),
-				coverage: { url: pathToFileURL(path).href, functions: [] },
+				coverage: { url: pathToFileURL(module).href, functions: [] },
 			});
 		})();
 		sources.set(path, result);
@@ -44,9 +47,9 @@ async function original(path: string, convert: typeof candidate) {
 	return (await result)[path];
 }
 
-// Compiler maps can anchor a body to its erased return type and omit exclusive
-// end columns. Resolve those ranges against the original syntax before Istanbul
-// merges representations. Counts always remain the generated V8 measurements.
+// Use the verified per-source compilation as the location vocabulary for every
+// representation of that original module, including deployed bundles. Resolve
+// syntax identities before Istanbul merges; retain all measured V8 counters.
 export async function originalLocations(
 	data: MapData,
 	convert: typeof candidate,

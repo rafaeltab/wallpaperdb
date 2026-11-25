@@ -56,7 +56,7 @@ function overlaps(left: Range, right: Range) {
 		return left.start.line === right.start.line;
 	const before = (start: Range["start"], end: Range["end"]) =>
 		start.line < end.line ||
-		(start.line === end.line && start.column <= end.column);
+		(start.line === end.line && start.column < end.column);
 	return before(left.start, right.end) && before(right.start, left.end);
 }
 

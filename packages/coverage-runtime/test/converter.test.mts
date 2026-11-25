@@ -91,6 +91,29 @@ for (const [name, declaration, condition, throws, expected] of [
 	["ordinary declaration", "const item = value;", "value", false, [1, 0]],
 	["valid object binding", "const {item} = {};", "item", false, [0, 1]],
 	["valid binding default", "const {item = true} = {};", "item", false, [1, 0]],
+	[
+		"valid alias binding",
+		"const object = {}; const {item = true} = object;",
+		"item",
+		false,
+		[1, 0],
+	],
+	["valid string binding", "const [item] = 'x';", "item", false, [1, 0]],
+	["valid rest binding", "const {...item} = {};", "item", false, [1, 0]],
+	[
+		"valid computed literal binding",
+		"const {['item']: item = true} = {};",
+		"item",
+		false,
+		[1, 0],
+	],
+	[
+		"throwing computed binding",
+		"const {[(() => { throw new Error('key'); })()]: item} = {};",
+		"value",
+		true,
+		[0, 0],
+	],
 ] as const)
 	test(`awaited continuation preserves ${name} reachability`, async () => {
 		const code = `export let reached = false;

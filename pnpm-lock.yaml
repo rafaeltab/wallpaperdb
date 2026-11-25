@@ -18,7 +18,7 @@ patchedDependencies:
     hash: 4896a2a729885b18f420685025dd580c8d0e6e5a6d63d862eb878f947e43ac7b
     path: patches/vitest-coverage-v8-5.0.2.patch
   ast-v8-to-istanbul@1.0.6:
-    hash: efa21037080d1675c2ddde817ae7768be8cedde0e4646fee109a0433d992f10c
+    hash: d5d27aea89cd8916a492ab9633ede59c9e453b30213bb4b393995294a80c9dca
     path: patches/ast-v8-to-istanbul-1.0.6.patch
   nats@2.29.3:
     hash: 6cd944b2572f0b3f276cace32d697ab22d9f274f32bd1dd20b6794ed3b9d3cc3
@@ -1641,7 +1641,7 @@ importers:
         version: 8.15.0
       ast-v8-to-istanbul:
         specifier: 1.0.6
-        version: 1.0.6(patch_hash=efa21037080d1675c2ddde817ae7768be8cedde0e4646fee109a0433d992f10c)
+        version: 1.0.6(patch_hash=d5d27aea89cd8916a492ab9633ede59c9e453b30213bb4b393995294a80c9dca)
       istanbul-lib-coverage:
         specifier: 3.2.2
         version: 3.2.2
@@ -2018,7 +2018,7 @@ importers:
         version: link:../packages/crap-typescript-core
       ast-v8-to-istanbul:
         specifier: 1.0.6
-        version: 1.0.6(patch_hash=efa21037080d1675c2ddde817ae7768be8cedde0e4646fee109a0433d992f10c)
+        version: 1.0.6(patch_hash=d5d27aea89cd8916a492ab9633ede59c9e453b30213bb4b393995294a80c9dca)
       istanbul-lib-coverage:
         specifier: 3.2.2
         version: 3.2.2
@@ -16693,7 +16693,7 @@ snapshots:
       '@bcoe/v8-coverage': 1.0.2
       '@vitest/istanbul-lib-coverage': 1.0.1
       '@vitest/istanbul-lib-report': 1.0.1
-      ast-v8-to-istanbul: 1.0.6(patch_hash=efa21037080d1675c2ddde817ae7768be8cedde0e4646fee109a0433d992f10c)
+      ast-v8-to-istanbul: 1.0.6(patch_hash=d5d27aea89cd8916a492ab9633ede59c9e453b30213bb4b393995294a80c9dca)
       magicast: 0.5.5
       obug: 2.2.1
       std-env: 4.2.0
@@ -16920,7 +16920,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  ast-v8-to-istanbul@1.0.6(patch_hash=efa21037080d1675c2ddde817ae7768be8cedde0e4646fee109a0433d992f10c):
+  ast-v8-to-istanbul@1.0.6(patch_hash=d5d27aea89cd8916a492ab9633ede59c9e453b30213bb4b393995294a80c9dca):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       estree-walker: 3.0.3

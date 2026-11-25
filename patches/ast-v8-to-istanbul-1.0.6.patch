@@ -45,7 +45,7 @@ diff --git a/dist/await-entries.js b/dist/await-entries.js
 new file mode 100644
 --- /dev/null
 +++ b/dist/await-entries.js
-@@ -0,0 +1,222 @@
+@@ -0,0 +1,225 @@
 +// Interpret the split continuation region emitted for two awaited conditional
 +// arms. Only correct entries owned by that exact recorded region. New control
 +// flow or another range ends propagation; compact layouts retain stock counts.
@@ -186,7 +186,7 @@ new file mode 100644
 +								wrapper +
 +								(next.consequent.type === "BlockStatement" ? 1 : 0),
 +						);
-+						// A member write can throw. Across one, only repair the original malformed
++						// A binding or member write can throw. Only repair the original malformed
 +						// implicit-false family, never replace a stock-valid entry by inference.
 +						if (
 +							uncertainAssignment &&
@@ -211,21 +211,24 @@ new file mode 100644
 +					)
 +						continue;
 +					if (next.type === "VariableDeclaration") {
++						for (const d of next.declarations) {
++							if (d.id.type === "Identifier") continue;
++							// Empty-object property reads with literal defaults do not
++							// evaluate user code. Other bindings can throw like member writes.
++							const safe = d.init?.type === "ObjectExpression" &&
++								d.init.properties.length === 0 && d.id.type === "ObjectPattern" &&
++								d.id.properties.every((property) =>
++									(property.type === "RestElement" && property.argument.type === "Identifier") ||
++									(property.type === "Property" &&
++										(!property.computed || property.key.type === "Literal") &&
++										(property.value.type === "Identifier" ||
++											(property.value.type === "AssignmentPattern" &&
++												property.value.left.type === "Identifier" &&
++												property.value.right.type === "Literal"))));
++							if (!safe) uncertainAssignment = true;
++						}
 +						const inert = next.declarations.every(
 +							(d) =>
-+								// Empty object literals have no getters or iterator effects.
-+								// Other binding patterns may throw before the guard executes.
-+								(d.id.type === "Identifier" ||
-+									(d.init?.type === "ObjectExpression" &&
-+										d.init.properties.length === 0 &&
-+										d.id.type === "ObjectPattern" &&
-+										d.id.properties.every((property) =>
-+											property.type === "Property" && !property.computed &&
-+											(property.value.type === "Identifier" ||
-+												(property.value.type === "AssignmentPattern" &&
-+													property.value.left.type === "Identifier" &&
-+													property.value.right.type === "Literal")),
-+										))) && (
 +								!d.init ||
 +								[
 +									"Identifier",
@@ -234,7 +237,7 @@ new file mode 100644
 +									"FunctionExpression",
 +								].includes(d.init.type) ||
 +								(d.init.type === "ObjectExpression" &&
-+									d.init.properties.length === 0)),
++									d.init.properties.length === 0),
 +						);
 +						if (inert) continue;
 +						break;

@@ -44,7 +44,8 @@ export function activityView(facts: ActivityFacts | undefined, failures: number)
     };
   });
   const selected = groups.find((group) => group.count > 0);
-  const unknown = !facts || !!facts.uncertainty.length || groups.some((g) => g.unknown);
+  const coverageIncomplete = !facts || groups.some((g) => g.unknown);
+  const unknown = coverageIncomplete || !!facts?.uncertainty.length;
   const summary =
     failures >= 3
       ? 'Disconnected'
@@ -55,7 +56,7 @@ export function activityView(facts: ActivityFacts | undefined, failures: number)
         : unknown
           ? 'Status unknown'
           : 'Idle';
-  return { groups, selected, summary, unknown };
+  return { groups, selected, summary, unknown, coverageIncomplete };
 }
 export function activityDuration(start: string | null, now: number) {
   if (start === null) return '-s';

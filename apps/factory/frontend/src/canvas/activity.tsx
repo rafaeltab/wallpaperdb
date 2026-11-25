@@ -100,7 +100,8 @@ export function FactoryActivity({
         <section id={id} className="fa-details" aria-label="Factory activity details">
           {view.unknown && (
             <p className="fa-warning">
-              Activity coverage incomplete. {facts?.uncertainty.join(' ')}
+              {view.coverageIncomplete && 'Activity coverage incomplete. '}
+              {facts?.uncertainty.join(' ')}
             </p>
           )}
           <div className="fa-rows">

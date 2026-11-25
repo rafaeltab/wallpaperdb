@@ -23,7 +23,7 @@ baseTest.each([
 	{
 		name: "join",
 		path: "apps/factory/src/adapters/github/joins.ts",
-		site: "apps/factory/src/adapters/github/joins.ts:1189:4",
+		site: "apps/factory/src/adapters/github/joins.ts:1230:4",
 		branch: "if (proposed) await publish(dir, planName, proposed);",
 		following: "await read(dir, planName)",
 		finalReturn: undefined,

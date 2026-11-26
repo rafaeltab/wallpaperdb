@@ -106,20 +106,20 @@ test("publish-reports preserves the coverage contract", async () => {
 				"apps/factory/src/adapters/github/joins.ts",
 			),
 			decision = {
-				start: { line: 1189, column: 4 },
-				end: { line: 1189, column: 57 },
+				start: { line: 1230, column: 4 },
+				end: { line: 1230, column: 57 },
 			};
 		const raw = {
 			[factory]: {
 				path: factory,
 				statementMap: {
 					0: {
-						start: { line: 1189, column: 18 },
-						end: { line: 1189, column: 57 },
+						start: { line: 1230, column: 18 },
+						end: { line: 1230, column: 57 },
 					},
 					1: {
-						start: { line: 1190, column: 18 },
-						end: { line: 1190, column: 43 },
+						start: { line: 1231, column: 18 },
+						end: { line: 1231, column: 43 },
 					},
 				},
 				s: { 0: 2, 1: 3 },
@@ -151,7 +151,7 @@ test("publish-reports preserves the coverage contract", async () => {
 		expect(raw, "publication mutated raw evidence").toStrictEqual(before);
 		assert.match(
 			await readFile(`${directory}/estimated/lcov.info`, "utf8"),
-			/BRDA:1189,0,1,1/,
+			/BRDA:1230,0,1,1/,
 		);
 		const estimatedSummary = JSON.parse(
 			await readFile(`${directory}/estimated/coverage-summary.json`, "utf8"),

@@ -45,7 +45,7 @@ diff --git a/dist/await-entries.js b/dist/await-entries.js
 new file mode 100644
 --- /dev/null
 +++ b/dist/await-entries.js
-@@ -0,0 +1,237 @@
+@@ -0,0 +1,243 @@
 +// Interpret the split continuation region emitted for two awaited conditional
 +// arms. Only correct entries owned by that exact recorded region. New control
 +// flow or another range ends propagation; compact layouts retain stock counts.
@@ -225,6 +225,12 @@ new file mode 100644
 +					if (next.type === "VariableDeclaration") {
 +						for (const d of next.declarations) {
 +							if (d.id.type === "Identifier") continue;
++							// Simple string bindings exhaust normally, including an empty string.
++							// Defaults and nested patterns can still evaluate code or throw.
++							if (d.init?.type === "Literal" && typeof d.init.value === "string" &&
++								d.id.type === "ArrayPattern" &&
++								d.id.elements.every((element) => !element || element.type === "Identifier"))
++								continue;
 +							// Empty-object property reads with literal defaults do not
 +							// evaluate user code. Other bindings can throw like member writes.
 +							const safe = d.init?.type === "ObjectExpression" &&

@@ -104,6 +104,14 @@ for (const [name, declaration, condition, throws, expected] of [
 		[1, 0],
 	],
 	["valid string binding", "const [item] = 'x';", "item", false, [1, 0]],
+	["empty string binding", "const [item] = '';", "item", false, [0, 1]],
+	[
+		"throwing string binding default",
+		"const [item = (() => { throw new Error('binding'); })()] = '';",
+		"value",
+		true,
+		[0, 0],
+	],
 	["valid rest binding", "const {...item} = {};", "item", false, [1, 0]],
 	[
 		"valid computed literal binding",

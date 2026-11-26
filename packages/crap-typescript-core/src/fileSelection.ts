@@ -1,4 +1,4 @@
-// Modified by WallpaperDB: include maintained JavaScript sources; see ../UPSTREAM.md.
+// Modified by WallpaperDB: include maintained JavaScript and ESM TypeScript sources; see ../UPSTREAM.md.
 import { readdir, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import path from "node:path";
@@ -6,7 +6,7 @@ import path from "node:path";
 import { IGNORED_DIRECTORIES, IGNORED_SOURCE_ROOT_DISCOVERY_DIRECTORIES } from "./constants.js";
 import { normalizeSlashes, runCommand, toRelativePath } from "./utils.js";
 
-const ANALYZABLE_EXTENSIONS = [".ts", ".tsx", ".js"];
+const ANALYZABLE_EXTENSIONS = [".ts", ".tsx", ".mts", ".js"];
 const TEST_FILE_MARKERS = [".test.", ".spec."];
 const BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS = new Set(["build", "out", "target"]);
 const EXCLUDED_PATH_SEGMENTS = [
@@ -70,7 +70,7 @@ export function isAnalyzableFile(filePath: string): boolean {
   if (!hasAnySuffix(normalized, ANALYZABLE_EXTENSIONS)) {
     return false;
   }
-  if (normalized.endsWith(".d.ts")) {
+  if (normalized.endsWith(".d.ts") || normalized.endsWith(".d.mts")) {
     return false;
   }
   if (containsAny(baseName, TEST_FILE_MARKERS)) {

@@ -9,7 +9,7 @@
   "files": {
     "ignoreUnknown": true,
     "includes": [
-      "**/*.{js,mjs,cjs,ts,tsx,json,jsonc}",
+      "**/*.{js,mjs,cjs,ts,mts,tsx,json,jsonc}",
       "!!**/node_modules",
       "!!**/dist",
       "!!**/build",

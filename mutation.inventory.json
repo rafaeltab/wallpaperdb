@@ -184,6 +184,11 @@
       "reason": "Shared configuration only; invalidate all dependent suites instead of claiming a standalone score.",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
+    "packages/coverage-runtime": {
+      "decision": "excluded",
+      "reason": "Native loader controls and compiled command descendants require separately qualified mutation activation; coverage collection does not establish mutation transport.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
     "apps/factory": {
       "decision": "enabled",
       "mechanism": "native-vitest-node",

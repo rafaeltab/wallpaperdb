@@ -254,7 +254,9 @@ test("shared tooling is invoked through the scripts workspace", () => {
 			"@wallpaperdb/gateway#lint:architecture",
 		),
 	).toBeTruthy();
-	expect(output("crap")).toMatch(/wallpaperdb-crap report/);
+	expect(output("crap")).toMatch(
+		/pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts report/,
+	);
 });
 
 test("local infrastructure owns its stream setup test", () => {
@@ -372,6 +374,21 @@ test("test task graphs do not build production images", () => {
 	}
 });
 
+for (const [target, taskName] of [
+	["test", "test"],
+	["test-unit", "test:unit"],
+]) {
+	test(`${target} prepares compiled coverage controls and repository policy`, () => {
+		const task = plannedTask(target, "coverage-runtime", taskName);
+		expect(task.dependencies).toEqual(
+			expect.arrayContaining([
+				"@wallpaperdb/coverage-runtime#build",
+				"@wallpaperdb/scripts#build",
+			]),
+		);
+	});
+}
+
 test("typecheck cache inputs include test files compiled by the workspace", () => {
 	const task = plannedTask("check-types", "asset", "check-types");
 	const tsconfig = JSON.parse(readFileSync("apps/asset/tsconfig.json", "utf8"));
@@ -404,9 +421,11 @@ test("root workspace checks use the shared Turbo commands", () => {
 test("CRAP commands pass the optional workspace selector to the shared analyzer", () => {
 	for (const target of ["crap", "check-crap"]) {
 		expect(output(target, "PACKAGE=ingestor")).toMatch(
-			/PACKAGE="ingestor".*wallpaperdb-crap/,
+			/PACKAGE="ingestor".*pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts/,
 		);
-		expect(output(target)).toMatch(/PACKAGE="".*wallpaperdb-crap/);
+		expect(output(target)).toMatch(
+			/PACKAGE="".*pnpm --filter @wallpaperdb\/scripts exec tsx crap.mts/,
+		);
 	}
 });
 
@@ -494,19 +513,17 @@ test("one-off scripts require a package and script", () => {
 
 test("force applies to ordinary CI checks and type checks", () => {
 	const ci = output("ci", "FORCE=1");
-	expect(ci).toMatch(
-		/run build lint check-types test:unit test:integration .*--force/,
-	);
+	expect(ci).toMatch(/node packages\/coverage-runtime\/dist\/command.mjs/);
+	expect(ci).not.toMatch(/command.mjs --package/);
+	expect(ci).toMatch(/run build lint check-types .*--force/);
 	expect(ci).not.toMatch(/run test:e2e/);
-	expect(ci).toMatch(
-		/run build lint check-types test:unit test:integration .*--concurrency=4/,
-	);
+	expect(ci).toMatch(/run build lint check-types .*--concurrency=4/);
 	expect(output("ci", "CI_CONCURRENCY=1")).toMatch(
-		/run build lint check-types test:unit test:integration .*--concurrency=1/,
+		/run build lint check-types .*--concurrency=1/,
 	);
 	const scopedCi = output("ci", "PACKAGE=web");
 	expect(scopedCi).not.toMatch(
-		/run (build lint check-types test:unit test:integration|test:e2e)[^\n]*--filter=/,
+		/run (build lint check-types|test:e2e)[^\n]*--filter=/,
 	);
 	expect(scopedCi).not.toMatch(
 		/run build --filter=@wallpaperdb\/vitest-config/,
@@ -541,4 +558,20 @@ test("all public targets are documented, phony, and advertised", () => {
 		expect(phony.includes(name), `${name} must be phony`).toBeTruthy();
 		expect(help.stdout).toMatch(new RegExp(`^  ${name}\\s`, "m"));
 	}
+});
+
+test("normal check-crap reaches threshold validation through the Scripts-owned runner", () => {
+	const result = spawnSync(
+		"make",
+		[
+			"--no-print-directory",
+			"check-crap",
+			"PACKAGE=user",
+			"CRAP_THRESHOLD=invalid",
+		],
+		{ encoding: "utf8", env },
+	);
+	expect(result.status).not.toBe(0);
+	expect(result.stderr).toContain("Usage: make check-crap");
+	expect(result.stderr).not.toContain("tsx: not found");
 });

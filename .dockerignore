@@ -56,3 +56,6 @@ pnpm-debug.log*
 .cache
 tmp
 temp
+
+.coverage-runtime
+.coverage-experiment

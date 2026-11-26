@@ -1,0 +1,209 @@
+// Interpret the split continuation region emitted for two awaited conditional
+// arms. Only correct entries owned by that exact recorded region. New control
+// flow or another range ends propagation; compact layouts retain stock counts.
+export function prepareAwaitEntries(mapper, ast, options) {
+	const entries = new WeakMap(),
+		wrapper = options.wrapperLength || 0;
+	const raw = options.coverage.functions.flatMap((f) => f.ranges);
+	const count = (offset) =>
+		mapper.ranges.find((r) => r.start <= offset && offset <= r.end)?.count ?? 0;
+	const owner = (offset) =>
+		raw
+			.filter((r) => r.startOffset <= offset && offset < r.endOffset)
+			.sort(
+				(a, b) => a.endOffset - a.startOffset - (b.endOffset - b.startOffset),
+			)[0];
+	function suspend(init) {
+		return (
+			init?.type === "ConditionalExpression" &&
+			["AwaitExpression", "YieldExpression"].includes(init.consequent.type) &&
+			init.alternate.type === init.consequent.type
+		);
+	}
+	function pure(test, name) {
+		if (test.type === "Literal") return true;
+		if (test.type === "Identifier") return test.name === name;
+		if (
+			test.type === "LogicalExpression" ||
+			(test.type === "BinaryExpression" &&
+				["===", "!=="].includes(test.operator))
+		)
+			return pure(test.left, name) && pure(test.right, name);
+		return false;
+	}
+	function bodyEntry(body) {
+		const first = body.type === "BlockStatement" ? body.body[0] : body;
+		if (
+			first?.type !== "ExpressionStatement" ||
+			!["AwaitExpression", "YieldExpression"].includes(first.expression.type)
+		)
+			return undefined;
+		return count(
+			body.start + wrapper + (body.type === "BlockStatement" ? 1 : 0),
+		);
+	}
+	function setEntry(node, incoming) {
+		entries.set(node, incoming);
+		let operand = node.test;
+		while (operand.type === "LogicalExpression") operand = operand.left;
+		entries.set(operand, incoming);
+	}
+	let generatorDepth = 0;
+	function visit(node) {
+		if (!node || typeof node !== "object") return;
+		if (node.generator === true) generatorDepth++;
+		if (node.type === "BlockStatement" || node.type === "Program") {
+			// For the recorded suspension layouts, a side-effect-free guard
+			// partitions complete nonempty arms. Count condition evaluations
+			// from both recorded outcomes rather than a resumption prefix.
+			let preceding,
+				abrupt = false;
+			for (const current of node.body) {
+				if (generatorDepth) continue;
+				if (current.type === "VariableDeclaration")
+					for (const d of current.declarations) {
+						const call = d.init,
+							fn = call?.type === "CallExpression" ? call.callee : null;
+						if (
+							fn &&
+							["ArrowFunctionExpression", "FunctionExpression"].includes(
+								fn.type,
+							) &&
+							!fn.async &&
+							!fn.generator &&
+							fn.body.type === "BlockStatement" &&
+							fn.body.body[0]?.type === "ThrowStatement"
+						)
+							abrupt = true;
+					}
+				if (
+					current.type === "VariableDeclaration" &&
+					current.declarations.length === 1 &&
+					suspend(current.declarations[0].init) &&
+					current.declarations[0].init.consequent.type === "AwaitExpression"
+				)
+					preceding = current;
+				if (
+					!preceding ||
+					current.type !== "IfStatement" ||
+					!pure(current.test, preceding.declarations[0].id.name)
+				)
+					continue;
+				const yes = bodyEntry(current.consequent),
+					no = current.alternate && bodyEntry(current.alternate);
+				if (abrupt) setEntry(current, 0);
+				else if (yes !== undefined && typeof no === "number")
+					setEntry(current, yes + no);
+				else if (
+					yes !== undefined &&
+					current.test.type === "Literal" &&
+					current.test.value === true
+				)
+					setEntry(current, yes);
+				// One direct if per declaration evaluation gives an upper bound.
+				// If all of those evaluations enter the true body, none can be
+				// rejected/pending or take a missing false continuation.
+				else if (yes > 0 && yes === count(preceding.start + wrapper))
+					setEntry(current, yes);
+			}
+
+			for (let i = 0; i < node.body.length; i++) {
+				const previous = node.body[i];
+				if (
+					previous.type !== "VariableDeclaration" ||
+					previous.declarations.length !== 1
+				)
+					continue;
+				const init = previous.declarations[0].init;
+				if (
+					init?.type !== "ConditionalExpression" ||
+					!["AwaitExpression", "YieldExpression"].includes(
+						init.consequent.type,
+					) ||
+					init.alternate.type !== init.consequent.type
+				)
+					continue;
+				// The colon itself belongs to the alternate arm, not a distinct resumption.
+				if (!/\s/.test(options.code[init.consequent.end] ?? "")) continue;
+				const first = count(init.consequent.end + wrapper);
+				if (!first) continue;
+				const boundary = previous.end + wrapper;
+				let uncertainAssignment = false;
+				for (let j = i + 1; j < node.body.length; j++) {
+					const next = node.body[j];
+					if (next.type === "IfStatement") {
+						const range = owner(next.start + wrapper);
+						const bodyCount = count(
+							next.consequent.start +
+								wrapper +
+								(next.consequent.type === "BlockStatement" ? 1 : 0),
+						);
+						// A member write can throw. Across one, only repair the original malformed
+						// implicit-false family, never replace a stock-valid entry by inference.
+						if (
+							uncertainAssignment &&
+							(next.alternate || bodyCount <= range?.count)
+						)
+							break;
+						if (range?.startOffset === boundary && !entries.has(next)) {
+							const incoming = first + range.count;
+							entries.set(next, incoming);
+							let operand = next.test;
+							while (operand.type === "LogicalExpression")
+								operand = operand.left;
+							entries.set(operand, incoming);
+						}
+						break;
+					}
+					// Only traverse straight-line declarations and assignments, never a call,
+					// await, loop, branch, or deferred function body as part of this join.
+					if (
+						next.type === "EmptyStatement" ||
+						next.type === "FunctionDeclaration"
+					)
+						continue;
+					if (next.type === "VariableDeclaration") {
+						const inert = next.declarations.every(
+							(d) =>
+								!d.init ||
+								[
+									"Identifier",
+									"Literal",
+									"ArrowFunctionExpression",
+									"FunctionExpression",
+								].includes(d.init.type) ||
+								(d.init.type === "ObjectExpression" &&
+									d.init.properties.length === 0),
+						);
+						if (inert) continue;
+						break;
+					}
+					if (
+						next.type === "ExpressionStatement" &&
+						next.expression.type === "AssignmentExpression"
+					) {
+						if (!["Identifier", "Literal"].includes(next.expression.right.type))
+							break;
+						if (next.expression.left.type === "MemberExpression")
+							uncertainAssignment = true;
+						else if (next.expression.left.type !== "Identifier") break;
+						continue;
+					}
+					break;
+				}
+			}
+		}
+		for (const value of Object.values(node)) {
+			if (Array.isArray(value)) value.forEach(visit);
+			else if (
+				value &&
+				typeof value === "object" &&
+				typeof value.type === "string"
+			)
+				visit(value);
+		}
+		if (node.generator === true) generatorDepth--;
+	}
+	visit(ast);
+	mapper.entryCounts = entries;
+}
